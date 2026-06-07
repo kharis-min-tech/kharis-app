@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors } from '../../tokens/colors';
+import { theme as colors } from '../../tokens/colors'
 import { shadows } from '../../tokens/shadows';
 
 export interface ReadingCardProps {

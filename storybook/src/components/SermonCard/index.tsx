@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors } from '../../tokens/colors';
+import { theme as colors } from '../../tokens/colors'
 import { shadows } from '../../tokens/shadows';
 
 export interface SermonCardProps {
@@ -125,7 +125,7 @@ export const SermonCard: React.FC<SermonCardProps> = ({
             style={{
               fontSize: '12px',
               fontFamily: "'DM Sans', sans-serif",
-              color: colors.text.secondary.hex,
+              color: colors.text.body.hex,
             }}
           >
             {speaker}
@@ -205,7 +205,7 @@ export const SermonCard: React.FC<SermonCardProps> = ({
           style={{
             fontSize: '13px',
             fontFamily: "'DM Sans', sans-serif",
-            color: colors.text.secondary.hex,
+            color: colors.text.body.hex,
           }}
         >
           {speaker}

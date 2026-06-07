@@ -163,6 +163,41 @@ export const colors: ColorGroup[] = [
 
 /** Flat lookup by name */
 export const colorMap: Record<string, string> = {};
+
+/**
+ * Flat theme object for component use.
+ * Structure mirrors what old components expect:
+ *   theme.brand.orange, theme.surface.dark, etc.
+ */
+export const theme = {
+  brand: {
+    orange: { hex: '#FD7F20', rgb: 'rgb(253, 127, 32)' },
+    purple: { hex: '#6B34FA', rgb: 'rgb(107, 52, 250)' },
+    magenta: { hex: '#800654', rgb: 'rgb(128, 6, 84)' },
+    // Legacy aliases used by existing components
+    gold: { hex: '#FD7F20', rgb: 'rgb(253, 127, 32)' },
+  },
+  surface: {
+    dark: { hex: '#0D0D0D', rgb: 'rgb(13, 13, 13)' },
+    elevated: { hex: '#1A1A1A', rgb: 'rgb(26, 26, 26)' },
+    subtle: { hex: '#252525', rgb: 'rgb(37, 37, 37)' },
+    card: { hex: '#FDFDFD', rgb: 'rgb(253, 253, 253)' },
+    sectionAlt: { hex: '#F9FAFE', rgb: 'rgb(249, 250, 254)' },
+  },
+  text: {
+    primary: { hex: '#FFFFFF', rgb: 'rgb(255, 255, 255)' },
+    heading: { hex: '#32363D', rgb: 'rgb(50, 54, 61)' },
+    body: { hex: '#7A7A7A', rgb: 'rgb(122, 122, 122)' },
+    muted: { hex: '#999999', rgb: 'rgb(153, 153, 153)' },
+    nearBlack: { hex: '#000002', rgb: 'rgb(0, 0, 2)' },
+  },
+  semantic: {
+    success: { hex: '#22C55E', rgb: 'rgb(34, 197, 94)' },
+    error: { hex: '#EF4444', rgb: 'rgb(239, 68, 68)' },
+    warning: { hex: '#F59E0B', rgb: 'rgb(245, 158, 11)' },
+    info: { hex: '#3B82F6', rgb: 'rgb(59, 130, 246)' },
+  },
+} as const;
 colors.forEach(g => g.colors.forEach(c => { colorMap[c.name] = c.hex; }));
 
 /**

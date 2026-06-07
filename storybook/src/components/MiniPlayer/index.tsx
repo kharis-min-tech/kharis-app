@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors } from '../../tokens/colors';
+import { theme as colors } from '../../tokens/colors'
 import { gradients } from '../../tokens/gradients';
 
 export interface MiniPlayerProps {
@@ -91,7 +91,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           style={{
             fontSize: '12px',
             fontFamily: "'DM Sans', sans-serif",
-            color: colors.text.secondary.hex,
+            color: colors.text.body.hex,
           }}
         >
           {artist}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors } from '../../tokens/colors';
+import { theme as colors } from '../../tokens/colors'
 import { shadows } from '../../tokens/shadows';
 
 export interface EventCardProps {
@@ -87,7 +87,7 @@ export const EventCard: React.FC<EventCardProps> = ({
         style={{
           fontSize: '13px',
           fontFamily: "'DM Sans', sans-serif",
-          color: colors.text.secondary.hex,
+          color: colors.text.body.hex,
           display: 'flex',
           gap: '8px',
           alignItems: 'center',

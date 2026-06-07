@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors } from '../../tokens/colors';
+import { theme as colors } from '../../tokens/colors'
 
 export interface SettingsItemProps {
   icon: string; // emoji or character
@@ -100,7 +100,7 @@ export const SettingsItem: React.FC<SettingsItemProps> = ({
         style={{
           fontSize: '14px',
           fontFamily: "'DM Sans', sans-serif",
-          color: colors.text.secondary.hex,
+          color: colors.text.body.hex,
           marginRight: hasArrow ? '4px' : 0,
         }}
       >

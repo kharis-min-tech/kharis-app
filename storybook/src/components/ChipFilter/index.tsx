@@ -1,5 +1,5 @@
 import React from 'react';
-import { colors } from '../../tokens/colors';
+import { theme as colors } from '../../tokens/colors'
 
 export interface ChipFilterProps {
   label: string;
@@ -26,7 +26,7 @@ export const ChipFilter: React.FC<ChipFilterProps> = ({
       background: active
         ? 'rgba(253,127,32,0.10)'
         : colors.surface.subtle.hex,
-      color: active ? colors.brand.gold.hex : colors.text.secondary.hex,
+      color: active ? colors.brand.gold.hex : colors.text.body.hex,
       fontFamily: "'DM Sans', sans-serif",
       fontSize: '13px',
       fontWeight: active ? 600 : 400,
