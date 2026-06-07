@@ -1,14 +1,15 @@
 import React from 'react';
+import { theme } from '../../tokens/colors';
 
 /**
- * ContentRow — horizontal scrolling section with header + "See All".
+ * ContentRow - horizontal scrolling section with header + "See All".
  *
  * Pattern: Netflix browse rows + Headspace content suggestions.
- * "See All" link uses #FD7F20 (Kharis orange, matching website CTAs).
- * Section title: Maven Pro 20px 600 weight, #FFFFFF.
+ * "See All" in orange (kharis.org CTA colour).
+ * Title: Maven Pro 20px 600.
  *
- * Ref: Netflix (https://mobbin.com/screens/4af9782e-47db-4330-9c6e-5154b445f7d6)
- *      Headspace (https://mobbin.com/screens/1cba404f-413c-4a8b-be36-d791e9ca4fed)
+ * Ref: Netflix (mobbin.com/screens/4af9782e)
+ *      Headspace (mobbin.com/screens/1cba404f)
  */
 
 export interface ContentRowProps {
@@ -36,7 +37,7 @@ export const ContentRow = ({
         fontFamily: '"Maven Pro", sans-serif',
         fontSize: 20,
         fontWeight: 600,
-        color: '#FFFFFF',
+        color: theme.text.primary.hex,
         margin: 0,
         letterSpacing: -0.5,
       }}>
@@ -51,7 +52,7 @@ export const ContentRow = ({
             fontFamily: '"DM Sans", sans-serif',
             fontSize: 13,
             fontWeight: 500,
-            color: '#FD7F20',
+            color: theme.brand.orange.hex,
             cursor: 'pointer',
             padding: 0,
           }}
@@ -66,7 +67,6 @@ export const ContentRow = ({
       overflowX: 'auto',
       paddingLeft: 20,
       paddingRight: 20,
-      scrollbarWidth: 'none',
     }}>
       {children}
     </div>

@@ -1,16 +1,17 @@
 import React from 'react';
+import { theme } from '../../tokens/colors';
 
 /**
- * HomeHero — full-width hero card at top of Home.
+ * HomeHero - full-width hero card at top of Home.
  *
  * Pattern: Headspace daily card + MasterClass featured content.
- * Colour: Kharis orange #FD7F20 CTA on dark/image overlay.
- * Ref: Headspace (https://mobbin.com/screens/d95b9be8-a5b8-4995-9196-ae15e24a722c)
- *      MasterClass (https://mobbin.com/screens/3f997cfa-8542-4c40-9290-abe6c67fe0bb)
+ * CTA: solid orange from kharis.org button spec.
+ *
+ * Ref: Headspace (mobbin.com/screens/d95b9be8)
+ *      MasterClass (mobbin.com/screens/3f997cfa)
  */
 
 export interface HomeHeroProps {
-  /** e.g. "LIVE SUNDAY" or "21 DAYS FASTING" */
   badge?: string;
   isLive?: boolean;
   title: string;
@@ -29,7 +30,7 @@ export const HomeHero = ({
   ctaLabel,
   ctaIcon,
   onCtaClick,
-  backgroundGradient = 'linear-gradient(135deg, #3a1a5e 0%, #1a0a2e 50%, #0D0D0D 100%)',
+  backgroundGradient = `linear-gradient(135deg, #3a1a5e 0%, #1a0a2e 50%, ${theme.surface.dark.hex} 100%)`,
 }: HomeHeroProps) => (
   <div style={{
     position: 'relative',
@@ -53,7 +54,7 @@ export const HomeHero = ({
         borderRadius: 50,
         fontSize: 11,
         fontWeight: 600,
-        color: '#FD7F20',
+        color: theme.brand.orange.hex,
         marginBottom: 10,
         alignSelf: 'flex-start',
         textTransform: 'uppercase',
@@ -61,9 +62,10 @@ export const HomeHero = ({
       }}>
         {isLive && (
           <span style={{
-            width: 7, height: 7, borderRadius: '50%',
-            backgroundColor: '#22C55E',
-            animation: 'pulse 2s infinite',
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            backgroundColor: theme.semantic.success.hex,
           }} />
         )}
         {badge}
@@ -74,7 +76,7 @@ export const HomeHero = ({
       fontFamily: '"Maven Pro", sans-serif',
       fontSize: 24,
       fontWeight: 700,
-      color: '#FFFFFF',
+      color: theme.text.primary.hex,
       lineHeight: 1.2,
       margin: '0 0 4px',
       letterSpacing: -0.5,
@@ -97,8 +99,8 @@ export const HomeHero = ({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#FD7F20',
-        color: '#FFFFFF',
+        backgroundColor: theme.brand.orange.hex,
+        color: theme.text.primary.hex,
         fontFamily: '"Maven Pro", sans-serif',
         fontSize: 14,
         fontWeight: 700,

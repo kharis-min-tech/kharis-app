@@ -1,22 +1,14 @@
 import React from 'react';
+import { theme } from '../../tokens/colors';
 
 /**
- * Button — matches kharis.org exactly.
+ * Button
  *
- * Website evidence (all 6 CTAs identical):
- *   bg: #FD7F20 (solid, NOT gradient)
- *   color: #FFFFFF
- *   font: Maven Pro, 14px, 700, uppercase
- *   padding: 18px 40px
- *   border-radius: 12px
- *   border: none
- *   shadow: none
+ * Sourced from kharis.org. All 6 CTAs on the website are identical:
+ * solid orange, Maven Pro 14px bold uppercase, 12px radius, 18px 40px pad.
  *
- * Secondary variant derived from social icons:
- *   bg: transparent, border: 1px solid #FD7F20, color: #FD7F20
- *
- * Ghost derived from nav links:
- *   bg: transparent, color: #7A7A7A
+ * Secondary and ghost derived from the same family.
+ * No gradients. No shadows. No glows.
  */
 
 export interface ButtonProps {
@@ -46,7 +38,7 @@ export const Button = ({
     fontFamily: '"Maven Pro", sans-serif',
     fontSize: s.fontSize,
     fontWeight: 700,
-    textTransform: 'uppercase' as const,
+    textTransform: 'uppercase',
     letterSpacing: 'normal',
     padding: s.padding,
     borderRadius: 12,
@@ -64,19 +56,19 @@ export const Button = ({
   const variants: Record<string, React.CSSProperties> = {
     primary: {
       ...base,
-      backgroundColor: '#FD7F20',
-      color: '#FFFFFF',
+      backgroundColor: theme.brand.orange.hex,
+      color: theme.text.primary.hex,
     },
     secondary: {
       ...base,
       backgroundColor: 'transparent',
-      border: '1px solid #FD7F20',
-      color: '#FD7F20',
+      border: `1px solid ${theme.brand.orange.hex}`,
+      color: theme.brand.orange.hex,
     },
     ghost: {
       ...base,
       backgroundColor: 'transparent',
-      color: '#7A7A7A',
+      color: theme.text.body.hex,
     },
   };
 

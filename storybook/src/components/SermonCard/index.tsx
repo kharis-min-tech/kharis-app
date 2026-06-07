@@ -9,7 +9,7 @@ export interface SermonCardProps {
   duration?: string;
   artworkColor?: string;
   isPlaying?: boolean;
-  progress?: number; // 0–1
+  progress?: number; // 0-1
 }
 
 const EqualizerIcon: React.FC = () => (

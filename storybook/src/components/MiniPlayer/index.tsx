@@ -6,7 +6,7 @@ export interface MiniPlayerProps {
   title: string;
   artist: string;
   isPlaying?: boolean;
-  progress?: number; // 0–1
+  progress?: number; // 0-1
 }
 
 const PlayIcon: React.FC = () => (
