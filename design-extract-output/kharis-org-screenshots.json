@@ -1,0 +1,100 @@
+{
+  "components": [
+    {
+      "cluster": "button--default",
+      "variant": 0,
+      "path": "screenshots/button-default-0.png",
+      "bounds": {
+        "w": 556,
+        "h": 50
+      },
+      "kind": "button",
+      "variantHint": "default",
+      "sizeHint": "",
+      "retina": true
+    },
+    {
+      "cluster": "button--default",
+      "variant": 1,
+      "path": "screenshots/button-default-1.png",
+      "bounds": {
+        "w": 556,
+        "h": 50
+      },
+      "kind": "button",
+      "variantHint": "default",
+      "sizeHint": "",
+      "retina": true
+    },
+    {
+      "cluster": "button--default",
+      "variant": 2,
+      "path": "screenshots/button-default-2.png",
+      "bounds": {
+        "w": 125,
+        "h": 14
+      },
+      "kind": "button",
+      "variantHint": "default",
+      "sizeHint": "",
+      "retina": true
+    },
+    {
+      "cluster": "button--default--sm",
+      "variant": 0,
+      "path": "screenshots/button-default-sm-0.png",
+      "bounds": {
+        "w": 205,
+        "h": 50
+      },
+      "kind": "button",
+      "variantHint": "default",
+      "sizeHint": "sm",
+      "retina": true
+    },
+    {
+      "cluster": "button--default--xs",
+      "variant": 0,
+      "path": "screenshots/button-default-xs-0.png",
+      "bounds": {
+        "w": 252,
+        "h": 50
+      },
+      "kind": "button",
+      "variantHint": "default",
+      "sizeHint": "xs",
+      "retina": true
+    },
+    {
+      "cluster": "button--default--xs",
+      "variant": 1,
+      "path": "screenshots/button-default-xs-1.png",
+      "bounds": {
+        "w": 252,
+        "h": 50
+      },
+      "kind": "button",
+      "variantHint": "default",
+      "sizeHint": "xs",
+      "retina": true
+    },
+    {
+      "cluster": "button--default--xs",
+      "variant": 2,
+      "path": "screenshots/button-default-xs-2.png",
+      "bounds": {
+        "w": 208,
+        "h": 50
+      },
+      "kind": "button",
+      "variantHint": "default",
+      "sizeHint": "xs",
+      "retina": true
+    }
+  ],
+  "fullPage": {
+    "path": "screenshots/full-page.png",
+    "retina": true
+  },
+  "count": 7
+}

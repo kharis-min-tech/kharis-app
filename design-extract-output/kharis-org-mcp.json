@@ -1,0 +1,1128 @@
+{
+  "colors": {
+    "all": [
+      {
+        "hex": "#7a7a7a",
+        "rgb": {
+          "r": 122,
+          "g": 122,
+          "b": 122,
+          "a": 1
+        },
+        "hsl": {
+          "h": 0,
+          "s": 0,
+          "l": 48
+        },
+        "count": 855,
+        "contexts": [
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#000000",
+        "rgb": {
+          "r": 0,
+          "g": 0,
+          "b": 0,
+          "a": 1
+        },
+        "hsl": {
+          "h": 0,
+          "s": 0,
+          "l": 0
+        },
+        "count": 451,
+        "contexts": [
+          "text",
+          "border",
+          "background"
+        ]
+      },
+      {
+        "hex": "#ffffff",
+        "rgb": {
+          "r": 255,
+          "g": 255,
+          "b": 255,
+          "a": 1
+        },
+        "hsl": {
+          "h": 0,
+          "s": 0,
+          "l": 100
+        },
+        "count": 149,
+        "contexts": [
+          "background",
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#5f626a",
+        "rgb": {
+          "r": 95,
+          "g": 98,
+          "b": 106,
+          "a": 1
+        },
+        "hsl": {
+          "h": 224,
+          "s": 5,
+          "l": 39
+        },
+        "count": 109,
+        "contexts": [
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#6b34fa",
+        "rgb": {
+          "r": 107,
+          "g": 52,
+          "b": 250,
+          "a": 1
+        },
+        "hsl": {
+          "h": 257,
+          "s": 95,
+          "l": 59
+        },
+        "count": 52,
+        "contexts": [
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#32363d",
+        "rgb": {
+          "r": 50,
+          "g": 54,
+          "b": 61,
+          "a": 1
+        },
+        "hsl": {
+          "h": 218,
+          "s": 10,
+          "l": 22
+        },
+        "count": 30,
+        "contexts": [
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#800654",
+        "rgb": {
+          "r": 128,
+          "g": 6,
+          "b": 84,
+          "a": 1
+        },
+        "hsl": {
+          "h": 322,
+          "s": 91,
+          "l": 26
+        },
+        "count": 21,
+        "contexts": [
+          "text",
+          "border",
+          "background"
+        ]
+      },
+      {
+        "hex": "#fd7f20",
+        "rgb": {
+          "r": 253,
+          "g": 127,
+          "b": 32,
+          "a": 1
+        },
+        "hsl": {
+          "h": 26,
+          "s": 98,
+          "l": 56
+        },
+        "count": 14,
+        "contexts": [
+          "text",
+          "border",
+          "background"
+        ]
+      },
+      {
+        "hex": "#8d8f93",
+        "rgb": {
+          "r": 141,
+          "g": 143,
+          "b": 147,
+          "a": 1
+        },
+        "hsl": {
+          "h": 220,
+          "s": 3,
+          "l": 56
+        },
+        "count": 12,
+        "contexts": [
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#141b38",
+        "rgb": {
+          "r": 20,
+          "g": 27,
+          "b": 56,
+          "a": 1
+        },
+        "hsl": {
+          "h": 228,
+          "s": 47,
+          "l": 15
+        },
+        "count": 10,
+        "contexts": [
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#d6ddeb",
+        "rgb": {
+          "r": 214,
+          "g": 221,
+          "b": 235,
+          "a": 1
+        },
+        "hsl": {
+          "h": 220,
+          "s": 34,
+          "l": 88
+        },
+        "count": 5,
+        "contexts": [
+          "border"
+        ]
+      },
+      {
+        "hex": "#babbc0",
+        "rgb": {
+          "r": 186,
+          "g": 187,
+          "b": 192,
+          "a": 1
+        },
+        "hsl": {
+          "h": 230,
+          "s": 5,
+          "l": 74
+        },
+        "count": 2,
+        "contexts": [
+          "border"
+        ]
+      },
+      {
+        "hex": "#999999",
+        "rgb": {
+          "r": 153,
+          "g": 153,
+          "b": 153,
+          "a": 1
+        },
+        "hsl": {
+          "h": 0,
+          "s": 0,
+          "l": 60
+        },
+        "count": 2,
+        "contexts": [
+          "text",
+          "border"
+        ]
+      },
+      {
+        "hex": "#3a4652",
+        "rgb": {
+          "r": 58,
+          "g": 70,
+          "b": 82,
+          "a": 1
+        },
+        "hsl": {
+          "h": 210,
+          "s": 17,
+          "l": 27
+        },
+        "count": 1,
+        "contexts": [
+          "background"
+        ]
+      },
+      {
+        "hex": "#d2d2d2",
+        "rgb": {
+          "r": 210,
+          "g": 210,
+          "b": 210,
+          "a": 0.92
+        },
+        "hsl": {
+          "h": 0,
+          "s": 0,
+          "l": 82
+        },
+        "count": 1,
+        "contexts": [
+          "background"
+        ]
+      },
+      {
+        "hex": "#202124",
+        "rgb": {
+          "r": 32,
+          "g": 33,
+          "b": 36,
+          "a": 1
+        },
+        "hsl": {
+          "h": 225,
+          "s": 6,
+          "l": 13
+        },
+        "count": 1,
+        "contexts": [
+          "background"
+        ]
+      }
+    ]
+  },
+  "regions": [
+    {
+      "role": "nav",
+      "tag": "nav",
+      "bounds": {
+        "x": 64,
+        "y": 0,
+        "w": 1152,
+        "h": 76.96875
+      },
+      "heading": null,
+      "buttonCount": 1,
+      "cardCount": 66,
+      "className": "uicore elementor-container"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 399.1875
+      },
+      "heading": "WELCOME TO KHARIS",
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "has-ui-fluid-gradient elementor-section elementor-top-section elementor-element elementor-element-a5c5a7f  ui-fluid-animation-1 elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "hero",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 399.1875,
+        "w": 1280,
+        "h": 338.28125
+      },
+      "heading": "June 2026 Corporate Fasting and Prayer",
+      "buttonCount": 5,
+      "cardCount": 0,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-c2119e3 elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 64,
+        "y": 857.859375,
+        "w": 1152,
+        "h": 210.671875
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "elementor-section elementor-inner-section elementor-element elementor-element-5fe73f53 elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 64,
+        "y": 1068.53125,
+        "w": 1152,
+        "h": 210.671875
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "elementor-section elementor-inner-section elementor-element elementor-element-367ccff6 elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "hero",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 1304.203125,
+        "w": 1280,
+        "h": 472.390625
+      },
+      "heading": "Latest Messages",
+      "buttonCount": 8,
+      "cardCount": 8,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-5205571 elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 74,
+        "y": 1409.59375,
+        "w": 1132,
+        "h": 332
+      },
+      "heading": null,
+      "buttonCount": 8,
+      "cardCount": 8,
+      "className": "elementor-section elementor-inner-section elementor-element elementor-element-1f5523f elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "hero",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 1776.59375,
+        "w": 1280,
+        "h": 620.390625
+      },
+      "heading": "Build God A House",
+      "buttonCount": 5,
+      "cardCount": 0,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-48c7d7e elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 2396.984375,
+        "w": 1280,
+        "h": 115.390625
+      },
+      "heading": "Testimonies",
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-467bc2e elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "testimonials",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 2512.375,
+        "w": 1280,
+        "h": 295.34375
+      },
+      "heading": "This is an opportunity for you to give glory to God.",
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-20d6c94e elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 2807.71875,
+        "w": 1280,
+        "h": 120
+      },
+      "heading": null,
+      "buttonCount": 5,
+      "cardCount": 0,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-ea7b73a elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "footer",
+      "tag": "footer",
+      "bounds": {
+        "x": 0,
+        "y": 3318.734375,
+        "w": 1280,
+        "h": 394.1875
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 8,
+      "className": null
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 3318.734375,
+        "w": 1280,
+        "h": 285.1875
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-384f5bb elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 74,
+        "y": 3379.734375,
+        "w": 1132,
+        "h": 214.1875
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "elementor-section elementor-inner-section elementor-element elementor-element-28256ad elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 0,
+        "y": 3603.921875,
+        "w": 1280,
+        "h": 109
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 8,
+      "className": "elementor-section elementor-top-section elementor-element elementor-element-9e99629 elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "content",
+      "tag": "section",
+      "bounds": {
+        "x": 74,
+        "y": 3613.921875,
+        "w": 1132,
+        "h": 88
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 8,
+      "className": "elementor-section elementor-inner-section elementor-element elementor-element-61e187a elementor-section-boxed elementor-section-height-default elementor-section-height-default"
+    },
+    {
+      "role": "footer",
+      "tag": "footer",
+      "bounds": {
+        "x": 0,
+        "y": 3712.921875,
+        "w": 1280,
+        "h": 69.125
+      },
+      "heading": null,
+      "buttonCount": 0,
+      "cardCount": 0,
+      "className": "uicore-footer-wrapper elementor"
+    },
+    {
+      "role": "nav",
+      "tag": "nav",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "heading": null,
+      "buttonCount": 1,
+      "cardCount": 0,
+      "className": "uicore elementor-container"
+    }
+  ],
+  "componentClusters": [
+    {
+      "kind": "button",
+      "structuralHash": "div>div",
+      "instanceCount": 7,
+      "variants": [
+        {
+          "css": {
+            "background": "rgba(0, 0, 0, 0)",
+            "color": "rgb(122, 122, 122)",
+            "padding": "0px 0px 0px 0px",
+            "borderRadius": "0px",
+            "border": "0px none rgb(122, 122, 122)",
+            "fontSize": "17px",
+            "fontWeight": "400"
+          },
+          "instanceCount": 7
+        }
+      ]
+    },
+    {
+      "kind": "button",
+      "structuralHash": "div>a",
+      "instanceCount": 4,
+      "variants": [
+        {
+          "css": {
+            "background": "rgba(0, 0, 0, 0)",
+            "color": "rgb(122, 122, 122)",
+            "padding": "0px 0px 0px 0px",
+            "borderRadius": "0px",
+            "border": "0px none rgb(122, 122, 122)",
+            "fontSize": "17px",
+            "fontWeight": "400"
+          },
+          "instanceCount": 4
+        }
+      ]
+    },
+    {
+      "kind": "button",
+      "structuralHash": "a>span",
+      "instanceCount": 4,
+      "variants": [
+        {
+          "css": {
+            "background": "rgb(253, 127, 32)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "18px 40px 18px 40px",
+            "borderRadius": "12px",
+            "border": "0px none rgb(255, 255, 255)",
+            "fontSize": "14px",
+            "fontWeight": "700"
+          },
+          "instanceCount": 4
+        }
+      ]
+    },
+    {
+      "kind": "button",
+      "structuralHash": "span>span",
+      "instanceCount": 4,
+      "variants": [
+        {
+          "css": {
+            "background": "rgba(0, 0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "0px 0px 0px 0px",
+            "borderRadius": "0px",
+            "border": "0px none rgb(255, 255, 255)",
+            "fontSize": "14px",
+            "fontWeight": "700"
+          },
+          "instanceCount": 4
+        }
+      ]
+    },
+    {
+      "kind": "button",
+      "structuralHash": "span",
+      "instanceCount": 4,
+      "variants": [
+        {
+          "css": {
+            "background": "rgba(0, 0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "0px 0px 0px 0px",
+            "borderRadius": "0px",
+            "border": "0px none rgb(255, 255, 255)",
+            "fontSize": "14px",
+            "fontWeight": "700"
+          },
+          "instanceCount": 4
+        }
+      ]
+    },
+    {
+      "kind": "button",
+      "structuralHash": "div>a>a",
+      "instanceCount": 1,
+      "variants": [
+        {
+          "css": {
+            "background": "rgba(0, 0, 0, 0)",
+            "color": "rgb(122, 122, 122)",
+            "padding": "0px 0px 0px 0px",
+            "borderRadius": "0px",
+            "border": "0px none rgb(122, 122, 122)",
+            "fontSize": "17px",
+            "fontWeight": "400"
+          },
+          "instanceCount": 1
+        }
+      ]
+    },
+    {
+      "kind": "button",
+      "structuralHash": "a>div",
+      "instanceCount": 2,
+      "variants": [
+        {
+          "css": {
+            "background": "rgb(253, 127, 32)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "18px 40px 18px 40px",
+            "borderRadius": "12px",
+            "border": "0px none rgb(107, 52, 250)",
+            "fontSize": "14px",
+            "fontWeight": "700"
+          },
+          "instanceCount": 2
+        }
+      ]
+    },
+    {
+      "kind": "button",
+      "structuralHash": "div",
+      "instanceCount": 2,
+      "variants": [
+        {
+          "css": {
+            "background": "rgba(0, 0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "0px 0px 0px 0px",
+            "borderRadius": "0px",
+            "border": "0px none rgb(255, 255, 255)",
+            "fontSize": "14px",
+            "fontWeight": "700"
+          },
+          "instanceCount": 2
+        }
+      ]
+    }
+  ],
+  "accessibility": {
+    "remediation": []
+  },
+  "cssHealth": {
+    "sheets": [
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/font-awesome/css/v4-shims.min.css?ver=4.1.1",
+        "totalBytes": 26702,
+        "usedBytes": 0,
+        "unusedBytes": 26702,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/font-awesome/css/fontawesome.min.css?ver=5.15.3",
+        "totalBytes": 58071,
+        "usedBytes": 431,
+        "unusedBytes": 57640,
+        "unusedPercent": 99
+      },
+      {
+        "url": "https://kharis.org/",
+        "totalBytes": 163,
+        "usedBytes": 0,
+        "unusedBytes": 163,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/dropdown-multisite-selector/assets/css/dms-front.css?ver=6.9.4",
+        "totalBytes": 181,
+        "usedBytes": 0,
+        "unusedBytes": 181,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/elementor/google-fonts/css/mavenpro.css?ver=1745960525",
+        "totalBytes": 7722,
+        "usedBytes": 0,
+        "unusedBytes": 7722,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/eventon-lite/assets/css/eventon_dynamic_styles.css?ver=2.5.5",
+        "totalBytes": 14162,
+        "usedBytes": 0,
+        "unusedBytes": 14162,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/elementor/google-fonts/css/dmsans.css?ver=1745960815",
+        "totalBytes": 16191,
+        "usedBytes": 0,
+        "unusedBytes": 16191,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/agile-store-locator/public/css/init.css?ver=4.8.11",
+        "totalBytes": 36,
+        "usedBytes": 0,
+        "unusedBytes": 36,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/bdthemes-element-pack/assets/css/bdt-uikit.css?ver=3.13.1",
+        "totalBytes": 89789,
+        "usedBytes": 229,
+        "unusedBytes": 89560,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/",
+        "totalBytes": 761,
+        "usedBytes": 0,
+        "unusedBytes": 761,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/uicore-global.css?ver=5020",
+        "totalBytes": 135787,
+        "usedBytes": 35898,
+        "unusedBytes": 99889,
+        "unusedPercent": 74
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/font-awesome/css/solid.min.css?ver=5.15.3",
+        "totalBytes": 669,
+        "usedBytes": 59,
+        "unusedBytes": 610,
+        "unusedPercent": 91
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/bdthemes-element-pack/assets/css/ep-helper.css?ver=6.4.0",
+        "totalBytes": 33596,
+        "usedBytes": 215,
+        "unusedBytes": 33381,
+        "unusedPercent": 99
+      },
+      {
+        "url": "wp-img-auto-sizes-contain-inline-css",
+        "totalBytes": 135,
+        "usedBytes": 0,
+        "unusedBytes": 135,
+        "unusedPercent": 100
+      },
+      {
+        "url": "global-styles-inline-css",
+        "totalBytes": 9291,
+        "usedBytes": 3019,
+        "unusedBytes": 6272,
+        "unusedPercent": 68
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/css/widget-heading.min.css?ver=4.1.1",
+        "totalBytes": 560,
+        "usedBytes": 216,
+        "unusedBytes": 344,
+        "unusedPercent": 61
+      },
+      {
+        "url": "https://kharis.org/",
+        "totalBytes": 722,
+        "usedBytes": 0,
+        "unusedBytes": 722,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/animations/styles/fadeIn.min.css?ver=4.1.1",
+        "totalBytes": 77,
+        "usedBytes": 30,
+        "unusedBytes": 47,
+        "unusedPercent": 61
+      },
+      {
+        "url": "/wp-includes/css/classic-themes.min.css",
+        "totalBytes": 350,
+        "usedBytes": 0,
+        "unusedBytes": 350,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/pdf-embedder/block/build/style-index.css",
+        "totalBytes": 151,
+        "usedBytes": 0,
+        "unusedBytes": 151,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/animations/styles/e-animation-grow.min.css?ver=4.1.1",
+        "totalBytes": 198,
+        "usedBytes": 80,
+        "unusedBytes": 118,
+        "unusedPercent": 60
+      },
+      {
+        "url": "https://kharis.org/wp-content/themes/landio-child/style.css?ver=6.9.4",
+        "totalBytes": 301,
+        "usedBytes": 0,
+        "unusedBytes": 301,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-includes/css/dist/components/style.min.css?ver=6.9.4",
+        "totalBytes": 100220,
+        "usedBytes": 353,
+        "unusedBytes": 99867,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/youtube-feed-pro/public/build/css/sb-youtube-common.css?ver=2.6.6",
+        "totalBytes": 52055,
+        "usedBytes": 0,
+        "unusedBytes": 52055,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/bdthemes-element-pack/assets/css/ep-dual-button.css?ver=6.4.0",
+        "totalBytes": 6186,
+        "usedBytes": 940,
+        "unusedBytes": 5246,
+        "unusedPercent": 85
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/youtube-feed-pro/public/build/css/sb-youtube.css?ver=2.6.6",
+        "totalBytes": 8576,
+        "usedBytes": 0,
+        "unusedBytes": 8576,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/eicons/css/elementor-icons.min.css?ver=5.49.0",
+        "totalBytes": 21927,
+        "usedBytes": 0,
+        "unusedBytes": 21927,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/uicore-framework/assets/fonts/themify-icons.css?ver=1.0.0",
+        "totalBytes": 17510,
+        "usedBytes": 473,
+        "unusedBytes": 17037,
+        "unusedPercent": 97
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/eventon-lite/assets/css/eventon_styles.css?ver=2.5.5",
+        "totalBytes": 165968,
+        "usedBytes": 2693,
+        "unusedBytes": 163275,
+        "unusedPercent": 98
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/elementor/css/post-76.css?ver=1780527770",
+        "totalBytes": 49659,
+        "usedBytes": 21223,
+        "unusedBytes": 28436,
+        "unusedPercent": 57
+      },
+      {
+        "url": "https://kharis.org/",
+        "totalBytes": 86,
+        "usedBytes": 0,
+        "unusedBytes": 86,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/font-awesome/css/all.min.css?ver=4.1.1",
+        "totalBytes": 59344,
+        "usedBytes": 571,
+        "unusedBytes": 58773,
+        "unusedPercent": 99
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/animations/styles/fadeInDown.min.css?ver=4.1.1",
+        "totalBytes": 137,
+        "usedBytes": 0,
+        "unusedBytes": 137,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/animations/styles/fadeInUp.min.css?ver=4.1.1",
+        "totalBytes": 130,
+        "usedBytes": 0,
+        "unusedBytes": 130,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/css/widget-image.min.css?ver=4.1.1",
+        "totalBytes": 214,
+        "usedBytes": 113,
+        "unusedBytes": 101,
+        "unusedPercent": 47
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/uicore-framework/assets/fonts/themify-icons.css?ver=1.0.0",
+        "totalBytes": 17510,
+        "usedBytes": 0,
+        "unusedBytes": 17510,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/elementor/css/custom-frontend.min.css?ver=1780527769",
+        "totalBytes": 54840,
+        "usedBytes": 5198,
+        "unusedBytes": 49642,
+        "unusedPercent": 91
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/css/widget-spacer.min.css?ver=4.1.1",
+        "totalBytes": 1793,
+        "usedBytes": 68,
+        "unusedBytes": 1725,
+        "unusedPercent": 96
+      },
+      {
+        "url": "https://kharis.org/wp-content/mu-plugins/vendor/wpex/godaddy-launch/includes/Dependencies/GoDaddy/Styles/build/latest.css?ver=2.0.2",
+        "totalBytes": 12886,
+        "usedBytes": 0,
+        "unusedBytes": 12886,
+        "unusedPercent": 100
+      },
+      {
+        "url": "wp-emoji-styles-inline-css",
+        "totalBytes": 340,
+        "usedBytes": 0,
+        "unusedBytes": 340,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/elementor/css/custom-widget-image-box.min.css?ver=1780527769",
+        "totalBytes": 1657,
+        "usedBytes": 340,
+        "unusedBytes": 1317,
+        "unusedPercent": 79
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/youtube-feed-pro/public/build/css/sb-youtube-common.css?ver=2.6.6",
+        "totalBytes": 52055,
+        "usedBytes": 44964,
+        "unusedBytes": 7091,
+        "unusedPercent": 14
+      },
+      {
+        "url": "https://fonts.googleapis.com/css?family=Noto+Sans%3A400%2C400italic%2C700%7CPoppins%3A700%2C800%2C900&subset=latin%2Clatin-ext&ver=2.5.5",
+        "totalBytes": 12564,
+        "usedBytes": 0,
+        "unusedBytes": 12564,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/youtube-feed-pro/public/build/css/sb-youtube.css?ver=2.6.6",
+        "totalBytes": 8576,
+        "usedBytes": 4591,
+        "unusedBytes": 3985,
+        "unusedPercent": 46
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/eventon-lite/assets/fonts/all.css?ver=2.5.5",
+        "totalBytes": 156838,
+        "usedBytes": 1126,
+        "unusedBytes": 155712,
+        "unusedPercent": 99
+      },
+      {
+        "url": "https://kharis.org/",
+        "totalBytes": 721,
+        "usedBytes": 447,
+        "unusedBytes": 274,
+        "unusedPercent": 38
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/bdthemes-element-pack/assets/css/ep-advanced-icon-box.css?ver=6.4.0",
+        "totalBytes": 8078,
+        "usedBytes": 1535,
+        "unusedBytes": 6543,
+        "unusedPercent": 81
+      },
+      {
+        "url": "https://kharis.org/",
+        "totalBytes": 4241,
+        "usedBytes": 0,
+        "unusedBytes": 4241,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/elementor/css/custom-apple-webkit.min.css?ver=1780527769",
+        "totalBytes": 6713,
+        "usedBytes": 0,
+        "unusedBytes": 6713,
+        "unusedPercent": 100
+      },
+      {
+        "url": "https://kharis.org/wp-content/uploads/elementor/css/post-167.css?ver=1780527770",
+        "totalBytes": 12171,
+        "usedBytes": 9007,
+        "unusedBytes": 3164,
+        "unusedPercent": 26
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/css/widget-social-icons.min.css?ver=4.1.1",
+        "totalBytes": 5110,
+        "usedBytes": 1592,
+        "unusedBytes": 3518,
+        "unusedPercent": 69
+      },
+      {
+        "url": "https://kharis.org/wp-content/plugins/elementor/assets/lib/font-awesome/css/brands.min.css?ver=5.15.3",
+        "totalBytes": 675,
+        "usedBytes": 57,
+        "unusedBytes": 618,
+        "unusedPercent": 92
+      }
+    ],
+    "totalBytes": 1234395,
+    "usedBytes": 135468,
+    "unusedBytes": 1098927,
+    "unusedPercent": 89,
+    "importantCount": 628,
+    "duplicates": 11777,
+    "vendorPrefixes": {
+      "webkit": 263,
+      "moz": 122,
+      "ms": 62,
+      "o": 19
+    },
+    "keyframes": [
+      {
+        "name": "evo_blinking_red",
+        "steps": 37
+      },
+      {
+        "name": "fa-beat",
+        "steps": 27
+      }
+    ],
+    "specificity": {
+      "max": [
+        3,
+        9,
+        21
+      ],
+      "average": [
+        0.04,
+        2.06,
+        0.21
+      ],
+      "count": 17521
+    },
+    "issues": [
+      "628 !important rules",
+      "11777 duplicate declarations",
+      "89% unused CSS"
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "openGraph": {},
+  "twitter": {},
+  "description": null,
+  "canonical": null,
+  "themeColor": "#FFFFFF",
+  "viewport": "width=device-width, initial-scale=1",
+  "favicons": [
+    {
+      "rel": "shortcut icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "",
+      "type": ""
+    },
+    {
+      "rel": "icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "",
+      "type": ""
+    },
+    {
+      "rel": "apple-touch-icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "152x152",
+      "type": ""
+    },
+    {
+      "rel": "apple-touch-icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "120x120",
+      "type": ""
+    },
+    {
+      "rel": "apple-touch-icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "76x76",
+      "type": ""
+    },
+    {
+      "rel": "apple-touch-icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "",
+      "type": ""
+    },
+    {
+      "rel": "icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText-150x150.png",
+      "sizes": "32x32",
+      "type": ""
+    },
+    {
+      "rel": "icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "192x192",
+      "type": ""
+    },
+    {
+      "rel": "apple-touch-icon",
+      "href": "https://kharis.org/wp-content/uploads/2022/08/Logo_transparent_noText.png",
+      "sizes": "",
+      "type": ""
+    }
+  ],
+  "manifest": null,
+  "structuredData": [],
+  "score": {
+    "hasOg": false,
+    "hasTwitter": false,
+    "hasDescription": false,
+    "hasCanonical": false,
+    "hasStructuredData": false,
+    "hasFavicon": true,
+    "hasThemeColor": true
+  }
+}

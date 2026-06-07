@@ -1,0 +1,30 @@
+Build a landing page with this exact visual language.
+COLORS:
+  #7a7a7a
+  #000000
+  #ffffff
+  #5f626a
+  #6b34fa
+  #32363d
+  #800654
+  #fd7f20
+  #8d8f93
+  #141b38
+  #d6ddeb
+  #babbc0
+  #999999
+  #3a4652
+FONTS: [object Object], [object Object], [object Object], [object Object]
+SPACING: 5, 15, 30, 38, 50, 60, 64, 80
+RADIUS: 3, 8, 12, 15, 18, 50
+SHADOWS: rgba(0, 0, 0, 0.02) 0px 0px 0px 1px, rgba(0, 0, 0, 0.04) 0px 2px 35px 0px | rgba(0, 0, 0, 0.5) 0px 0px 0px 0px | rgba(0, 0, 0, 0) 0px 1px 0px 0px
+MATERIAL LANGUAGE: flat
+VOICE: Tone: friendly · Headings: Title Case · CTA verbs: [object Object], [object Object], [object Object], [object Object], [object Object], [object Object]
+SECTIONS (in order):
+- hero — heading: "June 2026 Corporate Fasting and Prayer"
+- hero — heading: "Latest Messages"
+- hero — heading: "Build God A House"
+- testimonials — heading: "This is an opportunity for you to give glory to God."
+- footer
+- footer
+Use Tailwind. Match these tokens exactly. Keep the material language consistent.

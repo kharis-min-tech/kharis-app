@@ -1,0 +1,13 @@
+Clone the design language of this landing page and build a fresh equivalent.
+Visual feel: flat. Tone: friendly · Headings: Title Case · CTA verbs: [object Object], [object Object], [object Object], [object Object], [object Object], [object Object]
+Primary palette: #7a7a7a, #000000, #ffffff, #5f626a, #6b34fa.
+Typography: [object Object], [object Object], [object Object], [object Object].
+Corner radius vocabulary: 3, 8, 12, 15, 18, 50.
+Shadow vocabulary: rgba(0, 0, 0, 0.02) 0px 0px 0px 1px, rgba(0, 0, 0, 0.04) 0px 2px 35px 0px | rgba(0, 0, 0, 0.5) 0px 0px 0px 0px | rgba(0, 0, 0, 0) 0px 1px 0px 0px.
+Page structure:
+- hero — heading: "June 2026 Corporate Fasting and Prayer"
+- hero — heading: "Latest Messages"
+- hero — heading: "Build God A House"
+- testimonials — heading: "This is an opportunity for you to give glory to God."
+- footer
+- footer

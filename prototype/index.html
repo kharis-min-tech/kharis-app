@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=430, initial-scale=1">
+<title>Kharis App — New Design Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --brand-purple: #6b34fa;
+  --brand-gold: #fd7f20;
+  --brand-magenta: #800654;
+  --surface-dark: #0D0D0D;
+  --surface-elevated: #1A1A1A;
+  --surface-subtle: #252525;
+  --surface-card: #1E1E1E;
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0A0A0;
+  --text-muted: #666666;
+  --success: #22C55E;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 50px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 20px;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.phone-frame {
+  width: 390px;
+  height: 844px;
+  background: var(--surface-dark);
+  border-radius: 44px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 0 3px #333, 0 20px 60px rgba(0,0,0,0.8);
+  flex-shrink: 0;
+}
+
+.screen-label {
+  text-align: center;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  margin-top: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Status bar */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 28px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  height: 54px;
+}
+.status-bar .notch {
+  width: 126px;
+  height: 34px;
+  background: #000;
+  border-radius: 20px;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.status-icons { display: flex; gap: 6px; align-items: center; }
+.status-icons svg { width: 16px; height: 16px; fill: white; }
+
+/* Scrollable content */
+.screen-content {
+  height: calc(100% - 54px - 82px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.screen-content::-webkit-scrollbar { display: none; }
+
+/* Tab bar */
+.tab-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 82px;
+  background: rgba(13,13,13,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tab-item.active { color: var(--brand-gold); }
+.tab-item svg { width: 24px; height: 24px; }
+
+/* Mini player */
+.mini-player {
+  position: absolute;
+  bottom: 82px;
+  left: 8px;
+  right: 8px;
+  height: 56px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 10px;
+  z-index: 10;
+}
+.mini-player::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 65%;
+  height: 2px;
+  background: var(--brand-gold);
+  border-radius: 2px;
+}
+.mini-player .thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--brand-purple), var(--brand-magenta));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.mini-player .info { flex: 1; }
+.mini-player .info .title { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+.mini-player .info .artist { font-size: 11px; color: var(--text-secondary); }
+.mini-player .play-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+/* Headings */
+h1 { font-family: 'Maven Pro', sans-serif; font-size: 28px; font-weight: 700; color: var(--text-primary); }
+h2 { font-family: 'Maven Pro', sans-serif; font-size: 20px; font-weight: 600; color: var(--text-primary); }
+h3 { font-family: 'Maven Pro', sans-serif; font-size: 16px; font-weight: 600; color: var(--text-primary); }
+
+/* Section */
+.section { padding: 0 20px; margin-bottom: 24px; }
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.see-all {
+  font-size: 13px;
+  color: var(--brand-gold);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/* Horizontal scroll */
+.h-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 0 20px;
+  margin: 0 -20px;
+  scrollbar-width: none;
+}
+.h-scroll::-webkit-scrollbar { display: none; }
+
+/* Cards */
+.sermon-card {
+  flex-shrink: 0;
+  width: 150px;
+  cursor: pointer;
+}
+.sermon-card .art {
+  width: 150px;
+  height: 150px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #2a1a4e, #1a1a3e);
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+.sermon-card .art .overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 50%, rgba(0,0,0,0.7));
+}
+.sermon-card .art .duration {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  z-index: 1;
+}
+.sermon-card .art-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sermon-card .name {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sermon-card .speaker {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* Hero banner */
+.hero {
+  position: relative;
+  height: 220px;
+  margin: 0 0 20px;
+  overflow: hidden;
+}
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--brand-purple), var(--brand-magenta), var(--surface-dark));
+  opacity: 0.8;
+}
+.hero-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 30%, var(--surface-dark));
+}
+.hero-content {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 1;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(10px);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  color: var(--brand-gold);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.hero-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.hero-title {
+  font-family: 'Maven Pro', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.hero-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+}
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--brand-gold);
+  color: #000;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  margin-top: 12px;
+  border: none;
+  cursor: pointer;
+}
+
+/* Reading card */
+.reading-card {
+  margin: 0 20px 20px;
+  padding: 14px 16px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--brand-gold);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.reading-card .left {}
+.reading-card .label { font-size: 11px; color: var(--brand-gold); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.reading-card .verse { font-size: 16px; color: var(--text-primary); font-weight: 600; margin-top: 2px; }
+.reading-card .icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(253,127,32,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+/* Event cards */
+.event-card {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.event-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  flex-shrink: 0;
+}
+.event-date .day { font-size: 22px; font-weight: 700; color: var(--brand-purple); font-family: 'Maven Pro'; }
+.event-date .month { font-size: 11px; color: var(--brand-purple); font-weight: 500; text-transform: uppercase; }
+.event-info { flex: 1; }
+.event-info .name { font-size: 15px; color: var(--text-primary); font-weight: 500; margin-bottom: 4px; }
+.event-info .location { font-size: 12px; color: var(--text-secondary); }
+.event-info .time {
+  font-size: 11px;
+  color: var(--brand-gold);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Daily prayer */
+.prayer-card {
+  margin: 0 20px 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(107,52,250,0.15), rgba(128,6,84,0.1));
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(107,52,250,0.2);
+}
+.prayer-card .label {
+  font-size: 11px;
+  color: var(--brand-purple);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.prayer-card .text {
+  font-size: 15px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-style: italic;
+}
+.prayer-card .ref {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+/* Greeting */
+.greeting {
+  padding: 16px 20px 8px;
+}
+.greeting .hi {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.greeting .name {
+  font-family: 'Maven Pro', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+.logo svg { width: 32px; height: 32px; fill: var(--brand-purple); }
+
+/* ============ MESSAGES SCREEN ============ */
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  padding: 0 20px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.filter-chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.chip.active {
+  background: rgba(253,127,32,0.1);
+  color: var(--brand-gold);
+  border-color: var(--brand-gold);
+}
+
+.sermon-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+.sermon-list-item:active { background: var(--surface-subtle); }
+.sermon-list-item .thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #2a1a4e, #1a1a3e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sermon-list-item .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sermon-list-item .info { flex: 1; }
+.sermon-list-item .info .title { font-size: 15px; color: var(--text-primary); font-weight: 500; }
+.sermon-list-item .info .meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.sermon-list-item .duration-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sermon-list-item .eq-icon {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 16px;
+}
+.sermon-list-item .eq-icon span {
+  width: 3px;
+  background: var(--brand-gold);
+  border-radius: 2px;
+  animation: eq 0.8s ease-in-out infinite alternate;
+}
+.sermon-list-item .eq-icon span:nth-child(1) { height: 8px; animation-delay: 0s; }
+.sermon-list-item .eq-icon span:nth-child(2) { height: 14px; animation-delay: 0.2s; }
+.sermon-list-item .eq-icon span:nth-child(3) { height: 10px; animation-delay: 0.4s; }
+@keyframes eq {
+  from { height: 4px; }
+  to { height: 16px; }
+}
+
+/* ============ PLAYER SCREEN ============ */
+.player-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 30%, var(--brand-purple), var(--brand-magenta) 50%, var(--surface-dark) 100%);
+  opacity: 0.4;
+}
+.player-content {
+  position: relative;
+  z-index: 1;
+  padding: 54px 24px 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.player-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+.player-top .chevron { color: var(--text-secondary); font-size: 18px; cursor: pointer; }
+.player-top .label { font-size: 12px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: 1px; }
+.player-top .dots { color: var(--text-secondary); font-size: 20px; cursor: pointer; }
+
+.artwork {
+  width: 280px;
+  height: 280px;
+  margin: 0 auto 32px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--brand-purple), var(--brand-magenta));
+  box-shadow: 0 20px 60px rgba(107,52,250,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px;
+}
+
+.track-info {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.track-info .title {
+  font-family: 'Maven Pro', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.track-info .artist {
+  font-size: 14px;
+  color: var(--brand-gold);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.seek-bar {
+  margin-bottom: 8px;
+}
+.seek-track {
+  width: 100%;
+  height: 4px;
+  background: var(--surface-subtle);
+  border-radius: 2px;
+  position: relative;
+  overflow: visible;
+}
+.seek-progress {
+  width: 55%;
+  height: 100%;
+  background: var(--brand-gold);
+  border-radius: 2px;
+  position: relative;
+}
+.seek-progress::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: -4px;
+  width: 12px;
+  height: 12px;
+  background: var(--brand-gold);
+  border-radius: 50%;
+}
+.seek-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  margin: 16px 0;
+}
+.player-controls .btn { color: var(--text-primary); cursor: pointer; display: flex; align-items: center; }
+.player-controls .btn svg { fill: currentColor; }
+.player-controls .play-main {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.player-controls .play-main svg { fill: #000; width: 28px; height: 28px; }
+
+.player-actions {
+  display: flex;
+  justify-content: space-around;
+  margin-top: auto;
+  padding-bottom: 40px;
+}
+.player-actions .action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+}
+.speed-pill {
+  padding: 4px 12px;
+  border: 1px solid var(--text-muted);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* ============ GIVING SCREEN ============ */
+.giving-header {
+  padding: 20px;
+  text-align: center;
+}
+.giving-header .verse {
+  font-size: 15px;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.5;
+  max-width: 280px;
+  margin: 0 auto 6px;
+}
+.giving-header .ref {
+  font-size: 12px;
+  color: var(--brand-gold);
+}
+
+.amount-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0 20px;
+  margin-bottom: 16px;
+}
+.amount-btn {
+  padding: 16px 0;
+  text-align: center;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: 'Maven Pro', sans-serif;
+}
+.amount-btn.selected {
+  border-color: var(--brand-gold);
+  background: rgba(253,127,32,0.08);
+  color: var(--brand-gold);
+}
+.amount-btn.custom {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.give-main-btn {
+  margin: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--brand-gold), #f5a623);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+  cursor: pointer;
+  width: calc(100% - 40px);
+  font-family: 'DM Sans', sans-serif;
+}
+
+.branch-select {
+  margin: 0 20px 20px;
+  padding: 14px 16px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.branch-select .label { font-size: 12px; color: var(--text-secondary); }
+.branch-select .value { display: flex; align-items: center; gap: 6px; }
+
+.giving-option {
+  margin: 0 20px 10px;
+  padding: 16px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+}
+.giving-option .icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.giving-option .icon-circle.purple { background: rgba(107,52,250,0.15); }
+.giving-option .icon-circle.gold { background: rgba(253,127,32,0.15); }
+.giving-option .text .title { font-size: 15px; color: var(--text-primary); font-weight: 500; }
+.giving-option .text .desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.giving-option .arrow { color: var(--text-muted); margin-left: auto; }
+
+/* ============ CALENDAR SCREEN ============ */
+.cal-filters {
+  display: flex;
+  gap: 8px;
+  padding: 0 20px;
+  margin-bottom: 16px;
+}
+.cal-filter {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
+  cursor: pointer;
+}
+.cal-filter.active {
+  background: var(--brand-purple);
+  color: white;
+}
+
+.service-times {
+  margin: 0 20px 16px;
+  padding: 12px 16px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  display: flex;
+  gap: 16px;
+}
+.service-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.service-time .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-purple);
+}
+
+/* ============ SETTINGS SCREEN ============ */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+}
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand-purple), var(--brand-gold));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  font-family: 'Maven Pro';
+}
+.profile-header .name { font-size: 20px; font-weight: 600; color: var(--text-primary); font-family: 'Maven Pro'; }
+.profile-header .role { font-size: 13px; color: var(--text-secondary); }
+.profile-header .branch-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(107,52,250,0.12);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  color: var(--brand-purple);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.settings-group {
+  margin: 0 20px 20px;
+}
+.settings-group .group-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+.settings-list {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.settings-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.settings-item:last-child { border-bottom: none; }
+.settings-item .icon { font-size: 18px; width: 24px; text-align: center; }
+.settings-item .label { flex: 1; font-size: 15px; color: var(--text-primary); }
+.settings-item .value { font-size: 13px; color: var(--text-secondary); }
+.settings-item .arrow { color: var(--text-muted); }
+.toggle {
+  width: 44px;
+  height: 26px;
+  background: var(--surface-subtle);
+  border-radius: 13px;
+  position: relative;
+}
+.toggle.on { background: var(--brand-purple); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+.toggle.on::after { left: 21px; }
+
+/* Dove SVG placeholder */
+.dove { font-size: 28px; filter: drop-shadow(0 0 20px rgba(107,52,250,0.4)); }
+</style>
+</head>
+<body>
+
+<!-- ==================== SCREEN 1: HOME ==================== -->
+<div>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="notch"></div>
+    <div class="status-icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+  <div class="screen-content">
+    <div class="greeting">
+      <div class="hi">Good evening</div>
+      <div class="name">Welcome back ✨</div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-gradient"></div>
+      <div class="hero-content">
+        <div class="hero-badge"><span class="dot"></span> LIVE SUNDAY</div>
+        <div class="hero-title">21 Days Prayer &amp; Fasting</div>
+        <div class="hero-sub">1st – 21st June 2026 · All Branches</div>
+        <button class="hero-cta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Watch Live
+        </button>
+      </div>
+    </div>
+
+    <!-- Today's reading -->
+    <div class="reading-card">
+      <div class="left">
+        <div class="label">Today's Reading</div>
+        <div class="verse">Revelation 7</div>
+      </div>
+      <div class="icon">📖</div>
+    </div>
+
+    <!-- Latest sermons -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Latest Sermons</h2>
+        <a href="#" class="see-all">See All</a>
+      </div>
+    </div>
+    <div class="h-scroll" style="margin-bottom:24px">
+      <div class="sermon-card">
+        <div class="art" style="background:linear-gradient(135deg,#3a1078,#6b34fa)">
+          <div class="overlay"></div>
+          <div class="duration">29:15</div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;z-index:0">🎤</div>
+        </div>
+        <div class="name">The Presence of God</div>
+        <div class="speaker">David Antwi</div>
+      </div>
+      <div class="sermon-card">
+        <div class="art" style="background:linear-gradient(135deg,#800654,#b91c8a)">
+          <div class="overlay"></div>
+          <div class="duration">34:02</div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;z-index:0">🙏</div>
+        </div>
+        <div class="name">Have a Pure Heart Towards God</div>
+        <div class="speaker">David Antwi</div>
+      </div>
+      <div class="sermon-card">
+        <div class="art" style="background:linear-gradient(135deg,#1a3a1a,#2d6a2d)">
+          <div class="overlay"></div>
+          <div class="duration">41:30</div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;z-index:0">⚡</div>
+        </div>
+        <div class="name">Why Fast?</div>
+        <div class="speaker">David Antwi</div>
+      </div>
+    </div>
+
+    <!-- Events -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Upcoming Events</h2>
+        <a href="#" class="see-all">See All</a>
+      </div>
+      <div class="event-card">
+        <div class="event-date">
+          <div class="day">08</div>
+          <div class="month">Jun</div>
+        </div>
+        <div class="event-info">
+          <div class="name">Prayer &amp; Fasting Service</div>
+          <div class="location">📍 Leigh Academy, Rainham</div>
+          <div class="time">7:00 PM</div>
+        </div>
+      </div>
+      <div class="event-card">
+        <div class="event-date">
+          <div class="day">14</div>
+          <div class="month">Jun</div>
+        </div>
+        <div class="event-info">
+          <div class="name">Sunday Service</div>
+          <div class="location">📍 Strood Academy, Rochester</div>
+          <div class="time">10:30 AM</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily prayer -->
+    <div class="prayer-card">
+      <div class="label">✦ Daily Prayer</div>
+      <div class="text">"Pray that like Paul, your faith in God will be unwavering in every season and that God will grant you the endurance to finish well."</div>
+      <div class="ref">— Acts 24</div>
+    </div>
+    <div style="height:60px"></div>
+  </div>
+
+  <!-- Mini player -->
+  <div class="mini-player">
+    <div class="thumb">🎵</div>
+    <div class="info">
+      <div class="title">The Presence of God</div>
+      <div class="artist">David Antwi</div>
+    </div>
+    <div class="play-btn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <div class="tab-item active">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Home
+    </div>
+    <div class="tab-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+      Messages
+    </div>
+    <div class="tab-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      Giving
+    </div>
+    <div class="tab-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+      Calendar
+    </div>
+    <div class="tab-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      More
+    </div>
+  </div>
+</div>
+<div class="screen-label">Home</div>
+</div>
+
+<!-- ==================== SCREEN 2: MESSAGES ==================== -->
+<div>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="notch"></div>
+    <div class="status-icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+  <div class="screen-content">
+    <div style="padding:16px 20px">
+      <h1>Messages</h1>
+    </div>
+
+    <!-- Search -->
+    <div style="padding:0 20px;margin-bottom:14px">
+      <div style="background:var(--surface-subtle);border-radius:var(--radius-md);padding:12px 14px;display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:14px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        Search sermons, speakers...
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="filter-chips">
+      <div class="chip active">All</div>
+      <div class="chip">Audio</div>
+      <div class="chip">Video</div>
+      <div class="chip">Series</div>
+      <div class="chip">Speakers</div>
+      <div class="chip">Playlists</div>
+    </div>
+
+    <!-- Continue listening -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Continue Listening</h2>
+      </div>
+    </div>
+    <div class="h-scroll" style="margin-bottom:24px">
+      <div class="sermon-card">
+        <div class="art" style="background:linear-gradient(135deg,#3a1078,#6b34fa);position:relative">
+          <div class="overlay"></div>
+          <div class="duration">12:30 left</div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px">🎤</div>
+          <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--surface-subtle)"><div style="width:55%;height:100%;background:var(--brand-gold);border-radius:2px"></div></div>
+        </div>
+        <div class="name">The Presence of God</div>
+        <div class="speaker">David Antwi</div>
+      </div>
+      <div class="sermon-card">
+        <div class="art" style="background:linear-gradient(135deg,#1a2a4e,#2a4a7e)">
+          <div class="overlay"></div>
+          <div class="duration">8:45 left</div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px">📖</div>
+          <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--surface-subtle)"><div style="width:72%;height:100%;background:var(--brand-gold);border-radius:2px"></div></div>
+        </div>
+        <div class="name">God Knows How To Protect</div>
+        <div class="speaker">David Antwi</div>
+      </div>
+    </div>
+
+    <!-- Sermon list -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Recent</h2>
+      </div>
+    </div>
+
+    <div class="sermon-list-item">
+      <div class="thumb" style="background:linear-gradient(135deg,#3a1078,#6b34fa)">🎤</div>
+      <div class="info">
+        <div class="title">The Presence of God</div>
+        <div class="meta">David Antwi · Jun 3, 2026</div>
+      </div>
+      <div class="eq-icon"><span></span><span></span><span></span></div>
+    </div>
+    <div class="sermon-list-item">
+      <div class="thumb" style="background:linear-gradient(135deg,#800654,#b91c8a)">🙏</div>
+      <div class="info">
+        <div class="title">Have a Pure Heart Towards God</div>
+        <div class="meta">David Antwi · Jun 3, 2026</div>
+      </div>
+      <div class="duration-badge">34:02</div>
+    </div>
+    <div class="sermon-list-item">
+      <div class="thumb" style="background:linear-gradient(135deg,#1a3a1a,#2d6a2d)">⚡</div>
+      <div class="info">
+        <div class="title">Why Fast?</div>
+        <div class="meta">David Antwi · Jun 3, 2026</div>
+      </div>
+      <div class="duration-badge">41:30</div>
+    </div>
+    <div class="sermon-list-item">
+      <div class="thumb" style="background:linear-gradient(135deg,#1a2a4e,#2a4a7e)">📖</div>
+      <div class="info">
+        <div class="title">God Knows How To Protect</div>
+        <div class="meta">David Antwi · May 18, 2026</div>
+      </div>
+      <div class="duration-badge">38:21</div>
+    </div>
+    <div class="sermon-list-item">
+      <div class="thumb" style="background:linear-gradient(135deg,#4a2a0a,#8a5a2a)">✝️</div>
+      <div class="info">
+        <div class="title">Acts 22</div>
+        <div class="meta">David Antwi · May 17, 2026</div>
+      </div>
+      <div class="duration-badge">45:10</div>
+    </div>
+    <div class="sermon-list-item">
+      <div class="thumb" style="background:linear-gradient(135deg,#2a1a3e,#5a3a7e)">🕊️</div>
+      <div class="info">
+        <div class="title">The Great Power In Little Things</div>
+        <div class="meta">Awo Antwi · May 13, 2026</div>
+      </div>
+      <div class="duration-badge">28:44</div>
+    </div>
+    <div class="sermon-list-item">
+      <div class="thumb" style="background:linear-gradient(135deg,#0a2a3e,#1a4a5e)">🌟</div>
+      <div class="info">
+        <div class="title">A Mission Worth Dying For</div>
+        <div class="meta">David Antwi · May 6, 2026</div>
+      </div>
+      <div class="duration-badge">36:55</div>
+    </div>
+    <div style="height:60px"></div>
+  </div>
+
+  <div class="mini-player">
+    <div class="thumb">🎵</div>
+    <div class="info">
+      <div class="title">The Presence of God</div>
+      <div class="artist">David Antwi</div>
+    </div>
+    <div class="play-btn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+    <div class="tab-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Messages</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>Giving</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>Calendar</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>More</div>
+  </div>
+</div>
+<div class="screen-label">Messages</div>
+</div>
+
+<!-- ==================== SCREEN 3: PLAYER ==================== -->
+<div>
+<div class="phone-frame" style="overflow:hidden">
+  <div class="player-bg"></div>
+  <div class="player-content">
+    <div class="player-top">
+      <span class="chevron">▾</span>
+      <span class="label">Now Playing</span>
+      <span class="dots">⋯</span>
+    </div>
+    <div class="artwork">🕊️</div>
+    <div class="track-info">
+      <div class="title">The Presence of God</div>
+      <div class="artist">David Antwi · June Fasting 2026</div>
+    </div>
+    <div class="seek-bar">
+      <div class="seek-track"><div class="seek-progress"></div></div>
+      <div class="seek-times"><span>16:05</span><span>-13:10</span></div>
+    </div>
+    <div class="player-controls">
+      <div class="btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></div>
+      <div class="btn"><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg></div>
+      <div class="play-main"><svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></div>
+      <div class="btn" style="transform:scaleX(-1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg></div>
+      <div class="btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:8px">
+      <span class="speed-pill">1.0x</span>
+    </div>
+    <div class="player-actions">
+      <div class="action"><span style="font-size:18px">📝</span>Notes</div>
+      <div class="action"><span style="font-size:18px">🔗</span>Share</div>
+      <div class="action"><span style="font-size:18px">📋</span>Playlist</div>
+      <div class="action"><span style="font-size:18px">☰</span>Queue</div>
+    </div>
+  </div>
+</div>
+<div class="screen-label">Now Playing</div>
+</div>
+
+<!-- ==================== SCREEN 4: GIVING ==================== -->
+<div>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="notch"></div>
+    <div class="status-icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+  <div class="screen-content">
+    <div style="padding:16px 20px"><h1>Give</h1></div>
+    <div class="giving-header">
+      <div class="verse">"Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver."</div>
+      <div class="ref">— 2 Corinthians 9:7</div>
+    </div>
+
+    <div class="branch-select">
+      <div>
+        <div class="label">Branch</div>
+        <div class="value">📍 London <span style="color:var(--text-muted)">▾</span></div>
+      </div>
+    </div>
+
+    <div style="padding:0 20px;margin-bottom:8px"><h3 style="color:var(--text-secondary);font-weight:500">Select Amount</h3></div>
+    <div class="amount-grid">
+      <div class="amount-btn">£10</div>
+      <div class="amount-btn">£25</div>
+      <div class="amount-btn selected">£50</div>
+      <div class="amount-btn">£100</div>
+      <div class="amount-btn">£250</div>
+      <div class="amount-btn custom">Custom</div>
+    </div>
+
+    <button class="give-main-btn">Give £50</button>
+
+    <div style="padding:20px 20px 8px"><h2>Other Ways to Give</h2></div>
+
+    <div class="giving-option">
+      <div class="icon-circle purple">🏦</div>
+      <div class="text">
+        <div class="title">Bank Transfer</div>
+        <div class="desc">Kharis Ministries · Sort 20-71-82</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>
+    <div class="giving-option">
+      <div class="icon-circle gold">🏠</div>
+      <div class="text">
+        <div class="title">Build God a House</div>
+        <div class="desc">Church building fund</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>
+    <div style="height:20px"></div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Messages</div>
+    <div class="tab-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>Giving</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>Calendar</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>More</div>
+  </div>
+</div>
+<div class="screen-label">Giving</div>
+</div>
+
+<!-- ==================== SCREEN 5: CALENDAR ==================== -->
+<div>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="notch"></div>
+    <div class="status-icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+  <div class="screen-content">
+    <div style="padding:16px 20px"><h1>Calendar</h1></div>
+
+    <div class="cal-filters">
+      <div class="cal-filter active">All Branches</div>
+      <div class="cal-filter">London</div>
+      <div class="cal-filter">Birmingham</div>
+      <div class="cal-filter">Reading</div>
+    </div>
+
+    <div class="service-times">
+      <div class="service-time"><span class="dot"></span> Sun 10:30am</div>
+      <div class="service-time"><span class="dot" style="background:var(--brand-gold)"></span> Wed 7:00pm</div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><h2>This Week</h2></div>
+
+      <div class="event-card">
+        <div class="event-date"><div class="day">08</div><div class="month">Jun</div></div>
+        <div class="event-info">
+          <div class="name">Day 8 — Prayer &amp; Fasting</div>
+          <div class="location">📍 Leigh Academy, Rainham</div>
+          <div class="time">7:00 PM · Evening Service</div>
+        </div>
+      </div>
+      <div class="event-card">
+        <div class="event-date"><div class="day">09</div><div class="month">Jun</div></div>
+        <div class="event-info">
+          <div class="name">Day 9 — Prayer &amp; Fasting</div>
+          <div class="location">📍 Leigh Academy, Otterham Quay</div>
+          <div class="time">7:00 PM · Evening Service</div>
+        </div>
+      </div>
+      <div class="event-card">
+        <div class="event-date"><div class="day">10</div><div class="month">Jun</div></div>
+        <div class="event-info">
+          <div class="name">Day 10 — Prayer &amp; Fasting</div>
+          <div class="location">📍 Leigh Academy, Otterham Quay</div>
+          <div class="time">7:00 PM · Evening Service</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><h2>Coming Up</h2></div>
+      <div class="event-card" style="border-left:3px solid var(--brand-gold)">
+        <div class="event-date"><div class="day">14</div><div class="month">Jun</div></div>
+        <div class="event-info">
+          <div class="name">Sunday Service ✨</div>
+          <div class="location">📍 Strood Academy, Carnation Road</div>
+          <div class="time">10:30 AM · Main Service</div>
+        </div>
+      </div>
+      <div class="event-card">
+        <div class="event-date"><div class="day">21</div><div class="month">Jun</div></div>
+        <div class="event-info">
+          <div class="name">End of Fasting Celebration</div>
+          <div class="location">📍 All Branches</div>
+          <div class="time">10:30 AM · Special Service</div>
+        </div>
+      </div>
+    </div>
+    <div style="height:20px"></div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Messages</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>Giving</div>
+    <div class="tab-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>Calendar</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>More</div>
+  </div>
+</div>
+<div class="screen-label">Calendar</div>
+</div>
+
+<!-- ==================== SCREEN 6: SETTINGS ==================== -->
+<div>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="notch"></div>
+    <div class="status-icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+  <div class="screen-content">
+    <div class="profile-header">
+      <div class="avatar">DA</div>
+      <div>
+        <div class="name">David</div>
+        <div class="role">Member</div>
+        <div class="branch-badge">📍 London Branch</div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="group-label">Account</div>
+      <div class="settings-list">
+        <div class="settings-item"><span class="icon">👤</span><span class="label">Profile</span><span class="arrow">›</span></div>
+        <div class="settings-item"><span class="icon">📍</span><span class="label">Branch</span><span class="value">London</span><span class="arrow">›</span></div>
+        <div class="settings-item"><span class="icon">🌐</span><span class="label">Language</span><span class="value">English</span><span class="arrow">›</span></div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="group-label">Notifications</div>
+      <div class="settings-list">
+        <div class="settings-item"><span class="icon">⛪</span><span class="label">Service Reminders</span><div class="toggle on"></div></div>
+        <div class="settings-item"><span class="icon">📅</span><span class="label">Event Announcements</span><div class="toggle on"></div></div>
+        <div class="settings-item"><span class="icon">📖</span><span class="label">Daily Reading</span><div class="toggle on"></div></div>
+        <div class="settings-item"><span class="icon">🔔</span><span class="label">New Sermons</span><div class="toggle"></div></div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="group-label">Appearance</div>
+      <div class="settings-list">
+        <div class="settings-item"><span class="icon">🌙</span><span class="label">Dark Mode</span><div class="toggle on"></div></div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="group-label">About</div>
+      <div class="settings-list">
+        <div class="settings-item"><span class="icon">ℹ️</span><span class="label">About Kharis</span><span class="arrow">›</span></div>
+        <div class="settings-item"><span class="icon">🔒</span><span class="label">Privacy Policy</span><span class="arrow">›</span></div>
+        <div class="settings-item"><span class="icon">📧</span><span class="label">Contact Us</span><span class="arrow">›</span></div>
+        <div class="settings-item"><span class="icon">⭐</span><span class="label">Rate the App</span><span class="arrow">›</span></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:20px;font-size:12px;color:var(--text-muted)">Kharis Church v2.0.0</div>
+    <div style="height:20px"></div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Home</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Messages</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>Giving</div>
+    <div class="tab-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>Calendar</div>
+    <div class="tab-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>More</div>
+  </div>
+</div>
+<div class="screen-label">Settings</div>
+</div>
+
+</body>
+</html>

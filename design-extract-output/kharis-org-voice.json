@@ -1,0 +1,75 @@
+{
+  "tone": "friendly",
+  "pronoun": "you-only",
+  "headingStyle": "Title Case",
+  "headingLengthClass": "balanced",
+  "ctaVerbs": [
+    {
+      "value": "fasting",
+      "count": 5
+    },
+    {
+      "value": "watch",
+      "count": 5
+    },
+    {
+      "value": "donate",
+      "count": 5
+    },
+    {
+      "value": "share",
+      "count": 5
+    },
+    {
+      "value": "find",
+      "count": 5
+    },
+    {
+      "value": "listen",
+      "count": 3
+    }
+  ],
+  "buttonPatterns": [
+    {
+      "value": "fasting booklet",
+      "count": 5
+    },
+    {
+      "value": "donate now",
+      "count": 5
+    },
+    {
+      "value": "share your testimony",
+      "count": 5
+    },
+    {
+      "value": "find a branch",
+      "count": 5
+    },
+    {
+      "value": "watch more messages",
+      "count": 3
+    },
+    {
+      "value": "listen to messages",
+      "count": 3
+    },
+    {
+      "value": "watch more messages\nlisten to messages",
+      "count": 2
+    }
+  ],
+  "sampleHeadings": [
+    "WELCOME TO KHARIS",
+    "CHANGING THE WORLD WITH A TOUCH OF HIS GRACE",
+    "June 2026 Corporate Fasting and Prayer",
+    "Latest Messages",
+    "Build God A House",
+    "Testimonies",
+    "This is an opportunity for you to give glory to God."
+  ],
+  "stats": {
+    "buttons": 28,
+    "headings": 7
+  }
+}

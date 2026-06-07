@@ -1,0 +1,72 @@
+{
+  "$schema": "https://designlang.app/schemas/gradients.json",
+  "source": "https://kharis.org",
+  "generated": "2026-06-07T21:53:51.476Z",
+  "count": 4,
+  "gradients": [
+    {
+      "raw": "radial-gradient(circle at 80% 3%, rgb(56, 167, 205), rgba(255, 255, 255, 0) 35%)",
+      "type": "radial",
+      "direction": "circle at 80% 3%",
+      "stops": [
+        {
+          "color": "rgb(56, 167, 205)",
+          "position": null
+        },
+        {
+          "color": "rgba(255, 255, 255, 0)",
+          "position": "35%"
+        }
+      ],
+      "classification": "brand"
+    },
+    {
+      "raw": "radial-gradient(circle at 60% 60%, rgb(121, 23, 64), rgba(255, 255, 255, 0) 45%)",
+      "type": "radial",
+      "direction": "circle at 60% 60%",
+      "stops": [
+        {
+          "color": "rgb(121, 23, 64)",
+          "position": null
+        },
+        {
+          "color": "rgba(255, 255, 255, 0)",
+          "position": "45%"
+        }
+      ],
+      "classification": "brand"
+    },
+    {
+      "raw": "radial-gradient(circle at 36% 65%, rgb(56, 167, 205), rgba(255, 255, 255, 0) 9%)",
+      "type": "radial",
+      "direction": "circle at 36% 65%",
+      "stops": [
+        {
+          "color": "rgb(56, 167, 205)",
+          "position": null
+        },
+        {
+          "color": "rgba(255, 255, 255, 0)",
+          "position": "9%"
+        }
+      ],
+      "classification": "brand"
+    },
+    {
+      "raw": "linear-gradient(60deg, rgb(122, 122, 122) 0%, rgb(122, 122, 122) 100%)",
+      "type": "linear",
+      "direction": "60deg",
+      "stops": [
+        {
+          "color": "rgb(122, 122, 122)",
+          "position": "0%"
+        },
+        {
+          "color": "rgb(122, 122, 122)",
+          "position": "100%"
+        }
+      ],
+      "classification": "brand"
+    }
+  ]
+}

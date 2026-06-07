@@ -1,0 +1,439 @@
+{
+  "pageIntent": {
+    "type": "landing",
+    "confidence": 0.29,
+    "path": "/",
+    "title": "Kharis Church – Kharis Church official website",
+    "description": "",
+    "signals": [
+      {
+        "kind": "dom",
+        "type": "legal",
+        "weight": 0.4
+      },
+      {
+        "kind": "url",
+        "type": "landing",
+        "weight": 0.45,
+        "detail": "root-path"
+      }
+    ],
+    "alternates": [
+      {
+        "type": "legal",
+        "score": 0.4
+      }
+    ],
+    "needsSmart": true
+  },
+  "sectionRoles": {
+    "sections": [
+      {
+        "index": 0,
+        "tag": "nav",
+        "role": "nav",
+        "subrole": null,
+        "confidence": 0.9,
+        "heading": null,
+        "bounds": {
+          "x": 64,
+          "y": 0,
+          "w": 1152,
+          "h": 76.96875
+        },
+        "buttonCount": 1,
+        "cardCount": 66,
+        "slots": {
+          "ctaCount": 1,
+          "lede": "HOME\nMESSAGES\nLOCATIONS\nUNITED KINGDOM\nLONDON\nBIRMINGHAM\nBRIGHTON\nBRISTOL\nCHATHAM\nCHELMSFORD\nCOVENTRY\nCROYDON\nLUTON\nNORTHAMPTON\nNOTTINGHAM\nORPINGTON\nREADING\nKHARIS INTERNATIONAL\nACCRA\nFREETOWN\nABOUT US\nGOVERNANCE\nKHARIS LIFE\nKGROUP\nBAPTISM\nFASTING\nMARRIAGE\nCHILDREN\nDEPARTMENTS\nKP2\nEVENTS\nGIVING\nCONTACT US"
+        },
+        "needsSmart": false
+      },
+      {
+        "index": 1,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": "WELCOME TO KHARIS",
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 399.1875
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "heading": "WELCOME TO KHARIS",
+          "subheadings": [
+            "CHANGING THE WORLD WITH A TOUCH OF HIS GRACE"
+          ],
+          "lede": "WELCOME TO KHARIS\nCHANGING THE WORLD WITH A TOUCH OF HIS GRACE"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 2,
+        "tag": "section",
+        "role": "hero",
+        "subrole": null,
+        "confidence": 0.85,
+        "heading": "June 2026 Corporate Fasting and Prayer",
+        "bounds": {
+          "x": 0,
+          "y": 399.1875,
+          "w": 1280,
+          "h": 338.28125
+        },
+        "buttonCount": 5,
+        "cardCount": 0,
+        "slots": {
+          "heading": "June 2026 Corporate Fasting and Prayer",
+          "ctaCount": 5
+        },
+        "needsSmart": false
+      },
+      {
+        "index": 3,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 64,
+          "y": 857.859375,
+          "w": 1152,
+          "h": 210.671875
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "heading": "",
+          "subheadings": [
+            "",
+            ""
+          ]
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 4,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 64,
+          "y": 1068.53125,
+          "w": 1152,
+          "h": 210.671875
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "heading": "",
+          "subheadings": [
+            ""
+          ]
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 5,
+        "tag": "section",
+        "role": "hero",
+        "subrole": null,
+        "confidence": 0.4,
+        "heading": "Latest Messages",
+        "bounds": {
+          "x": 0,
+          "y": 1304.203125,
+          "w": 1280,
+          "h": 472.390625
+        },
+        "buttonCount": 8,
+        "cardCount": 8,
+        "slots": {
+          "heading": "Latest Messages",
+          "ctaCount": 8,
+          "lede": "Latest Messages\nYouTube Video VVU0bDhXbWRGOWl2TURRSEhWT2RZS3FRLmdqQTQ0emtydVpF\nWATCH MORE MESSAGES\nLISTEN TO MESSAGES"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 6,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 74,
+          "y": 1409.59375,
+          "w": 1132,
+          "h": 332
+        },
+        "buttonCount": 8,
+        "cardCount": 8,
+        "slots": {
+          "ctaCount": 8,
+          "lede": "YouTube Video VVU0bDhXbWRGOWl2TURRSEhWT2RZS3FRLmdqQTQ0emtydVpF\nWATCH MORE MESSAGES\nLISTEN TO MESSAGES"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 7,
+        "tag": "section",
+        "role": "hero",
+        "subrole": null,
+        "confidence": 0.4,
+        "heading": "Build God A House",
+        "bounds": {
+          "x": 0,
+          "y": 1776.59375,
+          "w": 1280,
+          "h": 620.390625
+        },
+        "buttonCount": 5,
+        "cardCount": 0,
+        "slots": {
+          "heading": "Build God A House",
+          "ctaCount": 5
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 8,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": "Testimonies",
+        "bounds": {
+          "x": 0,
+          "y": 2396.984375,
+          "w": 1280,
+          "h": 115.390625
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "heading": "Testimonies"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 9,
+        "tag": "section",
+        "role": "testimonials",
+        "subrole": null,
+        "confidence": 0.4,
+        "heading": "This is an opportunity for you to give glory to God.",
+        "bounds": {
+          "x": 0,
+          "y": 2512.375,
+          "w": 1280,
+          "h": 295.34375
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "heading": "This is an opportunity for you to give glory to God."
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 10,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 0,
+          "y": 2807.71875,
+          "w": 1280,
+          "h": 120
+        },
+        "buttonCount": 5,
+        "cardCount": 0,
+        "slots": {
+          "ctaCount": 5,
+          "lede": "SHARE YOUR TESTIMONY"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 11,
+        "tag": "footer",
+        "role": "footer",
+        "subrole": null,
+        "confidence": 0.95,
+        "heading": null,
+        "bounds": {
+          "x": 0,
+          "y": 3318.734375,
+          "w": 1280,
+          "h": 394.1875
+        },
+        "buttonCount": 0,
+        "cardCount": 8,
+        "slots": {
+          "lede": "About"
+        },
+        "needsSmart": false
+      },
+      {
+        "index": 12,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 0,
+          "y": 3318.734375,
+          "w": 1280,
+          "h": 285.1875
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "lede": "About"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 13,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 74,
+          "y": 3379.734375,
+          "w": 1132,
+          "h": 214.1875
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "lede": "About"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 14,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 0,
+          "y": 3603.921875,
+          "w": 1280,
+          "h": 109
+        },
+        "buttonCount": 0,
+        "cardCount": 8,
+        "slots": {
+          "lede": "Youtube\n \nFacebook\n \nTwitter\n \nInstagram"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 15,
+        "tag": "section",
+        "role": "content",
+        "subrole": null,
+        "confidence": 0.3,
+        "heading": null,
+        "bounds": {
+          "x": 74,
+          "y": 3613.921875,
+          "w": 1132,
+          "h": 88
+        },
+        "buttonCount": 0,
+        "cardCount": 8,
+        "slots": {
+          "lede": "Youtube\n \nFacebook\n \nTwitter\n \nInstagram"
+        },
+        "needsSmart": true
+      },
+      {
+        "index": 16,
+        "tag": "footer",
+        "role": "footer",
+        "subrole": null,
+        "confidence": 0.95,
+        "heading": null,
+        "bounds": {
+          "x": 0,
+          "y": 3712.921875,
+          "w": 1280,
+          "h": 69.125
+        },
+        "buttonCount": 0,
+        "cardCount": 0,
+        "slots": {
+          "lede": "© 2026 Kharis Ministries | All Rights Reserved | Charity Number 1139291 | Disclaimer | Privacy Policy"
+        },
+        "needsSmart": false
+      },
+      {
+        "index": 17,
+        "tag": "nav",
+        "role": "nav",
+        "subrole": null,
+        "confidence": 0.9,
+        "heading": null,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "buttonCount": 1,
+        "cardCount": 0,
+        "slots": {
+          "ctaCount": 1,
+          "lede": ""
+        },
+        "needsSmart": false
+      }
+    ],
+    "counts": {
+      "nav": 2,
+      "content": 10,
+      "hero": 3,
+      "testimonials": 1,
+      "footer": 2
+    },
+    "readingOrder": [
+      "nav",
+      "content",
+      "nav",
+      "hero",
+      "content",
+      "content",
+      "hero",
+      "content",
+      "hero",
+      "content",
+      "testimonials",
+      "content",
+      "footer",
+      "content",
+      "content",
+      "content",
+      "content",
+      "footer"
+    ]
+  }
+}

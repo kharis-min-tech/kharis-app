@@ -1,0 +1,63 @@
+{
+  "materialLanguage": {
+    "label": "flat",
+    "confidence": 0,
+    "signals": [],
+    "metrics": {
+      "saturation": 0.257,
+      "shadowProfile": "soft",
+      "avgShadowBlur": 0,
+      "maxShadowBlur": 0,
+      "insetShadows": 0,
+      "avgRadius": 132,
+      "maxRadius": 850,
+      "hasPill": true,
+      "hasBackdropBlur": false,
+      "gradientCount": 4
+    },
+    "alternates": []
+  },
+  "imageryStyle": {
+    "label": "photography",
+    "confidence": 0.383,
+    "counts": {
+      "total": 10,
+      "svg": 1,
+      "icon": 4,
+      "hero": 0,
+      "screenshot": 0,
+      "photoLike": 5
+    },
+    "dominantAspect": "square-ish",
+    "radiusProfile": "square",
+    "alternates": [],
+    "signals": [
+      "raster photo-ext",
+      "raster photo-ext",
+      "raster photo-ext",
+      "raster photo-ext"
+    ]
+  },
+  "backgroundPatterns": {
+    "labels": [
+      "gradient-mesh"
+    ],
+    "counts": {
+      "noise": 0,
+      "dotGrid": 0,
+      "lineGrid": 0,
+      "meshCount": 1,
+      "svgPattern": 0
+    },
+    "gradientTotals": {
+      "radial": 3,
+      "linear": 1
+    },
+    "samples": [
+      {
+        "tag": "gradient-mesh",
+        "value": "radial-gradient(circle at 80% 3%, rgb(56, 167, 205), rgba(255, 255, 255, 0) 35%), radial-gradient(circle at 60% 60%, rgb(121, 23, 64), rgba(255, 255, 255, 0) 45%), radial-gradient(circle at 36% 65%, r"
+      }
+    ]
+  }
+}
