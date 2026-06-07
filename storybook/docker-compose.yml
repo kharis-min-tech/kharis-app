@@ -1,0 +1,10 @@
+services:
+  storybook:
+    build: .
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./src:/app/src
+      - ./.storybook:/app/.storybook
+    environment:
+      - NODE_ENV=development
