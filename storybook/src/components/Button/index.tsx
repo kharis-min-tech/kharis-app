@@ -1,80 +1,92 @@
-import React, { useState } from 'react';
-import { colors } from '../../tokens/colors';
-import { gradients } from '../../tokens/gradients';
-import { shadows } from '../../tokens/shadows';
+import React from 'react';
+
+/**
+ * Button — matches kharis.org exactly.
+ *
+ * Website evidence (all 6 CTAs identical):
+ *   bg: #FD7F20 (solid, NOT gradient)
+ *   color: #FFFFFF
+ *   font: Maven Pro, 14px, 700, uppercase
+ *   padding: 18px 40px
+ *   border-radius: 12px
+ *   border: none
+ *   shadow: none
+ *
+ * Secondary variant derived from social icons:
+ *   bg: transparent, border: 1px solid #FD7F20, color: #FD7F20
+ *
+ * Ghost derived from nav links:
+ *   bg: transparent, color: #7A7A7A
+ */
 
 export interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   children: React.ReactNode;
   onClick?: () => void;
 }
 
-const SIZE_STYLES: Record<NonNullable<ButtonProps['size']>, React.CSSProperties> = {
-  sm: { padding: '8px 16px', fontSize: '13px' },
-  md: { padding: '12px 24px', fontSize: '15px' },
-  lg: { padding: '16px 32px', fontSize: '17px' },
+const sizes = {
+  sm: { padding: '12px 24px', fontSize: 12 },
+  md: { padding: '18px 40px', fontSize: 14 },
+  lg: { padding: '20px 48px', fontSize: 16 },
 };
 
-export const Button: React.FC<ButtonProps> = ({
+export const Button = ({
   variant = 'primary',
   size = 'md',
   disabled = false,
   children,
   onClick,
-}) => {
-  const [hovered, setHovered] = useState(false);
+}: ButtonProps) => {
+  const s = sizes[size];
 
   const base: React.CSSProperties = {
-    borderRadius: '9999px',
+    fontFamily: '"Maven Pro", sans-serif',
+    fontSize: s.fontSize,
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 'normal',
+    padding: s.padding,
+    borderRadius: 12,
     border: 'none',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    fontFamily: "'DM Sans', sans-serif",
-    fontWeight: 600,
-    letterSpacing: '0.01em',
-    transition: 'opacity 0.15s ease, box-shadow 0.15s ease',
+    opacity: disabled ? 0.5 : 1,
+    transition: 'opacity 0.2s ease',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: disabled ? 0.5 : hovered ? 0.85 : 1,
-    ...SIZE_STYLES[size],
+    gap: 8,
+    textDecoration: 'none',
   };
 
-  const variants: Record<NonNullable<ButtonProps['variant']>, React.CSSProperties> = {
+  const variants: Record<string, React.CSSProperties> = {
     primary: {
-      background: gradients.goldAccent.css,
-      color: '#000000',
-      boxShadow: hovered ? shadows.glowGold.value : 'none',
+      ...base,
+      backgroundColor: '#FD7F20',
+      color: '#FFFFFF',
     },
     secondary: {
-      background: 'transparent',
-      color: colors.brand.purple.hex,
-      border: `1.5px solid ${colors.brand.purple.hex}`,
-      boxShadow: hovered ? shadows.glowPurple.value : 'none',
+      ...base,
+      backgroundColor: 'transparent',
+      border: '1px solid #FD7F20',
+      color: '#FD7F20',
     },
     ghost: {
-      background: 'transparent',
-      color: colors.text.primary.hex,
-      border: '1.5px solid transparent',
-    },
-    destructive: {
-      background: colors.semantic.error.hex,
-      color: colors.text.primary.hex,
+      ...base,
+      backgroundColor: 'transparent',
+      color: '#7A7A7A',
     },
   };
 
   return (
     <button
-      style={{ ...base, ...variants[variant] }}
+      style={variants[variant]}
       disabled={disabled}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {children}
     </button>
   );
 };
-
-export default Button;
