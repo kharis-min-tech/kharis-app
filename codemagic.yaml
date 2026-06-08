@@ -21,9 +21,10 @@ workflows:
       - name: Build APK
         script: |
           cd app
-          flutter build apk --debug --verbose 2>&1 | tail -100
+          flutter build apk --debug
     artifacts:
-      - app/build/app/outputs/flutter-apk/app-debug.apk
+      - app/build/app/outputs/flutter-apk/*.apk
+      - app/build/app/outputs/apk/**/*.apk
 
   android-release:
     name: Android Release AAB
