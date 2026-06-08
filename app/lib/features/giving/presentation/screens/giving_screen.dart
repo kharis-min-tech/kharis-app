@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import 'giving_webview_screen.dart';
 
 class GivingScreen extends StatefulWidget {
   const GivingScreen({super.key});
@@ -51,7 +52,10 @@ class _GivingScreenState extends State<GivingScreen> {
                 onSelected: (i) => setState(() => _selectedIndex = i),
               ),
               const SizedBox(height: 28),
-              _GiveButton(label: _selectedLabel),
+              _GiveButton(
+                label: _selectedLabel,
+                onPressed: () => openGivingFlow(context, 'https://kharis.org/give'),
+              ),
               const SizedBox(height: 36),
               Text(
                 'Other Ways to Give',
@@ -208,9 +212,10 @@ class _AmountGrid extends StatelessWidget {
 }
 
 class _GiveButton extends StatelessWidget {
-  const _GiveButton({required this.label});
+  const _GiveButton({required this.label, required this.onPressed});
 
   final String label;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +223,7 @@ class _GiveButton extends StatelessWidget {
       width: double.infinity,
       height: 52,
       child: TextButton(
-        onPressed: () {},
+        onPressed: onPressed,
         style: TextButton.styleFrom(
           backgroundColor: AppColors.orange,
           foregroundColor: AppColors.textPrimary,

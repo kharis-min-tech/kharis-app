@@ -1,15 +1,17 @@
+import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
 class _Event {
-  const _Event({
+  _Event({
     required this.day,
     required this.month,
     required this.title,
     required this.location,
     required this.time,
+    required this.startDate,
     this.isFeatured = false,
   });
 
@@ -19,15 +21,17 @@ class _Event {
   final String location;
   final String time;
   final bool isFeatured;
+  final DateTime startDate;
 }
 
-const _thisWeekEvents = [
+final _thisWeekEvents = [
   _Event(
     day: '08',
     month: 'JUN',
     title: 'Sunday Celebration Service',
     location: 'London — 12 Acton Street',
     time: 'Sun, 10:30am',
+    startDate: DateTime(2026, 6, 8, 10, 30),
   ),
   _Event(
     day: '10',
@@ -35,6 +39,7 @@ const _thisWeekEvents = [
     title: 'Midweek Prayer & Bible Study',
     location: 'Birmingham — Broad Street',
     time: 'Wed, 7:00pm',
+    startDate: DateTime(2026, 6, 10, 19, 0),
   ),
   _Event(
     day: '12',
@@ -42,16 +47,18 @@ const _thisWeekEvents = [
     title: 'Youth Night',
     location: 'Reading — Caversham Road',
     time: 'Fri, 6:30pm',
+    startDate: DateTime(2026, 6, 12, 18, 30),
   ),
 ];
 
-const _comingUpEvents = [
+final _comingUpEvents = [
   _Event(
     day: '15',
     month: 'JUN',
     title: 'Kharis Leadership Summit 2026',
     location: 'London — 12 Acton Street',
     time: 'Sun, 10:00am',
+    startDate: DateTime(2026, 6, 15, 10, 0),
     isFeatured: true,
   ),
   _Event(
@@ -60,6 +67,7 @@ const _comingUpEvents = [
     title: 'Worship Night',
     location: 'Birmingham — Broad Street',
     time: 'Sun, 6:00pm',
+    startDate: DateTime(2026, 6, 22, 18, 0),
   ),
 ];
 
@@ -300,6 +308,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ],
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                final endDate = event.startDate.add(const Duration(hours: 2));
+                Add2Calendar.addEvent2Cal(
+                  Event(
+                    title: event.title,
+                    description: event.location,
+                    location: event.location,
+                    startDate: event.startDate,
+                    endDate: endDate,
+                  ),
+                );
+              },
+              child: const Icon(
+                Icons.calendar_today_outlined,
+                size: 20,
+                color: AppColors.orange,
               ),
             ),
           ],

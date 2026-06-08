@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: user has admin custom claim
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+
+    // sermons — readable by any authenticated user, writable only by admin
+    match /sermons/{sermonId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // events — readable by any authenticated user, writable only by admin
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // dailyContent — readable by any authenticated user, writable only by admin
+    match /dailyContent/{dateId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // news — readable by any authenticated user, writable only by admin
+    match /news/{newsId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
