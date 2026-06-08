@@ -1,11 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/firebase_service.dart';
+import '../../features/calendar/data/event_repository.dart';
+import '../../features/home/data/daily_content_repository.dart';
+import '../../features/messages/data/firestore_sermon_repository.dart';
 import '../../features/messages/data/sermon_repository.dart';
+import '../../features/messages/data/sermon_repository_base.dart';
 import '../models/sermon.dart';
 
 // ── Repository ────────────────────────────────────────────────────────────────
 
-final sermonRepositoryProvider = Provider<SermonRepository>((ref) {
+final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
+  if (kUseFirebase) return FirestoreSermonRepository();
   return SermonRepository();
 });
 
@@ -68,3 +74,29 @@ final filteredSermonsProvider = Provider<List<Sermon>>((ref) {
 // ── Currently playing sermon ──────────────────────────────────────────────────
 
 final currentSermonProvider = StateProvider<Sermon?>((ref) => null);
+
+// ── Events ────────────────────────────────────────────────────────────────────
+
+final eventRepositoryProvider = Provider<EventRepository>((ref) {
+  return EventRepository();
+});
+
+/// Upcoming events, optionally filtered by branch.
+///
+/// Pass a [branch] override via `ref.watch(upcomingEventsProvider('Main'))`.
+final upcomingEventsProvider =
+    FutureProvider.family<List<Event>, String?>((ref, branch) async {
+  final repo = ref.watch(eventRepositoryProvider);
+  return repo.getUpcomingEvents(branch: branch);
+});
+
+// ── Daily content ─────────────────────────────────────────────────────────────
+
+final dailyContentRepositoryProvider = Provider<DailyContentRepository>((ref) {
+  return DailyContentRepository();
+});
+
+final dailyContentProvider = FutureProvider<DailyContent>((ref) async {
+  final repo = ref.watch(dailyContentRepositoryProvider);
+  return repo.getTodaysContent();
+});

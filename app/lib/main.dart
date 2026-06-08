@@ -4,12 +4,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/services/app_router.dart';
 import 'core/services/cache_service.dart';
+import 'core/services/firebase_service.dart';
 import 'core/theme/theme.dart';
 import 'shared/providers/cache_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (kUseFirebase) {
+    await FirebaseService.init();
+  }
+
   final prefs = await SharedPreferences.getInstance();
   final cacheService = await CacheService.init();
 

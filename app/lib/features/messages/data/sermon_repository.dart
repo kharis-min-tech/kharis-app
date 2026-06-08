@@ -1,12 +1,13 @@
 import 'package:dio/dio.dart';
 
 import '../../../shared/models/sermon.dart';
+import 'sermon_repository_base.dart';
 
 /// Fetches sermons from the Kharis SoundCloud RSS feed.
 ///
 /// Falls back to [getMockSermons] during offline development or when the
 /// network is unavailable.
-class SermonRepository {
+class SermonRepository extends AbstractSermonRepository {
   SermonRepository({Dio? dio}) : _dio = dio ?? Dio();
 
   static const _feedUrl =
@@ -15,6 +16,7 @@ class SermonRepository {
   final Dio _dio;
 
   /// Live fetch from SoundCloud RSS.
+  @override
   Future<List<Sermon>> getSermons() async {
     final response = await _dio.get<String>(
       _feedUrl,
@@ -29,6 +31,7 @@ class SermonRepository {
   }
 
   /// 10 hardcoded sermons for offline development.
+  @override
   List<Sermon> getMockSermons() => _mockSermons;
 
   // ── RSS parser ─────────────────────────────────────────────────────────────
