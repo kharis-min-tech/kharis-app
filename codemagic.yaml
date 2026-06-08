@@ -22,14 +22,13 @@ workflows:
         script: |
           cd app
           flutter build apk --debug 2>&1 | tail -20
-          echo "=== APK location ==="
-          find build -name "*.apk" -type f 2>/dev/null
-          mkdir -p build/artifacts
-          find build -name "*.apk" -type f -exec cp {} build/artifacts/ \;
+      - name: Collect APK
+        script: |
+          mkdir -p /tmp/artifacts
+          find app/build -name "*.apk" -type f -exec cp {} /tmp/artifacts/ \;
+          ls -lh /tmp/artifacts/ || echo "No APK found"
     artifacts:
-      - app/build/artifacts/*.apk
-      - app/build/**/outputs/**/*.apk
-      - app/build/**/*.apk
+      - /tmp/artifacts/*.apk
 
   android-release:
     name: Android Release AAB
