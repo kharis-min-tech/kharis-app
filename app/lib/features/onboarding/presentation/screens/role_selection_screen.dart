@@ -1,0 +1,96 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/features/onboarding/presentation/widgets/role_card.dart';
+
+class RoleSelectionScreen extends StatelessWidget {
+  const RoleSelectionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surfaceDark,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 56),
+              // Heading
+              Text(
+                'Welcome to Kharis',
+                style: TextStyle(
+                  fontFamily: 'Maven Pro',
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Subtitle
+              Text(
+                'How would you like to explore?',
+                style: AppTypography.body.copyWith(
+                  fontSize: 16,
+                  color: AppColors.textBody,
+                ),
+              ),
+              const SizedBox(height: 40),
+              // Role cards
+              RoleCard(
+                icon: Icons.people_outline,
+                title: 'Member',
+                description: 'I attend Kharis Church',
+                color: AppColors.purple,
+                onTap: () => context.push('/branch-selection'),
+              ),
+              const SizedBox(height: 12),
+              RoleCard(
+                icon: Icons.waving_hand,
+                title: 'New Here',
+                description: 'This is my first time',
+                color: AppColors.orange,
+                onTap: () => context.push('/branch-selection'),
+              ),
+              const SizedBox(height: 12),
+              RoleCard(
+                icon: Icons.headphones,
+                title: 'Guest',
+                description: 'Just browsing sermons',
+                color: AppColors.magenta,
+                onTap: () => context.push('/branch-selection'),
+              ),
+              const Spacer(),
+              // Language selector
+              Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    // TODO: open language bottom sheet
+                  },
+                  icon: Icon(
+                    Icons.language,
+                    color: AppColors.textMuted,
+                    size: 18,
+                  ),
+                  label: Text(
+                    'English',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textMuted,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
