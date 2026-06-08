@@ -7,9 +7,6 @@ workflows:
       flutter: stable
       java: 17
     scripts:
-      - name: Flutter doctor
-        script: |
-          flutter doctor -v
       - name: Get dependencies
         script: |
           cd app
@@ -18,98 +15,9 @@ workflows:
         script: |
           cd app
           flutter build apk --debug
+      - name: List artifacts
+        script: |
+          find app/build -name "*.apk" -type f 2>/dev/null
     artifacts:
-      - app/build/app/outputs/flutter-apk/*.apk
-      - app/build/app/outputs/apk/**/*.apk
-
-  android-release:
-    name: Android Release AAB
-    max_build_duration: 30
-    instance_type: mac_mini_m2
-    environment:
-      flutter: stable
-      java: 17
-      groups:
-        - android_signing
-    scripts:
-      - name: Get dependencies
-        script: |
-          cd app
-          flutter pub get
-      - name: Set up signing
-        script: |
-          cd app
-          echo $CM_KEYSTORE | base64 --decode > android/keystore/kharis-release.jks
-          cat > android/key.properties <<EOF
-          storePassword=$CM_KEYSTORE_PASSWORD
-          keyPassword=$CM_KEY_PASSWORD
-          keyAlias=$CM_KEY_ALIAS
-          storeFile=../keystore/kharis-release.jks
-          EOF
-      - name: Build AAB
-        script: |
-          cd app
-          flutter build appbundle --release
-    artifacts:
-      - app/build/app/outputs/bundle/release/app-release.aab
-
-  ios-debug:
-    name: iOS Debug (No Signing)
-    max_build_duration: 30
-    instance_type: mac_mini_m2
-    environment:
-      flutter: stable
-      xcode: latest
-      cocoapods: default
-    scripts:
-      - name: Get dependencies
-        script: |
-          cd app
-          flutter pub get
-      - name: Install CocoaPods
-        script: |
-          cd app/ios
-          pod install
-      - name: Build iOS (no codesign)
-        script: |
-          cd app
-          flutter build ios --debug --no-codesign
-    artifacts:
-      - app/build/ios/iphoneos/Runner.app
-
-  ios-release:
-    name: iOS Release (TestFlight)
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-    environment:
-      flutter: stable
-      xcode: latest
-      cocoapods: default
-      groups:
-        - ios_signing
-    scripts:
-      - name: Get dependencies
-        script: |
-          cd app
-          flutter pub get
-      - name: Install CocoaPods
-        script: |
-          cd app/ios
-          pod install
-      - name: Set up code signing
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "org.kharis.app" --type IOS_APP_STORE
-          keychain add-certificates
-          xcode-project use-profiles
-        working_directory: app
-      - name: Build IPA
-        script: |
-          cd app
-          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
-    artifacts:
-      - app/build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
+      - app/build/**/outputs/**/*.apk
+      - app/build/**/outputs/**/*.aab
