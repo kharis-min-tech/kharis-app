@@ -7,14 +7,21 @@ workflows:
       flutter: stable
       java: 17
     scripts:
+      - name: Flutter doctor
+        script: |
+          flutter doctor -v
       - name: Get dependencies
         script: |
           cd app
           flutter pub get
+      - name: Analyze
+        script: |
+          cd app
+          flutter analyze --no-fatal-infos
       - name: Build APK
         script: |
           cd app
-          flutter build apk --debug
+          flutter build apk --debug --verbose 2>&1 | tail -100
     artifacts:
       - app/build/app/outputs/flutter-apk/app-debug.apk
 
