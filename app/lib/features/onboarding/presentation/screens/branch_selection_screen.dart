@@ -150,7 +150,7 @@ class _BranchSelectionScreenState
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed:
-                      selected != null ? () => context.go('/login') : null,
+                      selected != null ? () => context.go('/home') : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.orange,
                     disabledBackgroundColor: AppColors.orange.withValues(alpha: 0.35),

@@ -48,29 +48,7 @@ class RouterNotifier extends ChangeNotifier {
   ///
   /// Reads auth state synchronously from the repository to avoid stream lag.
   String? redirect(BuildContext context, GoRouterState state) {
-    // Read directly from the repository: _currentUser is updated before the
-    // stream event is processed, so this is always current.
-    final isAuthenticated =
-        _ref.read(authRepositoryProvider).isAuthenticated;
-
-    final path = state.uri.path;
-
-    if (isAuthenticated) {
-      // Authenticated users skip the splash, onboarding, and auth screens.
-      if (path == '/' ||
-          path == '/login' ||
-          path == '/register') {
-        return '/home';
-      }
-      return null;
-    }
-
-    // Unauthenticated: gate all main-app routes.
-    // Allow ?bypass=test query param for development testing.
-    final bypass = state.uri.queryParameters['bypass'] == 'test';
-    const protectedRoutes = {'/home', '/messages', '/giving', '/calendar', '/more'};
-    if (protectedRoutes.contains(path) && !bypass) return '/login';
-
+    // Prototype mode: no auth gating. All routes accessible.
     return null;
   }
 }
