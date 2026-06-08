@@ -66,8 +66,10 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     // Unauthenticated: gate all main-app routes.
-    const protected = {'/home', '/messages', '/giving', '/calendar', '/more'};
-    if (protected.contains(path)) return '/login';
+    // Allow ?bypass=test query param for development testing.
+    final bypass = state.uri.queryParameters['bypass'] == 'test';
+    const protectedRoutes = {'/home', '/messages', '/giving', '/calendar', '/more'};
+    if (protectedRoutes.contains(path) && !bypass) return '/login';
 
     return null;
   }
