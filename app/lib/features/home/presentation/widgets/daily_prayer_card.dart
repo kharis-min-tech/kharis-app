@@ -14,12 +14,12 @@ class DailyPrayerCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.purple.withOpacity(0.15),
-            AppColors.purple.withOpacity(0.05),
+            AppColors.purple.withValues(alpha: 0.15),
+            AppColors.purple.withValues(alpha: 0.05),
           ],
         ),
         border: Border.all(
-          color: AppColors.purple.withOpacity(0.35),
+          color: AppColors.purple.withValues(alpha: 0.35),
           width: 1.5,
         ),
       ),
@@ -36,7 +36,7 @@ class DailyPrayerCard extends StatelessWidget {
                     vertical: AppSpacing.xs,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.purple.withOpacity(0.2),
+                    color: AppColors.purple.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                   child: Row(
@@ -93,7 +93,7 @@ class DailyPrayerCard extends StatelessWidget {
                 onPressed: () {},
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(
-                    color: AppColors.purple.withOpacity(0.5),
+                    color: AppColors.purple.withValues(alpha: 0.5),
                     width: 1.5,
                   ),
                   shape: RoundedRectangleBorder(

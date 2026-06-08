@@ -204,9 +204,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.orange,
-                      // ignore: deprecated_member_use
                       disabledBackgroundColor:
-                          AppColors.orange.withOpacity(0.5),
+                          AppColors.orange.withValues(alpha: 0.5),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

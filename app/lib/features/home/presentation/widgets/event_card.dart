@@ -42,10 +42,10 @@ class EventCard extends StatelessWidget {
                   vertical: AppSpacing.sm,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.purple.withOpacity(0.12),
+                  color: AppColors.purple.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppSpacing.sm),
                   border: Border.all(
-                    color: AppColors.purple.withOpacity(0.2),
+                    color: AppColors.purple.withValues(alpha: 0.2),
                     width: 1,
                   ),
                 ),

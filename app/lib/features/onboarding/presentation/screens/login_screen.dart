@@ -186,8 +186,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: _isLoading ? null : _signIn,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.orange,
-                      // ignore: deprecated_member_use
-                      disabledBackgroundColor: AppColors.orange.withOpacity(0.5),
+                      disabledBackgroundColor: AppColors.orange.withValues(alpha: 0.5),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

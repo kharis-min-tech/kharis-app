@@ -45,7 +45,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 title: 'Member',
                 description: 'I attend Kharis Church',
                 color: AppColors.purple,
-                onTap: () => context.push('/branch-selection'),
+                onTap: () => context.go('/branch-selection'),
               ),
               const SizedBox(height: 12),
               RoleCard(
@@ -53,7 +53,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 title: 'New Here',
                 description: 'This is my first time',
                 color: AppColors.orange,
-                onTap: () => context.push('/branch-selection'),
+                onTap: () => context.go('/branch-selection'),
               ),
               const SizedBox(height: 12),
               RoleCard(
@@ -61,7 +61,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 title: 'Guest',
                 description: 'Just browsing sermons',
                 color: AppColors.magenta,
-                onTap: () => context.push('/branch-selection'),
+                onTap: () => context.go('/branch-selection'),
               ),
               const Spacer(),
               // Language selector

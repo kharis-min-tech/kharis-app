@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/providers/audio_provider.dart';
+import '../../../player/presentation/widgets/mini_player.dart';
 
 /// Bottom-nav shell that wraps all 5 dashboard tabs.
 ///
 /// Uses [StatefulNavigationShell] from [StatefulShellRoute.indexedStack] so
 /// every branch gets its own navigator and state is preserved between tab
 /// switches via an IndexedStack under the hood.
-class DashboardShell extends StatefulWidget {
+class DashboardShell extends ConsumerStatefulWidget {
   const DashboardShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  State<DashboardShell> createState() => _DashboardShellState();
+  ConsumerState<DashboardShell> createState() => _DashboardShellState();
 }
 
-class _DashboardShellState extends State<DashboardShell> {
+class _DashboardShellState extends ConsumerState<DashboardShell> {
   void _onTap(int index) {
-    // Passing initialLocation: true when re-tapping the current tab pops back
-    // to the branch root — standard UX for bottom-nav.
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == widget.navigationShell.currentIndex,
@@ -30,12 +31,20 @@ class _DashboardShellState extends State<DashboardShell> {
 
   @override
   Widget build(BuildContext context) {
+    final currentSermon = ref.watch(currentSermonProvider);
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
       body: widget.navigationShell,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Mini player sits above the bottom nav when a sermon is loaded.
+          if (currentSermon != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: const MiniPlayer(),
+            ),
           // 1 px top separator
           Container(height: 1, color: AppColors.surfaceSubtle),
           BottomNavigationBar(

@@ -80,7 +80,7 @@ class _QuickActionTile extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: AppColors.magenta.withOpacity(0.12),
+                  color: AppColors.magenta.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppSpacing.sm),
                 ),
                 child: Icon(

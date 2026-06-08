@@ -150,11 +150,10 @@ class _BranchSelectionScreenState
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed:
-                      selected != null ? () => context.go('/home') : null,
+                      selected != null ? () => context.go('/login') : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.orange,
-                    // ignore: deprecated_member_use
-                    disabledBackgroundColor: AppColors.orange.withOpacity(0.35),
+                    disabledBackgroundColor: AppColors.orange.withValues(alpha: 0.35),
                     foregroundColor: Colors.white,
                     disabledForegroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 18),
