@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
-import '../screens/full_player_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
@@ -26,14 +26,7 @@ class MiniPlayer extends ConsumerWidget {
         : 0.0;
 
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const FullPlayerScreen(),
-            fullscreenDialog: true,
-          ),
-        );
-      },
+      onTap: () => context.push('/player'),
       child: Container(
         height: 56,
         margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),

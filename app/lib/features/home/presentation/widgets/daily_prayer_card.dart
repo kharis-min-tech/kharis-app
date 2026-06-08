@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 
-class DailyPrayerCard extends StatelessWidget {
+import '../../../../shared/providers/sermon_provider.dart';
+
+class DailyPrayerCard extends ConsumerWidget {
   const DailyPrayerCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contentAsync = ref.watch(dailyContentProvider);
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: AppRadius.cardBorder,
@@ -28,6 +33,7 @@ class DailyPrayerCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Badge
             Row(
               children: [
                 Container(
@@ -42,14 +48,14 @@ class DailyPrayerCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.self_improvement_rounded,
                         size: 13,
                         color: AppColors.purple,
                       ),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        "DAILY PRAYER",
+                        'DAILY PRAYER',
                         style: GoogleFonts.dmSans(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -63,26 +69,42 @@ class DailyPrayerCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(
-              '"Father, I thank You for the gift of life and Your Word that gives me victory in every situation. '
-              'I am empowered by Your Spirit to walk in divine health, '
-              'prosperity, and excellence today — in Jesus\' Name."',
-              style: GoogleFonts.dmSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                color: AppColors.textPrimary,
-                fontStyle: FontStyle.italic,
-                height: 1.65,
+            // Prayer content
+            contentAsync.when(
+              loading: () => _PrayerPlaceholder(),
+              error: (_, _) => Text(
+                'Prayer unavailable. Please try again later.',
+                style: GoogleFonts.dmSans(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                  fontStyle: FontStyle.italic,
+                  height: 1.65,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              '— Philippians 4:13 · John 10:10',
-              style: GoogleFonts.dmSans(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textMuted,
-                letterSpacing: 0.3,
+              data: (content) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '\u201c${content.prayer}\u201d',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textPrimary,
+                      fontStyle: FontStyle.italic,
+                      height: 1.65,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    '— ${content.prayerReference}',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMuted,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -113,6 +135,69 @@ class DailyPrayerCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Loading placeholder ────────────────────────────────────────────────────────
+
+class _PrayerPlaceholder extends StatefulWidget {
+  @override
+  State<_PrayerPlaceholder> createState() => _PrayerPlaceholderState();
+}
+
+class _PrayerPlaceholderState extends State<_PrayerPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.2, end: 0.5).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacity,
+      builder: (context, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _line(double.infinity, 14),
+            const SizedBox(height: AppSpacing.sm),
+            _line(double.infinity, 14),
+            const SizedBox(height: AppSpacing.sm),
+            _line(200, 14),
+            const SizedBox(height: AppSpacing.md),
+            _line(120, 12),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _line(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.purple.withValues(alpha: _opacity.value),
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }

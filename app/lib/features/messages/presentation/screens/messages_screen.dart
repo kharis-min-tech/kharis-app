@@ -22,15 +22,36 @@ const _kGradients = [
   [Color(0xFF1A0A2A), Color(0xFFEC4899)],
 ];
 
-class MessagesScreen extends ConsumerWidget {
+class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MessagesScreen> createState() => _MessagesScreenState();
+}
+
+class _MessagesScreenState extends ConsumerState<MessagesScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final sermonsAsync = ref.watch(sermonsProvider);
     final categories = ref.watch(categoryLabelsProvider);
     final selectedIndex = ref.watch(selectedCategoryIndexProvider);
     final filteredSermons = ref.watch(filteredSermonsProvider);
+
+    final query = _searchQuery.toLowerCase();
+    final displaySermons = query.isEmpty
+        ? filteredSermons
+        : filteredSermons
+            .where((s) => s.title.toLowerCase().contains(query))
+            .toList();
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
@@ -55,6 +76,66 @@ class MessagesScreen extends ConsumerWidget {
                 ),
               ),
             ),
+
+            // ── Search field ─────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+              ),
+              child: TextField(
+                controller: _searchController,
+                style: GoogleFonts.dmSans(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v),
+                decoration: InputDecoration(
+                  hintText: 'Search sermons...',
+                  hintStyle: GoogleFonts.dmSans(
+                    fontSize: 14,
+                    color: AppColors.textMuted,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppColors.textMuted,
+                    size: 20,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.close,
+                            color: AppColors.textMuted,
+                            size: 18,
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppColors.surfaceSubtle,
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.md),
 
             // ── Category filter chips ────────────────────────────────────
             SizedBox(
@@ -107,61 +188,92 @@ class MessagesScreen extends ConsumerWidget {
 
             // ── Content area ─────────────────────────────────────────────
             Expanded(
-              child: sermonsAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.orange,
-                  ),
-                ),
-                error: (error, _) => Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: AppColors.error,
-                        size: 48,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'Failed to load sermons',
-                        style: GoogleFonts.dmSans(
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      TextButton(
-                        onPressed: () =>
-                            ref.invalidate(sermonsProvider),
-                        child: const Text(
-                          'Retry',
-                          style: TextStyle(color: AppColors.orange),
+              child: RefreshIndicator(
+                color: AppColors.orange,
+                onRefresh: () async {
+                  ref.invalidate(sermonsProvider);
+                },
+                child: sermonsAsync.when(
+                  loading: () => ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(
+                        height: 300,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.orange,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-                data: (_) => filteredSermons.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No sermons found',
-                          style: GoogleFonts.dmSans(
-                            color: AppColors.textMuted,
+                  error: (error, _) => ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: 300,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                color: AppColors.error,
+                                size: 48,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                'Failed to load sermons',
+                                style: GoogleFonts.dmSans(
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              TextButton(
+                                onPressed: () =>
+                                    ref.invalidate(sermonsProvider),
+                                child: const Text(
+                                  'Retry',
+                                  style: TextStyle(color: AppColors.orange),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg,
-                          vertical: AppSpacing.sm,
-                        ),
-                        itemCount: filteredSermons.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: AppSpacing.sm),
-                        itemBuilder: (context, index) => _SermonTile(
-                          sermon: filteredSermons[index],
-                        ),
                       ),
+                    ],
+                  ),
+                  data: (_) => displaySermons.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: 300,
+                              child: Center(
+                                child: Text(
+                                  'No sermons found',
+                                  style: GoogleFonts.dmSans(
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg,
+                            vertical: AppSpacing.sm,
+                          ),
+                          itemCount: displaySermons.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: AppSpacing.sm),
+                          itemBuilder: (context, index) => _SermonTile(
+                            sermon: displaySermons[index],
+                          ),
+                        ),
+                ),
               ),
             ),
           ],

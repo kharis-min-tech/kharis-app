@@ -3,9 +3,27 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/role_card.dart';
+import 'package:kharis_app/shared/widgets/language_bottom_sheet.dart';
 
-class RoleSelectionScreen extends StatelessWidget {
+class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
+
+  @override
+  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+}
+
+class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
+  String _selectedLanguage = 'English';
+
+  Future<void> _openLanguageSheet() async {
+    final result = await showLanguageBottomSheet(
+      context,
+      selected: _selectedLanguage,
+    );
+    if (result != null && mounted) {
+      setState(() => _selectedLanguage = result);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,16 +85,14 @@ class RoleSelectionScreen extends StatelessWidget {
               // Language selector
               Center(
                 child: TextButton.icon(
-                  onPressed: () {
-                    // TODO: open language bottom sheet
-                  },
+                  onPressed: _openLanguageSheet,
                   icon: Icon(
                     Icons.language,
                     color: AppColors.textMuted,
                     size: 18,
                   ),
                   label: Text(
-                    'English',
+                    _selectedLanguage,
                     style: AppTypography.caption.copyWith(
                       color: AppColors.textMuted,
                     ),

@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/app_colors.dart';
-
-class SettingsScreen extends StatefulWidget {
+import '../../../../shared/providers/auth_provider.dart';
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _serviceReminders = true;
   bool _eventAnnouncements = true;
   bool _dailyReading = true;
@@ -107,6 +109,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _NavItem(icon: Icons.mail_outline, label: 'Contact Us'),
                   _Divider(),
                   _NavItem(icon: Icons.star_outline, label: 'Rate the App'),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // ── Log out ─────────────────────────────────────────────────────
+              _SettingsGroup(
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: AppColors.surfaceElevated,
+                          title: Text(
+                            'Log Out',
+                            style: GoogleFonts.mavenPro(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          content: Text(
+                            'Are you sure you want to log out?',
+                            style: GoogleFonts.dmSans(
+                              color: AppColors.textBody,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.dmSans(
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: Text(
+                                'Log Out',
+                                style: GoogleFonts.dmSans(
+                                  color: AppColors.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true && mounted) {
+                        await ref
+                            .read(authRepositoryProvider)
+                            .logout();
+                        if (context.mounted) context.go('/role-selection');
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Log Out',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 32),

@@ -27,9 +27,9 @@ class KharisTopics {
 }
 
 class NotificationService {
-  NotificationService({GoRouter? router}) : _router = router;
+  NotificationService({this.router});
 
-  final GoRouter? _router;
+  final GoRouter? router;
 
   Future<void> init() async {
     if (!kUseFirebase) return;
@@ -87,12 +87,12 @@ class NotificationService {
     switch (type) {
       case 'sermon':
       case KharisTopics.newSermons:
-        _router?.go('/messages');
+        router?.go('/messages');
       case 'event':
       case KharisTopics.events:
-        _router?.go('/calendar');
+        router?.go('/calendar');
       default:
-        _router?.go('/home');
+        router?.go('/home');
     }
   }
 

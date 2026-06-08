@@ -4,14 +4,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 class CacheService {
   CacheService._({
-    required Box<dynamic> sermonsBox,
-    required Box<dynamic> eventsBox,
-    required Box<dynamic> preferencesBox,
-    required Box<dynamic> playbackPositionsBox,
-  })  : _sermonsBox = sermonsBox,
-        _eventsBox = eventsBox,
-        _preferencesBox = preferencesBox,
-        _playbackPositionsBox = playbackPositionsBox;
+    required this._sermonsBox,
+    required this._eventsBox,
+    required this._preferencesBox,
+    required this._playbackPositionsBox,
+  });
 
   final Box<dynamic> _sermonsBox;
   // ignore: unused_field
