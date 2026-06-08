@@ -1,12 +1,13 @@
 {
-  "name": "storybook",
+  "name": "kharis-design-system",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "type": "module",
+  "private": true,
   "scripts": {
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest --project storybook run",
+    "test:watch": "vitest --project storybook"
   },
   "keywords": [],
   "author": "",
@@ -27,7 +28,10 @@
     "storybook": "^10.4.2",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "playwright": "^1.60.0",
+    "@vitest/browser-playwright": "4.1.8",
+    "@vitest/coverage-v8": "4.1.8"
   },
   "msw": {
     "workerDirectory": [

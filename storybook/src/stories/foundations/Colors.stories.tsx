@@ -1,6 +1,22 @@
 import React, { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { colors, type ColorToken } from '../../tokens/colors';
+import { theme, type ColorToken } from '../../tokens/colors';
+
+/** Convert theme group entries to ColorToken array for SwatchGroup. */
+function themeToTokens(
+  group: Record<string, { hex: string; rgb: string }>,
+  descriptions?: Record<string, string>,
+  skip?: string[],
+): ColorToken[] {
+  return Object.entries(group)
+    .filter(([key]) => !skip?.includes(key))
+    .map(([key, val]) => ({
+      name: key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()),
+      hex: val.hex,
+      rgb: val.rgb,
+      description: descriptions?.[key] ?? '',
+    }));
+}
 
 // ── WCAG helpers ────────────────────────────────────────────────────────────
 
@@ -238,21 +254,25 @@ function ColorPaletteView() {
 
       <SwatchGroup
         title="Brand"
-        tokens={Object.values(colors.brand)}
+        tokens={themeToTokens(theme.brand, {
+          orange: 'Primary CTA. Every button on kharis.org.',
+          purple: 'Identity. Logo, social icons. Not for buttons.',
+          magenta: 'Feature icons (50px icon-boxes).',
+        }, ['gold'])}
       />
       <SwatchGroup
         title="Surface"
-        tokens={Object.values(colors.surface)}
+        tokens={themeToTokens(theme.surface)}
         showContrast
       />
       <SwatchGroup
         title="Text"
-        tokens={Object.values(colors.text)}
+        tokens={themeToTokens(theme.text)}
         showContrast
       />
       <SwatchGroup
         title="Semantic"
-        tokens={Object.values(colors.semantic)}
+        tokens={themeToTokens(theme.semantic)}
       />
     </div>
   );
