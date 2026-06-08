@@ -2,25 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/core/utils/artwork_gradient.dart';
 
-/// The palette of artwork gradient colours indexed by [Sermon.artworkColor].
-const _kArtworkGradients = [
-  [Color(0xFFFD7F20), Color(0xFFFF4E00)], // orange–red
-  [Color(0xFF6B34FA), Color(0xFF9B5DE5)], // purple–violet
-  [Color(0xFF22C55E), Color(0xFF16A34A)], // green
-  [Color(0xFF3B82F6), Color(0xFF2563EB)], // blue
-  [Color(0xFFF59E0B), Color(0xFFD97706)], // amber
-  [Color(0xFF800654), Color(0xFFBE185D)], // magenta–pink
-  [Color(0xFF06B6D4), Color(0xFF0284C7)], // cyan
-  [Color(0xFFEF4444), Color(0xFFDC2626)], // red
-  [Color(0xFF10B981), Color(0xFF059669)], // emerald
-  [Color(0xFF8B5CF6), Color(0xFF7C3AED)], // violet
-];
-
-List<Color> _gradientForIndex(int? index) {
-  if (index == null) return _kArtworkGradients[0];
-  return _kArtworkGradients[index % _kArtworkGradients.length];
-}
 
 /// A 56-px-tall list row for a single sermon.
 ///
@@ -110,7 +93,7 @@ class _SermonListItemState extends State<SermonListItem>
 
   @override
   Widget build(BuildContext context) {
-    final gradientColors = _gradientForIndex(widget.artworkColor);
+    final gradientColors = sermonGradient(widget.artworkColor ?? 0);
     final dateStr =
         '${widget.pubDate.year}-${widget.pubDate.month.toString().padLeft(2, '0')}-${widget.pubDate.day.toString().padLeft(2, '0')}';
 

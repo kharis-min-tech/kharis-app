@@ -11,6 +11,7 @@ import '../widgets/latest_sermons_section.dart';
 import '../widgets/quick_actions_grid.dart';
 import '../widgets/todays_reading_card.dart';
 import '../widgets/upcoming_events_section.dart';
+import '../widgets/news_section.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -47,6 +48,8 @@ class HomeScreen extends ConsumerWidget {
                 TodaysReadingCard(),
                 SizedBox(height: AppSpacing.xxl),
                 UpcomingEventsSection(),
+                SizedBox(height: AppSpacing.xxl),
+                NewsSection(),
                 SizedBox(height: AppSpacing.xxl),
                 DailyPrayerCard(),
                 SizedBox(height: AppSpacing.xl),

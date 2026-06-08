@@ -13,7 +13,7 @@ plugins {
 }
 
 android {
-    namespace = "org.kharis.app"
+    namespace = "org.kharis.kharis_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -32,7 +32,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "org.kharis.app"
+        applicationId = "org.kharis.kharis_app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = 1

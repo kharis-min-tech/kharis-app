@@ -7,20 +7,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/models/sermon.dart';
 import '../../../../shared/providers/audio_provider.dart';
 import '../../../../shared/providers/sermon_provider.dart';
+import '../../../../core/utils/artwork_gradient.dart';
 
-// Gradient palette indexed by Sermon.artworkColor (0–9).
-const _kGradients = [
-  [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
-  [Color(0xFF1A2A0A), Color(0xFF22C55E)],
-  [Color(0xFF3B1A0A), Color(0xFFFD7F20)],
-  [Color(0xFF0A1A3B), Color(0xFF3B82F6)],
-  [Color(0xFF2A0A1A), Color(0xFF800654)],
-  [Color(0xFF0A3B2A), Color(0xFF14B8A6)],
-  [Color(0xFF3B2A0A), Color(0xFFF59E0B)],
-  [Color(0xFF0A2A3B), Color(0xFF0EA5E9)],
-  [Color(0xFF2A3B0A), Color(0xFF84CC16)],
-  [Color(0xFF1A0A2A), Color(0xFFEC4899)],
-];
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -290,8 +278,7 @@ class _SermonTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = _kGradients[
-        (sermon.artworkColor ?? 0) % _kGradients.length];
+    final palette = sermonGradient(sermon.artworkColor ?? 0);
 
     return GestureDetector(
       onTap: () =>
@@ -313,7 +300,7 @@ class _SermonTile extends ConsumerWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [palette[0], palette[1]],
+                  colors: palette,
                 ),
               ),
               child: const Icon(
