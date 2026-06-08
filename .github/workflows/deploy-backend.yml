@@ -1,0 +1,32 @@
+name: Deploy Backend
+
+'on':
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: false
+        default: production
+
+jobs:
+  deploy-backend:
+    name: Deploy Firebase Functions & Firestore
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: backend/functions/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend/functions
+        run: npm install
+
+      - name: Deploy to Firebase
+        working-directory: backend
+        run: |
+          npx firebase-tools deploy --only functions,firestore --token "${{ secrets.FIREBASE_TOKEN }}" --non-interactive
