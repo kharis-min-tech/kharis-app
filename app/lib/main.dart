@@ -20,16 +20,16 @@ Future<void> main() async {
   );
 }
 
-class KharisApp extends StatelessWidget {
+class KharisApp extends ConsumerWidget {
   const KharisApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'Kharis Church',
       debugShowCheckedModeBanner: false,
       theme: kharisTheme(),
-      routerConfig: appRouter,
+      routerConfig: ref.watch(appRouterProvider),
     );
   }
 }
