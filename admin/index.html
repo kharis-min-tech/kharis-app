@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kharis Church — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0D0D0D;
+      --surface:  #141414;
+      --surface2: #1E1E1E;
+      --border:   #2C2C2C;
+      --text:     #FFFFFF;
+      --muted:    #8A8A8A;
+      --purple:   #6B34FA;
+      --orange:   #FD7F20;
+      --danger:   #FF4545;
+      --success:  #22C55E;
+      --radius:   10px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3, h4, h5 {
+      font-family: 'Maven Pro', sans-serif;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    /* ── Login ─────────────────────────────────────────────────────────── */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+    }
+
+    .login-card .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--purple);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg { width: 26px; height: 26px; fill: #fff; }
+
+    .login-card h1 { font-size: 22px; margin-bottom: 4px; }
+    .login-card .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+
+    #login-error {
+      background: rgba(255, 69, 69, 0.12);
+      border: 1px solid rgba(255, 69, 69, 0.3);
+      color: var(--danger);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── Forms & Inputs ───────────────────────────────────────────────── */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="url"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--purple);
+    }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238A8A8A' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+
+    textarea { resize: vertical; min-height: 100px; }
+
+    .field { margin-bottom: 16px; }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .checkbox-field input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--orange);
+      cursor: pointer;
+    }
+
+    .checkbox-field label {
+      margin-bottom: 0;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    /* ── Buttons ──────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.45; pointer-events: none; }
+
+    .btn-primary {
+      background: var(--orange);
+      color: #fff;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--muted); }
+
+    .btn-danger {
+      background: rgba(255, 69, 69, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(255, 69, 69, 0.3);
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    .btn-danger:hover { background: rgba(255, 69, 69, 0.25); }
+
+    .btn-full { width: 100%; }
+
+    /* ── Admin Layout ─────────────────────────────────────────────────── */
+    #admin-panel { display: none; min-height: 100vh; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 13, 13, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      height: 60px;
+    }
+
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .topbar-brand .logo-icon { width: 34px; height: 34px; border-radius: 8px; }
+    .topbar-brand .logo-icon svg { width: 20px; height: 20px; }
+    .topbar-brand span {
+      font-family: 'Maven Pro', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--text);
+    }
+    .topbar-brand .badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      padding: 2px 8px;
+      font-weight: 500;
+    }
+
+    #user-email {
+      font-size: 13px;
+      color: var(--muted);
+      margin-right: 12px;
+    }
+
+    /* ── Tab Navigation ───────────────────────────────────────────────── */
+    .tab-nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 28px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 14px 18px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      margin-bottom: -1px;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+
+    .tab-btn.active {
+      color: var(--orange);
+      border-bottom-color: var(--orange);
+    }
+
+    .tab-btn .count-badge {
+      background: var(--surface2);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 1px 7px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    /* ── Content ──────────────────────────────────────────────────────── */
+    .content-area {
+      padding: 28px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    .pane-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .pane-layout { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+
+    .card-title {
+      font-family: 'Maven Pro', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--orange);
+      flex-shrink: 0;
+    }
+
+    /* ── Item List ────────────────────────────────────────────────────── */
+    .item-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .item-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .item-card-body { flex: 1; min-width: 0; }
+
+    .item-card-title {
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .item-card-meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meta-chip {
+      background: var(--border);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .meta-chip.featured { background: rgba(107, 52, 250, 0.25); color: #a47cff; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .empty-state svg { opacity: 0.3; margin-bottom: 12px; }
+
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .list-section-title {
+      font-family: 'Maven Pro', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    /* ── Loading spinner ──────────────────────────────────────────────── */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 20px 0;
+    }
+
+    /* ── Toast ────────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast-msg {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideUp 0.25s ease-out;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    .toast-msg.success { border-color: rgba(34, 197, 94, 0.4); color: var(--success); }
+    .toast-msg.error   { border-color: rgba(255, 69, 69, 0.4);  color: var(--danger); }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Daily content special ─────────────────────────────────────────── */
+    .daily-existing {
+      background: rgba(107, 52, 250, 0.08);
+      border: 1px solid rgba(107, 52, 250, 0.25);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+
+    .daily-existing strong { color: #a47cff; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 20px 0;
+    }
+
+    /* ── Responsive tweaks ─────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .topbar { padding: 0 16px; }
+      .tab-nav { padding: 0 8px; }
+      .content-area { padding: 16px; }
+      .card { padding: 18px; }
+      .field-row { grid-template-columns: 1fr; gap: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Login ─────────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="logo-row">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <!-- Dove silhouette -->
+          <path d="M12 3C9.5 3 7.5 4.5 6.5 6.5C5 6.2 3.5 6.8 2.5 8C1.5 9.2 1.3 10.8 2 12C1.2 13 1 14.3 1.5 15.5C2 16.7 3 17.5 4.2 17.8L5 21H9L10 18H14L15 21H19L19.8 17.8C21 17.5 22 16.7 22.5 15.5C23 14.3 22.8 13 22 12C22.7 10.8 22.5 9.2 21.5 8C20.5 6.8 19 6.2 17.5 6.5C16.5 4.5 14.5 3 12 3Z"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Kharis Church</h1>
+        <p style="color:var(--muted);font-size:12px;margin-top:2px;">Admin Panel</p>
+      </div>
+    </div>
+    <p class="subtitle">Sign in with your admin account to manage content.</p>
+    <div id="login-error"></div>
+    <form id="login-form">
+      <div class="field">
+        <label for="login-email">Email address</label>
+        <input type="email" id="login-email" placeholder="admin@kharisministries.org" autocomplete="email" required />
+      </div>
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" id="login-btn">
+        Sign In
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Admin Panel ────────────────────────────────────────────────────────── -->
+<div id="admin-panel">
+
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#fff">
+          <path d="M12 3C9.5 3 7.5 4.5 6.5 6.5C5 6.2 3.5 6.8 2.5 8C1.5 9.2 1.3 10.8 2 12C1.2 13 1 14.3 1.5 15.5C2 16.7 3 17.5 4.2 17.8L5 21H9L10 18H14L15 21H19L19.8 17.8C21 17.5 22 16.7 22.5 15.5C23 14.3 22.8 13 22 12C22.7 10.8 22.5 9.2 21.5 8C20.5 6.8 19 6.2 17.5 6.5C16.5 4.5 14.5 3 12 3Z"/>
+        </svg>
+      </div>
+      <span>Kharis Church</span>
+      <span class="badge">Admin</span>
+    </div>
+    <div style="display:flex;align-items:center">
+      <span id="user-email"></span>
+      <button class="btn btn-secondary" id="signout-btn" style="font-size:13px;padding:7px 14px;">Sign Out</button>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="events">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Events
+      <span class="count-badge" id="events-count">—</span>
+    </button>
+    <button class="tab-btn" data-tab="news">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      News
+      <span class="count-badge" id="news-count">—</span>
+    </button>
+    <button class="tab-btn" data-tab="daily">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Daily Content
+    </button>
+  </nav>
+
+  <div class="content-area">
+
+    <!-- ── Events Tab ──────────────────────────────────────────────────────── -->
+    <div class="tab-pane active" id="tab-events">
+      <div class="pane-layout">
+
+        <!-- Form -->
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Create Event</div>
+          <form id="event-form">
+            <div class="field">
+              <label for="ev-title">Title *</label>
+              <input type="text" id="ev-title" placeholder="Sunday Service" required />
+            </div>
+            <div class="field">
+              <label for="ev-desc">Description</label>
+              <textarea id="ev-desc" placeholder="Brief description of the event…" style="min-height:80px;"></textarea>
+            </div>
+            <div class="field">
+              <label for="ev-location">Location</label>
+              <input type="text" id="ev-location" placeholder="e.g. Main Auditorium" />
+            </div>
+            <div class="field">
+              <label for="ev-branch">Branch</label>
+              <select id="ev-branch">
+                <option value="">All Branches</option>
+                <option value="London">London</option>
+                <option value="Birmingham">Birmingham</option>
+                <option value="Reading">Reading</option>
+                <option value="Chatham">Chatham</option>
+                <option value="Croydon">Croydon</option>
+                <option value="Medway">Medway</option>
+                <option value="Accra">Accra</option>
+                <option value="Freetown">Freetown</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="ev-start">Start Date &amp; Time *</label>
+                <input type="datetime-local" id="ev-start" required />
+              </div>
+              <div class="field">
+                <label for="ev-end">End Date &amp; Time *</label>
+                <input type="datetime-local" id="ev-end" required />
+              </div>
+            </div>
+            <div class="checkbox-field">
+              <input type="checkbox" id="ev-featured" />
+              <label for="ev-featured">Mark as Featured</label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="event-submit-btn">
+              Create Event
+            </button>
+          </form>
+        </div>
+
+        <!-- List -->
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Upcoming Events</span>
+            <button class="btn btn-secondary" id="refresh-events" style="font-size:12px;padding:6px 12px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div id="events-list">
+            <div class="loading-row"><span class="spinner"></span> Loading events…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── News Tab ────────────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-news">
+      <div class="pane-layout">
+
+        <!-- Form -->
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Publish News</div>
+          <form id="news-form">
+            <div class="field">
+              <label for="nw-title">Title *</label>
+              <input type="text" id="nw-title" placeholder="Announcement headline" required />
+            </div>
+            <div class="field">
+              <label for="nw-body">Body *</label>
+              <textarea id="nw-body" placeholder="Full article or announcement text…" style="min-height:140px;" required></textarea>
+            </div>
+            <div class="field">
+              <label for="nw-image">Image URL</label>
+              <input type="url" id="nw-image" placeholder="https://…" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="nw-publish">Publish Date *</label>
+                <input type="date" id="nw-publish" required />
+              </div>
+              <div class="field">
+                <label for="nw-expiry">Expiry Date</label>
+                <input type="date" id="nw-expiry" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="news-submit-btn">
+              Publish
+            </button>
+          </form>
+        </div>
+
+        <!-- List -->
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Published News</span>
+            <button class="btn btn-secondary" id="refresh-news" style="font-size:12px;padding:6px 12px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div id="news-list">
+            <div class="loading-row"><span class="spinner"></span> Loading news…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Daily Content Tab ───────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-daily">
+      <div class="pane-layout">
+
+        <!-- Form -->
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Daily Content</div>
+
+          <div id="daily-existing-banner" class="daily-existing" style="display:none;">
+            <strong>✓ Content exists for this date</strong>
+            <p style="margin-top:6px;color:var(--text);font-size:13px;">Submitting will overwrite the existing entry.</p>
+          </div>
+
+          <form id="daily-form">
+            <div class="field">
+              <label for="dc-date">Date *</label>
+              <input type="date" id="dc-date" required />
+            </div>
+
+            <div class="divider"></div>
+            <div class="card-title" style="margin-bottom:14px;font-size:13px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              Bible Reading
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="dc-book">Book *</label>
+                <input type="text" id="dc-book" placeholder="e.g. John" required />
+              </div>
+              <div class="field">
+                <label for="dc-chapter">Chapter *</label>
+                <input type="number" id="dc-chapter" placeholder="3" min="1" required />
+              </div>
+            </div>
+            <div class="field">
+              <label for="dc-verse">Verse / Range</label>
+              <input type="text" id="dc-verse" placeholder="e.g. 16 or 1-6" />
+            </div>
+
+            <div class="divider"></div>
+            <div class="card-title" style="margin-bottom:14px;font-size:13px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+              Prayer
+            </div>
+
+            <div class="field">
+              <label for="dc-prayer">Prayer Text *</label>
+              <textarea id="dc-prayer" placeholder="Lord, thank You for…" style="min-height:120px;" required></textarea>
+            </div>
+            <div class="field">
+              <label for="dc-ref">Prayer Reference *</label>
+              <input type="text" id="dc-ref" placeholder="e.g. Psalm 23:1" required />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="daily-submit-btn">
+              Save Daily Content
+            </button>
+          </form>
+        </div>
+
+        <!-- Preview of existing content -->
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Saved Entry</span>
+          </div>
+          <div id="daily-preview">
+            <div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
+              Select a date to preview existing content.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.content-area -->
+</div><!-- /#admin-panel -->
+
+<!-- Toast container -->
+<div id="toast"></div>
+
+<!-- ── Firebase JS SDK (modular v10) via CDN ──────────────────────────────── -->
+<script type="module">
+// ════════════════════════════════════════════════════════════════════════════
+//  FIREBASE CONFIG
+//  ─────────────────────────────────────────────────────────────────────────
+//  Replace the placeholder values below with your project's real config.
+//  To get this:
+//    1. Go to https://console.firebase.google.com
+//    2. Select your project (or create one)
+//    3. Click the gear icon → Project Settings
+//    4. Scroll to "Your apps" → Web app (</> icon)
+//    5. Register the app if you haven't yet
+//    6. Copy the firebaseConfig object shown there
+// ════════════════════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID",
+};
+
+// ── SDK imports ─────────────────────────────────────────────────────────────
+import { initializeApp }
+  from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  setDoc,
+  getDoc,
+  Timestamp,
+  query,
+  orderBy,
+} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════════════════════════
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast-msg ${type}`;
+  el.textContent = (type === 'success' ? '✓ ' : '✕ ') + msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════════════════════════
+const loginScreen = document.getElementById('login-screen');
+const adminPanel  = document.getElementById('admin-panel');
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    loginScreen.style.display = 'none';
+    adminPanel.style.display  = 'block';
+    document.getElementById('user-email').textContent = user.email;
+    loadEvents();
+    loadNews();
+    setDefaultDailyDate();
+  } else {
+    loginScreen.style.display = 'flex';
+    adminPanel.style.display  = 'none';
+  }
+});
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn   = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      document.getElementById('login-email').value.trim(),
+      document.getElementById('login-password').value,
+    );
+  } catch (err) {
+    errEl.textContent = friendlyAuthError(err.code);
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+});
+
+document.getElementById('signout-btn').addEventListener('click', () => signOut(auth));
+
+function friendlyAuthError(code) {
+  const map = {
+    'auth/invalid-credential':     'Incorrect email or password.',
+    'auth/user-not-found':         'No account found with that email.',
+    'auth/wrong-password':         'Incorrect password.',
+    'auth/too-many-requests':      'Too many failed attempts. Try again later.',
+    'auth/network-request-failed': 'Network error. Check your connection.',
+  };
+  return map[code] ?? `Sign-in failed (${code}).`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TAB NAVIGATION
+// ════════════════════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  EVENTS
+// ════════════════════════════════════════════════════════════════════════════
+async function loadEvents() {
+  const listEl = document.getElementById('events-list');
+  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading events…</div>';
+  try {
+    const q      = query(collection(db, 'events'), orderBy('startTime', 'asc'));
+    const snap   = await getDocs(q);
+    const events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    document.getElementById('events-count').textContent = events.length;
+    renderEventList(events);
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${err.message}</div>`;
+  }
+}
+
+function renderEventList(events) {
+  const listEl = document.getElementById('events-list');
+  if (!events.length) {
+    listEl.innerHTML = `<div class="empty-state">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <p>No events yet. Create one!</p>
+    </div>`;
+    return;
+  }
+  listEl.innerHTML = '';
+  const ul = document.createElement('div');
+  ul.className = 'item-list';
+  events.forEach(ev => {
+    const start = ev.startTime?.toDate ? ev.startTime.toDate() : new Date(ev.startTime);
+    const item  = document.createElement('div');
+    item.className = 'item-card';
+    item.innerHTML = `
+      <div class="item-card-body">
+        <div class="item-card-title">${escHtml(ev.title)}</div>
+        <div class="item-card-meta">
+          <span>${formatDateTime(start)}</span>
+          ${ev.branch ? `<span class="meta-chip">${escHtml(ev.branch)}</span>` : ''}
+          ${ev.location ? `<span class="meta-chip">${escHtml(ev.location)}</span>` : ''}
+          ${ev.isFeatured ? `<span class="meta-chip featured">★ Featured</span>` : ''}
+        </div>
+      </div>
+      <button class="btn btn-danger" data-id="${ev.id}" data-col="events">Delete</button>
+    `;
+    ul.appendChild(item);
+  });
+  listEl.appendChild(ul);
+  attachDeleteListeners();
+}
+
+document.getElementById('event-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('event-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try {
+    const startVal = document.getElementById('ev-start').value;
+    const endVal   = document.getElementById('ev-end').value;
+    const payload  = {
+      title:       document.getElementById('ev-title').value.trim(),
+      description: document.getElementById('ev-desc').value.trim() || null,
+      location:    document.getElementById('ev-location').value.trim() || null,
+      branch:      document.getElementById('ev-branch').value || null,
+      startTime:   Timestamp.fromDate(new Date(startVal)),
+      endTime:     Timestamp.fromDate(new Date(endVal)),
+      isFeatured:  document.getElementById('ev-featured').checked,
+      createdAt:   Timestamp.now(),
+    };
+    await addDoc(collection(db, 'events'), payload);
+    document.getElementById('event-form').reset();
+    toast('Event created successfully');
+    loadEvents();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Event';
+  }
+});
+
+document.getElementById('refresh-events').addEventListener('click', loadEvents);
+
+// ════════════════════════════════════════════════════════════════════════════
+//  NEWS
+// ════════════════════════════════════════════════════════════════════════════
+async function loadNews() {
+  const listEl = document.getElementById('news-list');
+  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading news…</div>';
+  try {
+    const q    = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
+    const snap = await getDocs(q);
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    document.getElementById('news-count').textContent = items.length;
+    renderNewsList(items);
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${err.message}</div>`;
+  }
+}
+
+function renderNewsList(items) {
+  const listEl = document.getElementById('news-list');
+  if (!items.length) {
+    listEl.innerHTML = `<div class="empty-state">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <p>No news items yet. Publish one!</p>
+    </div>`;
+    return;
+  }
+  listEl.innerHTML = '';
+  const ul = document.createElement('div');
+  ul.className = 'item-list';
+  items.forEach(nw => {
+    const published = nw.publishedAt?.toDate ? nw.publishedAt.toDate() : new Date(nw.publishedAt);
+    const item = document.createElement('div');
+    item.className = 'item-card';
+    const preview = nw.body ? nw.body.slice(0, 80) + (nw.body.length > 80 ? '…' : '') : '';
+    item.innerHTML = `
+      <div class="item-card-body">
+        <div class="item-card-title">${escHtml(nw.title)}</div>
+        <div class="item-card-meta">
+          <span>Published ${formatDate(published)}</span>
+          ${nw.expiresAt ? `<span class="meta-chip">Expires ${formatDate(nw.expiresAt.toDate ? nw.expiresAt.toDate() : new Date(nw.expiresAt))}</span>` : ''}
+        </div>
+        ${preview ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">${escHtml(preview)}</div>` : ''}
+      </div>
+      <button class="btn btn-danger" data-id="${nw.id}" data-col="news">Delete</button>
+    `;
+    ul.appendChild(item);
+  });
+  listEl.appendChild(ul);
+  attachDeleteListeners();
+}
+
+document.getElementById('news-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('news-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Publishing…';
+  try {
+    const publishVal = document.getElementById('nw-publish').value;
+    const expiryVal  = document.getElementById('nw-expiry').value;
+    const payload = {
+      title:       document.getElementById('nw-title').value.trim(),
+      body:        document.getElementById('nw-body').value.trim(),
+      imageUrl:    document.getElementById('nw-image').value.trim() || null,
+      publishedAt: Timestamp.fromDate(new Date(publishVal)),
+      expiresAt:   expiryVal ? Timestamp.fromDate(new Date(expiryVal)) : null,
+      createdAt:   Timestamp.now(),
+    };
+    await addDoc(collection(db, 'news'), payload);
+    document.getElementById('news-form').reset();
+    setDefaultNewsDate();
+    toast('News item published');
+    loadNews();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Publish';
+  }
+});
+
+document.getElementById('refresh-news').addEventListener('click', loadNews);
+
+// ════════════════════════════════════════════════════════════════════════════
+//  DAILY CONTENT
+// ════════════════════════════════════════════════════════════════════════════
+function setDefaultDailyDate() {
+  const dateInput = document.getElementById('dc-date');
+  dateInput.value = toDateKey(new Date());
+  loadDailyPreview(dateInput.value);
+}
+
+function setDefaultNewsDate() {
+  const el = document.getElementById('nw-publish');
+  if (!el.value) el.value = toDateKey(new Date());
+}
+
+document.getElementById('dc-date').addEventListener('change', (e) => {
+  loadDailyPreview(e.target.value);
+});
+
+async function loadDailyPreview(dateKey) {
+  const previewEl = document.getElementById('daily-preview');
+  const bannerEl  = document.getElementById('daily-existing-banner');
+  if (!dateKey) return;
+  previewEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Checking…</div>';
+  try {
+    const snap = await getDoc(doc(db, 'dailyContent', dateKey));
+    if (snap.exists()) {
+      bannerEl.style.display = 'block';
+      const d = snap.data();
+      const reading = d.reading || {};
+      previewEl.innerHTML = `
+        <div class="card" style="background:var(--surface2);">
+          <div style="margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;">Bible Reading</div>
+            <div style="font-size:15px;font-weight:600;">${escHtml(reading.book || '')} ${reading.chapter || ''}:${escHtml(reading.verse || '')}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;">Prayer</div>
+            <div style="font-size:13px;line-height:1.6;color:var(--text);">${escHtml(d.prayer || '')}</div>
+            <div style="margin-top:8px;font-size:12px;color:#a47cff;font-style:italic;">${escHtml(d.prayerReference || '')}</div>
+          </div>
+        </div>
+      `;
+      // Pre-fill form with existing values
+      document.getElementById('dc-book').value    = reading.book    || '';
+      document.getElementById('dc-chapter').value = reading.chapter || '';
+      document.getElementById('dc-verse').value   = reading.verse   || '';
+      document.getElementById('dc-prayer').value  = d.prayer        || '';
+      document.getElementById('dc-ref').value     = d.prayerReference || '';
+    } else {
+      bannerEl.style.display = 'none';
+      previewEl.innerHTML = `<div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">No content saved for <strong style="color:var(--text)">${dateKey}</strong> yet.</div>`;
+    }
+  } catch (err) {
+    bannerEl.style.display = 'none';
+    previewEl.innerHTML = `<div style="color:var(--danger);font-size:13px;">Error: ${err.message}</div>`;
+  }
+}
+
+document.getElementById('daily-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('daily-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const dateKey = document.getElementById('dc-date').value;
+  if (!dateKey) { toast('Select a date first', 'error'); btn.disabled = false; btn.textContent = 'Save Daily Content'; return; }
+  try {
+    const payload = {
+      reading: {
+        book:    document.getElementById('dc-book').value.trim(),
+        chapter: parseInt(document.getElementById('dc-chapter').value, 10),
+        verse:   document.getElementById('dc-verse').value.trim() || '1',
+      },
+      prayer:          document.getElementById('dc-prayer').value.trim(),
+      prayerReference: document.getElementById('dc-ref').value.trim(),
+      updatedAt:       Timestamp.now(),
+    };
+    // Document ID = "YYYY-MM-DD" — matches Flutter's _dateKey() exactly
+    await setDoc(doc(db, 'dailyContent', dateKey), payload);
+    toast('Daily content saved');
+    loadDailyPreview(dateKey);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Daily Content';
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  DELETE (shared)
+// ════════════════════════════════════════════════════════════════════════════
+function attachDeleteListeners() {
+  document.querySelectorAll('[data-col]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this item?')) return;
+      const colName = btn.dataset.col;
+      const id      = btn.dataset.id;
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        await deleteDoc(doc(db, colName, id));
+        toast('Deleted');
+        if (colName === 'events') loadEvents();
+        if (colName === 'news')   loadNews();
+      } catch (err) {
+        toast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+      }
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════════════════════════════
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateTime(date) {
+  return date.toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function formatDate(date) {
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Set default news publish date on load
+document.addEventListener('DOMContentLoaded', () => {
+  setDefaultNewsDate();
+});
+// Also set it immediately in case DOMContentLoaded already fired
+setDefaultNewsDate();
+
+</script>
+</body>
+</html>

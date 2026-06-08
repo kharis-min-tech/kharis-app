@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Kharis Church</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0D0D0D;
+      --surface: #161616;
+      --border: #252525;
+      --purple: #6B34FA;
+      --orange: #FD7F20;
+      --text: #F0F0F0;
+      --text-muted: #9A9A9A;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 28px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      background: var(--purple);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logo-mark svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+    }
+
+    .site-name {
+      font-family: 'Maven Pro', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.2px;
+    }
+
+    .site-name span { color: var(--purple); }
+
+    /* ── Layout ── */
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+
+    /* ── Hero ── */
+    .label {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--orange);
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-family: 'Maven Pro', sans-serif;
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin-bottom: 16px;
+    }
+
+    .effective {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 300;
+    }
+
+    .effective strong { color: var(--text); font-weight: 500; }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 40px 0;
+    }
+
+    /* ── Sections ── */
+    section { margin-bottom: 40px; }
+
+    h2 {
+      font-family: 'Maven Pro', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: var(--purple);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    p {
+      font-size: 15px;
+      line-height: 1.8;
+      margin-bottom: 12px;
+      font-weight: 300;
+    }
+
+    p:last-child { margin-bottom: 0; }
+
+    /* ── Lists ── */
+    ul, ol {
+      padding-left: 0;
+      list-style: none;
+      margin-bottom: 12px;
+    }
+
+    ul li, ol li {
+      font-size: 15px;
+      font-weight: 300;
+      line-height: 1.8;
+      padding-left: 20px;
+      position: relative;
+      margin-bottom: 6px;
+    }
+
+    ul li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 11px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--purple);
+    }
+
+    ol { counter-reset: item; }
+    ol li { counter-increment: item; }
+    ol li::before {
+      content: counter(item) ".";
+      position: absolute;
+      left: 0;
+      color: var(--purple);
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-family: 'Maven Pro', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+
+    .card ul { margin-bottom: 0; }
+
+    /* ── Tags ── */
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #1C1C1C;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 13px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--purple);
+      flex-shrink: 0;
+    }
+
+    .dot.orange { background: var(--orange); }
+
+    /* ── Notice boxes ── */
+    .notice {
+      background: rgba(107, 52, 250, 0.08);
+      border: 1px solid rgba(107, 52, 250, 0.3);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 12px;
+    }
+
+    .notice p { margin-bottom: 0; font-size: 14px; }
+
+    .notice.warn {
+      background: rgba(253, 127, 32, 0.06);
+      border-color: rgba(253, 127, 32, 0.25);
+    }
+
+    /* ── Contact block ── */
+    .contact-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .contact-label {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .contact-email {
+      font-family: 'Maven Pro', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--purple);
+      text-decoration: none;
+    }
+
+    .contact-email:hover { color: var(--orange); }
+
+    .contact-note {
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--text-muted);
+      margin-top: 4px;
+      margin-bottom: 0;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 24px;
+      text-align: center;
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 0;
+      font-weight: 300;
+    }
+
+    a {
+      color: var(--purple);
+      text-decoration: underline;
+      text-decoration-color: rgba(107, 52, 250, 0.4);
+      text-underline-offset: 3px;
+    }
+
+    a:hover {
+      color: var(--orange);
+      text-decoration-color: rgba(253, 127, 32, 0.4);
+    }
+
+    @media (max-width: 560px) {
+      header { padding: 20px 16px; }
+      main { padding: 40px 16px 72px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C8.5 2 5.5 4.2 4.3 7.2L2 9l2.3 1.8C4.1 11.8 4 12.9 4 14c0 3.9 3.6 7 8 7s8-3.1 8-7c0-1.1-.1-2.2-.3-3.2L22 9l-2.3-1.8C18.5 4.2 15.5 2 12 2zm0 2c2.4 0 4.5 1.1 5.8 2.8L16 8.4c-.9-1.5-2.4-2.4-4-2.4s-3.1.9-4 2.4L6.2 6.8C7.5 5.1 9.6 4 12 4zm0 4c1.1 0 2 .5 2.6 1.3L12 11.5 9.4 9.3C10 8.5 10.9 8 12 8zm0 3.5l3.2 2.6c.2.5.3 1.2.3 1.9 0 2.8-1.6 5-3.5 5S8.5 18.8 8.5 16c0-.7.1-1.4.3-1.9L12 11.5z"/>
+      </svg>
+    </div>
+    <span class="site-name">Kharis <span>Church</span></span>
+  </header>
+
+  <main>
+
+    <div style="margin-bottom: 48px;">
+      <span class="label">Legal</span>
+      <h1>Privacy Policy</h1>
+      <p class="effective">Effective date: <strong>June 2026</strong>&nbsp;&nbsp;·&nbsp;&nbsp;Kharis Ministries</p>
+    </div>
+
+    <div class="notice">
+      <p>This policy explains how the <strong>Kharis Church</strong> mobile application collects, uses, and protects your personal information. By using the app, you agree to the practices described below.</p>
+    </div>
+
+    <hr />
+
+    <section>
+      <h2>Who We Are</h2>
+      <p>The Kharis Church app is developed and maintained by <strong>Kharis Ministries</strong>. We are committed to protecting your privacy and handling your data with transparency and care.</p>
+      <p>For any privacy-related questions, contact us at <a href="mailto:info@kharis.org">info@kharis.org</a>.</p>
+    </section>
+
+    <section>
+      <h2>Information We Collect</h2>
+      <p>We collect only what is necessary to provide you with a personalised church app experience.</p>
+
+      <div class="card">
+        <div class="card-title">Account &amp; Profile</div>
+        <ul>
+          <li>Email address — used for account creation and authentication</li>
+          <li>Display name — shown within the app</li>
+          <li>Selected branch — chosen manually by you from a list</li>
+          <li>Role preference — e.g. member, visitor (selected by you)</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">App Usage Data</div>
+        <ul>
+          <li>Playback history for sermons and audio content (stored locally on your device)</li>
+          <li>Resume positions for media content (stored locally on your device)</li>
+          <li>Push notification preferences</li>
+          <li>Device push token — used by Firebase to deliver notifications to your device</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Information We Do Not Collect</h2>
+      <p>We want to be explicit about what we do <em>not</em> collect or have access to:</p>
+
+      <div class="tag-list" style="margin-bottom: 16px;">
+        <span class="tag"><span class="dot orange"></span>Payment information</span>
+        <span class="tag"><span class="dot orange"></span>Location data</span>
+        <span class="tag"><span class="dot orange"></span>Contacts</span>
+        <span class="tag"><span class="dot orange"></span>Photos or camera</span>
+        <span class="tag"><span class="dot orange"></span>Microphone</span>
+        <span class="tag"><span class="dot orange"></span>Other device data</span>
+      </div>
+
+      <p>Giving and tithes are handled entirely through an external website operated by a third party. We never see, store, or process any payment card or banking information within the app.</p>
+      <p>Branch selection is done manually by you; the app never requests or accesses your device location.</p>
+    </section>
+
+    <section>
+      <h2>How We Use Your Information</h2>
+      <ol>
+        <li>To create and manage your account and authenticate you securely</li>
+        <li>To personalise your experience based on your chosen branch and role</li>
+        <li>To remember your media playback positions across sessions</li>
+        <li>To send relevant push notifications (only if you grant permission)</li>
+        <li>To improve app functionality and resolve technical issues</li>
+      </ol>
+      <p style="margin-top: 12px;">We do not sell, rent, or trade your personal information to third parties for marketing purposes.</p>
+    </section>
+
+    <section>
+      <h2>Third-Party Services</h2>
+      <p>The app integrates the following third-party services, each governed by their own privacy policies:</p>
+
+      <div class="card">
+        <div class="card-title">Firebase (Google)</div>
+        <ul>
+          <li>Authentication — secure sign-in and account management</li>
+          <li>Firestore / Cloud Storage — account data and app content</li>
+          <li>Firebase Cloud Messaging (FCM) — push notifications via device token</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">SoundCloud</div>
+        <ul>
+          <li>Streams sermon and worship audio content embedded within the app</li>
+          <li>SoundCloud's own privacy policy governs data collected during playback</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">YouTube</div>
+        <ul>
+          <li>Delivers video content (services, events, worship) embedded within the app</li>
+          <li>YouTube / Google's privacy policy governs data collected during playback</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Google Fonts</div>
+        <ul>
+          <li>Provides typography via the Google Fonts CDN; standard Google Fonts usage applies</li>
+        </ul>
+      </div>
+
+      <p>We encourage you to review the privacy policies of these services.</p>
+    </section>
+
+    <section>
+      <h2>Data Storage &amp; Security</h2>
+      <p>Your account data is stored securely on <strong>Firebase servers</strong>, which run on Google Cloud infrastructure. Google maintains industry-standard physical, administrative, and technical safeguards.</p>
+      <p>Playback history and resume positions are stored <strong>locally on your device</strong> and are not transmitted to our servers.</p>
+      <p>We take reasonable steps to protect your information, but no system is completely secure. We encourage you to use a strong, unique password for your account.</p>
+    </section>
+
+    <section>
+      <h2>Data Retention</h2>
+      <p>Your account data is retained for as long as your account is active. If you request deletion of your account, we will remove your personal information from our systems within a reasonable timeframe, except where retention is required by law.</p>
+      <p>Push notification tokens are removed when you delete your account or revoke notification permissions on your device.</p>
+    </section>
+
+    <section>
+      <h2>Your Rights</h2>
+      <p>You have the right to:</p>
+      <ul>
+        <li><strong>Access</strong> the personal data we hold about you</li>
+        <li><strong>Correct</strong> inaccurate or incomplete data</li>
+        <li><strong>Delete</strong> your account and associated personal data</li>
+        <li><strong>Withdraw consent</strong> for push notifications at any time via your device settings</li>
+        <li><strong>Object</strong> to or restrict certain processing of your data</li>
+      </ul>
+      <p style="margin-top: 12px;">To exercise any of these rights, contact us at <a href="mailto:info@kharis.org">info@kharis.org</a>.</p>
+    </section>
+
+    <section>
+      <h2>Children's Privacy</h2>
+      <div class="notice warn">
+        <p>The Kharis Church app is <strong>not directed at children under the age of 13</strong>. We do not knowingly collect personal information from children under 13. If you believe a child under 13 has provided us with personal information, please contact us immediately at <a href="mailto:info@kharis.org">info@kharis.org</a> and we will take prompt steps to delete such information.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. When we make significant changes, we will notify you through the app. The effective date at the top of this page will always reflect the most recent revision.</p>
+      <p>Continued use of the app after changes are posted constitutes your acceptance of the updated policy.</p>
+    </section>
+
+    <section>
+      <h2>Contact Us</h2>
+      <p>If you have any questions, concerns, or requests regarding this Privacy Policy or your personal data, please reach out:</p>
+      <div class="contact-block">
+        <span class="contact-label">Kharis Ministries — Privacy</span>
+        <a class="contact-email" href="mailto:info@kharis.org">info@kharis.org</a>
+        <p class="contact-note">We aim to respond to all privacy enquiries within 5 business days.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Kharis Ministries. All rights reserved.&nbsp;&nbsp;&middot;&nbsp;&nbsp;<a href="mailto:info@kharis.org">info@kharis.org</a></p>
+  </footer>
+
+</body>
+</html>
