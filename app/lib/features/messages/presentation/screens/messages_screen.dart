@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -284,10 +284,7 @@ class _SermonTile extends ConsumerWidget {
     return GestureDetector(
       onTap: () async {
         if (sermon.isYouTubeVideo && sermon.youtubeUrl != null) {
-          final uri = Uri.parse(sermon.youtubeUrl!);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
+          await launchUrlString(sermon.youtubeUrl!);
         } else if (sermon.audioUrl.isNotEmpty) {
           ref.read(audioPlayerServiceProvider).play(sermon);
         }

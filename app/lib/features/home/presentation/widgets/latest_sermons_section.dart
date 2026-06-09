@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../../../shared/models/sermon.dart';
 
@@ -86,10 +86,7 @@ class _SermonRow extends StatelessWidget {
 
   Future<void> _handleTap() async {
     if (sermon.isYouTubeVideo && sermon.youtubeUrl != null) {
-      final uri = Uri.parse(sermon.youtubeUrl!);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      await launchUrlString(sermon.youtubeUrl!);
     } else {
       onPlay();
     }
