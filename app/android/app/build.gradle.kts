@@ -17,7 +17,7 @@ plugins {
 
 android {
     namespace = "org.kharis.kharis_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
