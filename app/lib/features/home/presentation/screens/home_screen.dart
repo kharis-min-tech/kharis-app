@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import '../../../../shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import '../widgets/todays_reading_card.dart';
 import '../widgets/latest_message_card.dart';
 import '../widgets/latest_sermons_section.dart';

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../shared/models/sermon.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'sermon_repository.dart';
 import 'sermon_repository_base.dart';
 

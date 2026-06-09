@@ -1,5 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
-import '../../../firebase_options.dart';
+import '../../firebase_options.dart';
 
 /// Toggle this to `true` once you've run `flutterfire configure`.
 /// When `false` the app runs entirely on mock / local data.

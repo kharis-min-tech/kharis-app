@@ -1,4 +1,4 @@
-import '../../../shared/models/sermon.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 
 /// Shared contract for both the RSS-based and Firestore-based sermon sources.
 abstract class AbstractSermonRepository {

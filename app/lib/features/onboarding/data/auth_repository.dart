@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../shared/models/user.dart';
+import 'package:kharis_app/shared/models/user.dart';
 
 // ── Exceptions ──────────────────────────────────────────────────────────────
 

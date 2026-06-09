@@ -1,14 +1,16 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
-import '../../../../shared/models/sermon.dart';
-import '../../../../shared/providers/audio_provider.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 
 /// Unified media player for audio and YouTube video content.
 /// Design follows Spotify-like full-screen player from MOBBIN references.
@@ -31,15 +33,20 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   void initState() {
     super.initState();
     if (_isVideo && widget.sermon.videoId != null) {
-      _youtubeController = YoutubePlayerController.fromVideoId(
-        videoId: widget.sermon.videoId!,
-        autoPlay: true,
-        params: const YoutubePlayerParams(
-          showControls: true,
-          showFullscreenButton: true,
-          playsInline: false,
-        ),
-      );
+      // On web we render a direct iframe embed (YoutubeWebEmbed) instead of
+      // youtube_player_iframe, whose platform view fails silently in
+      // release builds. Only create the controller on mobile/desktop.
+      if (!kIsWeb) {
+        _youtubeController = YoutubePlayerController.fromVideoId(
+          videoId: widget.sermon.videoId!,
+          autoPlay: true,
+          params: const YoutubePlayerParams(
+            showControls: true,
+            showFullscreenButton: true,
+            playsInline: false,
+          ),
+        );
+      }
     } else {
       // Start audio playback
       ref.read(audioPlayerServiceProvider).play(widget.sermon);
@@ -71,9 +78,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: YoutubePlayer(
-                  controller: _youtubeController!,
-                ),
+                child: kIsWeb
+                    ? YoutubeWebEmbed(videoId: widget.sermon.videoId!)
+                    : YoutubePlayer(
+                        controller: _youtubeController!,
+                      ),
               ),
             ),
           ),

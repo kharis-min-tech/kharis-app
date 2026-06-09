@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import '../../../../shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

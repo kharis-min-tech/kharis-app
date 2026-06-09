@@ -31,9 +31,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // news — readable by any authenticated user, writable only by admin
+    // news — publicly readable, writable only by admin
     match /news/{newsId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 

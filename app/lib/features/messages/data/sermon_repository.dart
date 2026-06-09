@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../../../shared/models/sermon.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'sermon_repository_base.dart';
 
 /// Fetches sermons from the Kharis SoundCloud RSS feed.

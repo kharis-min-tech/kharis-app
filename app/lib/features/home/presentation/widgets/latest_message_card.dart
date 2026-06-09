@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import '../../../../shared/providers/sermon_provider.dart';
-import '../../../../core/utils/artwork_gradient.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/core/utils/artwork_gradient.dart';
+
+import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 
 class LatestMessageCard extends ConsumerWidget {
   const LatestMessageCard({super.key});
@@ -55,11 +57,23 @@ class LatestMessageCard extends ConsumerWidget {
           ),
           data: (sermons) {
             final sermon = sermons.isNotEmpty ? sermons.first : null;
-            return _buildVideoCard(
-              title: sermon?.title ?? 'Future-Proofing the Church',
-              speaker: sermon?.speaker ?? 'Kharis Church',
-              gradientColors: sermonGradient(sermon?.artworkColor ?? 0),
-              artworkUrl: sermon?.artworkUrl,
+            return GestureDetector(
+              onTap: sermon != null
+                  ? () {
+                      Navigator.of(context, rootNavigator: true).push(
+                        MaterialPageRoute<void>(
+                          builder: (context) =>
+                              MediaPlayerScreen(sermon: sermon),
+                        ),
+                      );
+                    }
+                  : null,
+              child: _buildVideoCard(
+                title: sermon?.title ?? 'Future-Proofing the Church',
+                speaker: sermon?.speaker ?? 'Kharis Church',
+                gradientColors: sermonGradient(sermon?.artworkColor ?? 0),
+                artworkUrl: sermon?.artworkUrl,
+              ),
             );
           },
         ),

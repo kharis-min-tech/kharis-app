@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../shared/providers/audio_provider.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 import '../screens/media_player_screen.dart';
 
 /// Persistent mini player bar (56px) above tab bar.
@@ -30,7 +30,7 @@ class MiniPlayer extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
+        Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute<void>(
             builder: (context) => MediaPlayerScreen(sermon: sermon),
           ),

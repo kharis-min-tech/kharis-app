@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../shared/providers/audio_provider.dart';
-import '../../../player/presentation/widgets/mini_player.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 
 /// Bottom-nav shell that wraps all 5 dashboard tabs.
 ///

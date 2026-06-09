@@ -2,7 +2,7 @@ import 'package:add_2_calendar_new/add_2_calendar_new.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
 
 class _Event {
   _Event({

@@ -1,6 +1,6 @@
 import 'package:just_audio/just_audio.dart';
 
-import '../../../shared/models/sermon.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 
 /// Wraps [AudioPlayer] (just_audio) with a sermon-aware API.
 ///

@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
 
 class GivingWebViewScreen extends StatefulWidget {
   const GivingWebViewScreen({

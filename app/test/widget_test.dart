@@ -9,5 +9,9 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     // Splash screen should show KHARIS text
     expect(find.text('KHARIS'), findsOneWidget);
+
+    // Wait for the splash screen timer (2500ms) to complete
+    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pump(); // Allow navigation to process
   });
 }

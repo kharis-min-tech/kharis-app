@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 
-import '../../../../shared/models/sermon.dart';
-import '../../../../shared/providers/audio_provider.dart';
-import '../../../../shared/providers/sermon_provider.dart';
-import '../../../player/presentation/screens/media_player_screen.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 
 // Figma Group 32 card colours — solid purple row, dark inner play square.
 const _kCardBg = Color(0xFF3B1278);
@@ -84,8 +84,10 @@ class _SermonRow extends StatelessWidget {
   final VoidCallback onPlay;
 
   void _handleTap(BuildContext context) {
-    // Open unified media player for both video and audio
-    Navigator.of(context).push(
+    // Open unified media player for both video and audio.
+    // rootNavigator: true so the player overlays the entire shell
+    // (escapes the StatefulShellRoute branch navigator).
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
         builder: (context) => MediaPlayerScreen(sermon: sermon),
       ),

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
-import '../../../../shared/models/sermon.dart';
-import '../../../../shared/providers/sermon_provider.dart';
-import '../../../../core/utils/artwork_gradient.dart';
-import '../../../player/presentation/screens/media_player_screen.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/core/utils/artwork_gradient.dart';
+import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 
 
 class MessagesScreen extends ConsumerStatefulWidget {
@@ -283,7 +283,7 @@ class _SermonTile extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         // Open unified media player for both video and audio
-        Navigator.of(context).push(
+        Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute<void>(
             builder: (context) => MediaPlayerScreen(sermon: sermon),
           ),

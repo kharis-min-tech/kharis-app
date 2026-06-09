@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import '../../../../shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 class TodaysReadingCard extends ConsumerWidget {
   const TodaysReadingCard({super.key});
