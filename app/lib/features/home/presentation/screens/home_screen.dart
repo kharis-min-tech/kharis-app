@@ -1,16 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import '../../../../shared/providers/sermon_provider.dart';
-import '../widgets/daily_prayer_card.dart';
-import '../widgets/greeting_section.dart';
-import '../widgets/hero_card.dart';
-import '../widgets/latest_sermons_section.dart';
-import '../widgets/quick_actions_grid.dart';
 import '../widgets/todays_reading_card.dart';
-import '../widgets/upcoming_events_section.dart';
+import '../widgets/latest_message_card.dart';
+import '../widgets/latest_sermons_section.dart';
 import '../widgets/news_section.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -22,37 +16,51 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.orange,
+          color: AppColors.accent,
           onRefresh: () async {
             ref.invalidate(sermonsProvider);
-            ref.invalidate(upcomingEventsProvider(null));
             ref.invalidate(dailyContentProvider);
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.xl,
-            ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GreetingSection(),
-                SizedBox(height: AppSpacing.xl),
-                HeroCard(),
-                SizedBox(height: AppSpacing.xxl),
-                QuickActionsGrid(),
-                SizedBox(height: AppSpacing.xxl),
-                LatestSermonsSection(),
-                SizedBox(height: AppSpacing.xxl),
-                TodaysReadingCard(),
-                SizedBox(height: AppSpacing.xxl),
-                UpcomingEventsSection(),
-                SizedBox(height: AppSpacing.xxl),
-                NewsSection(),
-                SizedBox(height: AppSpacing.xxl),
-                DailyPrayerCard(),
-                SizedBox(height: AppSpacing.xl),
+                // Dove logo header - centered, ~40px
+                Padding(
+                  padding: const EdgeInsets.only(top: 24, bottom: 20),
+                  child: Center(
+                    child: Image.asset(
+                      'assets/figma/dove_logo.png',
+                      height: 44,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // Today's reading pill
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: TodaysReadingCard(),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                // Latest Message section
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: LatestMessageCard(),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                // Continue Listening
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: LatestSermonsSection(),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                // News & Updates
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: NewsSection(),
+                ),
+                const SizedBox(height: AppSpacing.xxxl),
               ],
             ),
           ),

@@ -84,7 +84,7 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
               color: AppColors.surfaceDark,
               alignment: Alignment.center,
               child: const CircularProgressIndicator(
-                color: AppColors.orange,
+                color: AppColors.accent,
                 strokeWidth: 2.5,
               ),
             ),

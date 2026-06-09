@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "193550520841",
+    "project_id": "kharis-church",
+    "storage_bucket": "kharis-church.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:193550520841:android:6d53c36ad3ddb7a5689ed8",
+        "android_client_info": {
+          "package_name": "org.kharis.kharis_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-BfsQ5dGkmcYVX87QMDz5k0gAxDG9ETQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

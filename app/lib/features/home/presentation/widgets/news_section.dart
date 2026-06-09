@@ -1,38 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_radius.dart';
-import '../../../../core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 class _NewsItem {
   const _NewsItem({
     required this.title,
-    required this.date,
+    required this.source,
+    required this.age,
+    required this.type,
     required this.gradientColors,
   });
 
   final String title;
-  final String date;
+  final String source;
+  final String age;
+  final String type;
   final List<Color> gradientColors;
 }
 
 const _kNewsItems = [
   _NewsItem(
+    title: 'Happy Mothers Day Rev Awo...',
+    source: 'Kharis Church',
+    age: '2 weeks ago',
+    type: 'Announcement',
+    gradientColors: [Color(0xFF8B0A50), Color(0xFFC0305A)],
+  ),
+  _NewsItem(
     title: '21 Days Prayer & Fasting',
-    date: '1st - 21st June 2026',
+    source: 'Kharis Church',
+    age: '1 month ago',
+    type: 'Event',
     gradientColors: [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
   ),
   _NewsItem(
     title: 'Kharis Phase 2 Conference',
-    date: 'Coming September 2026',
-    gradientColors: [Color(0xFF2A0A1A), Color(0xFFFD7F20)],
-  ),
-  _NewsItem(
-    title: 'Youth Camp Registration Open',
-    date: 'July 2026',
-    gradientColors: [Color(0xFF0A2A1A), Color(0xFF059669)],
+    source: 'Kharis Church',
+    age: '2 months ago',
+    type: 'Conference',
+    gradientColors: [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
   ),
 ];
 
@@ -44,46 +51,24 @@ class NewsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Section header ───────────────────────────────────────────────────
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'News & Updates',
-              style: GoogleFonts.mavenPro(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            Text(
-              'See All',
-              style: GoogleFonts.dmSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.orange,
-              ),
-            ),
-          ],
+        Text(
+          'News & Updates',
+          style: GoogleFonts.mavenPro(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
-
-        // ── Horizontal scroll ────────────────────────────────────────────────
         SizedBox(
-          height: 280,
+          height: 200,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
             itemCount: _kNewsItems.length,
             separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-            itemBuilder: (context, index) {
-              final item = _kNewsItems[index];
-              return _NewsCard(
-                title: item.title,
-                date: item.date,
-                gradientColors: item.gradientColors,
-              );
-            },
+            itemBuilder: (context, index) =>
+                _NewsCard(item: _kNewsItems[index]),
           ),
         ),
       ],
@@ -92,88 +77,107 @@ class NewsSection extends ConsumerWidget {
 }
 
 class _NewsCard extends StatelessWidget {
-  const _NewsCard({
-    required this.title,
-    required this.date,
-    required this.gradientColors,
-  });
+  const _NewsCard({required this.item});
 
-  final String title;
-  final String date;
-  final List<Color> gradientColors;
+  final _NewsItem item;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 280,
+      width: 260,
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: item.gradientColors,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          // ── Image area with gradient overlay ────────────────────────────────
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppRadius.card),
-            ),
-            child: SizedBox(
-              height: 200,
-              width: 280,
-              child: Stack(
-                fit: StackFit.expand,
+          // Content at bottom
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12),
+                ),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.7),
+                  ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Placeholder "image" — brand gradient background
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: gradientColors,
-                      ),
+                  Text(
+                    item.title,
+                    style: GoogleFonts.mavenPro(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  // Overlay: transparent → surfaceDark (fades bottom of image)
-                  const DecoratedBox(
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        item.source,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white54,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        item.age,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, AppColors.surfaceDark],
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      item.type,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-
-          // ── Title + date ─────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.mavenPro(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  date,
-                  style: GoogleFonts.dmSans(
-                    fontSize: 12,
-                    color: AppColors.textBody,
-                  ),
-                ),
-              ],
             ),
           ),
         ],

@@ -47,7 +47,7 @@ class _SeekBarState extends State<SeekBar> {
     final remaining = widget.duration - widget.position;
     final textStyle = GoogleFonts.dmSans(
       fontSize: 11,
-      color: AppColors.textMuted,
+      color: const Color(0xFF6B6B6B),
     );
 
     return Column(
@@ -84,7 +84,7 @@ class _SeekBarState extends State<SeekBar> {
                     height: 4,
                     width: trackWidth,
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceSubtle,
+                      color: const Color(0xFFD0D0D5),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -93,7 +93,7 @@ class _SeekBarState extends State<SeekBar> {
                     height: 4,
                     width: _fraction * trackWidth,
                     decoration: BoxDecoration(
-                      color: AppColors.orange,
+                      color: AppColors.purple,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -103,10 +103,10 @@ class _SeekBarState extends State<SeekBar> {
                     child: Container(
                       width: 12,
                       height: 12,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.orange,
-                      ),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.purple,
+                    ),
                     ),
                   ),
                 ],

@@ -9,7 +9,8 @@ import {
   YouTubeVideosResponse,
 } from './types';
 
-const CHANNEL_ID = 'KharisMinistries';
+// Direct channel ID — more reliable than handle/username lookup
+const CHANNEL_ID = 'UC4l8WmdF9ivMDQHHVOdYKqQ';
 const YT_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const youtubeApiKey = defineString('YOUTUBE_API_KEY');
 
@@ -23,16 +24,6 @@ function iso8601ToSeconds(duration: string): number {
   const m = parseInt(match[2] || '0', 10);
   const s = parseInt(match[3] || '0', 10);
   return h * 3600 + m * 60 + s;
-}
-
-async function fetchChannelId(apiKey: string): Promise<string> {
-  const url = `${YT_API_BASE}/channels?part=id&forHandle=${CHANNEL_ID}&key=${apiKey}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Channel lookup failed: ${res.status}`);
-  const data = (await res.json()) as { items?: { id: string }[] };
-  const channelId = data.items?.[0]?.id;
-  if (!channelId) throw new Error(`Channel not found for handle: ${CHANNEL_ID}`);
-  return channelId;
 }
 
 async function fetchLatestVideos(
@@ -88,14 +79,8 @@ export const syncYouTube = onSchedule(
       return;
     }
 
-    // Resolve channel handle to ID
-    let channelId: string;
-    try {
-      channelId = await fetchChannelId(apiKey);
-    } catch (err) {
-      console.error('Failed to resolve YouTube channel ID:', err);
-      throw err;
-    }
+    // Use the channel ID directly
+    const channelId = CHANNEL_ID;
 
     // Fetch latest videos
     let videos: YouTubeSearchItem[];

@@ -65,11 +65,11 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
         decoration: BoxDecoration(
           color: active
-              ? AppColors.orange.withValues(alpha: 0.10)
+              ? AppColors.accent.withValues(alpha: 0.10)
               : AppColors.surfaceSubtle,
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: active
-              ? Border.all(color: AppColors.orange, width: 1.5)
+              ? Border.all(color: AppColors.accent, width: 1.5)
               : Border.all(color: Colors.transparent, width: 1.5),
         ),
         child: Center(
@@ -78,7 +78,7 @@ class _FilterChip extends StatelessWidget {
             style: GoogleFonts.dmSans(
               fontSize: 13,
               fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              color: active ? AppColors.orange : AppColors.textBody,
+              color: active ? AppColors.accent : AppColors.textBody,
               height: 1.0,
             ),
           ),

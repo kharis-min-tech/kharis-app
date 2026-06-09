@@ -147,7 +147,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 color: isActive ? Colors.transparent : AppColors.surfaceSubtle,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isActive ? AppColors.orange : Colors.transparent,
+                  color: isActive ? AppColors.accent : Colors.transparent,
                   width: 1.5,
                 ),
               ),
@@ -156,7 +156,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 style: GoogleFonts.dmSans(
                   fontSize: 13,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  color: isActive ? AppColors.orange : AppColors.textMuted,
+                  color: isActive ? AppColors.accent : AppColors.textMuted,
                 ),
               ),
             ),
@@ -186,7 +186,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
           const Spacer(),
-          _buildServiceDot(AppColors.orange),
+          _buildServiceDot(AppColors.accent),
           const SizedBox(width: 6),
           Text(
             'Sun 10:30am',
@@ -245,7 +245,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         borderRadius: BorderRadius.circular(12),
         border: event.isFeatured
             ? const Border(
-                left: BorderSide(color: AppColors.orange, width: 3),
+                left: BorderSide(color: AppColors.accent, width: 3),
               )
             : null,
       ),
@@ -327,7 +327,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: const Icon(
                 Icons.calendar_today_outlined,
                 size: 20,
-                color: AppColors.orange,
+                color: AppColors.accent,
               ),
             ),
           ],

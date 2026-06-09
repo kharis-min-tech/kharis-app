@@ -213,7 +213,7 @@ class _EqualizerBars extends StatelessWidget {
                   width: 4,
                   height: 20 * animations[i].value,
                   decoration: BoxDecoration(
-                    color: AppColors.orange,
+                    color: AppColors.accent,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 );

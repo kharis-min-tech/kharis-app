@@ -203,9 +203,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.orange,
+                      backgroundColor: AppColors.accent,
                       disabledBackgroundColor:
-                          AppColors.orange.withValues(alpha: 0.5),
+                          AppColors.accent.withValues(alpha: 0.5),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -252,7 +252,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         'Sign In',
                         style: GoogleFonts.dmSans(
                           fontSize: 14,
-                          color: AppColors.orange,
+                          color: AppColors.accent,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -298,7 +298,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.orange, width: 1),
+        borderSide: const BorderSide(color: AppColors.accent, width: 1),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),

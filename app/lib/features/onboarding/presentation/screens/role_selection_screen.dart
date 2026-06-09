@@ -35,7 +35,15 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 56),
+              const SizedBox(height: 32),
+              Center(
+                child: Image.asset(
+                  'assets/figma/dove_logo.png',
+                  height: 48,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 28),
               // Heading
               Text(
                 'Welcome to Kharis',
@@ -70,7 +78,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 icon: Icons.waving_hand,
                 title: 'New Here',
                 description: 'This is my first time',
-                color: AppColors.orange,
+                color: AppColors.accent,
                 onTap: () => context.go('/branch-selection'),
               ),
               const SizedBox(height: 12),

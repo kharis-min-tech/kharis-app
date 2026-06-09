@@ -150,7 +150,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: selected
-                            ? AppColors.orange
+                            ? AppColors.accent
                             : AppColors.surfaceElevated,
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -177,7 +177,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             // ── Content area ─────────────────────────────────────────────
             Expanded(
               child: RefreshIndicator(
-                color: AppColors.orange,
+                color: AppColors.accent,
                 onRefresh: () async {
                   ref.invalidate(sermonsProvider);
                 },
@@ -189,7 +189,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         height: 300,
                         child: Center(
                           child: CircularProgressIndicator(
-                            color: AppColors.orange,
+                            color: AppColors.accent,
                           ),
                         ),
                       ),
@@ -222,7 +222,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                     ref.invalidate(sermonsProvider),
                                 child: const Text(
                                   'Retry',
-                                  style: TextStyle(color: AppColors.orange),
+                                  style: TextStyle(color: AppColors.accent),
                                 ),
                               ),
                             ],
@@ -351,7 +351,7 @@ class _SermonTile extends ConsumerWidget {
             const SizedBox(width: AppSpacing.sm),
             const Icon(
               Icons.play_arrow_rounded,
-              color: AppColors.orange,
+              color: AppColors.accent,
               size: 28,
             ),
           ],

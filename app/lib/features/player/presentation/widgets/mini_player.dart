@@ -47,7 +47,7 @@ class MiniPlayer extends ConsumerWidget {
                     height: 2,
                     width: progressFraction * constraints.maxWidth,
                     decoration: BoxDecoration(
-                      color: AppColors.orange,
+                      color: AppColors.accent,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(12),
                         topRight: Radius.circular(
@@ -137,7 +137,7 @@ class MiniPlayer extends ConsumerWidget {
                         isPlaying
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
-                        color: AppColors.orange,
+                        color: AppColors.accent,
                         size: 24,
                       ),
                       padding: EdgeInsets.zero,

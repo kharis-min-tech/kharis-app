@@ -152,8 +152,8 @@ class _BranchSelectionScreenState
                   onPressed:
                       selected != null ? () => context.go('/home') : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.orange,
-                    disabledBackgroundColor: AppColors.orange.withValues(alpha: 0.35),
+                    backgroundColor: AppColors.accent,
+                    disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.35),
                     foregroundColor: Colors.white,
                     disabledForegroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 18),

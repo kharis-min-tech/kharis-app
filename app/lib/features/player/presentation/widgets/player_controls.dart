@@ -29,8 +29,8 @@ class PlayerControls extends ConsumerWidget {
         IconButton(
           onPressed: () => service.seek(Duration.zero),
           icon: const Icon(Icons.skip_previous_rounded),
-          color: Colors.white,
-          iconSize: 24,
+          color: const Color(0xFF6B6B6B),
+          iconSize: 36,
           padding: EdgeInsets.zero,
         ),
         // Replay 15s
@@ -39,16 +39,16 @@ class PlayerControls extends ConsumerWidget {
         GestureDetector(
           onTap: () => isPlaying ? service.pause() : service.resume(),
           child: Container(
-            width: 64,
-            height: 64,
+            width: 70,
+            height: 70,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
             ),
             child: Icon(
               isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: Colors.black,
-              size: 28,
+              color: const Color(0xFF1A1A1A),
+              size: 36,
             ),
           ),
         ),
@@ -58,8 +58,8 @@ class PlayerControls extends ConsumerWidget {
         IconButton(
           onPressed: null,
           icon: const Icon(Icons.skip_next_rounded),
-          color: Colors.white.withValues(alpha: 0.4),
-          iconSize: 24,
+          color: const Color(0xFF6B6B6B),
+          iconSize: 36,
           padding: EdgeInsets.zero,
         ),
       ],
@@ -83,13 +83,13 @@ class _Replay15Button extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            const Icon(Icons.replay_rounded, color: Colors.white, size: 28),
+            const Icon(Icons.replay_rounded, color: Color(0xFF6B6B6B), size: 28),
             Positioned(
               bottom: 6,
               child: Text(
                 '15',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: Color(0xFF6B6B6B),
                   fontSize: 8,
                   fontWeight: FontWeight.w700,
                   height: 1,
@@ -119,13 +119,13 @@ class _Forward15Button extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            const Icon(Icons.forward_rounded, color: Colors.white, size: 28),
+            const Icon(Icons.forward_rounded, color: Color(0xFF6B6B6B), size: 28),
             Positioned(
               bottom: 6,
               child: Text(
                 '15',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: Color(0xFF6B6B6B),
                   fontSize: 8,
                   fontWeight: FontWeight.w700,
                   height: 1,

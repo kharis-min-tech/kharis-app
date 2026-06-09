@@ -5,8 +5,12 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   // ── Brand ──────────────────────────────────────────────────────────────────
 
-  /// Primary CTA. Every button on the website. Never use for decorative marks.
-  static const Color orange = Color(0xFFFD7F20);
+  /// Magenta/pink accent — links, active nav, play buttons, primary CTAs.
+  /// Matches Figma "Kharis App" canonical accent (#DC3F9E).
+  static const Color accent = Color(0xFFDC3F9E);
+
+  /// Today's reading pill base colour. Figma rounded pill bg.
+  static const Color pill = Color(0xFF882867);
 
   /// Identity colour. Logo and social icons only — not for buttons or fills.
   static const Color purple = Color(0xFF6B34FA);

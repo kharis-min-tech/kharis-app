@@ -58,26 +58,32 @@ In the Firebase Console for the project:
 - Build → Functions → **Get started**
 - The project must be on the **Blaze (pay-as-you-go)** plan — free tier does not support outbound network calls in functions
 
-### 1.3 Add the Android app
+### 1.3 Configure Firebase with FlutterFire CLI
 
-1. Project Settings → Your apps → **Add app** → Android
-2. Package name: `org.kharis.app`
-3. App nickname: `Kharis Church Android`
-4. Download `google-services.json`
-5. Place it at `app/android/app/google-services.json`
+The FlutterFire CLI automatically registers your app with Firebase and generates the configuration file. This is cleaner than manually downloading JSON/plist files.
 
-> Note: `build.gradle.kts` currently uses `org.kharis.kharis_app` as the `applicationId`. The Play Console and Firebase registration must use exactly the same package name — confirm with the team which is canonical, then update `android/app/build.gradle.kts` → `applicationId` and Firebase registration to match before generating the keystore.
+**Install the CLI (one-time):**
 
-### 1.4 Add the iOS app
+```bash
+dart pub global activate flutterfire_cli
+```
 
-1. Project Settings → Your apps → **Add app** → iOS
-2. Bundle ID: `org.kharis.app`
-3. App nickname: `Kharis Church iOS`
-4. Download `GoogleService-Info.plist`
-5. Place it at `app/ios/Runner/GoogleService-Info.plist`
-6. In Xcode: right-click the `Runner` folder → **Add Files to "Runner"** → select the plist
+**Run configure:**
 
-### 1.5 Enable Firebase in the Flutter app
+```bash
+cd app
+flutterfire configure --project=kharis-church
+```
+
+The CLI will:
+1. Prompt you to select platforms (Android, iOS, Web, macOS)
+2. Register apps in Firebase Console automatically
+3. Generate `lib/firebase_options.dart` with all platform configs
+4. Download `google-services.json` and `GoogleService-Info.plist` to the correct locations
+
+> **Package name:** When prompted, use `org.kharis.app` for both Android and iOS. The CLI will update `build.gradle.kts` and Xcode project if needed.
+
+### 1.4 Enable Firebase in the Flutter app
 
 Open `app/lib/core/services/firebase_service.dart` and change:
 
@@ -91,17 +97,15 @@ to:
 const bool kUseFirebase = true;
 ```
 
-This is the single flag that controls whether the app hits real Firebase or mock data.
+This single flag controls whether the app hits real Firebase or mock data.
 
-### 1.6 Verify Firebase dependencies
-
-Both `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) must be present before building. The build will fail at runtime if either is missing when `kUseFirebase = true`.
-
-Run a quick check:
+### 1.5 Verify configuration
 
 ```bash
-ls app/android/app/google-services.json
-ls app/ios/Runner/GoogleService-Info.plist
+# Check that firebase_options.dart was generated
+cat app/lib/firebase_options.dart | head -20
+
+# Should show your actual project ID, not "PLACEHOLDER"
 ```
 
 ---

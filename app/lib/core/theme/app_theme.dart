@@ -14,10 +14,10 @@ import 'app_typography.dart';
 /// ```
 ThemeData kharisTheme() {
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.orange,
+    seedColor: AppColors.accent,
     brightness: Brightness.dark,
   ).copyWith(
-    primary: AppColors.orange,
+    primary: AppColors.accent,
     onPrimary: AppColors.textPrimary,
     surface: AppColors.surfaceDark,
     onSurface: AppColors.textPrimary,
@@ -56,11 +56,10 @@ ThemeData kharisTheme() {
       ),
     ),
 
-    // ── Elevated button — matches kharis.org CTA spec exactly ─────────────────
-    // bg: #FD7F20 · color: #FFF · Maven Pro 14 px 700 · radius 12 · pad 18×40
+    // ── Elevated button — magenta/pink accent ─────────────────────────────────
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.orange,
+        backgroundColor: AppColors.accent,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         shadowColor: Colors.transparent,
@@ -68,7 +67,6 @@ ThemeData kharisTheme() {
           fontFamily: 'Maven Pro',
           fontSize: 14,
           fontWeight: FontWeight.w700,
-          // uppercase is applied at the widget call-site via .toUpperCase()
         ),
         shape: RoundedRectangleBorder(
           borderRadius: AppRadius.buttonBorder,
@@ -87,11 +85,11 @@ ThemeData kharisTheme() {
       titleTextStyle: AppTypography.h3,
     ),
 
-    // ── Bottom navigation ─────────────────────────────────────────────────────
+    // ── Bottom navigation — white active, #8A8A8A inactive ────────────────────
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: AppColors.surfaceDark,
-      selectedItemColor: AppColors.orange,
-      unselectedItemColor: AppColors.textMuted,
+      backgroundColor: Colors.transparent,
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Color(0xFF8A8A8A),
       type: BottomNavigationBarType.fixed,
       elevation: 0,
       selectedLabelStyle: AppTypography.nav,
@@ -112,7 +110,7 @@ ThemeData kharisTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: const BorderSide(color: AppColors.orange, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,

@@ -1,34 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 
-/// The artwork gradient palette (mirrors sermon_list_item.dart).
-const _kArtworkGradients = [
-  [Color(0xFFFD7F20), Color(0xFFFF4E00)],
-  [Color(0xFF6B34FA), Color(0xFF9B5DE5)],
-  [Color(0xFF22C55E), Color(0xFF16A34A)],
-  [Color(0xFF3B82F6), Color(0xFF2563EB)],
-  [Color(0xFFF59E0B), Color(0xFFD97706)],
-  [Color(0xFF800654), Color(0xFFBE185D)],
-  [Color(0xFF06B6D4), Color(0xFF0284C7)],
-  [Color(0xFFEF4444), Color(0xFFDC2626)],
-  [Color(0xFF10B981), Color(0xFF059669)],
-  [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-];
-
-List<Color> _gradientFor(int? index) {
-  if (index == null) return _kArtworkGradients[0];
-  return _kArtworkGradients[index % _kArtworkGradients.length];
-}
-
-/// A full playlist screen with a mosaic header, shuffle button, and
-/// reorderable sermon list.
-class PlaylistScreen extends ConsumerStatefulWidget {
+class PlaylistScreen extends ConsumerWidget {
   const PlaylistScreen({
     super.key,
     required this.playlistName,
@@ -39,245 +16,144 @@ class PlaylistScreen extends ConsumerStatefulWidget {
   final List<Sermon> sermons;
 
   @override
-  ConsumerState<PlaylistScreen> createState() => _PlaylistScreenState();
-}
-
-class _PlaylistScreenState extends ConsumerState<PlaylistScreen> {
-  late List<Sermon> _sermons;
-
-  @override
-  void initState() {
-    super.initState();
-    _sermons = List.of(widget.sermons);
-  }
-
-  // ── Total duration ─────────────────────────────────────────────────────────
-
-  String _totalDuration() {
-    final totalSeconds = _sermons.fold<int>(
-      0,
-      (acc, s) => acc + (s.duration?.inSeconds ?? 0),
-    );
-    final h = totalSeconds ~/ 3600;
-    final m = (totalSeconds % 3600) ~/ 60;
-    if (h > 0) return '${h}h ${m}m';
-    return '${m}m';
-  }
-
-  // ── Reorder callback ───────────────────────────────────────────────────────
-
-  // onReorderItem supplies an already-adjusted newIndex (item already removed).
-  void _onReorderItem(int oldIndex, int newIndex) {
-    setState(() {
-      final item = _sermons.removeAt(oldIndex);
-      _sermons.insert(newIndex, item);
-    });
-  }
-
-  // ── Shuffle ────────────────────────────────────────────────────────────────
-
-  void _shuffle() {
-    setState(() => _sermons.shuffle());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentSermon = ref.watch(currentSermonProvider);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final audioService = ref.read(audioPlayerServiceProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
-      body: CustomScrollView(
-        slivers: [
-          // ── App bar ────────────────────────────────────────────────────
-          SliverAppBar(
-            backgroundColor: AppColors.surfaceDark,
-            expandedHeight: 0,
-            pinned: true,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new,
-                  color: AppColors.textPrimary, size: 20),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.more_vert,
-                    color: AppColors.textPrimary, size: 22),
-                onPressed: () {},
-              ),
-            ],
-          ),
-
-          // ── Header ─────────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Header
+            SliverToBoxAdapter(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 2×2 mosaic
-                  _MosaicArtwork(sermons: _sermons),
-                  const SizedBox(height: 20),
-
-                  // Playlist name
-                  Text(
-                    widget.playlistName,
-                    style: GoogleFonts.mavenPro(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Metadata row
-                  Text(
-                    '${_sermons.length} sermons · ${_totalDuration()}',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 13,
-                      color: AppColors.textBody,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Shuffle button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: _shuffle,
-                      icon: const Icon(Icons.shuffle_rounded,
-                          size: 18, color: AppColors.textPrimary),
-                      label: Text(
-                        'Shuffle Play',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.orange,
-                        foregroundColor: AppColors.textPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.button),
-                        ),
-                      ),
+                  const SizedBox(height: 16),
+                  // Dove logo + Playlist label
+                  Center(
+                    child: Image.asset(
+                      'assets/figma/dove_logo.png',
+                      height: 32,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          ),
-
-          // ── Draggable list ─────────────────────────────────────────────
-          SliverReorderableList(
-            itemCount: _sermons.length,
-            onReorderItem: _onReorderItem,
-            itemBuilder: (context, index) {
-              final sermon = _sermons[index];
-              final isPlaying = currentSermon?.id == sermon.id;
-              final publishedAt = sermon.publishedAt ?? DateTime.now();
-
-              return ReorderableDelayedDragStartListener(
-                key: ValueKey(sermon.id),
-                index: index,
-                child: SermonListItem(
-                  title: sermon.title,
-                  speaker: sermon.speaker,
-                  duration: sermon.formattedDuration,
-                  pubDate: publishedAt,
-                  artworkColor: sermon.artworkColor,
-                  isPlaying: isPlaying,
-                  onTap: () {
-                    ref.read(currentSermonProvider.notifier).state = sermon;
-                  },
-                  trailing: ReorderableDragStartListener(
-                    index: index,
-                    child: const Icon(
-                      Icons.drag_handle_rounded,
+                  Text(
+                    'Playlist',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
                       color: AppColors.textMuted,
-                      size: 20,
+                      letterSpacing: 1.0,
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-
-          // Bottom padding
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
-      ),
-    );
-  }
-}
-
-// ── 2×2 mosaic widget ─────────────────────────────────────────────────────────
-
-class _MosaicArtwork extends StatelessWidget {
-  const _MosaicArtwork({required this.sermons});
-
-  final List<Sermon> sermons;
-
-  @override
-  Widget build(BuildContext context) {
-    // Take the first 4 (pad with index if fewer).
-    final indices = List.generate(
-      4,
-      (i) => i < sermons.length ? sermons[i].artworkColor : i,
-    );
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.card),
-      child: SizedBox(
-        width: 120,
-        height: 120,
-        child: Column(
-          children: [
-            Expanded(
-              child: Row(
-                children: [
-                  _MosaicTile(gradientColors: _gradientFor(indices[0])),
-                  const SizedBox(width: 2),
-                  _MosaicTile(gradientColors: _gradientFor(indices[1])),
+                  const SizedBox(height: 24),
+                  // ACTS SERIES artwork card
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppColors.purple, AppColors.accent],
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            playlistName.isNotEmpty
+                                ? playlistName.toUpperCase()
+                                : 'ACTS SERIES',
+                            style: GoogleFonts.mavenPro(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 2,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Description
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Going Through the book of ACTS exploring what God is doing line upon line precept upon precept',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 14,
+                        color: AppColors.textBody,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Playlist · ${sermons.length} Messages',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(color: Color(0xFF252525)),
                 ],
               ),
             ),
-            const SizedBox(height: 2),
-            Expanded(
-              child: Row(
-                children: [
-                  _MosaicTile(gradientColors: _gradientFor(indices[2])),
-                  const SizedBox(width: 2),
-                  _MosaicTile(gradientColors: _gradientFor(indices[3])),
-                ],
+            // Episode list
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final sermon = sermons[index];
+                  final durationStr = sermon.duration != null
+                      ? '${sermon.duration!.inMinutes} min'
+                      : '';
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 4,
+                    ),
+                    leading: IconButton(
+                      onPressed: () => audioService.play(sermon),
+                      icon: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: AppColors.accent,
+                        size: 28,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    title: Text(
+                      sermon.title,
+                      style: GoogleFonts.mavenPro(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      durationStr.isNotEmpty
+                          ? '${sermon.speaker} · $durationStr'
+                          : sermon.speaker,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  );
+                },
+                childCount: sermons.length,
               ),
             ),
+            // Bottom padding
+            const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MosaicTile extends StatelessWidget {
-  const _MosaicTile({required this.gradientColors});
-
-  final List<Color> gradientColors;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradientColors,
-          ),
         ),
       ),
     );

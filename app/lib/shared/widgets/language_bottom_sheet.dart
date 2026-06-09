@@ -101,7 +101,7 @@ class _LanguageRow extends StatelessWidget {
             if (isSelected)
               const Icon(
                 Icons.check,
-                color: AppColors.orange,
+                color: AppColors.accent,
                 size: 20,
               ),
           ],

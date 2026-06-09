@@ -1,16 +1,18 @@
 import 'package:firebase_core/firebase_core.dart';
+import '../../../firebase_options.dart';
 
-/// Toggle this to `true` once `google-services.json` (Android) and
-/// `GoogleService-Info.plist` (iOS) are in place.  When `false` the app runs
-/// entirely on mock / local data and no Firebase SDK calls are made.
-const bool kUseFirebase = false;
+/// Toggle this to `true` once you've run `flutterfire configure`.
+/// When `false` the app runs entirely on mock / local data.
+const bool kUseFirebase = true;
 
 class FirebaseService {
   FirebaseService._();
 
-  /// Initialises the Firebase app.  Must be called before any Firebase usage.
-  /// Requires platform config files to be present; will throw otherwise.
+  /// Initialises the Firebase app using FlutterFire CLI generated options.
+  /// Run `flutterfire configure` first to generate `lib/firebase_options.dart`.
   static Future<void> init() async {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   }
 }

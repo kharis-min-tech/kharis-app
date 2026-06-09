@@ -1,184 +1,129 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
-
-import '../widgets/seek_bar.dart';
 import '../widgets/player_controls.dart';
+import '../widgets/seek_bar.dart';
 
-class FullPlayerScreen extends ConsumerStatefulWidget {
+class FullPlayerScreen extends ConsumerWidget {
   const FullPlayerScreen({super.key});
 
   @override
-  ConsumerState<FullPlayerScreen> createState() => _FullPlayerScreenState();
-}
-
-class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
-  double _playbackSpeed = 1.0;
-
-  static const _speedSteps = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-
-  void _cycleSpeed() {
-    final idx = _speedSteps.indexOf(_playbackSpeed);
-    final next = _speedSteps[(idx + 1) % _speedSteps.length];
-    setState(() => _playbackSpeed = next);
-    ref.read(audioPlayerServiceProvider).setSpeed(next);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final sermon = ref.watch(currentSermonProvider);
     final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-    final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
+    final duration =
+        ref.watch(durationProvider).valueOrNull ?? Duration.zero;
     final service = ref.read(audioPlayerServiceProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── Blurred gradient background ──────────────────────────────────────
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF2A1A0A), // warm dark amber
-                  AppColors.surfaceDark,
-                ],
-                stops: [0.0, 0.55],
-              ),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFE8E8EC), Color(0xFFBFC2C8)],
           ),
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-            child: Container(color: Colors.black.withValues(alpha: 0.45)),
-          ),
-
-          // ── Content ──────────────────────────────────────────────────────────
-          SafeArea(
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // App bar row
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.md,
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        padding: EdgeInsets.zero,
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Now Playing',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textMuted,
-                            letterSpacing: 0.5,
-                          ),
+                // ── Top row: thumbnail + title/speaker + close + add ─────────
+                Row(
+                  children: [
+                    // Artwork thumbnail
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.purple, Color(0xFF9B5DE5)],
                         ),
                       ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(
-                          Icons.more_horiz_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: AppSpacing.xxxl),
-
-                // ── Artwork ────────────────────────────────────────────────────
-                Container(
-                  width: 280,
-                  height: 280,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF6B34FA), Color(0xFFFD7F20)],
+                      child: sermon?.artworkUrl != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                sermon!.artworkUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(
+                                  Icons.music_note_rounded,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.music_note_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.orange.withValues(alpha: 0.25),
-                        blurRadius: 40,
-                        spreadRadius: 4,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: sermon?.artworkUrl != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            sermon!.artworkUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (ctx, err, st) =>
-                                const _ArtworkPlaceholder(),
+                    const SizedBox(width: 12),
+                    // Title + speaker
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sermon?.title ?? 'No sermon loaded',
+                            style: GoogleFonts.mavenPro(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1A1A1A),
+                              height: 1.2,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        )
-                      : const _ArtworkPlaceholder(),
+                          const SizedBox(height: 2),
+                          Text(
+                            sermon?.speaker ?? '',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13,
+                              color: const Color(0xFF6B6B6B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Close button
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Color(0xFF1A1A1A),
+                        size: 24,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    // Add button
+                    IconButton(
+                      onPressed: () {},
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        color: Color(0xFF1A1A1A),
+                        size: 24,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
                 ),
 
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: 32),
 
-                // ── Track info ─────────────────────────────────────────────────
+                // ── Seek bar ─────────────────────────────────────────────────
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-                  child: Column(
-                    children: [
-                      Text(
-                        sermon?.title ?? 'No sermon loaded',
-                        style: GoogleFonts.mavenPro(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          height: 1.25,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        sermon?.speaker ?? '',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.orange,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: AppSpacing.xxxl),
-
-                // ── Seek bar ───────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: SeekBar(
                     position: position,
                     duration: duration,
@@ -186,70 +131,39 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                   ),
                 ),
 
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: 24),
 
-                // ── Controls ───────────────────────────────────────────────────
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  child: PlayerControls(),
-                ),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // ── Speed pill ─────────────────────────────────────────────────
-                GestureDetector(
-                  onTap: _cycleSpeed,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.surfaceSubtle, width: 1.5),
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                    ),
-                    child: Text(
-                      '${_playbackSpeed % 1 == 0 ? _playbackSpeed.toInt() : _playbackSpeed}x',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
+                // ── Controls ─────────────────────────────────────────────────
+                const PlayerControls(),
 
                 const Spacer(),
 
-                // ── Bottom actions ─────────────────────────────────────────────
+                // ── Bottom row: bluetooth | share + queue ────────────────────
                 Padding(
-                  padding: const EdgeInsets.only(
-                    left: AppSpacing.xxl,
-                    right: AppSpacing.xxl,
-                    bottom: AppSpacing.lg,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _BottomAction(
-                        icon: Icons.notes_rounded,
-                        label: 'Notes',
-                        onTap: () {},
+                      const Icon(
+                        Icons.bluetooth,
+                        color: Color(0xFF6B6B6B),
+                        size: 24,
                       ),
-                      _BottomAction(
-                        icon: Icons.share_rounded,
-                        label: 'Share',
-                        onTap: () {},
-                      ),
-                      _BottomAction(
-                        icon: Icons.queue_music_rounded,
-                        label: 'Playlist',
-                        onTap: () {},
-                      ),
-                      _BottomAction(
-                        icon: Icons.playlist_play_rounded,
-                        label: 'Queue',
-                        onTap: () {},
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.ios_share,
+                            color: Color(0xFF6B6B6B),
+                            size: 24,
+                          ),
+                          SizedBox(width: 20),
+                          Icon(
+                            Icons.queue_music_rounded,
+                            color: Color(0xFF6B6B6B),
+                            size: 24,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -257,59 +171,7 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Artwork placeholder ────────────────────────────────────────────────────────
-
-class _ArtworkPlaceholder extends StatelessWidget {
-  const _ArtworkPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Icon(
-        Icons.mic_none_rounded,
-        color: Colors.white54,
-        size: 64,
-      ),
-    );
-  }
-}
-
-// ── Bottom action chip ─────────────────────────────────────────────────────────
-
-class _BottomAction extends StatelessWidget {
-  const _BottomAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppColors.textBody, size: 22),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.dmSans(
-              fontSize: 11,
-              color: AppColors.textBody,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

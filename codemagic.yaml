@@ -1,4 +1,7 @@
 workflows:
+  # ════════════════════════════════════════════════════════════════════════════
+  # DEBUG BUILDS (for testing)
+  # ════════════════════════════════════════════════════════════════════════════
   android-debug:
     name: Android Debug APK
     max_build_duration: 60
@@ -20,4 +23,112 @@ workflows:
           flutter build apk --debug
     artifacts:
       - app/build/**/outputs/**/*.apk
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # PRODUCTION BUILDS
+  # ════════════════════════════════════════════════════════════════════════════
+  android-release:
+    name: Android Release (Play Store)
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      java: 17
+      groups:
+        - android_signing  # Contains: CM_KEYSTORE, CM_KEY_PASSWORD, CM_KEY_ALIAS, CM_KEYSTORE_PASSWORD
+      vars:
+        PACKAGE_NAME: org.kharis.app
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+    scripts:
+      - name: Set up keystore
+        script: |
+          echo $CM_KEYSTORE | base64 --decode > $CM_BUILD_DIR/app/android/keystore.jks
+          cat <<EOF > $CM_BUILD_DIR/app/android/key.properties
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_BUILD_DIR/app/android/keystore.jks
+          EOF
+      - name: Get dependencies
+        script: |
+          cd app
+          flutter pub get
+      - name: Build App Bundle
+        script: |
+          cd app
+          flutter build appbundle --release
+    artifacts:
       - app/build/**/outputs/**/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal  # internal → alpha → beta → production
+
+  ios-release:
+    name: iOS Release (App Store)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Kharis Church  # Set up in Codemagic dashboard
+    environment:
+      flutter: stable
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: org.kharis.app
+      vars:
+        BUNDLE_ID: org.kharis.app
+    cache:
+      cache_paths:
+        - $HOME/Library/Caches/CocoaPods
+    scripts:
+      - name: Install CocoaPods
+        script: |
+          cd app/ios
+          pod install
+      - name: Get dependencies
+        script: |
+          cd app
+          flutter pub get
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          cd app
+          flutter build ipa --release --export-options-plist=ios/exportOptions.plist
+    artifacts:
+      - app/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Kharis Testers
+
+  web-release:
+    name: Web Release (Firebase Hosting)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      groups:
+        - firebase  # Contains: FIREBASE_TOKEN
+    scripts:
+      - name: Get dependencies
+        script: |
+          cd app
+          flutter pub get
+      - name: Build Web
+        script: |
+          cd app
+          flutter build web --release
+      - name: Deploy to Firebase Hosting
+        script: |
+          cd app
+          npm install -g firebase-tools
+          firebase deploy --only hosting --token $FIREBASE_TOKEN
+    artifacts:
+      - app/build/web/**
