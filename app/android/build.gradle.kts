@@ -19,12 +19,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-subprojects {
-    project.plugins.withId("com.android.library") {
-        val android = project.extensions.getByType(com.android.build.gradle.LibraryExtension::class.java)
-        android.compileSdk = 35
-    }
-}
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)

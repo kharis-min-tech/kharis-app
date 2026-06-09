@@ -47,7 +47,7 @@ dependencies:
   webview_flutter: ^4.10.0
   shared_preferences: ^2.3.4
   url_launcher: ^6.3.1
-  add_2_calendar: ^3.0.1
+  add_2_calendar_new: ^1.0.4
   firebase_core: ^3.12.1
   cloud_firestore: ^5.6.12
   firebase_messaging: ^15.2.10
