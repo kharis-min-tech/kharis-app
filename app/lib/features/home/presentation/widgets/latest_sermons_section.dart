@@ -3,12 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../../../shared/models/sermon.dart';
-
 import '../../../../shared/providers/audio_provider.dart';
 import '../../../../shared/providers/sermon_provider.dart';
+import '../../../messages/presentation/screens/video_player_screen.dart';
 
 // Figma Group 32 card colours — solid purple row, dark inner play square.
 const _kCardBg = Color(0xFF3B1278);
@@ -84,9 +83,13 @@ class _SermonRow extends StatelessWidget {
   final Sermon sermon;
   final VoidCallback onPlay;
 
-  Future<void> _handleTap() async {
-    if (sermon.isYouTubeVideo && sermon.youtubeUrl != null) {
-      await launchUrlString(sermon.youtubeUrl!);
+  void _handleTap(BuildContext context) {
+    if (sermon.isYouTubeVideo && sermon.videoId != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => VideoPlayerScreen(sermon: sermon),
+        ),
+      );
     } else {
       onPlay();
     }
@@ -102,7 +105,7 @@ class _SermonRow extends StatelessWidget {
         : sermon.speaker;
 
     return GestureDetector(
-      onTap: _handleTap,
+      onTap: () => _handleTap(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(

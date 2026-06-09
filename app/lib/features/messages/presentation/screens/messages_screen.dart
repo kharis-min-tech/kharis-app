@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -9,6 +8,7 @@ import '../../../../shared/models/sermon.dart';
 import '../../../../shared/providers/audio_provider.dart';
 import '../../../../shared/providers/sermon_provider.dart';
 import '../../../../core/utils/artwork_gradient.dart';
+import 'video_player_screen.dart';
 
 
 class MessagesScreen extends ConsumerStatefulWidget {
@@ -282,9 +282,13 @@ class _SermonTile extends ConsumerWidget {
     final palette = sermonGradient(sermon.artworkColor ?? 0);
 
     return GestureDetector(
-      onTap: () async {
-        if (sermon.isYouTubeVideo && sermon.youtubeUrl != null) {
-          await launchUrlString(sermon.youtubeUrl!);
+      onTap: () {
+        if (sermon.isYouTubeVideo && sermon.videoId != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (context) => VideoPlayerScreen(sermon: sermon),
+            ),
+          );
         } else if (sermon.audioUrl.isNotEmpty) {
           ref.read(audioPlayerServiceProvider).play(sermon);
         }
