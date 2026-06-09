@@ -13,21 +13,21 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.admin == true;
     }
 
-    // sermons — readable by any authenticated user, writable only by admin
+    // sermons — publicly readable, writable only by admin
     match /sermons/{sermonId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    // events — readable by any authenticated user, writable only by admin
+    // events — publicly readable, writable only by admin
     match /events/{eventId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    // dailyContent — readable by any authenticated user, writable only by admin
+    // dailyContent — publicly readable, writable only by admin
     match /dailyContent/{dateId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
