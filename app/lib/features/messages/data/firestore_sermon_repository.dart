@@ -93,15 +93,17 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       title: data['title'] as String? ?? '',
       speaker: data['speaker'] as String? ?? '',
       audioUrl: data['audioUrl'] as String? ?? '',
-      artworkUrl: data['artworkUrl'] as String?,
-      duration: data['durationSeconds'] != null
-          ? Duration(seconds: (data['durationSeconds'] as num).toInt())
+      artworkUrl: data['thumbnailUrl'] as String? ?? data['artworkUrl'] as String?,
+      duration: data['duration'] != null
+          ? Duration(seconds: (data['duration'] as num).toInt())
           : null,
       publishedAt: (data['publishedAt'] as Timestamp?)?.toDate(),
       series: data['series'] as String?,
       description: data['description'] as String?,
       artworkColor: (data['artworkColor'] as num?)?.toInt(),
       category: data['category'] as String?,
+      videoId: data['videoId'] as String?,
+      source: data['source'] as String?,
     );
   }
 }

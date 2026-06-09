@@ -14,7 +14,15 @@ class Sermon {
     this.description,
     this.artworkColor,
     this.category,
+    this.videoId,
+    this.source,
   });
+
+  /// Returns true if this is a YouTube video (has videoId, no audioUrl)
+  bool get isYouTubeVideo => videoId != null && videoId!.isNotEmpty;
+
+  /// YouTube video URL for opening in browser/player
+  String? get youtubeUrl => isYouTubeVideo ? 'https://www.youtube.com/watch?v=$videoId' : null;
 
   final String id;
   final String title;
@@ -33,6 +41,12 @@ class Sermon {
 
   /// Category label (e.g. "Faith", "Prayer", "Messages").
   final String? category;
+
+  /// YouTube video ID (for videos synced from YouTube)
+  final String? videoId;
+
+  /// Content source: 'youtube', 'soundcloud', etc.
+  final String? source;
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -58,6 +72,8 @@ class Sermon {
     String? description,
     int? artworkColor,
     String? category,
+    String? videoId,
+    String? source,
   }) {
     return Sermon(
       id: id ?? this.id,
@@ -71,6 +87,8 @@ class Sermon {
       description: description ?? this.description,
       artworkColor: artworkColor ?? this.artworkColor,
       category: category ?? this.category,
+      videoId: videoId ?? this.videoId,
+      source: source ?? this.source,
     );
   }
 

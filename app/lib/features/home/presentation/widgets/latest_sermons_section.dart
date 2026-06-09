@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../../shared/models/sermon.dart';
 
 import '../../../../shared/providers/audio_provider.dart';
 import '../../../../shared/providers/sermon_provider.dart';
@@ -78,8 +81,19 @@ class LatestSermonsSection extends ConsumerWidget {
 class _SermonRow extends StatelessWidget {
   const _SermonRow({required this.sermon, required this.onPlay});
 
-  final dynamic sermon; // Sermon
+  final Sermon sermon;
   final VoidCallback onPlay;
+
+  Future<void> _handleTap() async {
+    if (sermon.isYouTubeVideo && sermon.youtubeUrl != null) {
+      final uri = Uri.parse(sermon.youtubeUrl!);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } else {
+      onPlay();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,10 +102,10 @@ class _SermonRow extends StatelessWidget {
         : null;
     final subtitle = durationStr != null
         ? '${sermon.speaker} · $durationStr'
-        : sermon.speaker as String;
+        : sermon.speaker;
 
     return GestureDetector(
-      onTap: onPlay,
+      onTap: _handleTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
@@ -122,7 +136,7 @@ class _SermonRow extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    sermon.title as String,
+                    sermon.title,
                     style: GoogleFonts.mavenPro(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
