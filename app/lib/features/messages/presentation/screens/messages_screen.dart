@@ -5,10 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/models/sermon.dart';
-import '../../../../shared/providers/audio_provider.dart';
 import '../../../../shared/providers/sermon_provider.dart';
 import '../../../../core/utils/artwork_gradient.dart';
-import 'video_player_screen.dart';
+import '../../../player/presentation/screens/media_player_screen.dart';
 
 
 class MessagesScreen extends ConsumerStatefulWidget {
@@ -283,15 +282,12 @@ class _SermonTile extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () {
-        if (sermon.isYouTubeVideo && sermon.videoId != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (context) => VideoPlayerScreen(sermon: sermon),
-            ),
-          );
-        } else if (sermon.audioUrl.isNotEmpty) {
-          ref.read(audioPlayerServiceProvider).play(sermon);
-        }
+        // Open unified media player for both video and audio
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (context) => MediaPlayerScreen(sermon: sermon),
+          ),
+        );
       },
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),

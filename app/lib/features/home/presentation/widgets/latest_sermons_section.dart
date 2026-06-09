@@ -7,7 +7,7 @@ import 'package:kharis_app/core/theme/theme.dart';
 import '../../../../shared/models/sermon.dart';
 import '../../../../shared/providers/audio_provider.dart';
 import '../../../../shared/providers/sermon_provider.dart';
-import '../../../messages/presentation/screens/video_player_screen.dart';
+import '../../../player/presentation/screens/media_player_screen.dart';
 
 // Figma Group 32 card colours — solid purple row, dark inner play square.
 const _kCardBg = Color(0xFF3B1278);
@@ -84,15 +84,12 @@ class _SermonRow extends StatelessWidget {
   final VoidCallback onPlay;
 
   void _handleTap(BuildContext context) {
-    if (sermon.isYouTubeVideo && sermon.videoId != null) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (context) => VideoPlayerScreen(sermon: sermon),
-        ),
-      );
-    } else {
-      onPlay();
-    }
+    // Open unified media player for both video and audio
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => MediaPlayerScreen(sermon: sermon),
+      ),
+    );
   }
 
   @override

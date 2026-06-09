@@ -1,106 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/shared/providers/audio_provider.dart';
 
-import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/providers/audio_provider.dart';
+import '../screens/media_player_screen.dart';
 
+/// Persistent mini player bar (56px) above tab bar.
+/// Shows current playing sermon with artwork, title, and play/pause.
+/// Gold 2px progress line at top. Tap to expand.
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sermon = ref.watch(currentSermonProvider);
-    final playerState = ref.watch(playerStateProvider).valueOrNull;
-    final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-    final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
-    final service = ref.read(audioPlayerServiceProvider);
+    final service = ref.watch(audioPlayerServiceProvider);
+    final sermon = service.currentSermon;
 
-    // Nothing loaded — render nothing
     if (sermon == null) return const SizedBox.shrink();
 
+    final playerState = ref.watch(playerStateProvider).valueOrNull;
     final isPlaying = playerState?.playing ?? false;
-    final progressFraction = duration.inMilliseconds > 0
-        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+    final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
+    final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
+
+    final progress = duration.inMilliseconds > 0
+        ? position.inMilliseconds / duration.inMilliseconds
         : 0.0;
 
     return GestureDetector(
-      onTap: () => context.push('/player'),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (context) => MediaPlayerScreen(sermon: sermon),
+          ),
+        );
+      },
       child: Container(
-        height: 56,
-        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        decoration: BoxDecoration(
+        height: 58, // 56px + 2px progress line
+        decoration: const BoxDecoration(
           color: AppColors.surfaceElevated,
-          borderRadius: BorderRadius.circular(12),
+          border: Border(
+            top: BorderSide(color: Colors.white10, width: 0.5),
+          ),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            children: [
-              // ── Gold progress bar at top ─────────────────────────────────────
-              LayoutBuilder(builder: (ctx, constraints) {
-                return Positioned(
-                  top: 0,
-                  left: 0,
-                  child: Container(
-                    height: 2,
-                    width: progressFraction * constraints.maxWidth,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(12),
-                        topRight: Radius.circular(
-                          progressFraction >= 1.0 ? 12 : 0,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-
-              // ── Main row ─────────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                ),
+        child: Column(
+          children: [
+            // Gold progress line
+            SizedBox(
+              height: 2,
+              child: LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                backgroundColor: Colors.transparent,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+              ),
+            ),
+            // Mini player content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   children: [
-                    // Thumbnail
+                    // Artwork thumbnail
                     Container(
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF6B34FA), Color(0xFFFD7F20)],
-                        ),
+                        borderRadius: BorderRadius.circular(4),
+                        color: AppColors.surfaceSubtle,
                       ),
+                      clipBehavior: Clip.antiAlias,
                       child: sermon.artworkUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: Image.network(
-                                sermon.artworkUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (ctx, err, st) => const Icon(
-                                  Icons.mic_none_rounded,
-                                  color: Colors.white54,
-                                  size: 20,
-                                ),
-                              ),
+                          ? Image.network(
+                              sermon.artworkUrl!,
+                              fit: BoxFit.cover,
                             )
                           : const Icon(
-                              Icons.mic_none_rounded,
+                              Icons.music_note,
                               color: Colors.white54,
                               size: 20,
                             ),
                     ),
-
-                    const SizedBox(width: AppSpacing.md),
-
-                    // Title + speaker
+                    const SizedBox(width: 12),
+                    // Title and speaker
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -109,8 +91,8 @@ class MiniPlayer extends ConsumerWidget {
                           Text(
                             sermon.title,
                             style: GoogleFonts.mavenPro(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                               color: Colors.white,
                             ),
                             maxLines: 1,
@@ -119,8 +101,8 @@ class MiniPlayer extends ConsumerWidget {
                           Text(
                             sermon.speaker,
                             style: GoogleFonts.dmSans(
-                              fontSize: 11,
-                              color: AppColors.textBody,
+                              fontSize: 12,
+                              color: AppColors.textMuted,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -128,25 +110,26 @@ class MiniPlayer extends ConsumerWidget {
                         ],
                       ),
                     ),
-
-                    // Play / Pause
+                    // Play/Pause button
                     IconButton(
-                      onPressed: () =>
-                          isPlaying ? service.pause() : service.resume(),
                       icon: Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        color: AppColors.accent,
-                        size: 24,
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                        size: 28,
                       ),
-                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        if (isPlaying) {
+                          service.pause();
+                        } else {
+                          service.resume();
+                        }
+                      },
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
