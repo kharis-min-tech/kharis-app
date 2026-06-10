@@ -12,7 +12,8 @@ class LatestMessageCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sermonsAsync = ref.watch(sermonsProvider);
+    final videos = ref.watch(videosProvider);
+    final video = videos.isNotEmpty ? videos.first : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,39 +44,23 @@ class LatestMessageCard extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        // Video card
-        sermonsAsync.when(
-          loading: () => _buildVideoCard(
-            title: 'Future-Proofing the Church',
-            speaker: 'Kharis Church',
-            gradientColors: const [Color(0xFF2A1A0A), Color(0xFF6B34FA)],
+        // Video card — taps into the in-app YouTube player
+        GestureDetector(
+          onTap: video != null
+              ? () {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => MediaPlayerScreen(sermon: video),
+                    ),
+                  );
+                }
+              : null,
+          child: _buildVideoCard(
+            title: video?.title ?? 'Latest Message',
+            speaker: video?.speaker ?? 'Kharis Church',
+            gradientColors: sermonGradient(video?.artworkColor ?? 0),
+            artworkUrl: video?.artworkUrl,
           ),
-          error: (_, _) => _buildVideoCard(
-            title: 'Latest Sermon',
-            speaker: 'Kharis Church',
-            gradientColors: const [Color(0xFF2A1A0A), Color(0xFF6B34FA)],
-          ),
-          data: (sermons) {
-            final sermon = sermons.isNotEmpty ? sermons.first : null;
-            return GestureDetector(
-              onTap: sermon != null
-                  ? () {
-                      Navigator.of(context, rootNavigator: true).push(
-                        MaterialPageRoute<void>(
-                          builder: (context) =>
-                              MediaPlayerScreen(sermon: sermon),
-                        ),
-                      );
-                    }
-                  : null,
-              child: _buildVideoCard(
-                title: sermon?.title ?? 'Future-Proofing the Church',
-                speaker: sermon?.speaker ?? 'Kharis Church',
-                gradientColors: sermonGradient(sermon?.artworkColor ?? 0),
-                artworkUrl: sermon?.artworkUrl,
-              ),
-            );
-          },
         ),
       ],
     );

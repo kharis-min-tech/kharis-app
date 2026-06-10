@@ -1,12 +1,16 @@
 import 'package:dio/dio.dart';
 
+import 'package:kharis_app/core/utils/html_entities.dart';
+
 import 'package:kharis_app/shared/models/sermon.dart';
+import 'kharis_content.dart';
 import 'sermon_repository_base.dart';
 
 /// Fetches sermons from the Kharis SoundCloud RSS feed.
 ///
-/// Falls back to [getMockSermons] during offline development or when the
-/// network is unavailable.
+/// On any network or CORS failure falls back to [getMockSermons], which
+/// returns the real Kharis dataset from [kharisAudioSermons] so the list is
+/// never empty and never contains fake titles.
 class SermonRepository extends AbstractSermonRepository {
   SermonRepository({Dio? dio}) : _dio = dio ?? Dio();
 
@@ -15,24 +19,29 @@ class SermonRepository extends AbstractSermonRepository {
 
   final Dio _dio;
 
-  /// Live fetch from SoundCloud RSS.
+  /// Live fetch from SoundCloud RSS; falls back to real dataset on any error.
   @override
   Future<List<Sermon>> getSermons() async {
-    final response = await _dio.get<String>(
-      _feedUrl,
-      options: Options(
-        headers: {'Accept': 'application/rss+xml, application/xml, text/xml'},
-        responseType: ResponseType.plain,
-      ),
-    );
-
-    final xml = response.data ?? '';
-    return _parseRss(xml);
+    try {
+      final response = await _dio.get<String>(
+        _feedUrl,
+        options: Options(
+          headers: {'Accept': 'application/rss+xml, application/xml, text/xml'},
+          responseType: ResponseType.plain,
+        ),
+      );
+      final xml = response.data ?? '';
+      final parsed = _parseRss(xml);
+      if (parsed.isNotEmpty) return parsed;
+      return getMockSermons();
+    } catch (_) {
+      return getMockSermons();
+    }
   }
 
-  /// 10 hardcoded sermons for offline development.
+  /// Real Kharis dataset — used as the guaranteed fallback.
   @override
-  List<Sermon> getMockSermons() => _mockSermons;
+  List<Sermon> getMockSermons() => _realSermons;
 
   // ── RSS parser ─────────────────────────────────────────────────────────────
 
@@ -48,19 +57,22 @@ class SermonRepository extends AbstractSermonRepository {
       final durationRaw = _extractText(item, 'itunes:duration');
       final pubDateRaw = _extractText(item, 'pubDate');
       final guid = _extractText(item, 'guid');
+      final itunesImage = _extractAttribute(item, 'itunes:image', 'href');
 
       if (audioUrl.isEmpty) continue;
 
       sermons.add(Sermon(
         id: guid.isNotEmpty ? guid : 'sermon_$index',
         title: title.isNotEmpty ? _stripCdata(title) : 'Untitled',
-        speaker: 'Kharis Ministries',
+        speaker: _inferSpeaker(title),
         description: _stripCdata(description),
         audioUrl: audioUrl,
+        artworkUrl: itunesImage.isNotEmpty ? itunesImage : null,
         duration: _parseDuration(durationRaw),
         publishedAt: _parsePubDate(pubDateRaw),
         artworkColor: index % 10,
         category: _inferCategory(title),
+        source: 'soundcloud',
       ));
       index++;
     }
@@ -113,11 +125,13 @@ class SermonRepository extends AbstractSermonRepository {
   }
 
   String _stripCdata(String value) {
-    return value
-        .replaceAll('<![CDATA[', '')
-        .replaceAll(']]>', '')
-        .replaceAll(RegExp(r'<[^>]+>'), '')
-        .trim();
+    return decodeHtmlEntities(
+      value
+          .replaceAll('<![CDATA[', '')
+          .replaceAll(']]>', '')
+          .replaceAll(RegExp(r'<[^>]+>'), '')
+          .trim(),
+    );
   }
 
   /// Parses HH:MM:SS or MM:SS or raw seconds into a [Duration].
@@ -150,134 +164,52 @@ class SermonRepository extends AbstractSermonRepository {
   String? _inferCategory(String title) {
     final t = title.toLowerCase();
     if (t.contains('faith') || t.contains('believe')) return 'Faith';
-    if (t.contains('prayer') || t.contains('pray')) return 'Prayer';
+    if (t.contains('prayer') || t.contains('pray') || t.contains('fast')) {
+      return 'Prayer';
+    }
     if (t.contains('worship')) return 'Worship';
     if (t.contains('grace') || t.contains('mercy')) return 'Grace';
     if (t.contains('holy') || t.contains('spirit')) return 'Holy Spirit';
     return 'Messages';
   }
 
-  // ── Mock data ──────────────────────────────────────────────────────────────
+  String _inferSpeaker(String title) {
+    if (title.contains('Awo Antwi')) return 'Awo Antwi';
+    return 'David Antwi';
+  }
 
-  static final _mockSermons = [
-    Sermon(
-      id: 'mock_1',
-      title: 'Walking in Faith',
-      speaker: 'Pastor Kharis',
-      description:
-          'A message about the foundation of faith and how it transforms our daily walk with God.',
-      audioUrl: 'https://example.com/sermons/walking-in-faith.mp3',
-      duration: const Duration(seconds: 3720),
-      publishedAt: DateTime(2024, 12, 1),
-      artworkColor: 0,
-      category: 'Faith',
-    ),
-    Sermon(
-      id: 'mock_2',
-      title: 'The Power of Prayer',
-      speaker: 'Pastor Kharis',
-      description:
-          'Discover how persistent prayer opens doors and changes circumstances.',
-      audioUrl: 'https://example.com/sermons/power-of-prayer.mp3',
-      duration: const Duration(seconds: 4140),
-      publishedAt: DateTime(2024, 11, 24),
-      artworkColor: 1,
-      category: 'Prayer',
-    ),
-    Sermon(
-      id: 'mock_3',
-      title: 'Grace Unending',
-      speaker: 'Pastor Kharis',
-      description:
-          "Understanding the depth and breadth of God's grace in our lives.",
-      audioUrl: 'https://example.com/sermons/grace-unending.mp3',
-      duration: const Duration(seconds: 2880),
-      publishedAt: DateTime(2024, 11, 17),
-      artworkColor: 2,
-      category: 'Grace',
-    ),
-    Sermon(
-      id: 'mock_4',
-      title: 'Holy Spirit: Our Guide',
-      speaker: 'Pastor Kharis',
-      description:
-          'How the Holy Spirit leads, comforts, and empowers believers.',
-      audioUrl: 'https://example.com/sermons/holy-spirit-guide.mp3',
-      duration: const Duration(seconds: 5100),
-      publishedAt: DateTime(2024, 11, 10),
-      artworkColor: 3,
-      category: 'Holy Spirit',
-    ),
-    Sermon(
-      id: 'mock_5',
-      title: 'Worship as a Lifestyle',
-      speaker: 'Pastor Kharis',
-      description:
-          'Moving worship beyond Sunday mornings into every area of life.',
-      audioUrl: 'https://example.com/sermons/worship-lifestyle.mp3',
-      duration: const Duration(seconds: 3300),
-      publishedAt: DateTime(2024, 11, 3),
-      artworkColor: 4,
-      category: 'Worship',
-    ),
-    Sermon(
-      id: 'mock_6',
-      title: 'Renewed Mind',
-      speaker: 'Pastor Kharis',
-      description:
-          'The transformation that comes when we align our thinking with Scripture.',
-      audioUrl: 'https://example.com/sermons/renewed-mind.mp3',
-      duration: const Duration(seconds: 3960),
-      publishedAt: DateTime(2024, 10, 27),
-      artworkColor: 5,
-      category: 'Messages',
-    ),
-    Sermon(
-      id: 'mock_7',
-      title: 'Purpose and Calling',
-      speaker: 'Pastor Kharis',
-      description: 'Discovering and stepping into your God-given purpose.',
-      audioUrl: 'https://example.com/sermons/purpose-calling.mp3',
-      duration: const Duration(seconds: 4500),
-      publishedAt: DateTime(2024, 10, 20),
-      artworkColor: 6,
-      category: 'Messages',
-    ),
-    Sermon(
-      id: 'mock_8',
-      title: 'Mercy Never Fails',
-      speaker: 'Pastor Kharis',
-      description:
-          "God's mercy endures through every season — even the darkest ones.",
-      audioUrl: 'https://example.com/sermons/mercy-never-fails.mp3',
-      duration: const Duration(seconds: 3600),
-      publishedAt: DateTime(2024, 10, 13),
-      artworkColor: 7,
-      category: 'Grace',
-    ),
-    Sermon(
-      id: 'mock_9',
-      title: 'Faith Over Fear',
-      speaker: 'Pastor Kharis',
-      description:
-          "Practical steps to replace anxiety with trust in God's promises.",
-      audioUrl: 'https://example.com/sermons/faith-over-fear.mp3',
-      duration: const Duration(seconds: 2760),
-      publishedAt: DateTime(2024, 10, 6),
-      artworkColor: 8,
-      category: 'Faith',
-    ),
-    Sermon(
-      id: 'mock_10',
-      title: 'Kingdom Perspective',
-      speaker: 'Pastor Kharis',
-      description:
-          "Seeing every situation through the lens of God's eternal kingdom.",
-      audioUrl: 'https://example.com/sermons/kingdom-perspective.mp3',
-      duration: const Duration(seconds: 4200),
-      publishedAt: DateTime(2024, 9, 29),
-      artworkColor: 9,
-      category: 'Messages',
-    ),
-  ];
+  // ── Real fallback dataset ──────────────────────────────────────────────────
+
+  static final List<Sermon> _realSermons = kharisAudioSermons
+      .asMap()
+      .entries
+      .map((entry) {
+        final i = entry.key;
+        final m = entry.value;
+        return Sermon(
+          id: 'sc_${i}_${(m['audioUrl'] as String).hashCode.abs()}',
+          title: m['title'] as String,
+          speaker: m['speaker'] as String,
+          audioUrl: m['audioUrl'] as String,
+          artworkUrl: m['artworkUrl'] as String?,
+          duration: Duration(seconds: m['durationSeconds'] as int),
+          publishedAt: DateTime.tryParse(m['publishedAt'] as String),
+          artworkColor: i % 10,
+          category: _staticInferCategory(m['title'] as String),
+          source: 'soundcloud',
+        );
+      })
+      .toList();
+
+  static String? _staticInferCategory(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('faith') || t.contains('believe')) return 'Faith';
+    if (t.contains('prayer') || t.contains('pray') || t.contains('fast')) {
+      return 'Prayer';
+    }
+    if (t.contains('worship')) return 'Worship';
+    if (t.contains('grace') || t.contains('mercy')) return 'Grace';
+    if (t.contains('holy') || t.contains('spirit')) return 'Holy Spirit';
+    return 'Messages';
+  }
 }
