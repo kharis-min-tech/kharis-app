@@ -194,6 +194,7 @@ class SermonRepository extends AbstractSermonRepository {
           artworkUrl: m['artworkUrl'] as String?,
           duration: Duration(seconds: m['durationSeconds'] as int),
           publishedAt: DateTime.tryParse(m['publishedAt'] as String),
+          description: m['description'] as String?,
           artworkColor: i % 10,
           category: _staticInferCategory(m['title'] as String),
           source: 'soundcloud',
