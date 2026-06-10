@@ -4,32 +4,50 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 class PlaylistScreen extends ConsumerWidget {
   const PlaylistScreen({
     super.key,
-    required this.playlistName,
-    required this.sermons,
+    this.playlistName = 'ACTS SERIES',
   });
 
   final String playlistName;
-  final List<Sermon> sermons;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final audioService = ref.read(audioPlayerServiceProvider);
+    final sermonsAsync = ref.watch(sermonsProvider);
+
+    final sermons = sermonsAsync.when(
+      data: (all) {
+        // Audio only — exclude YouTube videos
+        final audio = all
+            .where((s) => !s.isYouTubeVideo && s.audioUrl.isNotEmpty)
+            .toList();
+        // Prefer sermons whose category or title contains 'acts'
+        final acts = audio.where((s) {
+          final cat = (s.category ?? '').toLowerCase();
+          final title = s.title.toLowerCase();
+          return cat.contains('acts') || title.contains('acts');
+        }).toList();
+        return acts.isNotEmpty ? acts : audio.take(5).toList();
+      },
+      loading: () => <Sermon>[],
+      error: (_, _) => <Sermon>[],
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // Header
+            // ── Header ──────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Column(
                 children: [
                   const SizedBox(height: 16),
-                  // Dove logo + Playlist label
+                  // Dove logo
                   Center(
                     child: Image.asset(
                       'assets/figma/dove_logo.png',
@@ -38,16 +56,18 @@ class PlaylistScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  // Playlist title
                   Text(
                     'Playlist',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 13,
-                      color: AppColors.textMuted,
-                      letterSpacing: 1.0,
+                    style: GoogleFonts.mavenPro(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  // ACTS SERIES artwork card
+                  // ── ACTS SERIES artwork card ─────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: AspectRatio(
@@ -67,8 +87,8 @@ class PlaylistScreen extends ConsumerWidget {
                                 ? playlistName.toUpperCase()
                                 : 'ACTS SERIES',
                             style: GoogleFonts.mavenPro(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
                               color: Colors.white,
                               letterSpacing: 2,
                             ),
@@ -79,7 +99,7 @@ class PlaylistScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Description
+                  // ── Description ─────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
@@ -105,7 +125,22 @@ class PlaylistScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            // Episode list
+
+            // ── Loading indicator ────────────────────────────────────────
+            if (sermonsAsync.isLoading)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.accent,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+              ),
+
+            // ── Episode list ─────────────────────────────────────────────
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -121,9 +156,9 @@ class PlaylistScreen extends ConsumerWidget {
                     leading: IconButton(
                       onPressed: () => audioService.play(sermon),
                       icon: const Icon(
-                        Icons.play_arrow_rounded,
+                        Icons.play_circle_rounded,
                         color: AppColors.accent,
-                        size: 28,
+                        size: 32,
                       ),
                       padding: EdgeInsets.zero,
                     ),
@@ -146,11 +181,13 @@ class PlaylistScreen extends ConsumerWidget {
                         color: AppColors.textMuted,
                       ),
                     ),
+                    onTap: () => audioService.play(sermon),
                   );
                 },
                 childCount: sermons.length,
               ),
             ),
+
             // Bottom padding
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],

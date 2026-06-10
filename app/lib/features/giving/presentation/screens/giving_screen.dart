@@ -3,6 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'giving_webview_screen.dart';
 
+/// Gold/amber badge colour — matches the giving pill in the Figma frame.
+const Color _kGold = Color(0xFFD4A017);
+
+/// Giving URL used by both GIVE NOW and any future deep-link.
+const String _kGivingUrl = 'https://kharis.org/give';
+
 class GivingScreen extends StatelessWidget {
   const GivingScreen({super.key});
 
@@ -12,12 +18,33 @@ class GivingScreen extends StatelessWidget {
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // ── 1. GIVING pill badge ──────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _kGold,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  'GIVING',
+                  style: GoogleFonts.mavenPro(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── 2. Heading ────────────────────────────────────────────────
               Text(
                 'Support the Vision',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.mavenPro(
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
@@ -25,95 +52,208 @@ class GivingScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                'Your generosity fuels our mission to create a sanctuary for seekers and believers worldwide.',
-                style: GoogleFonts.dmSans(
-                  fontSize: 15,
-                  color: AppColors.textBody,
-                  height: 1.5,
+
+              // ── 3. Body copy (max 280 logical px) ────────────────────────
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: Text(
+                  'Your generosity fuels our mission to create a sanctuary for seekers and believers worldwide.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 15,
+                    color: AppColors.textBody,
+                    height: 1.55,
+                  ),
                 ),
               ),
               const SizedBox(height: 32),
-              // Giving card
+
+              // ── 4. White giving card ──────────────────────────────────────
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.volunteer_activism,
-                          color: AppColors.accent,
-                          size: 32,
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Give Online',
-                              style: GoogleFonts.mavenPro(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1A1A1A),
-                              ),
-                            ),
-                            Text(
-                              'Secure online giving',
-                              style: GoogleFonts.dmSans(
-                                fontSize: 13,
-                                color: const Color(0xFF6B6B6B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => openGivingFlow(context, _kGivingUrl),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
                     ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const GivingWebViewScreen(url: 'https://kharis.org/give'),
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: Text(
-                          'Give Now',
-                          style: GoogleFonts.mavenPro(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    child: Text(
+                      'GIVE NOW',
+                      style: GoogleFonts.mavenPro(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── 5. Branch selector row ────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      'Branch',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'London',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textMuted,
+                      size: 20,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 32),
+
+              // ── 6. Other Ways to Give ─────────────────────────────────────
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Other Ways to Give',
+                  style: GoogleFonts.mavenPro(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              _GivingOptionRow(
+                iconColor: AppColors.purple,
+                icon: Icons.account_balance_rounded,
+                title: 'Bank Transfer',
+                subtitle: 'Direct bank payment',
+                onTap: () {},
+              ),
+              const SizedBox(height: 10),
+              _GivingOptionRow(
+                iconColor: AppColors.accent,
+                icon: Icons.church_rounded,
+                title: 'Build God a House',
+                subtitle: 'Building fund contribution',
+                onTap: () {},
+              ),
+              const SizedBox(height: 24),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Private widget ────────────────────────────────────────────────────────────
+
+class _GivingOptionRow extends StatelessWidget {
+  const _GivingOptionRow({
+    required this.iconColor,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final Color iconColor;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.mavenPro(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMuted,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );

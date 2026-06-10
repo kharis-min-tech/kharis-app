@@ -1,105 +1,149 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+
+import 'notifications_settings_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
+    final displayName = userAsync.maybeWhen(
+      data: (u) => u?.displayName ?? 'Test User',
+      orElse: () => 'Test User',
+    );
+    final email = userAsync.maybeWhen(
+      data: (u) => u?.email ?? 'testuser@kharis.org',
+      orElse: () => 'testuser@kharis.org',
+    );
+
+    final parts = displayName.trim().split(' ');
+    final initials = parts.length >= 2
+        ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
+        : displayName.substring(0, displayName.length < 2 ? 1 : 2).toUpperCase();
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 24),
-              // KHARIS wordmark
+
+              // 1. KHARIS wordmark
               Center(
                 child: Image.asset(
                   'assets/figma/kharis_wordmark.png',
-                  height: 32,
-                  color: Colors.white,
+                  height: 22,
                 ),
               ),
+
               const SizedBox(height: 28),
-              // Profile row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppColors.purple, AppColors.accent],
-                        ),
+
+              // 2. Profile row
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.purple, AppColors.accent],
                       ),
-                      child: Center(
-                        child: Text(
-                          'TU',
-                          style: GoogleFonts.mavenPro(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        initials,
+                        style: GoogleFonts.mavenPro(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Test User',
-                          style: GoogleFonts.mavenPro(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
+                  ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        style: GoogleFonts.mavenPro(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
-                        Text(
-                          'testuser@kharis.org',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 13,
-                            color: AppColors.textMuted,
-                          ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        email,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 13,
+                          color: AppColors.textMuted,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+
               const SizedBox(height: 28),
-              const Divider(color: Color(0xFF252525), height: 1),
-              const SizedBox(height: 8),
-              _MenuRow(
+
+              // 3. Menu rows — surfaceElevated cards, 12px radius, 14px gap
+              _MenuCard(
                 label: 'Notifications',
-                onTap: () {},
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationsSettingsScreen(),
+                  ),
+                ),
               ),
-              _MenuRow(
+              const SizedBox(height: 14),
+              _MenuCard(
                 label: 'Help Centre',
-                onTap: () {},
+                onTap: () => unawaited(
+                  launchUrl(
+                    Uri.parse('https://kharis.org/help'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
               ),
-              _MenuRow(
+              const SizedBox(height: 14),
+              _MenuCard(
                 label: 'Contact Us',
-                onTap: () {},
+                onTap: () => unawaited(
+                  launchUrl(
+                    Uri.parse('https://kharis.org/contact'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
               ),
-              _MenuRow(
+              const SizedBox(height: 14),
+              _MenuCard(
                 label: 'Terms & Conditions',
-                onTap: () {},
+                onTap: () => unawaited(
+                  launchUrl(
+                    Uri.parse('https://kharis.org/terms'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              const Divider(color: Color(0xFF252525), height: 1),
-              const SizedBox(height: 24),
-              // SIGN OUT
+
+              // 4. SIGN OUT — 32px below menu
+              const SizedBox(height: 32),
               GestureDetector(
                 onTap: () async {
                   final confirmed = await showDialog<bool>(
@@ -143,22 +187,33 @@ class SettingsScreen extends ConsumerWidget {
                     if (context.mounted) context.go('/role-selection');
                   }
                 },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Center(
-                    child: Text(
-                      'SIGN OUT',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.error,
-                        letterSpacing: 1.0,
-                      ),
+                child: Center(
+                  child: Text(
+                    'SIGN OUT',
+                    style: GoogleFonts.mavenPro(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.error,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ),
               ),
+
               const SizedBox(height: 32),
+
+              // 5. Version footer
+              Center(
+                child: Text(
+                  'Kharis Church v2.0.0',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -167,36 +222,42 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.label, required this.onTap});
+// ── Menu card ─────────────────────────────────────────────────────────────────
+
+class _MenuCard extends StatelessWidget {
+  const _MenuCard({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: GoogleFonts.dmSans(
-                  fontSize: 15,
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w500,
+    return Material(
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              color: Color(0xFF8A8A8A),
-              size: 20,
-            ),
-          ],
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.textMuted,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );
