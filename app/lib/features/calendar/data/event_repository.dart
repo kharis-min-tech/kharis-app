@@ -85,6 +85,30 @@ class EventRepository {
     }
   }
 
+  /// Realtime stream of upcoming events, optionally branch-filtered.
+  ///
+  /// Branch filtering happens client-side over the snapshot so a single
+  /// listener covers both branch-specific and all-campus events.
+  Stream<List<Event>> watchUpcomingEvents({String? branch}) async* {
+    try {
+      yield* _firestore
+          .collection('events')
+          .where('startTime',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
+          .orderBy('startTime')
+          .snapshots()
+          .map((snap) {
+        final events = snap.docs.map(_docToEvent).where((e) {
+          if (branch == null) return true;
+          return e.branch == null || e.branch == branch;
+        }).toList();
+        return events.isEmpty && branch == null ? List.of(_mockEvents) : events;
+      });
+    } catch (_) {
+      yield List.of(_mockEvents);
+    }
+  }
+
   /// Fetches a single event by its Firestore document ID.
   Future<Event?> getEventById(String id) async {
     try {

@@ -1,113 +1,105 @@
-import 'package:add_2_calendar_new/add_2_calendar_new.dart';
+import 'package:add_2_calendar_new/add_2_calendar_new.dart' as cal;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/app_colors.dart';
-
-class _Event {
-  _Event({
-    required this.day,
-    required this.month,
-    required this.title,
-    required this.location,
-    required this.time,
-    required this.startDate,
-    this.isFeatured = false,
-  });
-
-  final String day;
-  final String month;
-  final String title;
-  final String location;
-  final String time;
-  final bool isFeatured;
-  final DateTime startDate;
-}
-
-final _thisWeekEvents = [
-  _Event(
-    day: '08',
-    month: 'JUN',
-    title: 'Sunday Celebration Service',
-    location: 'London — 12 Acton Street',
-    time: 'Sun, 10:30am',
-    startDate: DateTime(2026, 6, 8, 10, 30),
-  ),
-  _Event(
-    day: '10',
-    month: 'JUN',
-    title: 'Midweek Prayer & Bible Study',
-    location: 'Birmingham — Broad Street',
-    time: 'Wed, 7:00pm',
-    startDate: DateTime(2026, 6, 10, 19, 0),
-  ),
-  _Event(
-    day: '12',
-    month: 'JUN',
-    title: 'Youth Night',
-    location: 'Reading — Caversham Road',
-    time: 'Fri, 6:30pm',
-    startDate: DateTime(2026, 6, 12, 18, 30),
-  ),
-];
-
-final _comingUpEvents = [
-  _Event(
-    day: '15',
-    month: 'JUN',
-    title: 'Kharis Leadership Summit 2026',
-    location: 'London — 12 Acton Street',
-    time: 'Sun, 10:00am',
-    startDate: DateTime(2026, 6, 15, 10, 0),
-    isFeatured: true,
-  ),
-  _Event(
-    day: '22',
-    month: 'JUN',
-    title: 'Worship Night',
-    location: 'Birmingham — Broad Street',
-    time: 'Sun, 6:00pm',
-    startDate: DateTime(2026, 6, 22, 18, 0),
-  ),
-];
+import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 const _branches = ['All Branches', 'London', 'Birmingham', 'Reading'];
 
-class CalendarScreen extends StatefulWidget {
+/// Calendar tab - realtime upcoming events from Firestore.
+///
+/// Events stream live: anything created in the admin panel appears here
+/// without a refresh. Branch chips filter client-side via the provider.
+class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
 
   @override
-  State<CalendarScreen> createState() => _CalendarScreenState();
+  ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> {
+class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   String _selectedBranch = 'All Branches';
 
   @override
   Widget build(BuildContext context) {
+    final branchParam =
+        _selectedBranch == 'All Branches' ? null : _selectedBranch;
+    final eventsAsync = ref.watch(upcomingEventsProvider(branchParam));
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader()),
-            SliverToBoxAdapter(child: _buildBranchFilters()),
-            SliverToBoxAdapter(child: _buildServiceTimesBar()),
+        child: eventsAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.accent),
+          ),
+          error: (_, _) => _buildScroll(const [], const []),
+          data: (events) {
+            final cutoff = DateTime.now().add(const Duration(days: 7));
+            final thisWeek =
+                events.where((e) => e.startTime.isBefore(cutoff)).toList();
+            final comingUp =
+                events.where((e) => !e.startTime.isBefore(cutoff)).toList();
+            return _buildScroll(thisWeek, comingUp);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScroll(List<Event> thisWeek, List<Event> comingUp) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(child: _buildHeader()),
+        SliverToBoxAdapter(child: _buildBranchFilters()),
+        SliverToBoxAdapter(child: _buildServiceTimesBar()),
+        if (thisWeek.isEmpty && comingUp.isEmpty)
+          SliverToBoxAdapter(child: _buildEmpty())
+        else ...[
+          if (thisWeek.isNotEmpty) ...[
             SliverToBoxAdapter(child: _buildSectionTitle('This Week')),
             SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, i) => _buildEventCard(_thisWeekEvents[i]),
-                childCount: _thisWeekEvents.length,
+                (context, i) => _buildEventCard(thisWeek[i]),
+                childCount: thisWeek.length,
               ),
             ),
+          ],
+          if (comingUp.isNotEmpty) ...[
             SliverToBoxAdapter(child: _buildSectionTitle('Coming Up')),
             SliverList(
               delegate: SliverChildBuilderDelegate(
-                (context, i) => _buildEventCard(_comingUpEvents[i]),
-                childCount: _comingUpEvents.length,
+                (context, i) => _buildEventCard(comingUp[i]),
+                childCount: comingUp.length,
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          ],
+        ],
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
+      ],
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Padding(
+      padding: const EdgeInsets.all(40),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.event_busy_rounded,
+                color: AppColors.textMuted, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              'No upcoming events for this branch',
+              style: GoogleFonts.dmSans(
+                color: AppColors.textBody,
+                fontSize: 14,
+              ),
+            ),
           ],
         ),
       ),
@@ -237,7 +229,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildEventCard(_Event event) {
+  Widget _buildEventCard(Event event) {
+    final day = DateFormat('dd').format(event.startTime);
+    final month = DateFormat('MMM').format(event.startTime).toUpperCase();
+    final time = DateFormat('EEE, h:mma')
+        .format(event.startTime)
+        .replaceAll('AM', 'am')
+        .replaceAll('PM', 'pm');
+
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       decoration: BoxDecoration(
@@ -254,7 +253,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDateBadge(event.day, event.month),
+            _buildDateBadge(day, month),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -279,7 +278,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
-                          event.location,
+                          event.location ?? 'Kharis Church',
                           style: GoogleFonts.dmSans(
                             fontSize: 12,
                             color: AppColors.textMuted,
@@ -299,7 +298,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        event.time,
+                        time,
                         style: GoogleFonts.dmSans(
                           fontSize: 12,
                           color: AppColors.textMuted,
@@ -313,14 +312,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () {
-                final endDate = event.startDate.add(const Duration(hours: 2));
-                Add2Calendar.addEvent2Cal(
-                  Event(
+                cal.Add2Calendar.addEvent2Cal(
+                  cal.Event(
                     title: event.title,
-                    description: event.location,
-                    location: event.location,
-                    startDate: event.startDate,
-                    endDate: endDate,
+                    description: event.description ?? event.title,
+                    location: event.location ?? 'Kharis Church',
+                    startDate: event.startTime,
+                    endDate: event.endTime,
                   ),
                 );
               },

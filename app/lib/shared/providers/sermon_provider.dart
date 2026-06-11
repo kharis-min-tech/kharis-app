@@ -5,6 +5,7 @@ import '../../core/utils/sermon_categorizer.dart';
 import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
 import '../../features/home/data/daily_content_repository.dart';
+import '../../features/home/data/news_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
 import '../../features/messages/data/kharis_content.dart';
 import '../../features/messages/data/sermon_repository.dart';
@@ -139,13 +140,12 @@ final eventRepositoryProvider = Provider<EventRepository>((ref) {
   return EventRepository();
 });
 
-/// Upcoming events, optionally filtered by branch.
-///
-/// Pass a [branch] override via `ref.watch(upcomingEventsProvider('Main'))`.
+/// Upcoming events, optionally filtered by branch. Realtime: re-emits on
+/// every Firestore change so admin-panel edits appear without refresh.
 final upcomingEventsProvider =
-    FutureProvider.family<List<Event>, String?>((ref, branch) async {
+    StreamProvider.family<List<Event>, String?>((ref, branch) {
   final repo = ref.watch(eventRepositoryProvider);
-  return repo.getUpcomingEvents(branch: branch);
+  return repo.watchUpcomingEvents(branch: branch);
 });
 
 // ── Daily content ─────────────────────────────────────────────────────────────
@@ -154,7 +154,20 @@ final dailyContentRepositoryProvider = Provider<DailyContentRepository>((ref) {
   return DailyContentRepository();
 });
 
-final dailyContentProvider = FutureProvider<DailyContent>((ref) async {
+/// Today's reading + prayer. Realtime snapshot of dailyContent/{today}.
+final dailyContentProvider = StreamProvider<DailyContent>((ref) {
   final repo = ref.watch(dailyContentRepositoryProvider);
-  return repo.getTodaysContent();
+  return repo.watchTodaysContent();
+});
+
+// ── News ──────────────────────────────────────────────────────────────────────
+
+final newsRepositoryProvider = Provider<NewsRepository>((ref) {
+  return NewsRepository();
+});
+
+/// News & announcements, realtime.
+final newsProvider = StreamProvider<List<NewsItem>>((ref) {
+  final repo = ref.watch(newsRepositoryProvider);
+  return repo.watchNews();
 });

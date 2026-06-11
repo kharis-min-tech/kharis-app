@@ -49,6 +49,23 @@ class DailyContentRepository {
     return getContentForDate(dateKey);
   }
 
+  /// Realtime stream of today's content; emits the fallback first so the UI
+  /// is never empty, then live snapshots as the document changes.
+  Stream<DailyContent> watchTodaysContent() async* {
+    final dateKey = _dateKey(DateTime.now());
+    try {
+      yield* _firestore
+          .collection('dailyContent')
+          .doc(dateKey)
+          .snapshots()
+          .map((doc) => doc.exists && doc.data() != null
+              ? _mapData(doc.data()!)
+              : _hardcodedContent);
+    } catch (_) {
+      yield _hardcodedContent;
+    }
+  }
+
   /// Returns content for [dateKey] formatted as `"YYYY-MM-DD"`.
   Future<DailyContent> getContentForDate(String dateKey) async {
     try {

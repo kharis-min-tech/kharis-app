@@ -2,52 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-class _NewsItem {
-  const _NewsItem({
-    required this.title,
-    required this.source,
-    required this.age,
-    required this.type,
-    required this.gradientColors,
-  });
-
-  final String title;
-  final String source;
-  final String age;
-  final String type;
-  final List<Color> gradientColors;
-}
-
-const _kNewsItems = [
-  _NewsItem(
-    title: 'Happy Mothers Day Rev Awo...',
-    source: 'Kharis Church',
-    age: '2 weeks ago',
-    type: 'Announcement',
-    gradientColors: [Color(0xFF8B0A50), Color(0xFFC0305A)],
-  ),
-  _NewsItem(
-    title: '21 Days Prayer & Fasting',
-    source: 'Kharis Church',
-    age: '1 month ago',
-    type: 'Event',
-    gradientColors: [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
-  ),
-  _NewsItem(
-    title: 'Kharis Phase 2 Conference',
-    source: 'Kharis Church',
-    age: '2 months ago',
-    type: 'Conference',
-    gradientColors: [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
-  ),
+/// Brand gradients cycled across news cards (used when no imageUrl).
+const _kNewsGradients = [
+  [Color(0xFF8B0A50), Color(0xFFC0305A)],
+  [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
+  [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
 ];
+
+String _age(DateTime published) {
+  final diff = DateTime.now().difference(published);
+  if (diff.inDays >= 60) return '${diff.inDays ~/ 30} months ago';
+  if (diff.inDays >= 30) return '1 month ago';
+  if (diff.inDays >= 14) return '${diff.inDays ~/ 7} weeks ago';
+  if (diff.inDays >= 7) return '1 week ago';
+  if (diff.inDays >= 1) return '${diff.inDays} days ago';
+  return 'Today';
+}
 
 class NewsSection extends ConsumerWidget {
   const NewsSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final newsAsync = ref.watch(newsProvider);
+    final items = newsAsync.valueOrNull ?? const <NewsItem>[];
+    if (items.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -65,10 +48,13 @@ class NewsSection extends ConsumerWidget {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
-            itemCount: _kNewsItems.length,
+            itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-            itemBuilder: (context, index) =>
-                _NewsCard(item: _kNewsItems[index]),
+            itemBuilder: (context, index) => _NewsCard(
+              item: items[index],
+              gradientColors:
+                  _kNewsGradients[index % _kNewsGradients.length],
+            ),
           ),
         ),
       ],
@@ -77,9 +63,10 @@ class NewsSection extends ConsumerWidget {
 }
 
 class _NewsCard extends StatelessWidget {
-  const _NewsCard({required this.item});
+  const _NewsCard({required this.item, required this.gradientColors});
 
-  final _NewsItem item;
+  final NewsItem item;
+  final List<Color> gradientColors;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +77,7 @@ class _NewsCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: item.gradientColors,
+          colors: gradientColors,
         ),
       ),
       child: Stack(
@@ -132,7 +119,7 @@ class _NewsCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        item.source,
+                        'Kharis Church',
                         style: GoogleFonts.dmSans(
                           fontSize: 11,
                           color: Colors.white70,
@@ -149,7 +136,7 @@ class _NewsCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        item.age,
+                        _age(item.publishedAt),
                         style: GoogleFonts.dmSans(
                           fontSize: 11,
                           color: Colors.white70,
