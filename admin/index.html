@@ -141,8 +141,15 @@
 
     .field-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 16px;
+    }
+
+    /* datetime-local/date inputs have a large intrinsic min-width that
+       overflows 2-col rows; clamp them to their grid track. */
+    .field-row input {
+      width: 100%;
+      min-width: 0;
     }
 
     .checkbox-field {
