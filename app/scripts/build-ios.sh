@@ -16,7 +16,7 @@ echo "==> flutter clean"
 flutter clean
 
 echo "==> flutter build ipa (release)"
-flutter build ipa \
+flutter build ipa --dart-define-from-file=env.json \
   --release \
   --export-options-plist="$EXPORT_OPTIONS"
 

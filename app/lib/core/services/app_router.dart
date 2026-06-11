@@ -13,6 +13,7 @@ import '../../features/onboarding/presentation/screens/role_selection_screen.dar
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
+import '../../features/home/presentation/screens/reading_screen.dart';
 import '../../shared/providers/auth_provider.dart';
 
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
@@ -107,6 +108,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/player',
         builder: (context, state) => const FullPlayerScreen(),
+      ),
+
+      // ── Today's reading (overlays shell) ──────────────────────────────────
+      GoRoute(
+        path: '/reading',
+        builder: (context, state) => const ReadingScreen(),
       ),
     ],
   );

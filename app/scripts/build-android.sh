@@ -22,7 +22,7 @@ flutter clean
 
 echo ""
 echo "Step 2/3: Building release App Bundle..."
-flutter build appbundle --release
+flutter build appbundle --release --dart-define-from-file=env.json
 
 echo ""
 echo "Step 3/3: Build complete."

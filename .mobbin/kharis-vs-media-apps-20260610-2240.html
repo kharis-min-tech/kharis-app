@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kharis Home vs Media App References</title>
+<style>
+  :root {
+    --ink: #1c1e21;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #fafaf9;
+    --card: #ffffff;
+    --accent: #DC3F9E;
+    --good: #047857;
+    --gap: #b45309;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 40px 32px 64px;
+  }
+  header { max-width: 1480px; margin: 0 auto 28px; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  header p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  .board {
+    max-width: 1480px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 110px repeat(5, 1fr);
+    gap: 0;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .cell {
+    padding: 14px 14px;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+  .cell:nth-child(6n) { border-right: none; }
+  .rowlabel {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+  }
+  .apphead {
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fcfcfb;
+  }
+  .apphead a { font-size: 11px; font-weight: 500; color: var(--accent); text-decoration: none; }
+  .apphead a:hover { text-decoration: underline; }
+  .ours-badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+    letter-spacing: 0.4px;
+  }
+  .shot { padding: 10px; background: #f4f4f3; }
+  .shot a { display: block; }
+  .shot img {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    display: block;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+    margin: 0 4px 4px 0;
+    background: #f3f4f6;
+    color: #374151;
+  }
+  .tag.good { background: #ecfdf5; color: var(--good); }
+  .tag.gap { background: #fffbeb; color: var(--gap); }
+  .takeaway { font-size: 12px; color: var(--ink); }
+  .takeaway strong { color: var(--accent); }
+
+  .adopt {
+    max-width: 1480px;
+    margin: 28px auto 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .adopt .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .adopt .num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .adopt h3 { font-size: 13.5px; margin-bottom: 4px; }
+  .adopt p { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Kharis Home vs the best media-app homes</h1>
+  <p>Same rows, six columns. Screens link to Mobbin. Kharis column is the live deployment (kharis-church.web.app, June 10 2026).</p>
+</header>
+
+<div class="board">
+  <!-- header row -->
+  <div class="cell rowlabel"></div>
+  <div class="cell apphead">Kharis <span class="ours-badge">OURS</span></div>
+  <div class="cell apphead">Netflix <a href="https://mobbin.com/screens/8e17cb66-fcc6-42a0-93a3-ddf1987419e7" target="_blank">Mobbin ↗</a></div>
+  <div class="cell apphead">TIDAL <a href="https://mobbin.com/screens/fd013948-59e2-4edb-ac9d-044109910c94" target="_blank">Mobbin ↗</a></div>
+  <div class="cell apphead">Waking Up <a href="https://mobbin.com/screens/ebca587a-c673-4ea4-8e73-8885604daee0" target="_blank">Mobbin ↗</a></div>
+  <div class="cell apphead">Apple TV <a href="https://mobbin.com/screens/6e3e2b35-6d6b-4c83-b41b-f6da4a56f69f" target="_blank">Mobbin ↗</a></div>
+
+  <!-- screenshot row -->
+  <div class="cell rowlabel">Screen</div>
+  <div class="cell shot"><a href="assets/kharis-home.png" target="_blank"><img src="assets/kharis-home.png" alt="Kharis home"></a></div>
+  <div class="cell shot"><a href="https://mobbin.com/api/mcp/short/4lgQALXU" target="_blank"><img src="https://mobbin.com/api/mcp/short/4lgQALXU" alt="Netflix home"></a></div>
+  <div class="cell shot"><a href="https://mobbin.com/api/mcp/short/chaWIwor" target="_blank"><img src="https://mobbin.com/api/mcp/short/chaWIwor" alt="TIDAL home"></a></div>
+  <div class="cell shot"><a href="https://mobbin.com/api/mcp/short/TEJes8xk" target="_blank"><img src="https://mobbin.com/api/mcp/short/TEJes8xk" alt="Waking Up home"></a></div>
+  <div class="cell shot"><a href="https://mobbin.com/api/mcp/short/ciJ4gUIm" target="_blank"><img src="https://mobbin.com/api/mcp/short/ciJ4gUIm" alt="Apple TV home"></a></div>
+
+  <!-- hero row -->
+  <div class="cell rowlabel">Hero</div>
+  <div class="cell"><span class="tag">Reading pill</span><span class="tag">Video card</span> Utility-first top; video sits second.</div>
+  <div class="cell"><span class="tag good">Poster hero</span> One dominant title with Play + My List actions.</div>
+  <div class="cell"><span class="tag">Rail-led</span> No hero; jumps straight into editorial rails.</div>
+  <div class="cell"><span class="tag good">Daily card</span> One "today" item leads the page.</div>
+  <div class="cell"><span class="tag good">Cinematic hero</span> Full-bleed artwork with inline CTA.</div>
+
+  <!-- rails row -->
+  <div class="cell rowlabel">Content rails</div>
+  <div class="cell"><span class="tag">2 rails</span> Continue Listening + News; tiles are flat gradients.</div>
+  <div class="cell"><span class="tag good">3+ rails</span> Dense poster rails, real artwork everywhere.</div>
+  <div class="cell"><span class="tag good">3+ rails</span> Large square art, strong titles, tight rhythm.</div>
+  <div class="cell"><span class="tag">2 rails</span> Sparse by intent; generous breathing room.</div>
+  <div class="cell"><span class="tag good">3 rails</span> Hero + channel rails with real stills.</div>
+
+  <!-- nav row -->
+  <div class="cell rowlabel">Bottom nav</div>
+  <div class="cell"><span class="tag good">5 tabs</span> White active state on near-black bar.</div>
+  <div class="cell"><span class="tag">3 tabs</span> Home / New &amp; Hot / My Netflix.</div>
+  <div class="cell"><span class="tag">4 tabs</span> Home / Explore / Library / Profile.</div>
+  <div class="cell"><span class="tag">4 tabs</span> Home / Theory / Practice / Profile.</div>
+  <div class="cell"><span class="tag">4 tabs</span> Home / Apple TV+ / Library / Search.</div>
+
+  <!-- identity row -->
+  <div class="cell rowlabel">Identity</div>
+  <div class="cell"><span class="tag good">Dove mark</span><span class="tag good">One accent</span> Magenta used sparingly; brand is unmistakable.</div>
+  <div class="cell"><span class="tag">Logo corner</span> Brand recedes; content is the identity.</div>
+  <div class="cell"><span class="tag">Wordmark</span> Black canvas, art carries colour.</div>
+  <div class="cell"><span class="tag">Minimal</span> Typography-led calm identity.</div>
+  <div class="cell"><span class="tag">None</span> Content-first, zero chrome.</div>
+
+  <!-- takeaway row -->
+  <div class="cell rowlabel">Takeaway</div>
+  <div class="cell takeaway"><strong>Strong skeleton.</strong> Structure already matches the category leaders.</div>
+  <div class="cell takeaway">Adopt: real <strong>artwork density</strong> — posters sell taps.</div>
+  <div class="cell takeaway">Adopt: <strong>editorial rail titles</strong> ("Made for you", "New this week").</div>
+  <div class="cell takeaway">Adopt: <strong>one daily anchor</strong> — our reading pill can grow into this.</div>
+  <div class="cell takeaway">Adopt: <strong>full-bleed hero</strong> for the latest sermon on Sundays.</div>
+</div>
+
+<div class="adopt">
+  <div class="card">
+    <div class="num">1</div>
+    <h3>Real artwork on Continue Listening</h3>
+    <p>Netflix and TIDAL never show flat gradient tiles. We already have real SoundCloud artwork URLs in the dataset — render them on the rail tiles instead of gradients.</p>
+  </div>
+  <div class="card">
+    <div class="num">2</div>
+    <h3>Sunday hero mode</h3>
+    <p>Apple TV leads with one cinematic title. When a new sermon drops, promote the Latest Message card to a full-bleed hero with the YouTube still as background.</p>
+  </div>
+  <div class="card">
+    <div class="num">3</div>
+    <h3>Editorial rail naming</h3>
+    <p>TIDAL's rails read like a person curated them. Rename ours: "Continue Listening" stays, add "New this week" and "Start here" for first-time visitors.</p>
+  </div>
+</div>
+
+</body>
+</html>

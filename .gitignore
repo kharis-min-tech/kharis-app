@@ -53,3 +53,6 @@ tmp/
 storybook/node_modules/
 storybook/storybook-static/
 node_modules/
+
+# Build-time secrets (use env.example.json as template)
+app/env.json

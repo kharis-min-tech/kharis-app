@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -28,6 +29,15 @@ class TodaysReadingCard extends ConsumerWidget {
   }
 
   Widget _buildPill({required String label, required String reference}) {
+    return Builder(
+      builder: (context) => GestureDetector(
+        onTap: () => context.push('/reading'),
+        child: _pillBody(label: label, reference: reference),
+      ),
+    );
+  }
+
+  Widget _pillBody({required String label, required String reference}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),

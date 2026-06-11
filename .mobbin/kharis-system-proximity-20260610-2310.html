@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proximity to the Kharis Design System</title>
+<style>
+  :root {
+    --ink: #1c1e21; --muted: #6b7280; --line: #e5e7eb;
+    --bg: #fafaf9; --card: #fff; --accent: #DC3F9E;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); padding: 40px 32px 64px; }
+  .wrap { max-width: 1440px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  /* reference strip */
+  .ref {
+    display: flex; gap: 24px; align-items: stretch;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; margin: 22px 0 34px;
+  }
+  .ref img { height: 300px; border-radius: 10px; border: 1px solid var(--line); }
+  .ref .meta { display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+  .ref .meta h2 { font-size: 14px; }
+  .swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sw { width: 92px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  .sw .chip { height: 52px; }
+  .sw .lbl { font-size: 10px; padding: 5px 7px; background: #fff; color: var(--muted); font-weight: 600; }
+  .traits { font-size: 12.5px; color: var(--muted); line-height: 1.7; max-width: 520px; }
+  .traits b { color: var(--ink); }
+
+  .tier { margin: 34px 0 14px; display: flex; align-items: baseline; gap: 10px; }
+  .tier h2 { font-size: 15px; }
+  .tier span { font-size: 12px; color: var(--muted); }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .scr {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; position: relative;
+  }
+  .rank {
+    position: absolute; top: 10px; left: 10px; z-index: 2;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scr.top .rank { background: var(--accent); }
+  .scr a.shot { display: block; background: #f4f4f3; }
+  .scr img { width: 100%; display: block; }
+  .body { padding: 12px 14px 14px; }
+  .name { font-weight: 700; font-size: 13.5px; display: flex; justify-content: space-between; align-items: center; }
+  .name a { font-size: 11px; font-weight: 500; color: var(--accent); text-decoration: none; }
+  .bar { height: 6px; background: #f0f0ef; border-radius: 99px; margin: 10px 0 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #882867, #DC3F9E); }
+  .pct { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .chips { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .c { font-size: 10px; font-weight: 600; padding: 2.5px 8px; border-radius: 99px; }
+  .y { background: #ecfdf5; color: #047857; }
+  .p { background: #fffbeb; color: #b45309; }
+  .n { background: #f3f4f6; color: #6b7280; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Which apps are nearest to the Kharis design system?</h1>
+  <p class="sub">All 12 search results ranked against the Figma system. Chips score four axes: Canvas, Accent, Structure, Type.</p>
+
+  <div class="ref">
+    <img src="assets/kharis-figma-home.png" alt="Kharis Figma home frame">
+    <img src="assets/kharis-home.png" alt="Kharis live build">
+    <div class="meta">
+      <h2>The reference — Figma frame (left) and live build (right)</h2>
+      <div class="swatches">
+        <div class="sw"><div class="chip" style="background:#111014"></div><div class="lbl">#111014 canvas</div></div>
+        <div class="sw"><div class="chip" style="background:#DC3F9E"></div><div class="lbl">#DC3F9E accent</div></div>
+        <div class="sw"><div class="chip" style="background:#882867"></div><div class="lbl">#882867 pill</div></div>
+        <div class="sw"><div class="chip" style="background:#6B34FA"></div><div class="lbl">#6B34FA tiles</div></div>
+        <div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="lbl">#FFF type</div></div>
+      </div>
+      <p class="traits"><b>System traits:</b> near-black canvas · one hot-pink accent at interaction points · Spotify-style rails + persistent mini player · bold white type, grey metadata · rounded pills · 5-tab dark nav · dove identity mark.</p>
+    </div>
+  </div>
+
+  <div class="tier"><h2>Nearest</h2><span>colour story or restraint matches outright</span></div>
+  <div class="grid">
+    <div class="scr top">
+      <div class="rank">1</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/PTQPysTc" target="_blank"><img src="https://mobbin.com/api/mcp/short/PTQPysTc" alt="Spotify Kids"></a>
+      <div class="body">
+        <div class="name">Spotify Kids <a href="https://mobbin.com/screens/68f29bfd-b1ed-4e15-8854-f0c9e461a75c" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:88%"></i></div><div class="pct">88% — the colour twin</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c y">Accent ✓ pink</span><span class="c p">Structure ~ cards</span><span class="c y">Type ✓</span></div>
+      </div>
+    </div>
+    <div class="scr top">
+      <div class="rank">2</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/ZyO32PAc" target="_blank"><img src="https://mobbin.com/api/mcp/short/ZyO32PAc" alt="TIDAL"></a>
+      <div class="body">
+        <div class="name">TIDAL <a href="https://mobbin.com/screens/c3534592-8d4c-4d33-b168-2c4d29ca0f24" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:82%"></i></div><div class="pct">82% — the restraint</div>
+        <div class="chips"><span class="c y">Canvas ✓ black</span><span class="c n">Accent ✗ none</span><span class="c y">Structure ✓</span><span class="c y">Type ✓</span></div>
+      </div>
+    </div>
+    <div class="scr top">
+      <div class="rank">3</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/PgUThq3K" target="_blank"><img src="https://mobbin.com/api/mcp/short/PgUThq3K" alt="Spotify"></a>
+      <div class="body">
+        <div class="name">Spotify <a href="https://mobbin.com/screens/304c11c7-5f54-4471-9342-266024920f56" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:78%"></i></div><div class="pct">78% — the skeleton</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗ green</span><span class="c y">Structure ✓ rails</span><span class="c y">Type ✓</span></div>
+      </div>
+    </div>
+    <div class="scr top">
+      <div class="rank">4</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/zMLcFPQ1" target="_blank"><img src="https://mobbin.com/api/mcp/short/zMLcFPQ1" alt="YouTube Music"></a>
+      <div class="body">
+        <div class="name">YouTube Music <a href="https://mobbin.com/screens/a9626e3b-e898-4072-9eec-de86ca202dce" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:74%"></i></div><div class="pct">74% — same accent philosophy</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c p">Accent ~ red pop</span><span class="c y">Structure ✓</span><span class="c y">Type ✓</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier"><h2>Structural kin</h2><span>same bones, different voice</span></div>
+  <div class="grid">
+    <div class="scr">
+      <div class="rank">5</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/Ac3LKkjQ" target="_blank"><img src="https://mobbin.com/api/mcp/short/Ac3LKkjQ" alt="Spotify"></a>
+      <div class="body">
+        <div class="name">Spotify <a href="https://mobbin.com/screens/729558c8-6643-4df7-8be8-a18c3d74e519" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:70%"></i></div><div class="pct">70%</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗</span><span class="c y">Structure ✓</span><span class="c y">Type ✓</span></div>
+      </div>
+    </div>
+    <div class="scr">
+      <div class="rank">6</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/K7BZ9Lc3" target="_blank"><img src="https://mobbin.com/api/mcp/short/K7BZ9Lc3" alt="Spotify"></a>
+      <div class="body">
+        <div class="name">Spotify <a href="https://mobbin.com/screens/c2609ecf-234e-4f04-af1d-18199a45f2d5" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:68%"></i></div><div class="pct">68%</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗</span><span class="c y">Structure ✓</span><span class="c y">Type ✓</span></div>
+      </div>
+    </div>
+    <div class="scr">
+      <div class="rank">7</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/6J0HGSVL" target="_blank"><img src="https://mobbin.com/api/mcp/short/6J0HGSVL" alt="Spotify"></a>
+      <div class="body">
+        <div class="name">Spotify <a href="https://mobbin.com/screens/20cf7930-1e46-4c55-9cb2-39a0d30b266f" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:66%"></i></div><div class="pct">66%</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗</span><span class="c y">Structure ✓</span><span class="c y">Type ✓</span></div>
+      </div>
+    </div>
+    <div class="scr">
+      <div class="rank">8</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/74i844aR" target="_blank"><img src="https://mobbin.com/api/mcp/short/74i844aR" alt="Spotify"></a>
+      <div class="body">
+        <div class="name">Spotify <a href="https://mobbin.com/screens/6fbed742-71de-476a-ad4b-5e7298d6c7d5" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:64%"></i></div><div class="pct">64%</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗</span><span class="c y">Structure ✓</span><span class="c p">Type ~</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier"><h2>Same family, different voice</h2><span>dark media apps whose chrome or palette diverges</span></div>
+  <div class="grid">
+    <div class="scr">
+      <div class="rank">9</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/6aiNyOGd" target="_blank"><img src="https://mobbin.com/api/mcp/short/6aiNyOGd" alt="Amazon Music"></a>
+      <div class="body">
+        <div class="name">Amazon Music <a href="https://mobbin.com/screens/c885549d-56b4-4795-a345-cf43f725b6e7" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:58%"></i></div><div class="pct">58%</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗ teal</span><span class="c y">Structure ✓</span><span class="c p">Type ~ denser</span></div>
+      </div>
+    </div>
+    <div class="scr">
+      <div class="rank">10</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/bWlYv02X" target="_blank"><img src="https://mobbin.com/api/mcp/short/bWlYv02X" alt="Amazon Music"></a>
+      <div class="body">
+        <div class="name">Amazon Music <a href="https://mobbin.com/screens/ff23447d-714c-4d4a-abbf-baf91063ec82" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:55%"></i></div><div class="pct">55%</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗</span><span class="c p">Structure ~</span><span class="c p">Type ~</span></div>
+      </div>
+    </div>
+    <div class="scr">
+      <div class="rank">11</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/Q1KxHi9y" target="_blank"><img src="https://mobbin.com/api/mcp/short/Q1KxHi9y" alt="Amazon Music"></a>
+      <div class="body">
+        <div class="name">Amazon Music <a href="https://mobbin.com/screens/f36cd455-ef3f-4798-beff-daeb6ec6794f" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:52%"></i></div><div class="pct">52%</div>
+        <div class="chips"><span class="c y">Canvas ✓</span><span class="c n">Accent ✗</span><span class="c p">Structure ~</span><span class="c p">Type ~</span></div>
+      </div>
+    </div>
+    <div class="scr">
+      <div class="rank">12</div>
+      <a class="shot" href="https://mobbin.com/api/mcp/short/xWEsGTAD" target="_blank"><img src="https://mobbin.com/api/mcp/short/xWEsGTAD" alt="Headspace"></a>
+      <div class="body">
+        <div class="name">Headspace <a href="https://mobbin.com/screens/2bd13598-36c5-4ba7-b6f5-5b0b0e1ea266" target="_blank">Mobbin ↗</a></div>
+        <div class="bar"><i style="width:45%"></i></div><div class="pct">45% — pastel gradients diverge</div>
+        <div class="chips"><span class="c n">Canvas ✗ navy</span><span class="c p">Accent ~ warm</span><span class="c p">Structure ~ cards</span><span class="c n">Type ✗ rounded</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
