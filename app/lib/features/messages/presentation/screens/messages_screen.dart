@@ -22,11 +22,34 @@ class MessagesScreen extends ConsumerStatefulWidget {
   ConsumerState<MessagesScreen> createState() => _MessagesScreenState();
 }
 
+/// Rows kept mounted per scroll window. The window grows seamlessly as the
+/// user scrolls (no visible paging) but bounds layout cost for the
+/// 1,470-episode catalogue.
+const int _kWindowSize = 100;
+
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _searchOpen = false;
   int _tab = 0; // 0 = Episodes, 1 = About
+  int _window = _kWindowSize;
+  bool _growScheduled = false;
+
+  /// Grows the window after the current frame. Called from itemBuilder, so
+  /// it must never setState synchronously (mid-build/layout drops it).
+  void _growWindow(int total) {
+    if (_growScheduled || _window >= total) return;
+    _growScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _window = (_window + _kWindowSize).clamp(0, total);
+        _growScheduled = false;
+      });
+    });
+  }
+
+  void _resetWindow() => _window = _kWindowSize;
 
   @override
   void dispose() {
@@ -62,11 +85,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         : library
             .where((s) => s.title.toLowerCase().contains(query))
             .toList();
+    final visible = episodes.take(_window).toList();
+    final hasMore = episodes.length > visible.length;
     final showArt =
         allSermons.isNotEmpty ? allSermons.first.artworkUrl : null;
 
-    // The whole catalogue renders in one lazy sliver: rows are built only
-    // as they scroll into view, so no manual batching is needed.
     return RefreshIndicator(
       color: AppColors.accent,
       backgroundColor: AppColors.surfaceElevated,
@@ -79,18 +102,40 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           SliverToBoxAdapter(child: _tabs()),
           if (_tab == 0) ...[
             SliverToBoxAdapter(child: _filterRow(episodes.length)),
-            if (episodes.isEmpty)
+            if (visible.isEmpty)
               const SliverToBoxAdapter(child: _EmptyState())
             else
               SliverList.separated(
-                itemCount: episodes.length,
+                itemCount: visible.length,
                 separatorBuilder: (_, _) => const Divider(
                   color: AppColors.surfaceSubtle,
                   height: 1,
                   thickness: 1,
                 ),
-                itemBuilder: (context, i) =>
-                    _EpisodeTile(sermon: episodes[i]),
+                itemBuilder: (context, i) {
+                  // Laying out one of the trailing rows = user reached the
+                  // window edge: grow it seamlessly.
+                  if (hasMore && i >= visible.length - 10) {
+                    _growWindow(episodes.length);
+                  }
+                  return _EpisodeTile(sermon: visible[i]);
+                },
+              ),
+            if (hasMore)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: AppColors.accent,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             const SliverToBoxAdapter(
               child: SizedBox(height: AppSpacing.xxxl),
@@ -146,6 +191,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               if (!_searchOpen) {
                 _searchController.clear();
                 _searchQuery = '';
+                _resetWindow();
               }
             }),
             icon: Icon(
@@ -175,7 +221,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       child: TextField(
         controller: _searchController,
         autofocus: true,
-        onChanged: (v) => setState(() => _searchQuery = v),
+        onChanged: (v) => setState(() {
+          _searchQuery = v;
+          _resetWindow();
+        }),
         style: GoogleFonts.dmSans(color: AppColors.textPrimary, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Search episodes...',
@@ -323,6 +372,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                 sheetRef
                                     .read(sermonSortProvider.notifier)
                                     .state = s;
+                                setState(_resetWindow);
                               },
                             ),
                         ],
@@ -353,7 +403,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           sheetRef
                               .read(selectedCategoryProvider.notifier)
                               .state = c;
-
+                          setState(_resetWindow);
                           Navigator.of(sheetContext).pop();
                         },
                       ),
@@ -537,7 +587,8 @@ class _EpisodeTile extends ConsumerWidget {
     if (diff == 0) return 'Today';
     if (diff == 1) return 'Yesterday';
     if (diff < 7) return DateFormat('EEE').format(dt);
-    return DateFormat('d MMM').format(dt);
+    if (dt.year == now.year) return DateFormat('d MMM').format(dt);
+    return DateFormat('d MMM yyyy').format(dt);
   }
 
   static String _durationLabel(Duration? d) {

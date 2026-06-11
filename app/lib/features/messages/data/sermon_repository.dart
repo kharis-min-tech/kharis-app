@@ -21,7 +21,12 @@ class SermonRepository extends AbstractSermonRepository {
 
   final Dio _dio;
 
-  /// Live fetch from SoundCloud RSS; falls back to real dataset on any error.
+  /// Live fetch from SoundCloud RSS merged over the bundled catalogue.
+  ///
+  /// The RSS feed only exposes the newest 500 episodes, so it provides
+  /// freshness while the bundled catalogue (1,470+ back to 2013) provides
+  /// depth. Titles are deduped, RSS entries win. On any failure the full
+  /// catalogue alone is returned.
   @override
   Future<List<Sermon>> getSermons() async {
     try {
@@ -34,12 +39,20 @@ class SermonRepository extends AbstractSermonRepository {
       );
       final xml = response.data ?? '';
       final parsed = _parseRss(xml);
-      if (parsed.isNotEmpty) return parsed;
-      return loadCatalogue();
+      final catalogue = await loadCatalogue();
+      if (parsed.isEmpty) return catalogue;
+      final seen = {for (final s in parsed) _titleKey(s.title)};
+      return [
+        ...parsed,
+        ...catalogue.where((s) => seen.add(_titleKey(s.title))),
+      ];
     } catch (_) {
       return loadCatalogue();
     }
   }
+
+  static String _titleKey(String title) =>
+      title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
   /// Loads the bundled full catalogue (one-time, cached for the session).
   ///

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Regenerates assets/data/kharis_sermons.json from the SoundCloud RSS feed.
+"""Regenerates assets/data/kharis_sermons.json with the FULL catalogue.
 
-Run before each release so web builds ship the complete catalogue
-(the feed exposes the newest 500 episodes; mobile also refreshes live
-at runtime). Usage:
+Pages the public SoundCloud API for every track on kharismedia
+(1,470+ episodes back to Sep 2013) and constructs stable
+feeds.soundcloud.com stream URLs, which work for all public tracks
+regardless of RSS feed membership (verified on 2013-2026 uploads).
+
+Run before each release so web builds ship the complete catalogue.
 
     python3 scripts/fetch_sermon_feed.py
 """
@@ -11,61 +14,81 @@ import json
 import os
 import re
 import urllib.request
-import xml.etree.ElementTree as ET
-from email.utils import parsedate_to_datetime
-from html import unescape
+from datetime import date
 
-FEED = 'https://feeds.soundcloud.com/users/soundcloud:users:58625221/sounds.rss'
-NS = {'itunes': 'http://www.itunes.com/dtds/podcast-1.0.dtd'}
+USER_ID = 58625221
+PROFILE = 'https://soundcloud.com/kharismedia'
+UA = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
 OUT = os.path.join(os.path.dirname(__file__), '..', 'assets', 'data',
                    'kharis_sermons.json')
 
 
-def parse_duration(raw: str) -> int:
-    parts = [int(p) for p in raw.split(':')]
-    if len(parts) == 3:
-        return parts[0] * 3600 + parts[1] * 60 + parts[2]
-    if len(parts) == 2:
-        return parts[0] * 60 + parts[1]
-    return parts[0]
+def http_get(url: str) -> bytes:
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return resp.read()
+
+
+def scrape_client_id() -> str:
+    """Pulls a public client_id out of soundcloud.com's JS bundles."""
+    home = http_get(PROFILE).decode('utf-8', 'replace')
+    scripts = re.findall(
+        r'src="(https://a-v2\.sndcdn\.com/assets/[^"]+\.js)"', home)
+    for src in reversed(scripts):
+        js = http_get(src).decode('utf-8', 'replace')
+        m = re.search(r'client_id[=:"]+([A-Za-z0-9]{32})', js)
+        if m:
+            return m.group(1)
+    raise RuntimeError('client_id not found in SoundCloud JS bundles')
+
+
+def fetch_all_tracks(client_id: str) -> list:
+    tracks = []
+    url = (f'https://api-v2.soundcloud.com/users/{USER_ID}/tracks'
+           f'?client_id={client_id}&limit=200&linked_partitioning=1')
+    while url:
+        data = json.loads(http_get(url))
+        tracks.extend(data['collection'])
+        url = data.get('next_href')
+        if url and 'client_id' not in url:
+            url += f'&client_id={client_id}'
+    return tracks
 
 
 def main() -> None:
-    with urllib.request.urlopen(FEED, timeout=60) as resp:
-        root = ET.fromstring(resp.read())
+    client_id = scrape_client_id()
+    tracks = fetch_all_tracks(client_id)
 
-    episodes = []
-    for item in root.iter('item'):
-        title = unescape((item.findtext('title') or '').strip())
-        enclosure = item.find('enclosure')
-        url = enclosure.get('url') if enclosure is not None else None
-        if not url:
+    episodes, seen = [], set()
+    for t in tracks:
+        url = (f"https://feeds.soundcloud.com/stream/"
+               f"{t['id']}-kharismedia-{t['permalink']}.mp3")
+        if url in seen:
             continue
-        desc = item.findtext('description') or \
-            item.findtext('itunes:summary', '', NS) or ''
-        desc = unescape(re.sub(r'<[^>]+>', '', desc)).strip()
-        desc = re.sub(r'\s+', ' ', desc)[:200]
-        img = item.find('itunes:image', NS)
+        seen.add(url)
+        title = (t.get('title') or '').strip()
+        desc = re.sub(r'\s+', ' ', (t.get('description') or '')).strip()[:200]
+        art = t.get('artwork_url')
+        if art:
+            art = art.replace('-large.', '-t500x500.')
         episodes.append({
             'title': title,
             'audioUrl': url,
-            'durationSeconds':
-                parse_duration(item.findtext('itunes:duration', '0', NS)),
-            'publishedAt':
-                parsedate_to_datetime(item.findtext('pubDate', '')).isoformat(),
-            'artworkUrl': img.get('href') if img is not None else None,
-            'speaker': 'Awo Antwi' if 'awo' in title.lower() else 'David Antwi',
+            'durationSeconds': round((t.get('duration') or 0) / 1000),
+            'publishedAt': t.get('created_at', ''),
+            'artworkUrl': art,
+            'speaker':
+                'Awo Antwi' if 'awo' in title.lower() else 'David Antwi',
             'description': desc,
         })
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    from datetime import date
     with open(OUT, 'w') as f:
         json.dump(
             {
                 'episodes': episodes,
                 'generatedAt': date.today().isoformat(),
-                'source': 'soundcloud-rss',
+                'source': 'soundcloud-api',
             },
             f,
             ensure_ascii=False,
