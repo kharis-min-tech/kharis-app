@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'package:kharis_app/core/utils/html_entities.dart';
+import 'package:kharis_app/core/utils/sermon_categorizer.dart';
 
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'kharis_content.dart';
@@ -71,7 +72,7 @@ class SermonRepository extends AbstractSermonRepository {
         duration: _parseDuration(durationRaw),
         publishedAt: _parsePubDate(pubDateRaw),
         artworkColor: index % 10,
-        category: _inferCategory(title),
+        category: sermonCategory(title),
         source: 'soundcloud',
       ));
       index++;
@@ -161,17 +162,7 @@ class SermonRepository extends AbstractSermonRepository {
     }
   }
 
-  String? _inferCategory(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('faith') || t.contains('believe')) return 'Faith';
-    if (t.contains('prayer') || t.contains('pray') || t.contains('fast')) {
-      return 'Prayer';
-    }
-    if (t.contains('worship')) return 'Worship';
-    if (t.contains('grace') || t.contains('mercy')) return 'Grace';
-    if (t.contains('holy') || t.contains('spirit')) return 'Holy Spirit';
-    return 'Messages';
-  }
+
 
   String _inferSpeaker(String title) {
     if (title.contains('Awo Antwi')) return 'Awo Antwi';
@@ -196,21 +187,11 @@ class SermonRepository extends AbstractSermonRepository {
           publishedAt: DateTime.tryParse(m['publishedAt'] as String),
           description: m['description'] as String?,
           artworkColor: i % 10,
-          category: _staticInferCategory(m['title'] as String),
+          category: sermonCategory(m['title'] as String),
           source: 'soundcloud',
         );
       })
       .toList();
 
-  static String? _staticInferCategory(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('faith') || t.contains('believe')) return 'Faith';
-    if (t.contains('prayer') || t.contains('pray') || t.contains('fast')) {
-      return 'Prayer';
-    }
-    if (t.contains('worship')) return 'Worship';
-    if (t.contains('grace') || t.contains('mercy')) return 'Grace';
-    if (t.contains('holy') || t.contains('spirit')) return 'Holy Spirit';
-    return 'Messages';
-  }
+
 }

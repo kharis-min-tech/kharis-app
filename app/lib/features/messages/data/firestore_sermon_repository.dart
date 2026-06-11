@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:kharis_app/core/utils/html_entities.dart';
+import 'package:kharis_app/core/utils/sermon_categorizer.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'sermon_repository.dart';
 import 'sermon_repository_base.dart';
@@ -29,7 +30,7 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
   /// as audio when they carry no videoId.
   @override
   Future<List<Sermon>> getSermons({
-    int limit = 20,
+    int limit = 0,
     int offset = 0,
     String? source,
     String? type,
@@ -38,21 +39,38 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       final snapshot = await _firestore
           .collection('sermons')
           .orderBy('publishedAt', descending: true)
-          .limit(50)
+          .limit(500)
           .get();
       final wanted = type ?? 'audio';
-      final filtered = snapshot.docs.map(_docToSermon).where((s) {
+      final fromFirestore = snapshot.docs.map(_docToSermon).where((s) {
         final docType = (s.source == 'youtube' || s.videoId != null)
             ? 'video'
             : 'audio';
         return docType == wanted;
       }).toList();
-      if (filtered.isEmpty) return getMockSermons();
-      return filtered.take(limit > 0 ? limit : filtered.length).toList();
+
+      // Firestore may hold a partial sync (or nothing) until the backend
+      // functions run on schedule. Merge with the RSS/embedded dataset and
+      // dedupe by title so the library is always the full catalogue.
+      final fallback = await _mock.getSermons();
+      final seen = <String>{
+        for (final s in fromFirestore) _dedupeKey(s),
+      };
+      final merged = [
+        ...fromFirestore,
+        ...fallback.where((s) => seen.add(_dedupeKey(s))),
+      ]..sort((a, b) => (b.publishedAt ?? DateTime(0))
+          .compareTo(a.publishedAt ?? DateTime(0)));
+
+      if (merged.isEmpty) return fallback;
+      return limit > 0 ? merged.take(limit).toList() : merged;
     } catch (_) {
-      return getMockSermons();
+      return _mock.getSermons();
     }
   }
+
+  static String _dedupeKey(Sermon s) =>
+      s.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
   /// Fetches a single sermon by its Firestore document ID.
   Future<Sermon?> getSermonById(String id) async {
@@ -111,7 +129,8 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       series: data['series'] as String?,
       description: data['description'] as String?,
       artworkColor: (data['artworkColor'] as num?)?.toInt(),
-      category: data['category'] as String?,
+      category: data['category'] as String? ??
+          sermonCategory(data['title'] as String? ?? ''),
       videoId: data['videoId'] as String?,
       source: data['source'] as String?,
     );

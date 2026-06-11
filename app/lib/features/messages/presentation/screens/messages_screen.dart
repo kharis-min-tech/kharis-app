@@ -22,11 +22,15 @@ class MessagesScreen extends ConsumerStatefulWidget {
   ConsumerState<MessagesScreen> createState() => _MessagesScreenState();
 }
 
+/// Episodes loaded per auto-scroll batch.
+const int _kPageSize = 15;
+
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _searchOpen = false;
   int _tab = 0; // 0 = Episodes, 1 = About
+  int _visibleCount = _kPageSize;
 
   @override
   void dispose() {
@@ -55,13 +59,15 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   }
 
   Widget _buildShowPage(BuildContext context, List<Sermon> allSermons) {
-    final filtered = ref.watch(filteredSermonsProvider);
+    final library = ref.watch(librarySermonsProvider);
     final query = _searchQuery.toLowerCase();
     final episodes = query.isEmpty
-        ? filtered
-        : filtered
+        ? library
+        : library
             .where((s) => s.title.toLowerCase().contains(query))
             .toList();
+    final visible = episodes.take(_visibleCount).toList();
+    final hasMore = episodes.length > visible.length;
     final showArt =
         allSermons.isNotEmpty ? allSermons.first.artworkUrl : null;
 
@@ -69,33 +75,58 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       color: AppColors.accent,
       backgroundColor: AppColors.surfaceElevated,
       onRefresh: () async => ref.invalidate(sermonsProvider),
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _ShowHeader(artworkUrl: showArt)),
-          SliverToBoxAdapter(child: _actionRow()),
-          if (_searchOpen) SliverToBoxAdapter(child: _searchField()),
-          SliverToBoxAdapter(child: _tabs()),
-          if (_tab == 0) ...[
-            SliverToBoxAdapter(child: _filterRow()),
-            if (episodes.isEmpty)
-              const SliverToBoxAdapter(child: _EmptyState())
-            else
-              SliverList.separated(
-                itemCount: episodes.length,
-                separatorBuilder: (_, _) => const Divider(
-                  color: AppColors.surfaceSubtle,
-                  height: 1,
-                  thickness: 1,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          if (hasMore &&
+              n.metrics.pixels > n.metrics.maxScrollExtent - 600) {
+            setState(() => _visibleCount += _kPageSize);
+          }
+          return false;
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _ShowHeader(artworkUrl: showArt)),
+            SliverToBoxAdapter(child: _actionRow()),
+            if (_searchOpen) SliverToBoxAdapter(child: _searchField()),
+            SliverToBoxAdapter(child: _tabs()),
+            if (_tab == 0) ...[
+              SliverToBoxAdapter(child: _filterRow(episodes.length)),
+              if (visible.isEmpty)
+                const SliverToBoxAdapter(child: _EmptyState())
+              else
+                SliverList.separated(
+                  itemCount: visible.length,
+                  separatorBuilder: (_, _) => const Divider(
+                    color: AppColors.surfaceSubtle,
+                    height: 1,
+                    thickness: 1,
+                  ),
+                  itemBuilder: (context, i) =>
+                      _EpisodeTile(sermon: visible[i]),
                 ),
-                itemBuilder: (context, i) =>
-                    _EpisodeTile(sermon: episodes[i]),
+              if (hasMore)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          color: AppColors.accent,
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              const SliverToBoxAdapter(
+                child: SizedBox(height: AppSpacing.xxxl),
               ),
-            const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.xxxl),
-            ),
-          ] else
-            const SliverToBoxAdapter(child: _AboutTab()),
-        ],
+            ] else
+              const SliverToBoxAdapter(child: _AboutTab()),
+          ],
+        ),
       ),
     );
   }
@@ -173,7 +204,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       child: TextField(
         controller: _searchController,
         autofocus: true,
-        onChanged: (v) => setState(() => _searchQuery = v),
+        onChanged: (v) => setState(() {
+          _searchQuery = v;
+          _visibleCount = _kPageSize;
+        }),
         style: GoogleFonts.dmSans(color: AppColors.textPrimary, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Search episodes...',
@@ -218,30 +252,40 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     );
   }
 
-  // ── Newest • All Episodes filter row ──────────────────────────────────────
+  // ── Sort • Filter row ──────────────────────────────────────────────────────
 
-  Widget _filterRow() {
-    final labels = ref.watch(categoryLabelsProvider);
-    final selected = ref.watch(selectedCategoryIndexProvider);
-    final label = selected == 0 ? 'All Episodes' : labels[selected];
+  Widget _filterRow(int matchCount) {
+    final sort = ref.watch(sermonSortProvider);
+    final category = ref.watch(selectedCategoryProvider);
+    final label = category == 'All' ? 'All Episodes' : category;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.sm,
       ),
       child: GestureDetector(
-        onTap: () => _showCategorySheet(labels, selected),
+        onTap: _showSortFilterSheet,
         child: Row(
           children: [
             const Icon(Icons.tune_rounded,
                 color: AppColors.textPrimary, size: 18),
             const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                '${sort.label} • $label',
+                style: GoogleFonts.dmSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             Text(
-              'Newest • $label',
+              '$matchCount episodes',
               style: GoogleFonts.dmSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                fontSize: 12,
+                color: AppColors.textMuted,
               ),
             ),
           ],
@@ -250,42 +294,125 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     );
   }
 
-  void _showCategorySheet(List<String> labels, int selected) {
+  void _showSortFilterSheet() {
+    final labels = ref.read(categoryLabelsProvider);
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: AppSpacing.md),
-            for (var i = 0; i < labels.length; i++)
-              ListTile(
-                title: Text(
-                  i == 0 ? 'All Episodes' : labels[i],
-                  style: GoogleFonts.dmSans(
-                    color: i == selected
-                        ? AppColors.accent
-                        : AppColors.textPrimary,
-                    fontWeight:
-                        i == selected ? FontWeight.w700 : FontWeight.w400,
-                    fontSize: 14,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.75,
+            ),
+            child: Consumer(
+              builder: (context, sheetRef, _) {
+                final sort = sheetRef.watch(sermonSortProvider);
+                final category = sheetRef.watch(selectedCategoryProvider);
+
+                void resetPaging() =>
+                    setState(() => _visibleCount = _kPageSize);
+
+                return ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppSpacing.lg,
                   ),
-                ),
-                trailing: i == selected
-                    ? const Icon(Icons.check_rounded,
-                        color: AppColors.accent, size: 20)
-                    : null,
-                onTap: () {
-                  ref.read(selectedCategoryIndexProvider.notifier).state = i;
-                  Navigator.of(sheetContext).pop();
-                },
-              ),
-            const SizedBox(height: AppSpacing.md),
-          ],
+                  children: [
+                    _sheetHeading('Sort by'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          for (final s in SermonSort.values)
+                            ChoiceChip(
+                              label: Text(s.label),
+                              selected: sort == s,
+                              showCheckmark: false,
+                              selectedColor:
+                                  AppColors.accent.withValues(alpha: 0.18),
+                              backgroundColor: AppColors.surfaceSubtle,
+                              side: BorderSide(
+                                color: sort == s
+                                    ? AppColors.accent
+                                    : Colors.transparent,
+                              ),
+                              labelStyle: GoogleFonts.dmSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: sort == s
+                                    ? AppColors.accent
+                                    : AppColors.textBody,
+                              ),
+                              onSelected: (_) {
+                                sheetRef
+                                    .read(sermonSortProvider.notifier)
+                                    .state = s;
+                                resetPaging();
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _sheetHeading('Category'),
+                    for (final c in labels)
+                      ListTile(
+                        dense: true,
+                        title: Text(
+                          c == 'All' ? 'All Episodes' : c,
+                          style: GoogleFonts.dmSans(
+                            color: category == c
+                                ? AppColors.accent
+                                : AppColors.textPrimary,
+                            fontWeight: category == c
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            fontSize: 14,
+                          ),
+                        ),
+                        trailing: category == c
+                            ? const Icon(Icons.check_rounded,
+                                color: AppColors.accent, size: 20)
+                            : null,
+                        onTap: () {
+                          sheetRef
+                              .read(selectedCategoryProvider.notifier)
+                              .state = c;
+                          resetPaging();
+                          Navigator.of(sheetContext).pop();
+                        },
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _sheetHeading(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: Text(
+        text.toUpperCase(),
+        style: GoogleFonts.dmSans(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.1,
+          color: AppColors.textMuted,
         ),
       ),
     );

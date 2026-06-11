@@ -4,7 +4,6 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import '../widgets/todays_reading_card.dart';
 import '../widgets/latest_message_card.dart';
-import '../widgets/latest_sermons_section.dart';
 import '../widgets/news_section.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -47,12 +46,6 @@ class HomeScreen extends ConsumerWidget {
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                   child: LatestMessageCard(),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                // Continue Listening
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  child: LatestSermonsSection(),
                 ),
                 const SizedBox(height: AppSpacing.xxl),
                 // News & Updates

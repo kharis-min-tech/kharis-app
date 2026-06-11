@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/html_entities.dart';
+import '../../core/utils/sermon_categorizer.dart';
 import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
 import '../../features/home/data/daily_content_repository.dart';
@@ -32,41 +33,72 @@ final sermonsProvider = FutureProvider<List<Sermon>>((ref) async {
   }
 });
 
-// ── Category filter ───────────────────────────────────────────────────────────
+// ── Library sort + filter ─────────────────────────────────────────────────────
 
-/// The index of the currently selected category chip.
-/// 0 = "All" (no filter applied).
-final selectedCategoryIndexProvider = StateProvider<int>((ref) => 0);
+/// Sort orders for the message library.
+enum SermonSort { newest, oldest, longest, shortest, az }
 
-/// All unique categories derived from the loaded sermons, prefixed with "All".
+extension SermonSortLabel on SermonSort {
+  String get label => switch (this) {
+        SermonSort.newest => 'Newest',
+        SermonSort.oldest => 'Oldest',
+        SermonSort.longest => 'Longest',
+        SermonSort.shortest => 'Shortest',
+        SermonSort.az => 'A-Z',
+      };
+}
+
+/// Active sort order. Defaults to newest-first.
+final sermonSortProvider = StateProvider<SermonSort>((ref) => SermonSort.newest);
+
+/// Active category filter — a label from [kSermonCategories]. 'All' = none.
+final selectedCategoryProvider = StateProvider<String>((ref) => 'All');
+
+/// Categories that actually occur in the loaded library, in display order.
+/// Always starts with 'All'; buckets with zero sermons are hidden.
 final categoryLabelsProvider = Provider<List<String>>((ref) {
   final sermonsAsync = ref.watch(sermonsProvider);
-  return sermonsAsync.when(
-    data: (sermons) {
-      final categories = <String>{'All'};
-      for (final s in sermons) {
-        if (s.category != null) categories.add(s.category!);
-      }
-      return categories.toList();
-    },
-    loading: () => const ['All'],
-    error: (_, _) => const ['All'],
+  final present = sermonsAsync.when(
+    data: (sermons) => sermons.map((s) => s.category).whereType<String>().toSet(),
+    loading: () => const <String>{},
+    error: (_, _) => const <String>{},
   );
+  return [
+    'All',
+    for (final c in kSermonCategories)
+      if (c != 'All' && present.contains(c)) c,
+  ];
 });
 
-/// Sermons filtered by the selected category chip.
-///
-/// When "All" (index 0) is selected every sermon is returned.
-final filteredSermonsProvider = Provider<List<Sermon>>((ref) {
+/// The library list: category-filtered and sorted. Pagination happens in the UI.
+final librarySermonsProvider = Provider<List<Sermon>>((ref) {
   final sermonsAsync = ref.watch(sermonsProvider);
-  final selectedIndex = ref.watch(selectedCategoryIndexProvider);
-  final labels = ref.watch(categoryLabelsProvider);
+  final category = ref.watch(selectedCategoryProvider);
+  final sort = ref.watch(sermonSortProvider);
 
   return sermonsAsync.when(
     data: (sermons) {
-      if (selectedIndex == 0 || selectedIndex >= labels.length) return sermons;
-      final category = labels[selectedIndex];
-      return sermons.where((s) => s.category == category).toList();
+      final filtered = category == 'All'
+          ? List.of(sermons)
+          : sermons.where((s) => s.category == category).toList();
+      switch (sort) {
+        case SermonSort.newest:
+          filtered.sort((a, b) => (b.publishedAt ?? DateTime(0))
+              .compareTo(a.publishedAt ?? DateTime(0)));
+        case SermonSort.oldest:
+          filtered.sort((a, b) => (a.publishedAt ?? DateTime(0))
+              .compareTo(b.publishedAt ?? DateTime(0)));
+        case SermonSort.longest:
+          filtered.sort((a, b) =>
+              (b.duration ?? Duration.zero).compareTo(a.duration ?? Duration.zero));
+        case SermonSort.shortest:
+          filtered.sort((a, b) =>
+              (a.duration ?? Duration.zero).compareTo(b.duration ?? Duration.zero));
+        case SermonSort.az:
+          filtered.sort(
+              (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      }
+      return filtered;
     },
     loading: () => const [],
     error: (_, _) => const [],
