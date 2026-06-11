@@ -1,17 +1,18 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import 'package:kharis_app/core/utils/html_entities.dart';
 import 'package:kharis_app/core/utils/sermon_categorizer.dart';
-
 import 'package:kharis_app/shared/models/sermon.dart';
-import 'kharis_content.dart';
 import 'sermon_repository_base.dart';
 
 /// Fetches sermons from the Kharis SoundCloud RSS feed.
 ///
-/// On any network or CORS failure falls back to [getMockSermons], which
-/// returns the real Kharis dataset from [kharisAudioSermons] so the list is
-/// never empty and never contains fake titles.
+/// On any network or CORS failure falls back to [loadCatalogue] - the full
+/// 500-episode catalogue bundled at assets/data/kharis_sermons.json - so the
+/// library is always complete, never empty, never fake.
 class SermonRepository extends AbstractSermonRepository {
   SermonRepository({Dio? dio}) : _dio = dio ?? Dio();
 
@@ -34,15 +35,43 @@ class SermonRepository extends AbstractSermonRepository {
       final xml = response.data ?? '';
       final parsed = _parseRss(xml);
       if (parsed.isNotEmpty) return parsed;
-      return getMockSermons();
+      return loadCatalogue();
     } catch (_) {
-      return getMockSermons();
+      return loadCatalogue();
     }
   }
 
-  /// Real Kharis dataset — used as the guaranteed fallback.
+  /// Loads the bundled full catalogue (one-time, cached for the session).
+  ///
+  /// Regenerate the asset with `scripts/fetch_sermon_feed.py` before release
+  /// to pick up new episodes for web builds (mobile gets them live via RSS).
   @override
-  List<Sermon> getMockSermons() => _realSermons;
+  Future<List<Sermon>> loadCatalogue() async {
+    if (_catalogueCache != null) return _catalogueCache!;
+    final raw =
+        await rootBundle.loadString('assets/data/kharis_sermons.json');
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+    final episodes = (data['episodes'] as List).cast<Map<String, dynamic>>();
+    _catalogueCache = [
+      for (final (i, m) in episodes.indexed)
+        Sermon(
+          id: 'sc_${i}_${(m['audioUrl'] as String).hashCode.abs()}',
+          title: m['title'] as String,
+          speaker: m['speaker'] as String? ?? 'David Antwi',
+          audioUrl: m['audioUrl'] as String,
+          artworkUrl: m['artworkUrl'] as String?,
+          duration: Duration(seconds: (m['durationSeconds'] as num).toInt()),
+          publishedAt: DateTime.tryParse(m['publishedAt'] as String? ?? ''),
+          description: m['description'] as String?,
+          artworkColor: i % 10,
+          category: sermonCategory(m['title'] as String),
+          source: 'soundcloud',
+        ),
+    ];
+    return _catalogueCache!;
+  }
+
+  static List<Sermon>? _catalogueCache;
 
   // ── RSS parser ─────────────────────────────────────────────────────────────
 
@@ -169,29 +198,6 @@ class SermonRepository extends AbstractSermonRepository {
     return 'David Antwi';
   }
 
-  // ── Real fallback dataset ──────────────────────────────────────────────────
-
-  static final List<Sermon> _realSermons = kharisAudioSermons
-      .asMap()
-      .entries
-      .map((entry) {
-        final i = entry.key;
-        final m = entry.value;
-        return Sermon(
-          id: 'sc_${i}_${(m['audioUrl'] as String).hashCode.abs()}',
-          title: m['title'] as String,
-          speaker: m['speaker'] as String,
-          audioUrl: m['audioUrl'] as String,
-          artworkUrl: m['artworkUrl'] as String?,
-          duration: Duration(seconds: m['durationSeconds'] as int),
-          publishedAt: DateTime.tryParse(m['publishedAt'] as String),
-          description: m['description'] as String?,
-          artworkColor: i % 10,
-          category: sermonCategory(m['title'] as String),
-          source: 'soundcloud',
-        );
-      })
-      .toList();
 
 
 }

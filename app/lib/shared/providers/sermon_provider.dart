@@ -19,17 +19,16 @@ final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
 });
 
 // ── Sermons (live fetch) ──────────────────────────────────────────────────────
-
-/// Fetches sermons from the SoundCloud RSS feed.
+/// All audio sermons, freshest source first.
 ///
-/// Falls back to mock data during development when the feed is unavailable.
+/// Firestore/RSS when reachable; otherwise the bundled 500-episode catalogue.
 final sermonsProvider = FutureProvider<List<Sermon>>((ref) async {
   final repo = ref.watch(sermonRepositoryProvider);
   try {
     return await repo.getSermons();
   } catch (_) {
-    // Offline / CI fallback — never leaves the user with an empty screen.
-    return repo.getMockSermons();
+    // Offline / CI fallback - never leaves the user with an empty screen.
+    return repo.loadCatalogue();
   }
 });
 

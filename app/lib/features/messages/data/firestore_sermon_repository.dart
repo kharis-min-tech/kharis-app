@@ -101,14 +101,15 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       return snapshot.docs.map(_docToSermon).toList();
     } catch (_) {
       final q = query.toLowerCase();
-      return getMockSermons()
+      final catalogue = await loadCatalogue();
+      return catalogue
           .where((s) => s.title.toLowerCase().contains(q))
           .toList();
     }
   }
 
   @override
-  List<Sermon> getMockSermons() => _mock.getMockSermons();
+  Future<List<Sermon>> loadCatalogue() => _mock.loadCatalogue();
 
   // ── Mapping ────────────────────────────────────────────────────────────────
 
