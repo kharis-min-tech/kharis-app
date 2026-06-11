@@ -31,6 +31,24 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   bool _searchOpen = false;
   int _tab = 0; // 0 = Episodes, 1 = About
   int _visibleCount = _kPageSize;
+  bool _batchScheduled = false;
+
+  /// Grows the visible window by one batch after the current frame.
+  ///
+  /// Triggered from itemBuilder when the trailing rows are laid out, so it
+  /// must never call setState synchronously (mid-build/layout). The
+  /// post-frame callback is safe on every input method (touch, wheel, fling).
+  void _scheduleNextBatch(int total) {
+    if (_batchScheduled || _visibleCount >= total) return;
+    _batchScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _visibleCount = (_visibleCount + _kPageSize).clamp(0, total);
+        _batchScheduled = false;
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -75,35 +93,33 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       color: AppColors.accent,
       backgroundColor: AppColors.surfaceElevated,
       onRefresh: () async => ref.invalidate(sermonsProvider),
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (n) {
-          if (hasMore &&
-              n.metrics.pixels > n.metrics.maxScrollExtent - 600) {
-            setState(() => _visibleCount += _kPageSize);
-          }
-          return false;
-        },
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _ShowHeader(artworkUrl: showArt)),
-            SliverToBoxAdapter(child: _actionRow()),
-            if (_searchOpen) SliverToBoxAdapter(child: _searchField()),
-            SliverToBoxAdapter(child: _tabs()),
-            if (_tab == 0) ...[
-              SliverToBoxAdapter(child: _filterRow(episodes.length)),
-              if (visible.isEmpty)
-                const SliverToBoxAdapter(child: _EmptyState())
-              else
-                SliverList.separated(
-                  itemCount: visible.length,
-                  separatorBuilder: (_, _) => const Divider(
-                    color: AppColors.surfaceSubtle,
-                    height: 1,
-                    thickness: 1,
-                  ),
-                  itemBuilder: (context, i) =>
-                      _EpisodeTile(sermon: visible[i]),
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _ShowHeader(artworkUrl: showArt)),
+          SliverToBoxAdapter(child: _actionRow()),
+          if (_searchOpen) SliverToBoxAdapter(child: _searchField()),
+          SliverToBoxAdapter(child: _tabs()),
+          if (_tab == 0) ...[
+            SliverToBoxAdapter(child: _filterRow(episodes.length)),
+            if (visible.isEmpty)
+              const SliverToBoxAdapter(child: _EmptyState())
+            else
+              SliverList.separated(
+                itemCount: visible.length,
+                separatorBuilder: (_, _) => const Divider(
+                  color: AppColors.surfaceSubtle,
+                  height: 1,
+                  thickness: 1,
                 ),
+                itemBuilder: (context, i) {
+                  // Building one of the last 3 rows means the user has
+                  // scrolled them into view: schedule the next batch.
+                  if (hasMore && i >= visible.length - 3) {
+                    _scheduleNextBatch(episodes.length);
+                  }
+                  return _EpisodeTile(sermon: visible[i]);
+                },
+              ),
               if (hasMore)
                 const SliverToBoxAdapter(
                   child: Padding(
@@ -127,7 +143,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               const SliverToBoxAdapter(child: _AboutTab()),
           ],
         ),
-      ),
     );
   }
 
