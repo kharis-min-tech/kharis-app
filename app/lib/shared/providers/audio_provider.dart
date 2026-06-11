@@ -3,11 +3,13 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/sermon.dart';
 import '../../features/player/data/audio_player_service.dart';
+import 'cache_provider.dart';
 
 /// Singleton [AudioPlayerService] scoped to the widget tree root.
 /// Disposed automatically when the provider scope is destroyed.
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
-  final service = AudioPlayerService();
+  final cache = ref.read(cacheServiceProvider);
+  final service = AudioPlayerService(cache);
   ref.onDispose(() => service.dispose());
   return service;
 });

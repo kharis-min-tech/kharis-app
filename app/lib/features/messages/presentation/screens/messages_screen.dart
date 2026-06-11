@@ -9,6 +9,7 @@ import 'package:kharis_app/core/utils/artwork_gradient.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 /// Messages tab - the sermon library as a podcast show page.
 ///
@@ -65,9 +66,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: sermonsAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.accent),
-          ),
+          loading: () => _buildSkeletonPage(),
           error: (_, _) => _ErrorState(
             onRetry: () => ref.invalidate(sermonsProvider),
           ),
@@ -431,6 +430,48 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       ),
     );
   }
+
+  Widget _buildSkeletonPage() {
+    return CustomScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      slivers: [
+        // Header skeleton: 96px art square + 2 lines
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Skeleton(width: 96, height: 96),
+                const SizedBox(width: AppSpacing.lg),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonLine(width: 160),
+                    SizedBox(height: AppSpacing.sm),
+                    SkeletonLine(width: 100),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        // 4 episode-row skeletons
+        SliverList.separated(
+          itemCount: 4,
+          separatorBuilder: (_, _) => const Divider(
+            color: AppColors.surfaceSubtle,
+            height: 1,
+            thickness: 1,
+          ),
+          itemBuilder: (_, _) => const _EpisodeRowSkeleton(),
+        ),
+      ],
+    );
+  }
+
 }
 
 // ── Show header ───────────────────────────────────────────────────────────────
@@ -606,8 +647,11 @@ class _EpisodeTile extends ConsumerWidget {
       _durationLabel(sermon.duration),
     ].where((s) => s.isNotEmpty).join(' • ');
 
-    return InkWell(
-      onTap: () => _open(context),
+    return Semantics(
+      button: true,
+      label: 'Play ${sermon.title}',
+      child: InkWell(
+        onTap: () => _open(context),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg, vertical: AppSpacing.lg,
@@ -709,19 +753,24 @@ class _EpisodeTile extends ConsumerWidget {
                 const Icon(Icons.more_horiz_rounded,
                     color: AppColors.textMuted, size: 22),
                 const Spacer(),
-                GestureDetector(
-                  onTap: () => _open(context),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 24,
+                Semantics(
+                  button: true,
+                  label: 'Play ${sermon.title}',
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                    onTap: () => _open(context),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
@@ -730,7 +779,8 @@ class _EpisodeTile extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -838,6 +888,55 @@ class _ErrorState extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Skeleton for episode row ──────────────────────────────────────────────────
+
+class _EpisodeRowSkeleton extends StatelessWidget {
+  const _EpisodeRowSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg, vertical: AppSpacing.lg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Skeleton(width: 56, height: 56, radius: 6),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    SkeletonLine(width: double.infinity),
+                    SizedBox(height: AppSpacing.sm),
+                    SkeletonLine(width: 140),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: const [
+              SkeletonLine(width: 22, height: 22),
+              SizedBox(width: AppSpacing.xl),
+              SkeletonLine(width: 22, height: 22),
+              SizedBox(width: AppSpacing.xl),
+              SkeletonLine(width: 22, height: 22),
+              Spacer(),
+              Skeleton(width: 40, height: 40, radius: 99),
+            ],
           ),
         ],
       ),

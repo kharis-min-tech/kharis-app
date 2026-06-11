@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../providers/cache_provider.dart';
+
+const _kAppLanguageKey = 'app_language';
 
 Future<String?> showLanguageBottomSheet(
   BuildContext context, {
-  String selected = 'English',
+  String selected = 'English', // kept for API compat; sheet reads cache
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -13,7 +17,7 @@ Future<String?> showLanguageBottomSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => _LanguageBottomSheet(selected: selected),
+    builder: (_) => const _LanguageBottomSheet(),
   );
 }
 
@@ -25,10 +29,29 @@ const _kLanguages = [
   ('🇸🇱', 'Krio'),
 ];
 
-class _LanguageBottomSheet extends StatelessWidget {
-  const _LanguageBottomSheet({required this.selected});
+class _LanguageBottomSheet extends ConsumerStatefulWidget {
+  const _LanguageBottomSheet();
 
-  final String selected;
+  @override
+  ConsumerState<_LanguageBottomSheet> createState() =>
+      _LanguageBottomSheetState();
+}
+
+class _LanguageBottomSheetState extends ConsumerState<_LanguageBottomSheet> {
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = ref
+        .read(cacheServiceProvider)
+        .getPreference<String>(_kAppLanguageKey, 'English');
+  }
+
+  void _select(String name) {
+    ref.read(cacheServiceProvider).cachePreference(_kAppLanguageKey, name);
+    Navigator.of(context).pop(name);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,8 +75,8 @@ class _LanguageBottomSheet extends StatelessWidget {
               (entry) => _LanguageRow(
                 flag: entry.$1,
                 name: entry.$2,
-                isSelected: entry.$2 == selected,
-                onTap: () => Navigator.of(context).pop(entry.$2),
+                isSelected: entry.$2 == _selected,
+                onTap: () => _select(entry.$2),
               ),
             ),
           ],

@@ -28,7 +28,10 @@ class MiniPlayer extends ConsumerWidget {
         ? position.inMilliseconds / duration.inMilliseconds
         : 0.0;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: 'Open player for ${sermon.title}',
+      child: GestureDetector(
       onTap: () {
         Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute<void>(
@@ -111,19 +114,24 @@ class MiniPlayer extends ConsumerWidget {
                       ),
                     ),
                     // Play/Pause button
-                    IconButton(
-                      icon: Icon(
-                        isPlaying ? Icons.pause : Icons.play_arrow,
-                        color: Colors.white,
-                        size: 28,
+                    Semantics(
+                      button: true,
+                      label: isPlaying ? 'Pause' : 'Play',
+                      excludeSemantics: true,
+                      child: IconButton(
+                        icon: Icon(
+                          isPlaying ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        onPressed: () {
+                          if (isPlaying) {
+                            service.pause();
+                          } else {
+                            service.resume();
+                          }
+                        },
                       ),
-                      onPressed: () {
-                        if (isPlaying) {
-                          service.pause();
-                        } else {
-                          service.resume();
-                        }
-                      },
                     ),
                   ],
                 ),
@@ -132,6 +140,7 @@ class MiniPlayer extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/core/theme/app_spacing.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 const _branches = ['All Branches', 'London', 'Birmingham', 'Reading'];
 
@@ -34,9 +36,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: eventsAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.accent),
-          ),
+          loading: () => _buildLoadingSkeleton(),
           error: (_, _) => _buildScroll(const [], const []),
           data: (events) {
             final cutoff = DateTime.now().add(const Duration(days: 7));
@@ -368,4 +368,50 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       ),
     );
   }
+
+  Widget _buildLoadingSkeleton() {
+    return CustomScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(child: _buildHeader()),
+        SliverToBoxAdapter(child: _buildBranchFilters()),
+        SliverToBoxAdapter(child: _buildSectionTitle('This Week')),
+        SliverList.separated(
+          itemCount: 3,
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          itemBuilder: (_, _) => _buildEventCardSkeleton(),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
+      ],
+    );
+  }
+
+  Widget _buildEventCardSkeleton() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Skeleton(width: 44, height: 44, radius: 8),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                SkeletonLine(width: double.infinity),
+                SizedBox(height: AppSpacing.sm),
+                SkeletonLine(width: 160),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }

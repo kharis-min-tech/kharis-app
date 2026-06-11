@@ -577,6 +577,16 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       Daily Content
     </button>
+    <button class="tab-btn" data-tab="live">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      Live
+      <span class="count-badge" id="live-indicator">OFF</span>
+    </button>
+    <button class="tab-btn" data-tab="submissions">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Submissions
+      <span class="count-badge" id="subs-count">—</span>
+    </button>
   </nav>
 
   <div class="content-area">
@@ -778,6 +788,65 @@
       </div>
     </div>
 
+    <!-- ── Live Tab ────────────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-live">
+      <div class="pane-layout">
+        <div class="card">
+          <h2 class="card-title"><span class="dot"></span> Live Broadcast</h2>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:18px;line-height:1.5;">
+            Toggle this ON while the service streams on YouTube. The app's
+            Home screen shows a LIVE NOW banner instantly, and it disappears
+            the moment you turn it off.
+          </p>
+          <form id="live-form">
+            <div class="checkbox-field">
+              <input type="checkbox" id="lv-on" />
+              <label for="lv-on">We are live right now</label>
+            </div>
+            <div class="field">
+              <label for="lv-video">YouTube Video ID *</label>
+              <input type="text" id="lv-video" placeholder="e.g. dQw4w9WgXcQ (from the stream URL)" />
+            </div>
+            <div class="field">
+              <label for="lv-title">Stream Title</label>
+              <input type="text" id="lv-title" placeholder="Sunday Service - Live" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="live-submit-btn">
+              Update Live Status
+            </button>
+          </form>
+        </div>
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Current Status</span>
+          </div>
+          <div id="live-preview">
+            <div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
+              Loading status…
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Submissions Tab ─────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-submissions">
+      <div class="pane-layout" style="grid-template-columns: 1fr 1fr;">
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">New Here - Visitors</span>
+          </div>
+          <div id="visitors-list"></div>
+        </div>
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Testimonies</span>
+          </div>
+          <div id="testimonies-list"></div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /.content-area -->
 </div><!-- /#admin-panel -->
 
@@ -859,6 +928,8 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById('user-email').textContent = user.email;
     loadEvents();
     loadNews();
+    loadLiveStatus();
+    loadSubmissions();
     setDefaultDailyDate();
   } else {
     loginScreen.style.display = 'flex';
@@ -998,6 +1069,107 @@ document.getElementById('refresh-events').addEventListener('click', loadEvents);
 
 // ════════════════════════════════════════════════════════════════════════════
 //  NEWS
+// ════════════════════════════════════════════════════════════════════════════
+//  LIVE STATUS
+// ════════════════════════════════════════════════════════════════════════════
+async function loadLiveStatus() {
+  const preview = document.getElementById('live-preview');
+  try {
+    const snap = await getDoc(doc(db, 'config', 'live'));
+    const data = snap.exists() ? snap.data() : { isLive: false };
+    document.getElementById('lv-on').checked = !!data.isLive;
+    document.getElementById('lv-video').value = data.videoId || '';
+    document.getElementById('lv-title').value = data.title || '';
+    const badge = document.getElementById('live-indicator');
+    badge.textContent = data.isLive ? 'LIVE' : 'OFF';
+    badge.style.background = data.isLive ? '#e5484d' : '';
+    badge.style.color = data.isLive ? '#fff' : '';
+    preview.innerHTML = data.isLive
+      ? `<div class="item-card"><div class="item-card-body">
+           <div class="item-card-title" style="color:#e5484d;">● LIVE NOW</div>
+           <div class="item-card-meta">${data.title || 'Untitled stream'}</div>
+           <div class="item-card-meta">youtube.com/watch?v=${data.videoId || '?'}</div>
+         </div></div>`
+      : `<div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
+           Not live. The app shows no banner.
+         </div>`;
+  } catch (err) {
+    preview.innerHTML = `<div class="empty-state" style="color:var(--muted);font-size:13px;">${err.message}</div>`;
+  }
+}
+
+document.getElementById('live-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const isLive = document.getElementById('lv-on').checked;
+  const videoId = document.getElementById('lv-video').value.trim();
+  const title = document.getElementById('lv-title').value.trim();
+  if (isLive && !videoId) { toast('Video ID is required to go live', 'error'); return; }
+  const btn = document.getElementById('live-submit-btn');
+  btn.disabled = true;
+  try {
+    await setDoc(doc(db, 'config', 'live'), {
+      isLive, videoId, title,
+      updatedAt: Timestamp.now(),
+    });
+    toast(isLive ? 'You are LIVE - banner is up' : 'Live banner removed');
+    loadLiveStatus();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SUBMISSIONS (visitors + testimonies, read-only)
+// ════════════════════════════════════════════════════════════════════════════
+async function loadSubmissions() {
+  const vEl = document.getElementById('visitors-list');
+  const tEl = document.getElementById('testimonies-list');
+  vEl.innerHTML = tEl.innerHTML =
+    '<div class="loading-row"><span class="spinner"></span> Loading…</div>';
+  try {
+    const [vSnap, tSnap] = await Promise.all([
+      getDocs(query(collection(db, 'visitors'), orderBy('createdAt', 'desc'))),
+      getDocs(query(collection(db, 'testimonies'), orderBy('createdAt', 'desc'))),
+    ]);
+    document.getElementById('subs-count').textContent =
+      vSnap.size + tSnap.size;
+
+    vEl.innerHTML = vSnap.empty
+      ? '<div class="empty-state" style="padding:24px 0;color:var(--muted);font-size:13px;">No visitor submissions yet.</div>'
+      : '';
+    vSnap.forEach((d) => {
+      const v = d.data();
+      const when = v.createdAt?.toDate?.()?.toLocaleDateString('en-GB') || '';
+      vEl.insertAdjacentHTML('beforeend', `
+        <div class="item-card"><div class="item-card-body">
+          <div class="item-card-title">${v.name || 'Unnamed'}</div>
+          <div class="item-card-meta">${v.branch || 'No branch'} · ${v.email || ''} ${v.phone ? '· ' + v.phone : ''}</div>
+          <div class="item-card-meta">Submitted ${when}</div>
+        </div></div>`);
+    });
+
+    tEl.innerHTML = tSnap.empty
+      ? '<div class="empty-state" style="padding:24px 0;color:var(--muted);font-size:13px;">No testimonies yet.</div>'
+      : '';
+    tSnap.forEach((d) => {
+      const t = d.data();
+      const when = t.createdAt?.toDate?.()?.toLocaleDateString('en-GB') || '';
+      const snippet = (t.text || '').slice(0, 140) + ((t.text || '').length > 140 ? '…' : '');
+      tEl.insertAdjacentHTML('beforeend', `
+        <div class="item-card"><div class="item-card-body">
+          <div class="item-card-title">${t.name || 'Anonymous'} <span style="color:var(--muted);font-weight:400;font-size:11px;">· ${t.status || 'pending'}</span></div>
+          <div class="item-card-meta" style="white-space:normal;line-height:1.5;">${snippet}</div>
+          <div class="item-card-meta">${t.branch || ''} · ${when}</div>
+        </div></div>`);
+    });
+  } catch (err) {
+    vEl.innerHTML = tEl.innerHTML =
+      `<div class="empty-state" style="color:var(--muted);font-size:13px;">${err.message}</div>`;
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 async function loadNews() {
   const listEl = document.getElementById('news-list');

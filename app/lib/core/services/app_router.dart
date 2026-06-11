@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/calendar/presentation/screens/calendar_screen.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../../features/giving/presentation/screens/giving_screen.dart';
 import '../../features/home/presentation/screens/dashboard_shell.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
@@ -14,6 +16,7 @@ import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/home/presentation/screens/reading_screen.dart';
+import '../../features/notes/presentation/screens/notes_screen.dart';
 import '../../shared/providers/auth_provider.dart';
 
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
@@ -31,6 +34,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     refreshListenable: notifier,
     redirect: notifier.redirect,
+    observers: [
+      // Screen-view analytics; no-op when Firebase isn't initialized.
+      if (Firebase.apps.isNotEmpty)
+        FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
+    ],
     routes: [
       // ── Onboarding ────────────────────────────────────────────────────────
       GoRoute(
@@ -114,6 +122,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/reading',
         builder: (context, state) => const ReadingScreen(),
+      ),
+
+      // ── Notes (overlays shell) ────────────────────────────────────────────
+      GoRoute(
+        path: '/notes',
+        builder: (context, state) => const NotesScreen(),
       ),
     ],
   );

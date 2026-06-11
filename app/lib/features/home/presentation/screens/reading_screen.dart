@@ -231,31 +231,35 @@ class _PassageView extends ConsumerWidget {
                     ),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () => _showVersionSheet(context, ref),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.accent, width: 1),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          passage.bibleAbbreviation,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.accent,
+                Semantics(
+                  button: true,
+                  label: 'Change Bible version',
+                  child: GestureDetector(
+                    onTap: () => _showVersionSheet(context, ref),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md, vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.accent, width: 1),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            passage.bibleAbbreviation,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.accent,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 3),
-                        const Icon(Icons.keyboard_arrow_down_rounded,
-                            color: AppColors.accent, size: 16),
-                      ],
+                          const SizedBox(width: 3),
+                          const Icon(Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.accent, size: 16),
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -8,6 +8,7 @@ class CacheService {
     required this._eventsBox,
     required this._preferencesBox,
     required this._playbackPositionsBox,
+    required this._notesBox,
   });
 
   final Box<dynamic> _sermonsBox;
@@ -15,6 +16,10 @@ class CacheService {
   final Box<dynamic> _eventsBox;
   final Box<dynamic> _preferencesBox;
   final Box<dynamic> _playbackPositionsBox;
+  final Box<dynamic> _notesBox;
+
+  /// Direct access to the raw Hive box for notes storage.
+  Box<dynamic> get notesBox => _notesBox;
 
   static const _sermonsListKey = 'sermons_list';
 
@@ -27,11 +32,13 @@ class CacheService {
     final preferencesBox = await Hive.openBox<dynamic>('preferences');
     final playbackPositionsBox =
         await Hive.openBox<dynamic>('playback_positions');
+    final notesBox = await Hive.openBox<dynamic>('notes');
     return CacheService._(
       sermonsBox: sermonsBox,
       eventsBox: eventsBox,
       preferencesBox: preferencesBox,
       playbackPositionsBox: playbackPositionsBox,
+      notesBox: notesBox,
     );
   }
 
@@ -81,5 +88,6 @@ class CacheService {
     await _eventsBox.clear();
     await _preferencesBox.clear();
     await _playbackPositionsBox.clear();
+    await _notesBox.clear();
   }
 }

@@ -6,6 +6,7 @@ import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
 import '../../features/home/data/daily_content_repository.dart';
 import '../../features/home/data/news_repository.dart';
+import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
 import '../../features/messages/data/kharis_content.dart';
 import '../../features/messages/data/sermon_repository.dart';
@@ -170,4 +171,15 @@ final newsRepositoryProvider = Provider<NewsRepository>((ref) {
 final newsProvider = StreamProvider<List<NewsItem>>((ref) {
   final repo = ref.watch(newsRepositoryProvider);
   return repo.watchNews();
+});
+
+// ── Live status ───────────────────────────────────────────────────────────────
+
+final liveRepositoryProvider = Provider<LiveRepository>((ref) {
+  return LiveRepository();
+});
+
+/// Realtime stream of whether a service is currently live on YouTube.
+final liveStatusProvider = StreamProvider<LiveStatus>((ref) {
+  return ref.watch(liveRepositoryProvider).watchLiveStatus();
 });

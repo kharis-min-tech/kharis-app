@@ -11,6 +11,7 @@ import 'package:kharis_app/core/theme/app_spacing.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
 
 /// Unified media player for audio and YouTube video content.
 /// Design follows Spotify-like full-screen player from MOBBIN references.
@@ -136,6 +137,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
               const SizedBox(height: AppSpacing.md),
               // Speed selector
               _buildSpeedSelector(),
+              const SizedBox(height: AppSpacing.lg),
+              // Secondary actions (Notes, etc.)
+              const PlayerActions(),
               const SizedBox(height: AppSpacing.xl),
             ],
           ),

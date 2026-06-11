@@ -3,12 +3,15 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kharis_app/features/journey/presentation/screens/journey_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 import 'notifications_settings_screen.dart';
+import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
+import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -103,6 +106,36 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 28),
 
               // 3. Menu rows — surfaceElevated cards, 12px radius, 14px gap
+              _MenuCard(
+                label: 'New Here? Connect',
+                onTap: () => Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NewHereScreen(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              _MenuCard(
+                label: 'Share a Testimony',
+                onTap: () => Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const TestimonyScreen(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              _MenuCard(
+                label: 'Begin Your Journey',
+                onTap: () => Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const JourneyScreen(),
+                  ),
+                ),
+              ),
+              _MenuCard(
+                label: 'My Notes',
+                onTap: () => context.push('/notes'),
+              ),
               _MenuCard(
                 label: 'Notifications',
                 onTap: () => Navigator.of(context).push(

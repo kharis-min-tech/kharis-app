@@ -37,6 +37,30 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config (e.g. live status) — publicly readable, admin writable
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // visitors — anyone may submit (create), only admins may read/manage
+    match /visitors/{visitorId} {
+      allow create: if request.resource.data.keys().hasAll(['name', 'createdAt'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() < 200;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // testimonies — anyone may submit (create), only admins may read/manage
+    match /testimonies/{testimonyId} {
+      allow create: if request.resource.data.keys().hasAll(['text', 'createdAt'])
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() <= 2000;
+      allow read, update, delete: if isAdmin();
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

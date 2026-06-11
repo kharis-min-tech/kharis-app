@@ -30,9 +30,13 @@ class TodaysReadingCard extends ConsumerWidget {
 
   Widget _buildPill({required String label, required String reference}) {
     return Builder(
-      builder: (context) => GestureDetector(
-        onTap: () => context.push('/reading'),
-        child: _pillBody(label: label, reference: reference),
+      builder: (context) => Semantics(
+        button: true,
+        label: "Open today's reading $reference",
+        child: GestureDetector(
+          onTap: () => context.push('/reading'),
+          child: _pillBody(label: label, reference: reference),
+        ),
       ),
     );
   }

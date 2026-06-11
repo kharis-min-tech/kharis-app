@@ -6,6 +6,8 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/core/utils/artwork_gradient.dart';
 
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
+import 'package:kharis_app/shared/widgets/skeleton.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 
 class LatestMessageCard extends ConsumerWidget {
   const LatestMessageCard({super.key});
@@ -45,23 +47,26 @@ class LatestMessageCard extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         // Video card — taps into the in-app YouTube player
-        GestureDetector(
-          onTap: video != null
-              ? () {
-                  Navigator.of(context, rootNavigator: true).push(
-                    MaterialPageRoute<void>(
-                      builder: (context) => MediaPlayerScreen(sermon: video),
-                    ),
-                  );
-                }
-              : null,
-          child: _buildVideoCard(
-            title: video?.title ?? 'Latest Message',
-            speaker: video?.speaker ?? 'Kharis Church',
-            gradientColors: sermonGradient(video?.artworkColor ?? 0),
-            artworkUrl: video?.artworkUrl,
+        if (video == null)
+          _buildNullSkeleton()
+        else if (DateTime.now().weekday == DateTime.sunday)
+          _buildSundayHero(context, video)
+        else
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => MediaPlayerScreen(sermon: video),
+                ),
+              );
+            },
+            child: _buildVideoCard(
+              title: video.title,
+              speaker: video.speaker,
+              gradientColors: sermonGradient(video.artworkColor ?? 0),
+              artworkUrl: video.artworkUrl,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -184,6 +189,137 @@ class LatestMessageCard extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNullSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: const [
+        ClipRRect(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Skeleton(width: double.infinity, height: double.infinity, radius: 0),
+          ),
+        ),
+        SizedBox(height: AppSpacing.md),
+        SkeletonLine(width: 200),
+      ],
+    );
+  }
+
+  Widget _buildSundayHero(BuildContext context, Sermon video) {
+    final gradientColors = sermonGradient(video.artworkColor ?? 0);
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute<void>(
+            builder: (context) => MediaPlayerScreen(sermon: video),
+          ),
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background: artwork or gradient
+              if (video.artworkUrl != null)
+                Image.network(
+                  video.artworkUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _gradientBg(gradientColors),
+                )
+              else
+                _gradientBg(gradientColors),
+              // Bottom gradient scrim: transparent -> 85% black
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color.fromRGBO(0, 0, 0, 0.85)],
+                    stops: [0.35, 1.0],
+                  ),
+                ),
+              ),
+              // Scrim content
+              Positioned(
+                bottom: 14,
+                left: 14,
+                right: 14,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // SUNDAY overline pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        'SUNDAY',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accent,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Title + WATCH NOW pill row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            video.title,
+                            style: GoogleFonts.mavenPro(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.2,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            'WATCH NOW',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import '../widgets/todays_reading_card.dart';
 import '../widgets/latest_message_card.dart';
+import '../widgets/live_banner.dart';
 import '../widgets/news_section.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -36,6 +37,12 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                // Live stream banner
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: LiveBanner(),
+                ),
+                const SizedBox(height: 12),
                 // Today's reading pill
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
