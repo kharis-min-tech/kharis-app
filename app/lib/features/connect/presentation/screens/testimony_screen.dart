@@ -3,6 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/widgets/connect_form_widgets.dart';
+import 'package:kharis_app/shared/widgets/press_effect.dart';
+import 'package:kharis_app/shared/widgets/shake_effect.dart';
+
+enum _FormState { form, success }
 
 class TestimonyScreen extends StatefulWidget {
   const TestimonyScreen({super.key});
@@ -16,10 +20,10 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _testimonyController = TextEditingController();
+  final _shakeKey = GlobalKey<ShakeEffectState>();
 
   String? _selectedBranch;
-  bool _loading = false;
-  bool _success = false;
+  _FormState _state = _FormState.form;
 
   final _repo = ConnectRepository();
 
@@ -32,8 +36,11 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
   }
 
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _loading = true);
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      _shakeKey.currentState?.shake();
+      return;
+    }
+    setState(() => _state = _FormState.success);
     try {
       await _repo.submitTestimony(
         name: _nameController.text.trim(),
@@ -41,9 +48,9 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
         branch: _selectedBranch ?? '',
         text: _testimonyController.text.trim(),
       );
-      if (mounted) setState(() => _success = true);
     } catch (e) {
       if (mounted) {
+        setState(() => _state = _FormState.form);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -54,8 +61,6 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
           ),
         );
       }
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -77,7 +82,7 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: _success ? _buildSuccess() : _buildForm(),
+        child: _state == _FormState.success ? _buildSuccess() : _buildForm(),
       ),
     );
   }
@@ -143,7 +148,9 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Form(
         key: _formKey,
-        child: Column(
+        child: ShakeEffect(
+          key: _shakeKey,
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
@@ -215,40 +222,34 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
             const SizedBox(height: 32),
 
             // Submit
-            SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            PressEffect(
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
                   ),
-                  elevation: 0,
+                  onPressed: _submit,
+                  child: Text(
+                    'SHARE TESTIMONY',
+                    style: GoogleFonts.mavenPro(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-                onPressed: _loading ? null : _submit,
-                child: _loading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Text(
-                        'SHARE TESTIMONY',
-                        style: GoogleFonts.mavenPro(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
               ),
             ),
 
             const SizedBox(height: 32),
           ],
+          ),
         ),
       ),
     );

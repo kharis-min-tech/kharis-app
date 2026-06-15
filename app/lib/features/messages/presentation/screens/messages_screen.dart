@@ -10,6 +10,7 @@ import 'package:kharis_app/features/player/presentation/screens/media_player_scr
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
+import 'package:kharis_app/shared/widgets/press_effect.dart';
 
 /// Messages tab - the sermon library as a podcast show page.
 ///
@@ -714,16 +715,7 @@ class _EpisodeTile extends ConsumerWidget {
             if (sermon.description != null &&
                 sermon.description!.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
-              Text(
-                sermon.description!,
-                style: GoogleFonts.dmSans(
-                  fontSize: 12.5,
-                  color: AppColors.textBody,
-                  height: 1.45,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              _ExpandableDescription(text: sermon.description!),
             ],
 
             // Meta
@@ -757,22 +749,22 @@ class _EpisodeTile extends ConsumerWidget {
                   button: true,
                   label: 'Play ${sermon.title}',
                   excludeSemantics: true,
-                  child: GestureDetector(
-                    onTap: () => _open(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
+                child: PressEffect(
+                  onTap: () => _open(context),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: AppColors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 24,
                     ),
                   ),
+                ),
                 ),
               ],
             ),
@@ -781,6 +773,76 @@ class _EpisodeTile extends ConsumerWidget {
       ),
     ),
   );
+  }
+}
+
+// ── Expandable description (per-tile expand/collapse) ─────────────────────────
+
+class _ExpandableDescription extends StatefulWidget {
+  const _ExpandableDescription({required this.text});
+
+  final String text;
+
+  @override
+  State<_ExpandableDescription> createState() => _ExpandableDescriptionState();
+}
+
+class _ExpandableDescriptionState extends State<_ExpandableDescription> {
+  bool _expanded = false;
+
+  static bool _doesOverflow(
+      BuildContext context, String text, TextStyle style, double maxWidth) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      maxLines: 2,
+    )..layout(maxWidth: maxWidth);
+    return tp.didExceedMaxLines;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = GoogleFonts.dmSans(
+      fontSize: 12.5,
+      color: AppColors.textBody,
+      height: 1.45,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final overflows = _doesOverflow(
+            context, widget.text, style, constraints.maxWidth);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedCrossFade(
+              firstChild: Text(
+                widget.text,
+                style: style,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              secondChild: Text(widget.text, style: style),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+            ),
+            if (overflows)
+              GestureDetector(
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Text(
+                  _expanded ? 'less' : 'more',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
 

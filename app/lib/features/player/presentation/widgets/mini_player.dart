@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../screens/media_player_screen.dart';
 
 /// Persistent mini player bar (56px) above tab bar.
@@ -31,7 +32,7 @@ class MiniPlayer extends ConsumerWidget {
     return Semantics(
       button: true,
       label: 'Open player for ${sermon.title}',
-      child: GestureDetector(
+      child: PressEffect(
       onTap: () {
         Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute<void>(
@@ -119,10 +120,14 @@ class MiniPlayer extends ConsumerWidget {
                       label: isPlaying ? 'Pause' : 'Play',
                       excludeSemantics: true,
                       child: IconButton(
-                        icon: Icon(
-                          isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white,
-                          size: 28,
+                        icon: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            isPlaying ? Icons.pause : Icons.play_arrow,
+                            key: ValueKey<bool>(isPlaying),
+                            color: Colors.white,
+                            size: 28,
+                          ),
                         ),
                         onPressed: () {
                           if (isPlaying) {

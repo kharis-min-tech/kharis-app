@@ -8,6 +8,7 @@ import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/core/theme/app_spacing.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 const _branches = ['All Branches', 'London', 'Birmingham', 'Reading'];
@@ -25,6 +26,14 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   String _selectedBranch = 'All Branches';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedBranch = ref
+        .read(cacheServiceProvider)
+        .getPreference<String>('last_branch_filter', 'All Branches');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +141,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           final branch = _branches[i];
           final isActive = branch == _selectedBranch;
           return GestureDetector(
-            onTap: () => setState(() => _selectedBranch = branch),
+            onTap: () {
+              ref
+                  .read(cacheServiceProvider)
+                  .cachePreference('last_branch_filter', branch);
+              setState(() => _selectedBranch = branch);
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(

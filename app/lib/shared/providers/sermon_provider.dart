@@ -12,6 +12,7 @@ import '../../features/messages/data/kharis_content.dart';
 import '../../features/messages/data/sermon_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
 import '../models/sermon.dart';
+import 'cache_provider.dart';
 
 // ── Repository ────────────────────────────────────────────────────────────────
 
@@ -50,10 +51,24 @@ extension SermonSortLabel on SermonSort {
 }
 
 /// Active sort order. Defaults to newest-first.
-final sermonSortProvider = StateProvider<SermonSort>((ref) => SermonSort.newest);
+final sermonSortProvider = StateProvider<SermonSort>((ref) {
+  final cache = ref.read(cacheServiceProvider);
+  // ignore: deprecated_member_use
+  ref.listenSelf((_, next) => cache.cachePreference('last_sort', next.name));
+  final savedName = cache.getPreference<String>('last_sort', 'newest');
+  return SermonSort.values.firstWhere(
+    (e) => e.name == savedName,
+    orElse: () => SermonSort.newest,
+  );
+});
 
 /// Active category filter — a label from [kSermonCategories]. 'All' = none.
-final selectedCategoryProvider = StateProvider<String>((ref) => 'All');
+final selectedCategoryProvider = StateProvider<String>((ref) {
+  final cache = ref.read(cacheServiceProvider);
+  // ignore: deprecated_member_use
+  ref.listenSelf((_, next) => cache.cachePreference('last_category', next));
+  return cache.getPreference<String>('last_category', 'All');
+});
 
 /// Categories that actually occur in the loaded library, in display order.
 /// Always starts with 'All'; buckets with zero sermons are hidden.
