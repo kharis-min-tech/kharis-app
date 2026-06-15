@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/utils/html_entities.dart';
 import '../../core/utils/sermon_categorizer.dart';
 import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
@@ -8,6 +7,7 @@ import '../../features/home/data/daily_content_repository.dart';
 import '../../features/home/data/news_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
+import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/kharis_content.dart';
 import '../../features/messages/data/sermon_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
@@ -125,29 +125,17 @@ final librarySermonsProvider = Provider<List<Sermon>>((ref) {
 
 final currentSermonProvider = StateProvider<Sermon?>((ref) => null);
 
-// ── Videos (YouTube non-shorts) ───────────────────────────────────────────────
+// ── Videos (YouTube non-shorts, LIVE from feed) ──────────────────────────────
 
-/// Synchronous list of Kharis YouTube uploads with shorts excluded.
-///
-/// Built from the hardcoded [kharisVideos] dataset — no network call needed.
-/// The first entry is always the most recently published full-length video,
-/// suitable for the Home "Latest Message" card.
-final videosProvider = Provider<List<Sermon>>((ref) {
-  return kharisVideos.asMap().entries.map((entry) {
-    final i = entry.key;
-    final v = entry.value;
-    return Sermon(
-      id: v['videoId'] as String,
-      title: decodeHtmlEntities(v['title'] as String),
-      speaker: 'David Antwi',
-      audioUrl: '',
-      artworkUrl: v['thumbnailUrl'] as String?,
-      publishedAt: DateTime.tryParse(v['publishedAt'] as String),
-      videoId: v['videoId'] as String,
-      source: 'youtube',
-      artworkColor: i % 10,
-    );
-  }).toList();
+final videoRepositoryProvider = Provider<VideoRepository>(
+  (ref) => VideoRepository(),
+);
+
+/// Live YouTube video list. Fetches the Atom feed on every read (proxy on
+/// web, direct on mobile). Falls back to the embedded [kharisVideos] dataset.
+final videosProvider = FutureProvider<List<Sermon>>((ref) async {
+  final repo = ref.watch(videoRepositoryProvider);
+  return repo.getVideos();
 });
 
 // ── Events ────────────────────────────────────────────────────────────────────

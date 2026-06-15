@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 
 import 'package:kharis_app/core/utils/html_entities.dart';
@@ -16,8 +17,15 @@ import 'sermon_repository_base.dart';
 class SermonRepository extends AbstractSermonRepository {
   SermonRepository({Dio? dio}) : _dio = dio ?? Dio();
 
-  static const _feedUrl =
+  /// On web, CORS blocks the direct SoundCloud feed; route through the
+  /// Firebase Cloud Function proxy instead. On mobile, hit SoundCloud direct
+  /// (lower latency, no function cost). The proxy caches upstream for 5 min.
+  static const _directFeed =
       'https://feeds.soundcloud.com/users/soundcloud:users:58625221/sounds.rss';
+  static const _proxyFeed =
+      'https://feedproxy-qf5ohtc4tq-ew.a.run.app?source=soundcloud';
+  static String get _feedUrl =>
+      kIsWeb ? _proxyFeed : _directFeed;
 
   final Dio _dio;
 

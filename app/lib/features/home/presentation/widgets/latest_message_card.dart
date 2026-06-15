@@ -14,8 +14,10 @@ class LatestMessageCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final videos = ref.watch(videosProvider);
-    final video = videos.isNotEmpty ? videos.first : null;
+    final videosAsync = ref.watch(videosProvider);
+    final video = videosAsync.valueOrNull?.isNotEmpty == true
+        ? videosAsync.valueOrNull!.first
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
