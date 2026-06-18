@@ -1,59 +1,65 @@
 import 'package:flutter/material.dart';
 
-/// Brand and semantic colour tokens sourced from kharis.org computed styles.
-/// Do not invent values — every hex here traces back to the DESIGN.md reference.
+/// Kharis Church design-system colour tokens — v2.
+/// CRITICAL: secondary (gold) = CTAs, active nav, progress.
+///           primary (lavender) = brand, gradients, decorative.
 abstract final class AppColors {
   // ── Brand ──────────────────────────────────────────────────────────────────
 
-  /// Magenta/pink accent — links, active nav, play buttons, primary CTAs.
-  /// Matches Figma "Kharis App" canonical accent (#DC3F9E).
-  static const Color accent = Color(0xFFDC3F9E);
+  /// Lavender purple — branding, gradients, secondary decorative use.
+  static const Color primary = Color(0xFFD6BAFF);
 
-  /// Today's reading pill base colour. Figma rounded pill bg.
-  static const Color pill = Color(0xFF882867);
+  /// Text/icon on primary surfaces.
+  static const Color onPrimary = Color(0xFF41107E);
 
-  /// Identity colour. Logo and social icons only — not for buttons or fills.
-  static const Color purple = Color(0xFF6B34FA);
+  /// Stronger purple — containers, pills.
+  static const Color primaryContainer = Color(0xFFBD92FF);
 
-  /// Feature icon colour (50 px icon-box components on kharis.org).
-  static const Color magenta = Color(0xFF800654);
+  /// Gold — PRIMARY CTAs, active nav, Live badges, progress bars.
+  static const Color secondary = Color(0xFFE9C349);
+
+  /// Text/icon on gold (secondary) surfaces.
+  static const Color onSecondary = Color(0xFF3C2F00);
+
+  /// Warm grey — tertiary accents.
+  static const Color tertiary = Color(0xFFC8C6C5);
 
   // ── Surfaces (dark mode) ───────────────────────────────────────────────────
 
-  /// App background — deepest layer. Matches `dark` token from DESIGN.md.
-  static const Color surfaceDark = Color(0xFF0D0D0D);
+  /// App background — deepest layer.
+  static const Color surfaceDark = Color(0xFF131313);
 
-  /// Cards, bottom sheets, and modal surfaces. Matches `elevated` token.
-  static const Color surfaceElevated = Color(0xFF1A1A1A);
+  /// Cards, bottom bar — +1px white 10% border.
+  static const Color surfaceElevated = Color(0xFF1E1E1E);
 
-  /// Input fields and secondary surface containers. Matches `subtle` token.
-  static const Color surfaceSubtle = Color(0xFF252525);
+  /// Inputs, secondary surfaces.
+  static const Color surfaceSubtle = Color(0xFF2A2A2A);
 
-  // ── Text ───────────────────────────────────────────────────────────────────
+  /// Container surfaces (bottom sheets, separators).
+  static const Color surfaceContainer = Color(0xFF201F1F);
 
-  /// White — headings on dark surfaces and button labels.
-  static const Color textPrimary = Color(0xFFFFFFFF);
+  /// Low-emphasis container (mini player, deep backgrounds).
+  static const Color surfaceContainerLow = Color(0xFF1C1B1B);
 
-  /// Near-charcoal — section headings on light surfaces.
-  static const Color textHeading = Color(0xFF32363D);
+  // ── Content ────────────────────────────────────────────────────────────────
 
-  /// Mid-grey — body copy and description text.
-  static const Color textBody = Color(0xFF7A7A7A);
+  /// Primary text on dark surfaces.
+  static const Color onSurface = Color(0xFFE5E2E1);
 
-  /// Light grey — secondary metadata, timestamps, muted labels.
-  static const Color textMuted = Color(0xFF999999);
+  /// Body / secondary text.
+  static const Color onSurfaceVariant = Color(0xFFCCC3D3);
+
+  /// Muted text, inactive icons.
+  static const Color textMuted = Color(0xFF968E9D);
+
+  // ── Outline / dividers ─────────────────────────────────────────────────────
+
+  static const Color outline = Color(0xFF968E9D);
+  static const Color outlineVariant = Color(0xFF4A4451);
 
   // ── Semantic states ────────────────────────────────────────────────────────
 
-  /// Positive / success feedback.
+  static const Color error = Color(0xFFFFB4AB);
+  static const Color errorContainer = Color(0xFF93000A);
   static const Color success = Color(0xFF22C55E);
-
-  /// Destructive / error state.
-  static const Color error = Color(0xFFEF4444);
-
-  /// Caution / warning state. Derived — not present on kharis.org.
-  static const Color warning = Color(0xFFF59E0B);
-
-  /// Informational state. Derived — not present on kharis.org.
-  static const Color info = Color(0xFF3B82F6);
 }

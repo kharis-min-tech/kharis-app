@@ -36,10 +36,10 @@ class NewsSection extends ConsumerWidget {
       children: [
         Text(
           'News & Updates',
-          style: GoogleFonts.mavenPro(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: AppColors.onSurface,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -107,7 +107,7 @@ class _NewsCard extends StatelessWidget {
                 children: [
                   Text(
                     item.title,
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -120,7 +120,7 @@ class _NewsCard extends StatelessWidget {
                     children: [
                       Text(
                         'Kharis Church',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
                           color: Colors.white70,
                         ),
@@ -137,7 +137,7 @@ class _NewsCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         _age(item.publishedAt),
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
                           color: Colors.white70,
                         ),
@@ -156,7 +156,7 @@ class _NewsCard extends StatelessWidget {
                     ),
                     child: Text(
                       item.type,
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 10,
                         color: Colors.white,
                         fontWeight: FontWeight.w500,

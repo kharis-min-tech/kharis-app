@@ -57,13 +57,13 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary, size: 20),
+              color: AppColors.onSurface, size: 20),
           onPressed: _goBack,
         ),
         title: Text(
           widget.title,
-          style: GoogleFonts.mavenPro(
-            color: AppColors.textPrimary,
+          style: GoogleFonts.plusJakartaSans(
+            color: AppColors.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -71,7 +71,7 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.close_rounded,
-                color: AppColors.textPrimary, size: 22),
+                color: AppColors.onSurface, size: 22),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -84,7 +84,7 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
               color: AppColors.surfaceDark,
               alignment: Alignment.center,
               child: const CircularProgressIndicator(
-                color: AppColors.accent,
+                color: AppColors.secondary,
                 strokeWidth: 2.5,
               ),
             ),

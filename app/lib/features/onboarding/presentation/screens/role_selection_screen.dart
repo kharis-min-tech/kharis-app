@@ -48,10 +48,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               Text(
                 'Welcome to Kharis',
                 style: TextStyle(
-                  fontFamily: 'Maven Pro',
+                  fontFamily: 'Plus Jakarta Sans',
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                   height: 1.2,
                 ),
               ),
@@ -59,9 +59,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               // Subtitle
               Text(
                 'How would you like to explore?',
-                style: AppTypography.body.copyWith(
+                style: AppTypography.bodyLg.copyWith(
                   fontSize: 16,
-                  color: AppColors.textBody,
+                  color: AppColors.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 40),
@@ -70,7 +70,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 icon: Icons.people_outline,
                 title: 'Member',
                 description: 'I attend Kharis Church',
-                color: AppColors.purple,
+                color: AppColors.primary,
                 onTap: () => context.go('/branch-selection'),
               ),
               const SizedBox(height: 12),
@@ -78,7 +78,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 icon: Icons.waving_hand,
                 title: 'New Here',
                 description: 'This is my first time',
-                color: AppColors.accent,
+                color: AppColors.primary,
                 onTap: () => context.go('/branch-selection'),
               ),
               const SizedBox(height: 12),
@@ -86,7 +86,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 icon: Icons.headphones,
                 title: 'Guest',
                 description: 'Just browsing sermons',
-                color: AppColors.magenta,
+                color: AppColors.secondary,
                 onTap: () => context.go('/branch-selection'),
               ),
               const Spacer(),
@@ -101,7 +101,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   ),
                   label: Text(
                     _selectedLanguage,
-                    style: AppTypography.caption.copyWith(
+                    style: AppTypography.bodySm.copyWith(
                       color: AppColors.textMuted,
                     ),
                   ),

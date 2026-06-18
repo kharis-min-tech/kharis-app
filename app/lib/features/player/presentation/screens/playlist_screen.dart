@@ -59,7 +59,7 @@ class PlaylistScreen extends ConsumerWidget {
                   // Playlist title
                   Text(
                     'Playlist',
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -78,7 +78,7 @@ class PlaylistScreen extends ConsumerWidget {
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [AppColors.purple, AppColors.accent],
+                            colors: [AppColors.primary, AppColors.primary],
                           ),
                         ),
                         child: Center(
@@ -86,7 +86,7 @@ class PlaylistScreen extends ConsumerWidget {
                             playlistName.isNotEmpty
                                 ? playlistName.toUpperCase()
                                 : 'ACTS SERIES',
-                            style: GoogleFonts.mavenPro(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 24,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
@@ -104,9 +104,9 @@ class PlaylistScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
                       'Going Through the book of ACTS exploring what God is doing line upon line precept upon precept',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
-                        color: AppColors.textBody,
+                        color: AppColors.onSurfaceVariant,
                         height: 1.5,
                       ),
                       textAlign: TextAlign.center,
@@ -115,7 +115,7 @@ class PlaylistScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Playlist · ${sermons.length} Messages',
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       color: AppColors.textMuted,
                     ),
@@ -133,7 +133,7 @@ class PlaylistScreen extends ConsumerWidget {
                   padding: EdgeInsets.all(32),
                   child: Center(
                     child: CircularProgressIndicator(
-                      color: AppColors.accent,
+                      color: AppColors.primary,
                       strokeWidth: 2,
                     ),
                   ),
@@ -157,17 +157,17 @@ class PlaylistScreen extends ConsumerWidget {
                       onPressed: () => audioService.play(sermon),
                       icon: const Icon(
                         Icons.play_circle_rounded,
-                        color: AppColors.accent,
+                        color: AppColors.primary,
                         size: 32,
                       ),
                       padding: EdgeInsets.zero,
                     ),
                     title: Text(
                       sermon.title,
-                      style: GoogleFonts.mavenPro(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: AppColors.onSurface,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -176,7 +176,7 @@ class PlaylistScreen extends ConsumerWidget {
                       durationStr.isNotEmpty
                           ? '${sermon.speaker} · $durationStr'
                           : sermon.speaker,
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         color: AppColors.textMuted,
                       ),

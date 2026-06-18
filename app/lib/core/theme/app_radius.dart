@@ -1,27 +1,45 @@
 import 'package:flutter/material.dart';
 
-/// Corner-radius tokens sourced from kharis.org computed styles.
+/// Corner-radius tokens — Kharis Church design system v2.
 abstract final class AppRadius {
-  /// 12 px — all CTA buttons on kharis.org.
-  static const double button = 12;
+  /// 4 px — tight nudges.
+  static const double sm = 4;
 
-  /// 15 px — feature cards (paired with the card box-shadow).
-  static const double card = 15;
+  /// 8 px — default radius (inputs, standard elements).
+  static const double defaultRadius = 8;
 
-  /// 8 px — form input fields (derived; not explicit on kharis.org).
+  /// 12 px — medium surfaces.
+  static const double md = 12;
+
+  /// 16 px — cards and elevated surfaces.
+  static const double lg = 16;
+
+  /// 24 px — banners, large containers.
+  static const double xl = 24;
+
+  /// 8 px — standard CTA buttons (Kharis v2).
+  static const double button = 8;
+
+  /// 16 px — media/content cards.
+  static const double card = 16;
+
+  /// 8 px — form inputs.
   static const double input = 8;
 
-  /// 9999 px — fully-rounded pill shapes and social icon circles (50 %).
+  /// 9999 px — chips, tags, fully-rounded pills.
   static const double pill = 9999;
 
   // ── Composed BorderRadius ──────────────────────────────────────────────────
 
-  /// BorderRadius for all CTA buttons.
+  /// BorderRadius for standard CTA buttons.
   static BorderRadius get buttonBorder => BorderRadius.circular(button);
 
-  /// BorderRadius for feature cards.
+  /// BorderRadius for cards.
   static BorderRadius get cardBorder => BorderRadius.circular(card);
 
-  /// BorderRadius for form input fields.
+  /// BorderRadius for form inputs.
   static BorderRadius get inputBorder => BorderRadius.circular(input);
+
+  /// BorderRadius for chips and pill-shaped tags.
+  static BorderRadius get pillBorder => BorderRadius.circular(pill);
 }

@@ -74,10 +74,10 @@ class SermonCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               title,
-              style: GoogleFonts.mavenPro(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: AppColors.onSurface,
                 height: 1.3,
               ),
               maxLines: 2,
@@ -86,7 +86,7 @@ class SermonCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             Text(
               speaker,
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
                 color: AppColors.textMuted,

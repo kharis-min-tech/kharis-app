@@ -4,7 +4,11 @@ import 'app_colors.dart';
 import 'app_radius.dart';
 import 'app_typography.dart';
 
-/// Returns the Kharis app [ThemeData]. Dark-mode first.
+/// Returns the Kharis Church [ThemeData] — v2 design system.
+///
+/// Seed: secondary (gold) so Material3 generates a coherent palette from the
+/// CTA colour.  Scaffold background is surfaceDark. Cards carry the 1px white
+/// 10% border. ElevatedButtons are gold with dark text.
 ///
 /// Usage:
 /// ```dart
@@ -14,16 +18,26 @@ import 'app_typography.dart';
 /// ```
 ThemeData kharisTheme() {
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.accent,
+    seedColor: AppColors.secondary,
     brightness: Brightness.dark,
   ).copyWith(
-    primary: AppColors.accent,
-    onPrimary: AppColors.textPrimary,
+    primary: AppColors.primary,
+    onPrimary: AppColors.onPrimary,
+    primaryContainer: AppColors.primaryContainer,
+    secondary: AppColors.secondary,
+    onSecondary: AppColors.onSecondary,
+    tertiary: AppColors.tertiary,
     surface: AppColors.surfaceDark,
-    onSurface: AppColors.textPrimary,
+    onSurface: AppColors.onSurface,
+    onSurfaceVariant: AppColors.onSurfaceVariant,
     surfaceContainerHighest: AppColors.surfaceElevated,
+    surfaceContainer: AppColors.surfaceContainer,
+    surfaceContainerLow: AppColors.surfaceContainerLow,
     error: AppColors.error,
-    onError: AppColors.textPrimary,
+    errorContainer: AppColors.errorContainer,
+    onError: AppColors.onSurface,
+    outline: AppColors.outline,
+    outlineVariant: AppColors.outlineVariant,
   );
 
   return ThemeData(
@@ -35,15 +49,15 @@ ThemeData kharisTheme() {
     scaffoldBackgroundColor: AppColors.surfaceDark,
 
     // ── Text ─────────────────────────────────────────────────────────────────
-    textTheme: const TextTheme(
-      displayLarge: AppTypography.display,
-      headlineLarge: AppTypography.h1,
-      headlineMedium: AppTypography.h2,
-      headlineSmall: AppTypography.h3,
-      bodyLarge: AppTypography.body,
-      bodySmall: AppTypography.caption,
-      labelSmall: AppTypography.overline,
-      labelMedium: AppTypography.nav,
+    textTheme: TextTheme(
+      displayLarge: AppTypography.displayLg,
+      headlineLarge: AppTypography.headlineLg,
+      headlineMedium: AppTypography.headlineLgMobile,
+      headlineSmall: AppTypography.titleMd,
+      bodyLarge: AppTypography.bodyLg,
+      bodySmall: AppTypography.bodySm,
+      labelSmall: AppTypography.labelMd,
+      labelMedium: AppTypography.labelMd,
     ),
 
     // ── Cards ─────────────────────────────────────────────────────────────────
@@ -53,21 +67,20 @@ ThemeData kharisTheme() {
       shadowColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.cardBorder,
+        side: const BorderSide(color: Color(0x1AFFFFFF), width: 1),
       ),
     ),
 
-    // ── Elevated button — magenta/pink accent ─────────────────────────────────
+    // ── Elevated button — gold CTA, 8px radius ──────────────────────────────
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.accent,
-        foregroundColor: AppColors.textPrimary,
+        backgroundColor: AppColors.secondary,
+        foregroundColor: AppColors.onSecondary,
+        disabledBackgroundColor: Color(0x66E9C349),
+        disabledForegroundColor: AppColors.onSecondary,
         elevation: 0,
         shadowColor: Colors.transparent,
-        textStyle: const TextStyle(
-          fontFamily: 'Maven Pro',
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
+        textStyle: AppTypography.labelMd,
         shape: RoundedRectangleBorder(
           borderRadius: AppRadius.buttonBorder,
         ),
@@ -76,24 +89,24 @@ ThemeData kharisTheme() {
     ),
 
     // ── App bar ───────────────────────────────────────────────────────────────
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
-      foregroundColor: AppColors.textPrimary,
-      titleTextStyle: AppTypography.h3,
+      foregroundColor: AppColors.onSurface,
+      titleTextStyle: AppTypography.titleMd,
     ),
 
-    // ── Bottom navigation — white active, #8A8A8A inactive ────────────────────
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: Colors.transparent,
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Color(0xFF8A8A8A),
+    // ── Bottom navigation — gold active, textMuted inactive ──────────────────
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surfaceElevated,
+      selectedItemColor: AppColors.secondary,
+      unselectedItemColor: AppColors.textMuted,
       type: BottomNavigationBarType.fixed,
       elevation: 0,
-      selectedLabelStyle: AppTypography.nav,
-      unselectedLabelStyle: AppTypography.nav,
+      selectedLabelStyle: AppTypography.labelMd,
+      unselectedLabelStyle: AppTypography.labelMd,
     ),
 
     // ── Input decoration ──────────────────────────────────────────────────────
@@ -110,7 +123,7 @@ ThemeData kharisTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.secondary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,

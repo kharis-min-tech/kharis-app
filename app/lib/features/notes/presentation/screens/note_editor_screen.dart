@@ -88,7 +88,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.textPrimary),
+          icon: const Icon(Icons.close, color: AppColors.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -96,10 +96,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             onPressed: _save,
             child: Text(
               'Save',
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: AppColors.accent,
+                color: AppColors.primary,
               ),
             ),
           ),
@@ -127,16 +127,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 maxLines: null,
                 expands: true,
                 textAlignVertical: TextAlignVertical.top,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                   height: 1.6,
                 ),
-                cursorColor: AppColors.accent,
+                cursorColor: AppColors.primary,
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   hintText: 'Start typing...',
-                  hintStyle: GoogleFonts.dmSans(
+                  hintStyle: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
                     color: AppColors.textMuted,
                   ),
@@ -164,9 +164,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.15),
+        color: AppColors.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -174,15 +174,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           const Icon(
             Icons.headphones_outlined,
             size: 14,
-            color: AppColors.accent,
+            color: AppColors.primary,
           ),
           const SizedBox(width: AppSpacing.xs),
           Flexible(
             child: Text(
               label,
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
-                color: AppColors.accent,
+                color: AppColors.primary,
                 fontWeight: FontWeight.w500,
               ),
               maxLines: 1,

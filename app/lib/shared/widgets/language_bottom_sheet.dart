@@ -64,10 +64,10 @@ class _LanguageBottomSheetState extends ConsumerState<_LanguageBottomSheet> {
           children: [
             Text(
               'Select Language',
-              style: GoogleFonts.mavenPro(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 16),
@@ -113,9 +113,9 @@ class _LanguageRow extends StatelessWidget {
             Expanded(
               child: Text(
                 name,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                   fontWeight:
                       isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
@@ -124,7 +124,7 @@ class _LanguageRow extends StatelessWidget {
             if (isSelected)
               const Icon(
                 Icons.check,
-                color: AppColors.accent,
+                color: AppColors.secondary,
                 size: 20,
               ),
           ],

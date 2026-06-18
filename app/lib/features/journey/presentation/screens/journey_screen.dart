@@ -79,10 +79,10 @@ class JourneyScreen extends ConsumerWidget {
               // Heading
               Text(
                 'Your Journey',
-                style: GoogleFonts.mavenPro(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                 ),
               ),
 
@@ -90,7 +90,7 @@ class JourneyScreen extends ConsumerWidget {
 
               Text(
                 'Salvation - Baptism - Holy Spirit - Next Steps',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   color: AppColors.textMuted,
                 ),
@@ -195,10 +195,10 @@ class _StepCard extends StatelessWidget {
                     // Title
                     Text(
                       step.title,
-                      style: GoogleFonts.mavenPro(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.onSurface,
                       ),
                     ),
 
@@ -207,10 +207,10 @@ class _StepCard extends StatelessWidget {
                     // Scripture quote
                     Text(
                       step.scripture,
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
-                        color: AppColors.accent,
+                        color: AppColors.primary,
                         height: 1.5,
                       ),
                     ),
@@ -220,10 +220,10 @@ class _StepCard extends StatelessWidget {
                     // Scripture ref
                     Text(
                       step.scriptureRef,
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.accent,
+                        color: AppColors.primary,
                       ),
                     ),
 
@@ -232,9 +232,9 @@ class _StepCard extends StatelessWidget {
                     // Body
                     Text(
                       step.body,
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
-                        color: AppColors.textBody,
+                        color: AppColors.onSurfaceVariant,
                         height: 1.6,
                       ),
                     ),
@@ -276,7 +276,7 @@ class _RailCircle extends StatelessWidget {
             ? const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [AppColors.purple, AppColors.accent],
+                colors: [AppColors.secondary, AppColors.secondary],
               )
             : null,
         color: done ? null : AppColors.surfaceSubtle,
@@ -286,7 +286,7 @@ class _RailCircle extends StatelessWidget {
             ? const Icon(Icons.check, color: Colors.white, size: 16)
             : Text(
                 '$number',
-                style: GoogleFonts.mavenPro(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textMuted,
@@ -314,9 +314,9 @@ class _CompletePill extends StatelessWidget {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: done ? AppColors.accent : Colors.transparent,
+          color: done ? AppColors.secondary : Colors.transparent,
           border: Border.all(
-            color: AppColors.accent,
+            color: AppColors.secondary,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(100),
@@ -330,10 +330,10 @@ class _CompletePill extends StatelessWidget {
             ],
             Text(
               done ? 'Completed' : 'Mark complete',
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: done ? Colors.white : AppColors.accent,
+                color: done ? Colors.white : AppColors.secondary,
               ),
             ),
           ],
@@ -365,7 +365,7 @@ class _CelebrationCard extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppColors.purple.withValues(alpha: 0.3),
+          color: AppColors.primary.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -375,10 +375,10 @@ class _CelebrationCard extends StatelessWidget {
         children: [
           Text(
             'Welcome to new life in Christ.',
-            style: GoogleFonts.mavenPro(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: AppColors.onSurface,
             ),
           ),
 
@@ -386,9 +386,9 @@ class _CelebrationCard extends StatelessWidget {
 
           Text(
             'Speak to any team member on Sunday. We want to celebrate with you.',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
-              color: AppColors.textBody,
+              color: AppColors.onSurfaceVariant,
               height: 1.6,
             ),
           ),
@@ -403,7 +403,7 @@ class _CelebrationCard extends StatelessWidget {
                 gradient: const LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [AppColors.purple, AppColors.accent],
+                  colors: [AppColors.secondary, AppColors.secondary],
                 ),
                 borderRadius: BorderRadius.circular(100),
               ),
@@ -412,7 +412,7 @@ class _CelebrationCard extends StatelessWidget {
                 children: [
                   Text(
                     'New Here? Connect',
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,

@@ -24,17 +24,17 @@ class NotesScreen extends ConsumerWidget {
         scrolledUnderElevation: 0,
         title: Text(
           'Notes',
-          style: GoogleFonts.mavenPro(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 28,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: AppColors.onSurface,
           ),
         ),
       ),
       body: notes.isEmpty ? _buildEmpty() : _buildList(context, ref, notes),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.accent,
-        foregroundColor: AppColors.textPrimary,
+        backgroundColor: AppColors.secondary,
+        foregroundColor: AppColors.onSecondary,
         onPressed: () => _openEditor(context, ref),
         child: const Icon(Icons.edit_outlined),
       ),
@@ -54,7 +54,7 @@ class NotesScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           Text(
             'Take notes during any sermon',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               color: AppColors.textMuted,
             ),
@@ -147,9 +147,9 @@ class _NoteCard extends StatelessWidget {
               // Body text preview
               Text(
                 note.text,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 15,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                   height: 1.4,
                 ),
                 maxLines: 2,
@@ -169,7 +169,7 @@ class _NoteCard extends StatelessWidget {
                   const Spacer(),
                   Text(
                     _relativeDate(note.updatedAt),
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       color: AppColors.textMuted,
                     ),
@@ -216,14 +216,14 @@ class _SermonChip extends StatelessWidget {
         vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.15),
+        color: AppColors.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         label,
-        style: GoogleFonts.dmSans(
+        style: GoogleFonts.plusJakartaSans(
           fontSize: 11,
-          color: AppColors.accent,
+          color: AppColors.primary,
           fontWeight: FontWeight.w500,
         ),
         maxLines: 1,

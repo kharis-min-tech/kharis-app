@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_shadows.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 
@@ -33,7 +35,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final currentSermon = ref.watch(currentSermonProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF111014),
+      backgroundColor: AppColors.surfaceDark,
       body: widget.navigationShell,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -41,55 +43,49 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           // Mini player sits above the bottom nav when a sermon is loaded.
           if (currentSermon != null) const MiniPlayer(),
 
-          // Nav bar with dark gradient background matching Figma Group 30
+          // Glassmorphic nav bar — primary active, textMuted inactive.
           Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Color(0xFF111014)],
-              ),
-            ),
+            decoration: AppShadows.glassMorphicDecoration,
             child: BottomNavigationBar(
               currentIndex: widget.navigationShell.currentIndex,
               onTap: _onTap,
-              backgroundColor: Colors.transparent,
-              selectedItemColor: Colors.white,
-              unselectedItemColor: const Color(0xFF8A8A8A),
+              backgroundColor: AppColors.surfaceElevated,
+              selectedItemColor: AppColors.secondary,
+              unselectedItemColor: AppColors.textMuted,
               type: BottomNavigationBarType.fixed,
               elevation: 0,
-              selectedLabelStyle: GoogleFonts.dmSans(
+              selectedLabelStyle: GoogleFonts.plusJakartaSans(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
-              unselectedLabelStyle: GoogleFonts.dmSans(
+              unselectedLabelStyle: GoogleFonts.plusJakartaSans(
                 fontSize: 10,
                 fontWeight: FontWeight.w400,
               ),
-              items: [
+              items: const [
                 BottomNavigationBarItem(
-                  icon: const Icon(Icons.home_outlined),
-                  activeIcon: const Icon(Icons.home),
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home),
                   label: 'Home',
                 ),
                 BottomNavigationBarItem(
-                  icon: const Icon(Icons.play_circle_outline),
-                  activeIcon: const Icon(Icons.play_circle),
+                  icon: Icon(Icons.play_circle_outline),
+                  activeIcon: Icon(Icons.play_circle),
                   label: 'Messages',
                 ),
                 BottomNavigationBarItem(
-                  icon: const Icon(Icons.volunteer_activism_outlined),
-                  activeIcon: const Icon(Icons.volunteer_activism),
+                  icon: Icon(Icons.volunteer_activism_outlined),
+                  activeIcon: Icon(Icons.volunteer_activism),
                   label: 'Giving',
                 ),
                 BottomNavigationBarItem(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  activeIcon: const Icon(Icons.calendar_today),
+                  icon: Icon(Icons.calendar_today_outlined),
+                  activeIcon: Icon(Icons.calendar_today),
                   label: 'Calendar',
                 ),
                 BottomNavigationBarItem(
-                  icon: const Icon(Icons.more_horiz),
-                  activeIcon: const Icon(Icons.more_horiz),
+                  icon: Icon(Icons.more_horiz),
+                  activeIcon: Icon(Icons.more_horiz),
                   label: 'More',
                 ),
               ],

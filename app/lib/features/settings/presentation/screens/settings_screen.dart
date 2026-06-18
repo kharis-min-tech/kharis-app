@@ -64,13 +64,13 @@ class SettingsScreen extends ConsumerWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [AppColors.purple, AppColors.accent],
+                        colors: [AppColors.primary, AppColors.primary],
                       ),
                     ),
                     child: Center(
                       child: Text(
                         initials,
-                        style: GoogleFonts.mavenPro(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -84,16 +84,16 @@ class SettingsScreen extends ConsumerWidget {
                     children: [
                       Text(
                         displayName,
-                        style: GoogleFonts.mavenPro(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: AppColors.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         email,
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 13,
                           color: AppColors.textMuted,
                         ),
@@ -185,28 +185,28 @@ class SettingsScreen extends ConsumerWidget {
                       backgroundColor: AppColors.surfaceElevated,
                       title: Text(
                         'Sign Out',
-                        style: GoogleFonts.mavenPro(
-                          color: AppColors.textPrimary,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: AppColors.onSurface,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       content: Text(
                         'Are you sure you want to sign out?',
-                        style: GoogleFonts.dmSans(color: AppColors.textBody),
+                        style: GoogleFonts.plusJakartaSans(color: AppColors.onSurfaceVariant),
                       ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.of(ctx).pop(false),
                           child: Text(
                             'Cancel',
-                            style: GoogleFonts.dmSans(color: AppColors.textMuted),
+                            style: GoogleFonts.plusJakartaSans(color: AppColors.textMuted),
                           ),
                         ),
                         TextButton(
                           onPressed: () => Navigator.of(ctx).pop(true),
                           child: Text(
                             'Sign Out',
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.plusJakartaSans(
                               color: AppColors.error,
                               fontWeight: FontWeight.w600,
                             ),
@@ -223,7 +223,7 @@ class SettingsScreen extends ConsumerWidget {
                 child: Center(
                   child: Text(
                     'SIGN OUT',
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.error,
@@ -239,7 +239,7 @@ class SettingsScreen extends ConsumerWidget {
               Center(
                 child: Text(
                   'Kharis Church v2.0.0',
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     color: AppColors.textMuted,
                   ),
@@ -278,9 +278,9 @@ class _MenuCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                 ),
               ),

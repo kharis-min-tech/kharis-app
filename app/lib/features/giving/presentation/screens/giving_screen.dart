@@ -3,9 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'giving_webview_screen.dart';
 
-/// Gold/amber badge colour — matches the giving pill in the Figma frame.
-const Color _kGold = Color(0xFFD4A017);
-
 /// Giving URL used by both GIVE NOW and any future deep-link.
 const String _kGivingUrl = 'https://kharis.org/give';
 
@@ -26,12 +23,12 @@ class GivingScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _kGold,
+                  color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
                   'GIVING',
-                  style: GoogleFonts.mavenPro(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -45,10 +42,10 @@ class GivingScreen extends StatelessWidget {
               Text(
                 'Support the Vision',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.mavenPro(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -59,9 +56,9 @@ class GivingScreen extends StatelessWidget {
                 child: Text(
                   'Your generosity fuels our mission to create a sanctuary for seekers and believers worldwide.',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
-                    color: AppColors.textBody,
+                    color: AppColors.onSurfaceVariant,
                     height: 1.55,
                   ),
                 ),
@@ -88,8 +85,8 @@ class GivingScreen extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () => openGivingFlow(context, _kGivingUrl),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: AppColors.onSecondary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -98,7 +95,7 @@ class GivingScreen extends StatelessWidget {
                     ),
                     child: Text(
                       'GIVE NOW',
-                      style: GoogleFonts.mavenPro(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
@@ -121,7 +118,7 @@ class GivingScreen extends StatelessWidget {
                   children: [
                     Text(
                       'Branch',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
                         color: AppColors.textMuted,
                       ),
@@ -130,10 +127,10 @@ class GivingScreen extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'London',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: AppColors.onSurface,
                         ),
                       ),
                     ),
@@ -152,17 +149,17 @@ class GivingScreen extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Other Ways to Give',
-                  style: GoogleFonts.mavenPro(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                 ),
               ),
               const SizedBox(height: 14),
 
               _GivingOptionRow(
-                iconColor: AppColors.purple,
+                iconColor: AppColors.primary,
                 icon: Icons.account_balance_rounded,
                 title: 'Bank Transfer',
                 subtitle: 'Direct bank payment',
@@ -170,7 +167,7 @@ class GivingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               _GivingOptionRow(
-                iconColor: AppColors.accent,
+                iconColor: AppColors.primary,
                 icon: Icons.church_rounded,
                 title: 'Build God a House',
                 subtitle: 'Building fund contribution',
@@ -231,16 +228,16 @@ class _GivingOptionRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       color: AppColors.textMuted,
                     ),

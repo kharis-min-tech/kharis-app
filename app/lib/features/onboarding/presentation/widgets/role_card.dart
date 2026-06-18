@@ -56,15 +56,15 @@ class RoleCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: AppTypography.h3.copyWith(
-                        color: AppColors.textPrimary,
+                      style: AppTypography.titleMd.copyWith(
+                        color: AppColors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       description,
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textBody,
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
                       ),
                     ),
                   ],

@@ -42,10 +42,10 @@ class EventCard extends StatelessWidget {
                   vertical: AppSpacing.sm,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.purple.withValues(alpha: 0.12),
+                  color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppSpacing.sm),
                   border: Border.all(
-                    color: AppColors.purple.withValues(alpha: 0.2),
+                    color: AppColors.primary.withValues(alpha: 0.2),
                     width: 1,
                   ),
                 ),
@@ -54,10 +54,10 @@ class EventCard extends StatelessWidget {
                   children: [
                     Text(
                       day,
-                      style: GoogleFonts.mavenPro(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.purple,
+                        color: AppColors.primary,
                         height: 1.0,
                       ),
                       textAlign: TextAlign.center,
@@ -65,10 +65,10 @@ class EventCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       month.toUpperCase(),
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.purple,
+                        color: AppColors.primary,
                         letterSpacing: 0.5,
                       ),
                       textAlign: TextAlign.center,
@@ -84,10 +84,10 @@ class EventCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.mavenPro(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.onSurface,
                         height: 1.25,
                       ),
                       maxLines: 2,
@@ -105,7 +105,7 @@ class EventCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             location,
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
                               color: AppColors.textMuted,
                             ),
@@ -126,7 +126,7 @@ class EventCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Text(
                           time,
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             color: AppColors.textMuted,
                           ),

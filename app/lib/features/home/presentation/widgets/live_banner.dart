@@ -99,7 +99,7 @@ class _LiveBannerState extends ConsumerState<LiveBanner>
                 children: [
                   Text(
                     'LIVE NOW',
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: Colors.redAccent,
@@ -110,10 +110,10 @@ class _LiveBannerState extends ConsumerState<LiveBanner>
                     const SizedBox(height: 2),
                     Text(
                       status.title!,
-                      style: GoogleFonts.mavenPro(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -124,7 +124,7 @@ class _LiveBannerState extends ConsumerState<LiveBanner>
             ),
             Icon(
               Icons.play_circle_fill_rounded,
-              color: AppColors.accent,
+              color: AppColors.secondary,
               size: 36,
             ),
           ],

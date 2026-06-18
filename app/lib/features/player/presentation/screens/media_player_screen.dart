@@ -203,7 +203,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         children: [
           Text(
             widget.sermon.title,
-            style: GoogleFonts.mavenPro(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -215,7 +215,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           const SizedBox(height: AppSpacing.xs),
           Text(
             widget.sermon.speaker,
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               color: AppColors.textMuted,
             ),
@@ -239,10 +239,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
               trackHeight: 4,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              activeTrackColor: AppColors.accent,
+              activeTrackColor: AppColors.secondary,
               inactiveTrackColor: Colors.white24,
               thumbColor: Colors.white,
-              overlayColor: AppColors.accent.withValues(alpha: 0.2),
+              overlayColor: AppColors.secondary.withValues(alpha: 0.2),
             ),
             child: Slider(
               value: progress.clamp(0.0, 1.0),
@@ -261,14 +261,14 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
               children: [
                 Text(
                   _formatDuration(position),
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: AppColors.textMuted,
                   ),
                 ),
                 Text(
                   _formatDuration(duration),
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: AppColors.textMuted,
                   ),
@@ -347,7 +347,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         ),
         child: Text(
           '${_playbackSpeed}x',
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Colors.white,

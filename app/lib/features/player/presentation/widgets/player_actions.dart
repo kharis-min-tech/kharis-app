@@ -71,7 +71,7 @@ class _ActionButton extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Text(
             label,
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               color: Colors.white70,
             ),

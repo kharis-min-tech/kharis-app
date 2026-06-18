@@ -104,8 +104,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             const SizedBox(height: 12),
             Text(
               'No upcoming events for this branch',
-              style: GoogleFonts.dmSans(
-                color: AppColors.textBody,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppColors.onSurfaceVariant,
                 fontSize: 14,
               ),
             ),
@@ -120,10 +120,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
       child: Text(
         'Calendar',
-        style: GoogleFonts.mavenPro(
+        style: GoogleFonts.plusJakartaSans(
           fontSize: 28,
           fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+          color: AppColors.onSurface,
         ),
       ),
     );
@@ -153,16 +153,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 color: isActive ? Colors.transparent : AppColors.surfaceSubtle,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isActive ? AppColors.accent : Colors.transparent,
+                  color: isActive ? AppColors.secondary : Colors.transparent,
                   width: 1.5,
                 ),
               ),
               child: Text(
                 branch,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  color: isActive ? AppColors.accent : AppColors.textMuted,
+                  color: isActive ? AppColors.secondary : AppColors.textMuted,
                 ),
               ),
             ),
@@ -184,7 +184,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         children: [
           Text(
             'Service Times',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.textMuted,
@@ -192,25 +192,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             ),
           ),
           const Spacer(),
-          _buildServiceDot(AppColors.accent),
+          _buildServiceDot(AppColors.primary),
           const SizedBox(width: 6),
           Text(
             'Sun 10:30am',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+              color: AppColors.onSurface,
             ),
           ),
           const SizedBox(width: 16),
-          _buildServiceDot(AppColors.purple),
+          _buildServiceDot(AppColors.primary),
           const SizedBox(width: 6),
           Text(
             'Wed 7:00pm',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+              color: AppColors.onSurface,
             ),
           ),
         ],
@@ -234,10 +234,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
       child: Text(
         title,
-        style: GoogleFonts.mavenPro(
+        style: GoogleFonts.plusJakartaSans(
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+          color: AppColors.onSurface,
         ),
       ),
     );
@@ -258,7 +258,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         borderRadius: BorderRadius.circular(12),
         border: event.isFeatured
             ? const Border(
-                left: BorderSide(color: AppColors.accent, width: 3),
+                left: BorderSide(color: AppColors.primary, width: 3),
               )
             : null,
       ),
@@ -275,10 +275,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 children: [
                   Text(
                     event.title,
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -293,7 +293,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       Expanded(
                         child: Text(
                           event.location ?? 'Kharis Church',
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             color: AppColors.textMuted,
                           ),
@@ -313,7 +313,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       const SizedBox(width: 3),
                       Text(
                         time,
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           color: AppColors.textMuted,
                         ),
@@ -339,7 +339,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               child: const Icon(
                 Icons.calendar_today_outlined,
                 size: 20,
-                color: AppColors.accent,
+                color: AppColors.primary,
               ),
             ),
           ],
@@ -361,17 +361,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         children: [
           Text(
             day,
-            style: GoogleFonts.mavenPro(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: AppColors.purple,
+              color: AppColors.primary,
               height: 1.0,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             month,
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               fontWeight: FontWeight.w500,
               color: AppColors.textMuted,

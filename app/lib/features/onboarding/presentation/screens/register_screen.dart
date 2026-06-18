@@ -82,19 +82,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Text(
                   'Create Account',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.mavenPro(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Join the Kharis family',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
-                    color: AppColors.textBody,
+                    color: AppColors.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -189,7 +189,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Text(
                     _errorMessage!,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       color: AppColors.error,
                     ),
@@ -203,10 +203,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
+                      backgroundColor: AppColors.secondary,
                       disabledBackgroundColor:
-                          AppColors.accent.withValues(alpha: 0.5),
-                      foregroundColor: Colors.white,
+                          AppColors.secondary.withValues(alpha: 0.4),
+                      foregroundColor: AppColors.onSecondary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -225,7 +225,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           )
                         : Text(
                             'CREATE ACCOUNT',
-                            style: GoogleFonts.mavenPro(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
@@ -241,18 +241,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   children: [
                     Text(
                       'Already have an account? ',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
-                        color: AppColors.textBody,
+                        color: AppColors.onSurfaceVariant,
                       ),
                     ),
                     GestureDetector(
                       onTap: () => context.pop(),
                       child: Text(
                         'Sign In',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
-                          color: AppColors.accent,
+                          color: AppColors.secondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -270,9 +270,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  TextStyle get _textStyle => GoogleFonts.dmSans(
+  TextStyle get _textStyle => GoogleFonts.plusJakartaSans(
         fontSize: 15,
-        color: AppColors.textPrimary,
+        color: AppColors.onSurface,
       );
 
   InputDecoration _fieldDecoration({required String hint}) {
@@ -280,11 +280,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       filled: true,
       fillColor: AppColors.surfaceSubtle,
       hintText: hint,
-      hintStyle: GoogleFonts.dmSans(
+      hintStyle: GoogleFonts.plusJakartaSans(
         fontSize: 15,
-        color: AppColors.textBody,
+        color: AppColors.onSurfaceVariant,
       ),
-      errorStyle: GoogleFonts.dmSans(
+      errorStyle: GoogleFonts.plusJakartaSans(
         fontSize: 12,
         color: AppColors.error,
       ),
@@ -298,7 +298,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.accent, width: 1),
+        borderSide: const BorderSide(color: AppColors.secondary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -317,7 +317,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return IconButton(
       icon: Icon(
         obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-        color: AppColors.textBody,
+        color: AppColors.onSurfaceVariant,
         size: 20,
       ),
       onPressed: onTap,

@@ -50,12 +50,12 @@ class ReadingScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: AppColors.textPrimary),
+          icon: const Icon(Icons.close_rounded, color: AppColors.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           "Today's Reading",
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.1,
@@ -66,7 +66,7 @@ class ReadingScreen extends ConsumerWidget {
       ),
       body: contentAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.accent),
+          child: CircularProgressIndicator(color: AppColors.secondary),
         ),
         error: (_, _) => _ErrorView(
           message: 'Could not load today\'s reading',
@@ -117,16 +117,16 @@ class _PassageView extends ConsumerWidget {
 
               return biblesAsync.when(
                 loading: () => const Padding(
-                  padding: EdgeInsets.all(AppSpacing.xxl),
+                  padding: EdgeInsets.all(AppSpacing.lg),
                   child: Center(
-                    child: CircularProgressIndicator(color: AppColors.accent),
+                    child: CircularProgressIndicator(color: AppColors.secondary),
                   ),
                 ),
                 error: (_, _) => Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xxl),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Text(
                     'Could not load versions',
-                    style: GoogleFonts.dmSans(color: AppColors.textBody),
+                    style: GoogleFonts.plusJakartaSans(color: AppColors.onSurfaceVariant),
                   ),
                 ),
                 data: (bibles) => ListView(
@@ -139,7 +139,7 @@ class _PassageView extends ConsumerWidget {
                           horizontal: AppSpacing.lg),
                       child: Text(
                         'BIBLE VERSION',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.1,
@@ -153,28 +153,28 @@ class _PassageView extends ConsumerWidget {
                         dense: true,
                         title: Text(
                           b.abbreviation,
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 14,
                             fontWeight: b.id == selected.id
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                             color: b.id == selected.id
-                                ? AppColors.accent
-                                : AppColors.textPrimary,
+                                ? AppColors.secondary
+                                : AppColors.onSurface,
                           ),
                         ),
                         subtitle: Text(
                           b.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             color: AppColors.textMuted,
                           ),
                         ),
                         trailing: b.id == selected.id
                             ? const Icon(Icons.check_rounded,
-                                color: AppColors.accent, size: 20)
+                                color: AppColors.secondary, size: 20)
                             : null,
                         onTap: () {
                           sheetRef
@@ -202,7 +202,7 @@ class _PassageView extends ConsumerWidget {
 
     return passageAsync.when(
       loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.accent),
+        child: CircularProgressIndicator(color: AppColors.secondary),
       ),
       error: (_, _) => _ErrorView(
         message: 'Could not load the passage in ${version.abbreviation}',
@@ -212,7 +212,7 @@ class _PassageView extends ConsumerWidget {
       ),
       data: (passage) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.xxxl,
+          AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.xl,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,10 +224,10 @@ class _PassageView extends ConsumerWidget {
                     passage.reference.isNotEmpty
                         ? passage.reference
                         : fallbackReference,
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: AppColors.onSurface,
                     ),
                   ),
                 ),
@@ -241,7 +241,7 @@ class _PassageView extends ConsumerWidget {
                         horizontal: AppSpacing.md, vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.accent, width: 1),
+                        border: Border.all(color: AppColors.secondary, width: 1),
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Row(
@@ -249,15 +249,15 @@ class _PassageView extends ConsumerWidget {
                         children: [
                           Text(
                             passage.bibleAbbreviation,
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.accent,
+                              color: AppColors.secondary,
                             ),
                           ),
                           const SizedBox(width: 3),
                           const Icon(Icons.keyboard_arrow_down_rounded,
-                              color: AppColors.accent, size: 16),
+                              color: AppColors.secondary, size: 16),
                         ],
                       ),
                     ),
@@ -269,10 +269,10 @@ class _PassageView extends ConsumerWidget {
             _PassageBody(blocks: passage.blocks),
             if (passage.copyright != null &&
                 passage.copyright!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.lg),
               Text(
                 passage.copyright!,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
                   color: AppColors.textMuted,
                   height: 1.5,
@@ -295,16 +295,16 @@ class _PassageBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bodyStyle = GoogleFonts.dmSans(
+    final bodyStyle = GoogleFonts.plusJakartaSans(
       fontSize: 17,
       height: 1.8,
-      color: AppColors.textPrimary.withValues(alpha: 0.92),
+      color: AppColors.onSurface.withValues(alpha: 0.92),
     );
-    final verseStyle = GoogleFonts.dmSans(
+    final verseStyle = GoogleFonts.plusJakartaSans(
       fontSize: 11,
       height: 1.8,
       fontWeight: FontWeight.w700,
-      color: AppColors.accent,
+      color: AppColors.primary,
     );
 
     final children = <Widget>[];
@@ -316,10 +316,10 @@ class _PassageBody extends StatelessWidget {
           ),
           child: Text(
             block.segments.map((s) => s.text).join(' '),
-            style: GoogleFonts.mavenPro(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: AppColors.onSurface,
             ),
           ),
         ));
@@ -330,10 +330,10 @@ class _PassageBody extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Text(
             block.segments.map((s) => s.text).join(' '),
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               fontStyle: FontStyle.italic,
-              color: AppColors.textBody,
+              color: AppColors.onSurfaceVariant,
             ),
           ),
         ));
@@ -382,16 +382,16 @@ class _ErrorView extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Text(
             message,
-            style: GoogleFonts.dmSans(
-              color: AppColors.textBody, fontSize: 14,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppColors.onSurfaceVariant, fontSize: 14,
             ),
           ),
           TextButton(
             onPressed: onRetry,
             child: Text(
               'Retry',
-              style: GoogleFonts.dmSans(
-                color: AppColors.accent, fontWeight: FontWeight.w600,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppColors.secondary, fontWeight: FontWeight.w600,
               ),
             ),
           ),

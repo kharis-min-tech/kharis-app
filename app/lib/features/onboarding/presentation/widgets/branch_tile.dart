@@ -27,7 +27,7 @@ class BranchTile extends StatelessWidget {
           color: AppColors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.accent : Colors.transparent,
+            color: isSelected ? AppColors.primary : Colors.transparent,
             width: 1,
           ),
         ),
@@ -35,7 +35,7 @@ class BranchTile extends StatelessWidget {
           children: [
             const Icon(
               Icons.location_on,
-              color: AppColors.accent,
+              color: AppColors.primary,
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -46,18 +46,18 @@ class BranchTile extends StatelessWidget {
                 children: [
                   Text(
                     name,
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     location,
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
-                      color: AppColors.textBody,
+                      color: AppColors.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -66,7 +66,7 @@ class BranchTile extends StatelessWidget {
             if (isSelected)
               const Icon(
                 Icons.check_circle_rounded,
-                color: AppColors.accent,
+                color: AppColors.primary,
                 size: 20,
               ),
           ],

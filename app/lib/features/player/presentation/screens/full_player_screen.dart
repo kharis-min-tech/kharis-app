@@ -44,7 +44,7 @@ class FullPlayerScreen extends ConsumerWidget {
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [AppColors.purple, Color(0xFF9B5DE5)],
+                          colors: [AppColors.primary, Color(0xFF9B5DE5)],
                         ),
                       ),
                       child: sermon?.artworkUrl != null
@@ -74,7 +74,7 @@ class FullPlayerScreen extends ConsumerWidget {
                         children: [
                           Text(
                             sermon?.title ?? 'No sermon loaded',
-                            style: GoogleFonts.mavenPro(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                               color: const Color(0xFF1A1A1A),
@@ -86,7 +86,7 @@ class FullPlayerScreen extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             sermon?.speaker ?? '',
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 13,
                               color: const Color(0xFF6B6B6B),
                             ),

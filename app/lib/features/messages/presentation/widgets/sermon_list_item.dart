@@ -121,10 +121,10 @@ class _SermonListItemState extends State<SermonListItem>
                     widget.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: AppColors.onSurface,
                       height: 1.3,
                     ),
                   ),
@@ -133,9 +133,9 @@ class _SermonListItemState extends State<SermonListItem>
                     '${widget.speaker} · $dateStr',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
-                      color: AppColors.textBody,
+                      color: AppColors.onSurfaceVariant,
                       height: 1.3,
                     ),
                   ),
@@ -146,7 +146,7 @@ class _SermonListItemState extends State<SermonListItem>
             // ── Duration ──────────────────────────────────────────────────
             Text(
               widget.duration,
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 color: AppColors.textMuted,
               ),
@@ -213,7 +213,7 @@ class _EqualizerBars extends StatelessWidget {
                   width: 4,
                   height: 20 * animations[i].value,
                   decoration: BoxDecoration(
-                    color: AppColors.accent,
+                    color: AppColors.secondary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 );

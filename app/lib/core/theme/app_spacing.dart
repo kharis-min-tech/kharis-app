@@ -1,24 +1,23 @@
-/// Spacing scale in logical pixels.
-/// Consumed as padding, gap, and margin values throughout the app.
+/// Spacing scale — Kharis Church design system v2 (8px base, logical pixels).
 abstract final class AppSpacing {
   /// 4 px — tight nudges, icon-to-label gaps.
   static const double xs = 4;
 
-  /// 8 px — intra-component spacing.
-  static const double sm = 8;
+  /// 12 px — intra-component spacing.
+  static const double sm = 12;
 
-  /// 12 px — compact padding inside cards and chips.
-  static const double md = 12;
+  /// 24 px — default padding inside cards, inputs.
+  static const double md = 24;
 
-  /// 16 px — default section padding, list item vertical spacing.
-  static const double lg = 16;
+  /// 40 px — section padding, list item vertical spacing.
+  static const double lg = 40;
 
-  /// 20 px — comfortable content padding.
-  static const double xl = 20;
+  /// 64 px — large section separators.
+  static const double xl = 64;
 
-  /// 24 px — section-level breathing room.
-  static const double xxl = 24;
+  /// 16 px — horizontal screen gutter.
+  static const double gutter = 16;
 
-  /// 32 px — large section separators and screen margins.
-  static const double xxxl = 32;
+  /// 20 px — mobile screen side margins.
+  static const double marginMobile = 20;
 }

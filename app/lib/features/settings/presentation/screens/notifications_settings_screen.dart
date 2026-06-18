@@ -30,7 +30,7 @@ class NotificationsSettingsScreen extends ConsumerWidget {
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(
                   Icons.arrow_back_ios_new,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                   size: 20,
                 ),
               ),
@@ -40,10 +40,10 @@ class NotificationsSettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
               child: Text(
                 'Notifications',
-                style: GoogleFonts.mavenPro(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                 ),
               ),
             ),
@@ -117,16 +117,16 @@ class _ToggleRow extends ConsumerWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: AppColors.textMuted,
                   ),
@@ -138,7 +138,7 @@ class _ToggleRow extends ConsumerWidget {
             value: enabled,
             onChanged: (v) => ref.read(provider.notifier).state = v,
             activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.accent,
+            activeTrackColor: AppColors.secondary,
             inactiveThumbColor: AppColors.textMuted,
             inactiveTrackColor: AppColors.surfaceSubtle,
           ),

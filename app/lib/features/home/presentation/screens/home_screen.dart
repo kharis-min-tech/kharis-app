@@ -16,7 +16,7 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.accent,
+          color: AppColors.secondary,
           onRefresh: () async {
             ref.invalidate(sermonsProvider);
             ref.invalidate(dailyContentProvider);
@@ -54,13 +54,13 @@ class HomeScreen extends ConsumerWidget {
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                   child: LatestMessageCard(),
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.lg),
                 // News & Updates
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                   child: NewsSection(),
                 ),
-                const SizedBox(height: AppSpacing.xxxl),
+                const SizedBox(height: AppSpacing.xl),
               ],
             ),
           ),

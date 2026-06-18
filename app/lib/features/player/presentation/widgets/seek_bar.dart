@@ -45,7 +45,7 @@ class _SeekBarState extends State<SeekBar> {
   @override
   Widget build(BuildContext context) {
     final remaining = widget.duration - widget.position;
-    final textStyle = GoogleFonts.dmSans(
+    final textStyle = GoogleFonts.plusJakartaSans(
       fontSize: 11,
       color: const Color(0xFF6B6B6B),
     );
@@ -93,7 +93,7 @@ class _SeekBarState extends State<SeekBar> {
                     height: 4,
                     width: _fraction * trackWidth,
                     decoration: BoxDecoration(
-                      color: AppColors.purple,
+                      color: AppColors.secondary,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -105,7 +105,7 @@ class _SeekBarState extends State<SeekBar> {
                       height: 12,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.purple,
+                      color: AppColors.secondary,
                     ),
                     ),
                   ),

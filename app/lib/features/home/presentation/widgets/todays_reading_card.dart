@@ -46,8 +46,8 @@ class TodaysReadingCard extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: AppColors.pill,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Row(
         children: [
@@ -57,7 +57,7 @@ class TodaysReadingCard extends ConsumerWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
                     color: Colors.white70,
@@ -66,7 +66,7 @@ class TodaysReadingCard extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   reference,
-                  style: GoogleFonts.mavenPro(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -79,7 +79,7 @@ class TodaysReadingCard extends ConsumerWidget {
             width: 44,
             height: 44,
             decoration: const BoxDecoration(
-              color: Color(0xFFD4A017), // gold
+              color: AppColors.secondary,
               shape: BoxShape.circle,
             ),
             child: const Icon(

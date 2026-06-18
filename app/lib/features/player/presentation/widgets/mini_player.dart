@@ -43,7 +43,7 @@ class MiniPlayer extends ConsumerWidget {
       child: Container(
         height: 58, // 56px + 2px progress line
         decoration: const BoxDecoration(
-          color: AppColors.surfaceElevated,
+          color: AppColors.surfaceContainerLow,
           border: Border(
             top: BorderSide(color: Colors.white10, width: 0.5),
           ),
@@ -56,7 +56,7 @@ class MiniPlayer extends ConsumerWidget {
               child: LinearProgressIndicator(
                 value: progress.clamp(0.0, 1.0),
                 backgroundColor: Colors.transparent,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.secondary),
               ),
             ),
             // Mini player content
@@ -94,7 +94,7 @@ class MiniPlayer extends ConsumerWidget {
                         children: [
                           Text(
                             sermon.title,
-                            style: GoogleFonts.mavenPro(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: Colors.white,
@@ -104,7 +104,7 @@ class MiniPlayer extends ConsumerWidget {
                           ),
                           Text(
                             sermon.speaker,
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
                               color: AppColors.textMuted,
                             ),

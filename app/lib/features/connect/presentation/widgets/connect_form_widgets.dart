@@ -45,20 +45,20 @@ class ConnectFormField extends StatelessWidget {
       validator: validator,
       maxLines: maxLines,
       maxLength: maxLength,
-      style: GoogleFonts.dmSans(
+      style: GoogleFonts.plusJakartaSans(
         fontSize: 15,
         color: Colors.white,
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.dmSans(
+        labelStyle: GoogleFonts.plusJakartaSans(
           fontSize: 14,
           color: AppColors.textMuted,
         ),
         filled: true,
         fillColor: AppColors.surfaceSubtle,
         suffixIcon: suffixIcon,
-        counterStyle: GoogleFonts.dmSans(
+        counterStyle: GoogleFonts.plusJakartaSans(
           fontSize: 12,
           color: AppColors.textMuted,
         ),
@@ -72,7 +72,7 @@ class ConnectFormField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.secondary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -82,7 +82,7 @@ class ConnectFormField extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
-        errorStyle: GoogleFonts.dmSans(
+        errorStyle: GoogleFonts.plusJakartaSans(
           fontSize: 12,
           color: AppColors.error,
         ),
@@ -115,7 +115,7 @@ class ConnectBranchDropdown extends StatelessWidget {
           value: value,
           hint: Text(
             'Branch',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               color: AppColors.textMuted,
             ),
@@ -123,7 +123,7 @@ class ConnectBranchDropdown extends StatelessWidget {
           dropdownColor: AppColors.surfaceElevated,
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted),
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 15,
             color: Colors.white,
           ),

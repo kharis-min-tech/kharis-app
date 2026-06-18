@@ -64,18 +64,18 @@ class _BranchSelectionScreenState
               // ── Title ────────────────────────────────────────────────────
               Text(
                 'Select your branch',
-                style: GoogleFonts.mavenPro(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'You can change this later in settings',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
-                  color: AppColors.textBody,
+                  color: AppColors.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 28),
@@ -88,20 +88,20 @@ class _BranchSelectionScreenState
                 ),
                 child: TextField(
                   controller: _searchController,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                   onChanged: (v) => setState(() => _query = v),
                   decoration: InputDecoration(
                     hintText: 'Search branches...',
-                    hintStyle: GoogleFonts.dmSans(
+                    hintStyle: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
-                      color: AppColors.textBody,
+                      color: AppColors.onSurfaceVariant,
                     ),
                     prefixIcon: const Icon(
                       Icons.search_rounded,
-                      color: AppColors.textBody,
+                      color: AppColors.onSurfaceVariant,
                       size: 20,
                     ),
                     border: InputBorder.none,
@@ -120,9 +120,9 @@ class _BranchSelectionScreenState
                     ? Center(
                         child: Text(
                           'No branches found',
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 15,
-                            color: AppColors.textBody,
+                            color: AppColors.onSurfaceVariant,
                           ),
                         ),
                       )
@@ -152,10 +152,10 @@ class _BranchSelectionScreenState
                   onPressed:
                       selected != null ? () => context.go('/home') : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.35),
-                    foregroundColor: Colors.white,
-                    disabledForegroundColor: Colors.white,
+                    backgroundColor: AppColors.secondary,
+                    disabledBackgroundColor: AppColors.secondary.withValues(alpha: 0.35),
+                    foregroundColor: AppColors.onSecondary,
+                    disabledForegroundColor: AppColors.onSecondary,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -165,7 +165,7 @@ class _BranchSelectionScreenState
                   ),
                   child: Text(
                     'CONTINUE',
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,

@@ -46,7 +46,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.dark(
-            primary: AppColors.accent,
+            primary: AppColors.primary,
             surface: AppColors.surfaceElevated,
           ),
         ),
@@ -77,7 +77,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
           SnackBar(
             content: Text(
               'Something went wrong. Please try again.',
-              style: GoogleFonts.dmSans(color: Colors.white),
+              style: GoogleFonts.plusJakartaSans(color: Colors.white),
             ),
             backgroundColor: AppColors.error,
           ),
@@ -96,7 +96,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios,
-            color: AppColors.textPrimary,
+            color: AppColors.onSurface,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -116,24 +116,24 @@ class _NewHereScreenState extends State<NewHereScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle, color: AppColors.accent, size: 56),
+            const Icon(Icons.check_circle, color: AppColors.primary, size: 56),
             const SizedBox(height: 24),
             Text(
               'Welcome to the family!',
               textAlign: TextAlign.center,
-              style: GoogleFonts.mavenPro(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 12),
             Text(
               'Your branch team will reach out soon.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 15,
-                color: AppColors.textBody,
+                color: AppColors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 36),
@@ -141,8 +141,8 @@ class _NewHereScreenState extends State<NewHereScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: AppColors.onSecondary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -152,7 +152,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(
                   'Done',
-                  style: GoogleFonts.mavenPro(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -177,18 +177,18 @@ class _NewHereScreenState extends State<NewHereScreen> {
           children: [
             Text(
               'New Here?',
-              style: GoogleFonts.mavenPro(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               'We would love to get to know you',
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 15,
-                color: AppColors.textBody,
+                color: AppColors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 28),
@@ -261,8 +261,8 @@ class _NewHereScreenState extends State<NewHereScreen> {
                 height: 52,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: AppColors.onSecondary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -272,7 +272,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
                   onPressed: _submit,
                   child: Text(
                     'CONNECT WITH US',
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),

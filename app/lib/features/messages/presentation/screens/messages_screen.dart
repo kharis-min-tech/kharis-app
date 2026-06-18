@@ -91,7 +91,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         allSermons.isNotEmpty ? allSermons.first.artworkUrl : null;
 
     return RefreshIndicator(
-      color: AppColors.accent,
+      color: AppColors.secondary,
       backgroundColor: AppColors.surfaceElevated,
       onRefresh: () async => ref.invalidate(sermonsProvider),
       child: CustomScrollView(
@@ -130,7 +130,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
-                        color: AppColors.accent,
+                        color: AppColors.secondary,
                         strokeWidth: 2.5,
                       ),
                     ),
@@ -138,7 +138,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 ),
               ),
             const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.xxxl),
+              child: SizedBox(height: AppSpacing.xl),
             ),
           ] else
             const SliverToBoxAdapter(child: _AboutTab()),
@@ -159,7 +159,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           OutlinedButton(
             onPressed: () {},
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.accent, width: 1.2),
+              side: const BorderSide(color: AppColors.secondary, width: 1.2),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.lg, vertical: 6,
               ),
@@ -169,10 +169,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             ),
             child: Text(
               'Following',
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppColors.accent,
+                color: AppColors.secondary,
               ),
             ),
           ),
@@ -196,7 +196,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             }),
             icon: Icon(
               _searchOpen ? Icons.close_rounded : Icons.search_rounded,
-              color: _searchOpen ? AppColors.accent : AppColors.textMuted,
+              color: _searchOpen ? AppColors.secondary : AppColors.textMuted,
               size: 22,
             ),
           ),
@@ -225,11 +225,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           _searchQuery = v;
           _resetWindow();
         }),
-        style: GoogleFonts.dmSans(color: AppColors.textPrimary, fontSize: 14),
+        style: GoogleFonts.plusJakartaSans(color: AppColors.onSurface, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Search episodes...',
           hintStyle:
-              GoogleFonts.dmSans(color: AppColors.textMuted, fontSize: 14),
+              GoogleFonts.plusJakartaSans(color: AppColors.textMuted, fontSize: 14),
           prefixIcon: const Icon(Icons.search_rounded,
               color: AppColors.textMuted, size: 20),
           filled: true,
@@ -285,22 +285,22 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         child: Row(
           children: [
             const Icon(Icons.tune_rounded,
-                color: AppColors.textPrimary, size: 18),
+                color: AppColors.onSurface, size: 18),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 '${sort.label} • $label',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onSurface,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             Text(
               '$matchCount episodes',
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 color: AppColors.textMuted,
               ),
@@ -354,19 +354,19 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                               selected: sort == s,
                               showCheckmark: false,
                               selectedColor:
-                                  AppColors.accent.withValues(alpha: 0.18),
+                                  AppColors.secondary.withValues(alpha: 0.18),
                               backgroundColor: AppColors.surfaceSubtle,
                               side: BorderSide(
                                 color: sort == s
-                                    ? AppColors.accent
+                                    ? AppColors.secondary
                                     : Colors.transparent,
                               ),
-                              labelStyle: GoogleFonts.dmSans(
+                              labelStyle: GoogleFonts.plusJakartaSans(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: sort == s
-                                    ? AppColors.accent
-                                    : AppColors.textBody,
+                                    ? AppColors.secondary
+                                    : AppColors.onSurfaceVariant,
                               ),
                               onSelected: (_) {
                                 sheetRef
@@ -385,10 +385,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         dense: true,
                         title: Text(
                           c == 'All' ? 'All Episodes' : c,
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.plusJakartaSans(
                             color: category == c
-                                ? AppColors.accent
-                                : AppColors.textPrimary,
+                                ? AppColors.secondary
+                                : AppColors.onSurface,
                             fontWeight: category == c
                                 ? FontWeight.w700
                                 : FontWeight.w400,
@@ -397,7 +397,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         ),
                         trailing: category == c
                             ? const Icon(Icons.check_rounded,
-                                color: AppColors.accent, size: 20)
+                                color: AppColors.secondary, size: 20)
                             : null,
                         onTap: () {
                           sheetRef
@@ -422,7 +422,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       child: Text(
         text.toUpperCase(),
-        style: GoogleFonts.dmSans(
+        style: GoogleFonts.plusJakartaSans(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.1,
@@ -512,10 +512,10 @@ class _ShowHeader extends StatelessWidget {
               children: [
                 Text(
                   'Messages by David Antwi',
-                  style: GoogleFonts.mavenPro(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                     height: 1.2,
                   ),
                   maxLines: 2,
@@ -524,7 +524,7 @@ class _ShowHeader extends StatelessWidget {
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Kharis Church',
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textMuted,
@@ -584,10 +584,10 @@ class _TabLabel extends StatelessWidget {
         children: [
           Text(
             label,
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? AppColors.textPrimary : AppColors.textMuted,
+              color: active ? AppColors.onSurface : AppColors.textMuted,
             ),
           ),
           const SizedBox(height: 6),
@@ -595,7 +595,7 @@ class _TabLabel extends StatelessWidget {
             height: 2.5,
             width: 28,
             decoration: BoxDecoration(
-              color: active ? AppColors.accent : Colors.transparent,
+              color: active ? AppColors.secondary : Colors.transparent,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -698,10 +698,10 @@ class _EpisodeTile extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     sermon.title,
-                    style: GoogleFonts.mavenPro(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: AppColors.onSurface,
                       height: 1.3,
                     ),
                     maxLines: 2,
@@ -722,7 +722,7 @@ class _EpisodeTile extends ConsumerWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               meta,
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: AppColors.textMuted,
@@ -755,7 +755,7 @@ class _EpisodeTile extends ConsumerWidget {
                     width: 40,
                     height: 40,
                     decoration: const BoxDecoration(
-                      color: AppColors.accent,
+                      color: AppColors.secondary,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -802,9 +802,9 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
 
   @override
   Widget build(BuildContext context) {
-    final style = GoogleFonts.dmSans(
+    final style = GoogleFonts.plusJakartaSans(
       fontSize: 12.5,
-      color: AppColors.textBody,
+      color: AppColors.onSurfaceVariant,
       height: 1.45,
     );
     return LayoutBuilder(
@@ -832,9 +832,9 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
                 onTap: () => setState(() => _expanded = !_expanded),
                 child: Text(
                   _expanded ? 'less' : 'more',
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
-                    color: AppColors.accent,
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -862,25 +862,25 @@ class _AboutTab extends StatelessWidget {
             'Weekly messages from Kharis Church with Rev Dr David Antwi. '
             'Sermons, prayer series, and teaching from every branch - '
             'new episodes every week.',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
-              color: AppColors.textBody,
+              color: AppColors.onSurfaceVariant,
               height: 1.6,
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
           Text(
             'Hosted by Rev Dr David Antwi',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: AppColors.onSurface,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             'Kharis Church • Audio via SoundCloud',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               color: AppColors.textMuted,
             ),
@@ -899,7 +899,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.xxxl),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Center(
         child: Column(
           children: [
@@ -908,8 +908,8 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               'No episodes match',
-              style: GoogleFonts.dmSans(
-                color: AppColors.textBody,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppColors.onSurfaceVariant,
                 fontSize: 14,
               ),
             ),
@@ -936,8 +936,8 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Text(
             'Could not load episodes',
-            style: GoogleFonts.dmSans(
-              color: AppColors.textBody,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppColors.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -945,8 +945,8 @@ class _ErrorState extends StatelessWidget {
             onPressed: onRetry,
             child: Text(
               'Retry',
-              style: GoogleFonts.dmSans(
-                color: AppColors.accent,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppColors.secondary,
                 fontWeight: FontWeight.w600,
               ),
             ),

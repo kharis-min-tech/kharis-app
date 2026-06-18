@@ -86,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: 72,
                     height: 72,
                     child: CustomPaint(
-                      painter: _DovePainter(color: AppColors.purple),
+                      painter: _DovePainter(color: AppColors.primary),
                     ),
                   ),
                 ),
@@ -96,19 +96,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Text(
                   'Welcome back',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.mavenPro(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Sign in to your account',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
-                    color: AppColors.textBody,
+                    color: AppColors.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -118,9 +118,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                   decoration: _fieldDecoration(hint: 'Email address'),
                   validator: (v) {
@@ -141,9 +141,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _signIn(),
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
-                    color: AppColors.textPrimary,
+                    color: AppColors.onSurface,
                   ),
                   decoration: _fieldDecoration(hint: 'Password').copyWith(
                     suffixIcon: IconButton(
@@ -151,7 +151,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         _obscurePassword
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
-                        color: AppColors.textBody,
+                        color: AppColors.onSurfaceVariant,
                         size: 20,
                       ),
                       onPressed: () =>
@@ -171,7 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Text(
                     _errorMessage!,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       color: AppColors.error,
                     ),
@@ -185,9 +185,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _signIn,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.secondary,
+                      disabledBackgroundColor: AppColors.secondary.withValues(alpha: 0.4),
+                      foregroundColor: AppColors.onSecondary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -206,7 +206,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           )
                         : Text(
                             'SIGN IN',
-                            style: GoogleFonts.mavenPro(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
@@ -222,18 +222,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: [
                     Text(
                       "Don't have an account? ",
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
-                        color: AppColors.textBody,
+                        color: AppColors.onSurfaceVariant,
                       ),
                     ),
                     GestureDetector(
                       onTap: () => context.push('/register'),
                       child: Text(
                         'Register',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
-                          color: AppColors.accent,
+                          color: AppColors.secondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -250,7 +250,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   child: Text(
                     'Continue as Guest',
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       color: AppColors.textMuted,
                     ),
@@ -270,11 +270,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       filled: true,
       fillColor: AppColors.surfaceSubtle,
       hintText: hint,
-      hintStyle: GoogleFonts.dmSans(
+      hintStyle: GoogleFonts.plusJakartaSans(
         fontSize: 15,
-        color: AppColors.textBody,
+        color: AppColors.onSurfaceVariant,
       ),
-      errorStyle: GoogleFonts.dmSans(
+      errorStyle: GoogleFonts.plusJakartaSans(
         fontSize: 12,
         color: AppColors.error,
       ),
@@ -288,7 +288,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.accent, width: 1),
+        borderSide: const BorderSide(color: AppColors.secondary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),

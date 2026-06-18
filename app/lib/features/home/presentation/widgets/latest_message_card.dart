@@ -28,20 +28,20 @@ class LatestMessageCard extends ConsumerWidget {
           children: [
             Text(
               'Latest Message',
-              style: GoogleFonts.mavenPro(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: AppColors.onSurface,
               ),
             ),
             GestureDetector(
               onTap: () {},
               child: Text(
                 'See More',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.accent,
+                  color: AppColors.secondary,
                 ),
               ),
             ),
@@ -133,7 +133,7 @@ class LatestMessageCard extends ConsumerWidget {
                         title.length > 20
                             ? '${title.substring(0, 20)}...'
                             : title,
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -141,7 +141,7 @@ class LatestMessageCard extends ConsumerWidget {
                       ),
                       Text(
                         speaker,
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
                           color: Colors.white70,
                         ),
@@ -180,7 +180,7 @@ class LatestMessageCard extends ConsumerWidget {
                     const SizedBox(width: 6),
                     Text(
                       'Watch on YouTube',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         color: Colors.white,
                         fontWeight: FontWeight.w500,
@@ -265,15 +265,15 @@ class LatestMessageCard extends ConsumerWidget {
                         horizontal: 8, vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.18),
+                        color: AppColors.primary.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
                         'SUNDAY',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
+                          color: AppColors.primary,
                           letterSpacing: 1.2,
                         ),
                       ),
@@ -286,7 +286,7 @@ class LatestMessageCard extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             video.title,
-                            style: GoogleFonts.mavenPro(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 19,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
@@ -302,12 +302,12 @@ class LatestMessageCard extends ConsumerWidget {
                             horizontal: 14, vertical: 7,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.accent,
+                            color: AppColors.secondary,
                             borderRadius: BorderRadius.circular(99),
                           ),
                           child: Text(
                             'WATCH NOW',
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,

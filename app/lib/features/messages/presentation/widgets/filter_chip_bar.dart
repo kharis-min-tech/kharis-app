@@ -7,7 +7,7 @@ import 'package:kharis_app/core/theme/theme.dart';
 ///
 /// The active chip has an orange border, orange text, and a 10 % orange
 /// background fill. Inactive chips use [AppColors.surfaceSubtle] background
-/// and [AppColors.textBody] text.
+/// and [AppColors.onSurfaceVariant] text.
 class FilterChipBar extends StatelessWidget {
   const FilterChipBar({
     super.key,
@@ -65,20 +65,20 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
         decoration: BoxDecoration(
           color: active
-              ? AppColors.accent.withValues(alpha: 0.10)
+              ? AppColors.secondary.withValues(alpha: 0.10)
               : AppColors.surfaceSubtle,
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: active
-              ? Border.all(color: AppColors.accent, width: 1.5)
+              ? Border.all(color: AppColors.secondary, width: 1.5)
               : Border.all(color: Colors.transparent, width: 1.5),
         ),
         child: Center(
           child: Text(
             label,
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 13,
               fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              color: active ? AppColors.accent : AppColors.textBody,
+              color: active ? AppColors.secondary : AppColors.onSurfaceVariant,
               height: 1.0,
             ),
           ),

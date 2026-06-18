@@ -86,8 +86,8 @@ class _SplashScreenState extends State<SplashScreen>
                 const SizedBox(height: 28),
                 Text(
                   'KHARIS',
-                  style: GoogleFonts.mavenPro(
-                    color: AppColors.textPrimary,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppColors.onSurface,
                     fontSize: 32,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 8,
@@ -97,8 +97,8 @@ class _SplashScreenState extends State<SplashScreen>
                 Text(
                   'Changing the world with a touch of His grace',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.dmSans(
-                    color: AppColors.textBody,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppColors.onSurfaceVariant,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                   ),
@@ -144,9 +144,9 @@ class _GlowingDove extends StatelessWidget {
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          AppColors.purple,
-                          AppColors.purple.withValues(alpha: 0.4),
-                          AppColors.purple.withValues(alpha: 0.0),
+                          AppColors.primary,
+                          AppColors.primary.withValues(alpha: 0.4),
+                          AppColors.primary.withValues(alpha: 0.0),
                         ],
                         stops: const [0.0, 0.45, 1.0],
                       ),
