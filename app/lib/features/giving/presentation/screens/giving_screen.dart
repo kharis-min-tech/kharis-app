@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'giving_webview_screen.dart';
@@ -6,8 +7,32 @@ import 'giving_webview_screen.dart';
 /// Giving URL used by both GIVE NOW and any future deep-link.
 const String _kGivingUrl = 'https://kharis.org/give';
 
-class GivingScreen extends StatelessWidget {
+const List<int> _kPresets = [10, 50, 100];
+
+const List<String> _kCategories = [
+  'General Tithes & Offering',
+  'Building Fund',
+  'Missions',
+  'Youth Ministry',
+];
+
+class GivingScreen extends StatefulWidget {
   const GivingScreen({super.key});
+
+  @override
+  State<GivingScreen> createState() => _GivingScreenState();
+}
+
+class _GivingScreenState extends State<GivingScreen> {
+  int? _selectedPreset = 50;
+  final TextEditingController _customController = TextEditingController();
+  String _selectedCategory = _kCategories[0];
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,161 +44,183 @@ class GivingScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // ── 1. GIVING pill badge ──────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Text(
-                  'GIVING',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── 2. Heading ────────────────────────────────────────────────
+              // ── 1. Header ────────────────────────────────────────────────────
               Text(
-                'Support the Vision',
+                'Generous Giving',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 26,
+                  fontSize: 24,
                   fontWeight: FontWeight.w700,
                   color: AppColors.onSurface,
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // ── 3. Body copy (max 280 logical px) ────────────────────────
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 280),
-                child: Text(
-                  'Your generosity fuels our mission to create a sanctuary for seekers and believers worldwide.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.55,
-                  ),
+              const SizedBox(height: 8),
+              Text(
+                'Supporting our mission and community growth',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: AppColors.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 32),
 
-              // ── 4. White giving card ──────────────────────────────────────
+              // ── 2. Glass portal card ─────────────────────────────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  color: const Color(0xFF1E1E1E).withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.10),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => openGivingFlow(context, _kGivingUrl),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: AppColors.onSecondary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'GIVE NOW',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── 5. Branch selector row ────────────────────────────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ── SELECT AMOUNT ────────────────────────────────────────
                     Text(
-                      'Branch',
+                      'SELECT AMOUNT',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textMuted,
+                        letterSpacing: 1.1,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'London',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onSurface,
+                    const SizedBox(height: 10),
+
+                    // ── Preset buttons row ───────────────────────────────────
+                    Row(
+                      children: [
+                        for (int i = 0; i < _kPresets.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 10),
+                          Expanded(
+                            child: _AmountButton(
+                              label: '£${_kPresets[i]}',
+                              isSelected: _selectedPreset == _kPresets[i] &&
+                                  _customController.text.isEmpty,
+                              onTap: () => setState(() {
+                                _selectedPreset = _kPresets[i];
+                                _customController.clear();
+                              }),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Custom amount input ──────────────────────────────────
+                    _CustomAmountField(
+                      controller: _customController,
+                      onChanged: (v) => setState(() {
+                        if (v.isNotEmpty) _selectedPreset = null;
+                      }),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── GIVE TO ──────────────────────────────────────────────
+                    Text(
+                      'GIVE TO',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMuted,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    _CategoryDropdown(
+                      value: _selectedCategory,
+                      categories: _kCategories,
+                      onChanged: (v) => setState(() => _selectedCategory = v),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Give Now CTA ─────────────────────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => openGivingFlow(context, _kGivingUrl),
+                        icon: const Icon(Icons.favorite_rounded, size: 18),
+                        label: Text(
+                          'Give Now',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: AppColors.onSecondary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
+                          ),
+                          elevation: 0,
                         ),
                       ),
                     ),
-                    const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textMuted,
-                      size: 20,
+                    const SizedBox(height: 16),
+
+                    // ── Payment icons row ────────────────────────────────────
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.credit_card_outlined,
+                          color: AppColors.textMuted,
+                          size: 22,
+                        ),
+                        SizedBox(width: 16),
+                        Icon(
+                          Icons.account_balance_outlined,
+                          color: AppColors.textMuted,
+                          size: 22,
+                        ),
+                        SizedBox(width: 16),
+                        Icon(
+                          Icons.contactless,
+                          color: AppColors.textMuted,
+                          size: 22,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
-
-              // ── 6. Other Ways to Give ─────────────────────────────────────
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Other Ways to Give',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              _GivingOptionRow(
-                iconColor: AppColors.primary,
-                icon: Icons.account_balance_rounded,
-                title: 'Bank Transfer',
-                subtitle: 'Direct bank payment',
-                onTap: () {},
-              ),
-              const SizedBox(height: 10),
-              _GivingOptionRow(
-                iconColor: AppColors.primary,
-                icon: Icons.church_rounded,
-                title: 'Build God a House',
-                subtitle: 'Building fund contribution',
-                onTap: () {},
-              ),
               const SizedBox(height: 24),
+
+              // ── 3. Trust badge ───────────────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 14,
+                    color: AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'You are viewing our secure official giving portal.',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -182,75 +229,156 @@ class GivingScreen extends StatelessWidget {
   }
 }
 
-// ── Private widget ────────────────────────────────────────────────────────────
+// ── _AmountButton ──────────────────────────────────────────────────────────────
 
-class _GivingOptionRow extends StatelessWidget {
-  const _GivingOptionRow({
-    required this.iconColor,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
+class _AmountButton extends StatelessWidget {
+  const _AmountButton({
+    required this.label,
+    required this.isSelected,
     required this.onTap,
   });
 
-  final Color iconColor;
-  final IconData icon;
-  final String title;
-  final String subtitle;
+  final String label;
+  final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: AppColors.surfaceElevated,
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.surfaceSubtle,
+          borderRadius: BorderRadius.circular(AppRadius.defaultRadius),
+          border: Border.all(
+            color: isSelected ? AppColors.secondary : AppColors.outlineVariant,
+            width: 2,
+          ),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.18),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: iconColor, size: 22),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? AppColors.secondary : AppColors.onSurface,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _CustomAmountField ─────────────────────────────────────────────────────────
+
+class _CustomAmountField extends StatelessWidget {
+  const _CustomAmountField({
+    required this.controller,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+      ],
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 15,
+        color: AppColors.onSurface,
+      ),
+      cursorColor: AppColors.secondary,
+      decoration: InputDecoration(
+        hintText: 'Other amount',
+        hintStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 15,
+          color: AppColors.textMuted,
+        ),
+        prefixText: '£ ',
+        prefixStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 15,
+          color: AppColors.textMuted,
+        ),
+        filled: true,
+        fillColor: AppColors.surfaceSubtle,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.defaultRadius),
+          borderSide: const BorderSide(color: AppColors.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.defaultRadius),
+          borderSide: const BorderSide(color: AppColors.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.defaultRadius),
+          borderSide: const BorderSide(color: AppColors.secondary, width: 2),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _CategoryDropdown ──────────────────────────────────────────────────────────
+
+class _CategoryDropdown extends StatelessWidget {
+  const _CategoryDropdown({
+    required this.value,
+    required this.categories,
+    required this.onChanged,
+  });
+
+  final String value;
+  final List<String> categories;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(AppRadius.defaultRadius),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: AppColors.surfaceElevated,
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.textMuted,
+          ),
+          items: categories
+              .map(
+                (c) => DropdownMenuItem<String>(
+                  value: c,
+                  child: Text(
+                    c,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
                       color: AppColors.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textMuted,
-              size: 20,
-            ),
-          ],
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
         ),
       ),
     );

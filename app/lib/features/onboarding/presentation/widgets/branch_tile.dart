@@ -6,13 +6,15 @@ class BranchTile extends StatelessWidget {
   const BranchTile({
     super.key,
     required this.name,
-    required this.location,
+    required this.subtitle,
+    required this.gradientColors,
     required this.isSelected,
     required this.onTap,
   });
 
   final String name;
-  final String location;
+  final String subtitle;
+  final List<Color> gradientColors;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -21,24 +23,49 @@ class BranchTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.surfaceElevated,
-          borderRadius: BorderRadius.circular(12),
+          color: const Color(0x991E1E1E), // rgba(30,30,30,0.6)
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.transparent,
+            color: isSelected
+                ? AppColors.secondary.withValues(alpha: 0.30)
+                : Colors.white.withValues(alpha: 0.05),
             width: 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            const Icon(
-              Icons.location_on,
-              color: AppColors.primary,
-              size: 20,
+            // ── Gradient image placeholder ─────────────────────────────
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
+                ),
+              ),
+              child: const Icon(
+                Icons.church_rounded,
+                color: Colors.white54,
+                size: 28,
+              ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
+
+            // ── Text ──────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,27 +74,33 @@ class BranchTile extends StatelessWidget {
                   Text(
                     name,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: AppColors.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
-                    location,
+                    subtitle,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
                       color: AppColors.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
+
+            // ── Selection indicator ───────────────────────────────────
             if (isSelected)
-              const Icon(
-                Icons.check_circle_rounded,
-                color: AppColors.primary,
-                size: 20,
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.secondary,
+                  size: 22,
+                ),
               ),
           ],
         ),
