@@ -1,65 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.dart';
+import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 
-// Scoped to the onboarding flow — discarded once the router pops this screen.
+// Scoped to the onboarding flow, discarded once the router pops this screen.
 final _selectedBranchProvider = StateProvider<String?>((ref) => null);
 
-// Branch name, subtitle, and per-branch gradient (purple → gold palette).
-const _kBranches = <({
-  String name,
-  String subtitle,
-  List<Color> gradient,
-})>[
-  (
-    name: 'Kharis London',
-    subtitle: 'United Kingdom - Main Campus',
-    gradient: [Color(0xFF7B5EA7), Color(0xFFD6BAFF)],
-  ),
-  (
-    name: 'Kharis Manchester',
-    subtitle: 'United Kingdom - North Branch',
-    gradient: [Color(0xFF4A3468), Color(0xFFAD8FD4)],
-  ),
-  (
-    name: 'Kharis Birmingham',
-    subtitle: 'United Kingdom - Midlands',
-    gradient: [Color(0xFF5C3D7A), Color(0xFFBD92FF)],
-  ),
-  (
-    name: 'Kharis Reading',
-    subtitle: 'United Kingdom - South East',
-    gradient: [Color(0xFF8A6E2F), Color(0xFFE9C349)],
-  ),
-  (
-    name: 'Kharis Chatham',
-    subtitle: 'United Kingdom - Kent',
-    gradient: [Color(0xFF3D2B5C), Color(0xFFC4A0E8)],
-  ),
-  (
-    name: 'Kharis Croydon',
-    subtitle: 'United Kingdom - South London',
-    gradient: [Color(0xFF6B4F8A), Color(0xFFD4B8F0)],
-  ),
-  (
-    name: 'Kharis Medway',
-    subtitle: 'United Kingdom - Kent',
-    gradient: [Color(0xFF7A5C3A), Color(0xFFE0B84A)],
-  ),
-  (
-    name: 'Kharis Accra',
-    subtitle: 'Ghana - International Campus',
-    gradient: [Color(0xFF9B7523), Color(0xFFEDD27B)],
-  ),
-  (
-    name: 'Kharis Freetown',
-    subtitle: 'Sierra Leone - West Africa',
-    gradient: [Color(0xFF5A3E7A), Color(0xFFB89FE0)],
-  ),
-];
 
 class BranchSelectionScreen extends ConsumerWidget {
   const BranchSelectionScreen({super.key});
@@ -67,67 +18,60 @@ class BranchSelectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(_selectedBranchProvider);
+    final branches =
+        ref.watch(branchesProvider).valueOrNull ?? BranchRepository.seedBranches;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
       body: Stack(
         children: [
-          // ── Scrollable content ─────────────────────────────────────────
           SafeArea(
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const SizedBox(height: 6),
+                        const _TopBar(),
                         const SizedBox(height: 20),
-
-                        // ── Top bar ──────────────────────────────────────
-                        _TopBar(),
-
-                        const SizedBox(height: 28),
-
-                        // ── Title ────────────────────────────────────────
                         Text(
                           'Select Your Branch',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: AppTypography.displayLg.copyWith(
                             fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
+                            letterSpacing: -0.56,
+                            color: AppColors.heading,
                           ),
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Choose your local home church to get customized updates, event details, and local community messages.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            height: 1.5,
+                          'Choose your home church to get tailored updates, '
+                          'event details and local community messages.',
+                          style: AppTypography.bodySm.copyWith(
+                            fontSize: 13.5,
+                            height: 1.55,
                             color: AppColors.onSurfaceVariant,
                           ),
                         ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 22),
                       ],
                     ),
                   ),
                 ),
-
-                // ── Branch list ─────────────────────────────────────────
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
                   sliver: SliverList.separated(
-                    itemCount: _kBranches.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: 10),
+                    itemCount: branches.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, i) {
-                      final branch = _kBranches[i];
+                      final branch = branches[i];
                       return BranchTile(
                         name: branch.name,
                         subtitle: branch.subtitle,
                         gradientColors: branch.gradient,
+                        imageUrl: branch.imageUrl,
                         isSelected: selected == branch.name,
                         onTap: () => ref
                             .read(_selectedBranchProvider.notifier)
@@ -136,26 +80,47 @@ class BranchSelectionScreen extends ConsumerWidget {
                     },
                   ),
                 ),
-
-                // Bottom padding so last card clears the fixed CTA
-                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                const SliverToBoxAdapter(child: SizedBox(height: 130)),
               ],
             ),
           ),
 
-          // ── Fixed bottom CTA ───────────────────────────────────────────
+          // CTA slides up once a branch is chosen.
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _BottomCta(
-              enabled: selected != null,
-              onPressed: () => context.go('/home'),
+            child: IgnorePointer(
+              ignoring: selected == null,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                offset: selected == null ? const Offset(0, 1) : Offset.zero,
+                child: _BottomCta(
+                  onPressed: () => _confirm(context, ref, selected),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Persists the chosen branch to the signed-in profile (best effort), then
+  /// continues into the app.
+  Future<void> _confirm(
+      BuildContext context, WidgetRef ref, String? branch) async {
+    if (branch != null) {
+      final user = ref.read(currentUserProvider).valueOrNull;
+      final repo = ref.read(firebaseAuthRepositoryProvider);
+      if (user != null && user.email.isNotEmpty) {
+        try {
+          await repo.updateProfile(branch: branch);
+        } catch (_) {}
+      }
+    }
+    if (context.mounted) context.go('/home');
   }
 }
 
@@ -164,12 +129,13 @@ class BranchSelectionScreen extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _TopBar extends StatelessWidget {
+  const _TopBar();
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Back arrow — left
         Align(
           alignment: Alignment.centerLeft,
           child: GestureDetector(
@@ -177,23 +143,21 @@ class _TopBar extends StatelessWidget {
             child: Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: AppColors.surfaceElevated,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.arrow_back_rounded,
-                color: AppColors.onSurface,
-                size: 20,
+                Icons.chevron_left_rounded,
+                color: Color(0xFFCFC8D4),
+                size: 24,
               ),
             ),
           ),
         ),
-
-        // Dove logo — centred
         Image.asset(
           'assets/figma/dove_logo.png',
-          height: 32,
+          height: 30,
           color: Colors.white,
         ),
       ],
@@ -202,12 +166,8 @@ class _TopBar extends StatelessWidget {
 }
 
 class _BottomCta extends StatelessWidget {
-  const _BottomCta({
-    required this.enabled,
-    required this.onPressed,
-  });
+  const _BottomCta({required this.onPressed});
 
-  final bool enabled;
   final VoidCallback onPressed;
 
   @override
@@ -221,57 +181,41 @@ class _BottomCta extends StatelessWidget {
           end: Alignment.bottomCenter,
           colors: [
             AppColors.surfaceDark.withValues(alpha: 0.0),
-            AppColors.surfaceDark.withValues(alpha: 0.85),
+            AppColors.surfaceDark.withValues(alpha: 0.9),
             AppColors.surfaceDark,
           ],
-          stops: const [0.0, 0.35, 1.0],
+          stops: const [0.0, 0.4, 1.0],
         ),
       ),
-      padding: EdgeInsets.fromLTRB(24, 24, 24, 20 + bottomPadding),
+      padding: EdgeInsets.fromLTRB(22, 28, 22, 20 + bottomPadding),
       child: SizedBox(
         width: double.infinity,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 200),
-          opacity: enabled ? 1.0 : 0.45,
-          child: ElevatedButton.icon(
-            onPressed: enabled ? onPressed : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondary,
-              disabledBackgroundColor: AppColors.surfaceElevated,
-              foregroundColor: AppColors.onSecondary,
-              disabledForegroundColor:
-                  AppColors.onSurface.withValues(alpha: 0.4),
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondary,
+            foregroundColor: AppColors.onSecondary,
+            padding: const EdgeInsets.symmetric(vertical: 17),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 0,
+            shadowColor: Colors.transparent,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Confirm & Continue',
+                style: AppTypography.titleMd.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.onSecondary,
+                ),
               ),
-              elevation: 0,
-              shadowColor: Colors.transparent,
-            ),
-            icon: const SizedBox.shrink(),
-            label: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Confirm & Continue',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: enabled
-                        ? AppColors.onSecondary
-                        : AppColors.onSurface.withValues(alpha: 0.4),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 18,
-                  color: enabled
-                      ? AppColors.onSecondary
-                      : AppColors.onSurface.withValues(alpha: 0.4),
-                ),
-              ],
-            ),
+              const SizedBox(width: 9),
+              const Icon(Icons.arrow_forward_rounded, size: 18),
+            ],
           ),
         ),
       ),

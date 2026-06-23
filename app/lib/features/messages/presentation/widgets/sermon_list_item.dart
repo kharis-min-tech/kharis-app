@@ -1,36 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/core/utils/artwork_gradient.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
-
-/// A 56-px-tall list row for a single sermon.
+/// Spec-matching 56px sermon list row for the Messages tab.
 ///
-/// Shows an animated equalizer when [isPlaying] is true.
+/// Shows gradient art (play icon when idle, animated equalizer when playing),
+/// title, speaker/category, date/duration meta, and a trailing 3-dot button.
 class SermonListItem extends StatefulWidget {
   const SermonListItem({
     super.key,
     required this.title,
     required this.speaker,
-    required this.duration,
-    required this.pubDate,
+    this.category,
+    this.durationLabel = '',
+    this.dateLabel = '',
     this.artworkColor,
+    this.artworkUrl,
+    this.listIndex = 0,
     this.isPlaying = false,
     this.onTap,
-    this.trailing,
+    this.onMoreTap,
   });
 
   final String title;
   final String speaker;
-  final String duration;
-  final DateTime pubDate;
+  final String? category;
+  final String durationLabel;
+  final String dateLabel;
   final int? artworkColor;
+  final String? artworkUrl;
+  final int listIndex;
   final bool isPlaying;
   final VoidCallback? onTap;
-
-  /// Optional trailing widget (e.g. drag handle).
-  final Widget? trailing;
+  final VoidCallback? onMoreTap;
 
   @override
   State<SermonListItem> createState() => _SermonListItemState();
@@ -44,41 +49,35 @@ class _SermonListItemState extends State<SermonListItem>
   @override
   void initState() {
     super.initState();
-    // Three equalizer bars with offset durations so they're out of phase.
-    final durations = [350, 500, 420];
     _barControllers = List.generate(
       3,
       (i) => AnimationController(
         vsync: this,
-        duration: Duration(milliseconds: durations[i]),
+        duration: Duration(milliseconds: 380 + i * 110),
       ),
     );
-    _barAnimations = _barControllers.map((c) {
-      return Tween<double>(begin: 0.25, end: 1.0).animate(
-        CurvedAnimation(parent: c, curve: Curves.easeInOut),
-      );
-    }).toList();
-
+    _barAnimations = List.generate(
+      3,
+      (i) => Tween<double>(begin: 0.25, end: 1.0).animate(
+        CurvedAnimation(parent: _barControllers[i], curve: Curves.easeInOut),
+      ),
+    );
     _syncAnimation();
   }
 
   @override
-  void didUpdateWidget(SermonListItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isPlaying != widget.isPlaying) {
-      _syncAnimation();
-    }
+  void didUpdateWidget(SermonListItem old) {
+    super.didUpdateWidget(old);
+    if (old.isPlaying != widget.isPlaying) _syncAnimation();
   }
 
   void _syncAnimation() {
-    if (widget.isPlaying) {
-      for (final c in _barControllers) {
+    for (final c in _barControllers) {
+      if (widget.isPlaying) {
         c.repeat(reverse: true);
-      }
-    } else {
-      for (final c in _barControllers) {
+      } else {
         c.stop();
-        c.animateTo(0.3, duration: const Duration(milliseconds: 200));
+        c.value = 0.35;
       }
     }
   }
@@ -93,25 +92,36 @@ class _SermonListItemState extends State<SermonListItem>
 
   @override
   Widget build(BuildContext context) {
-    final gradientColors = sermonGradient(widget.artworkColor ?? 0);
-    final dateStr =
-        '${widget.pubDate.year}-${widget.pubDate.month.toString().padLeft(2, '0')}-${widget.pubDate.day.toString().padLeft(2, '0')}';
+    final cat = widget.category ?? '';
+    final speakerLine =
+        cat.isNotEmpty ? '${widget.speaker} · $cat' : widget.speaker;
+    final metaLine = [widget.dateLabel, widget.durationLabel]
+        .where((s) => s.isNotEmpty)
+        .join(' · ');
 
     return InkWell(
       onTap: widget.onTap,
-      borderRadius: BorderRadius.circular(AppRadius.input),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // ── Thumbnail ─────────────────────────────────────────────────
-            _Thumbnail(
-              gradientColors: gradientColors,
-              isPlaying: widget.isPlaying,
-              barAnimations: _barAnimations,
+            // ── Gradient art (56x56, radius 11) ───────────────────────────────
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: ArtworkImage(
+                url: widget.artworkUrl,
+                gradientIndex: widget.artworkColor ?? widget.listIndex,
+                radius: 11,
+                scrim: widget.isPlaying,
+                overlay: widget.isPlaying
+                    ? _EqualizerBars(animations: _barAnimations)
+                    : null,
+              ),
             ),
             const SizedBox(width: 12),
-            // ── Text block ────────────────────────────────────────────────
+            // ── Text block ────────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,40 +131,57 @@ class _SermonListItemState extends State<SermonListItem>
                     widget.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: AppTypography.bodyLg.copyWith(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.onSurface,
-                      height: 1.3,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${widget.speaker} · $dateStr',
+                    speakerLine,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      color: AppColors.onSurfaceVariant,
-                      height: 1.3,
+                    style: AppTypography.bodySm.copyWith(
+                      fontSize: 12.5,
+                      color: AppColors.textMuted,
                     ),
                   ),
+                  if (metaLine.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      metaLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.labelMd.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.textFaint,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            // ── Duration ──────────────────────────────────────────────────
-            Text(
-              widget.duration,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                color: AppColors.textMuted,
+            // ── 3-dot button (34px circle, white.06) ──────────────────────────
+            GestureDetector(
+              onTap: widget.onMoreTap,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: const Icon(
+                  Icons.more_vert_rounded,
+                  color: AppColors.textMuted,
+                  size: 18,
+                ),
               ),
             ),
-            if (widget.trailing != null) ...[
-              const SizedBox(width: 8),
-              widget.trailing!,
-            ],
           ],
         ),
       ),
@@ -162,34 +189,7 @@ class _SermonListItemState extends State<SermonListItem>
   }
 }
 
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({
-    required this.gradientColors,
-    required this.isPlaying,
-    required this.barAnimations,
-  });
-
-  final List<Color> gradientColors;
-  final bool isPlaying;
-  final List<Animation<double>> barAnimations;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.input),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradientColors,
-        ),
-      ),
-      child: isPlaying ? _EqualizerBars(animations: barAnimations) : null,
-    );
-  }
-}
+// ── Animated equalizer bars ────────────────────────────────────────────────────
 
 class _EqualizerBars extends StatelessWidget {
   const _EqualizerBars({required this.animations});
@@ -208,16 +208,14 @@ class _EqualizerBars extends StatelessWidget {
           children: List.generate(3, (i) {
             return AnimatedBuilder(
               animation: animations[i],
-              builder: (_, _) {
-                return Container(
-                  width: 4,
-                  height: 20 * animations[i].value,
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                );
-              },
+              builder: (_, _) => Container(
+                width: 4,
+                height: 20 * animations[i].value,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             );
           }),
         ),

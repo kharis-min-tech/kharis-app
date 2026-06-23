@@ -1,321 +1,256 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/core/utils/artwork_gradient.dart';
-
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
-import 'package:kharis_app/shared/widgets/skeleton.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
+/// Hero card: "Latest from Kharis" YouTube video in dark purple 16:9 card.
+/// When live, shows a "LIVE" pill instead of the "Latest" badge.
 class LatestMessageCard extends ConsumerWidget {
   const LatestMessageCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final videosAsync = ref.watch(videosProvider);
-    final video = videosAsync.valueOrNull?.isNotEmpty == true
-        ? videosAsync.valueOrNull!.first
-        : null;
+    final liveAsync = ref.watch(liveStatusProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Section header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Latest Message',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
-              ),
-            ),
-            GestureDetector(
-              onTap: () {},
-              child: Text(
-                'See More',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.secondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        // Video card — taps into the in-app YouTube player
-        if (video == null)
-          _buildNullSkeleton()
-        else if (DateTime.now().weekday == DateTime.sunday)
-          _buildSundayHero(context, video)
-        else
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => MediaPlayerScreen(sermon: video),
-                ),
-              );
-            },
-            child: _buildVideoCard(
-              title: video.title,
-              speaker: video.speaker,
-              gradientColors: sermonGradient(video.artworkColor ?? 0),
-              artworkUrl: video.artworkUrl,
-            ),
-          ),
-      ],
+    final isLive = liveAsync.valueOrNull?.isLive == true;
+    final liveStatus = liveAsync.valueOrNull;
+
+    return videosAsync.when(
+      loading: () => const _HeroSkeleton(),
+      error: (_, _) => const _HeroSkeleton(),
+      data: (videos) {
+        if (videos.isEmpty) return const _HeroSkeleton();
+        final video = videos.first;
+        return _VideoHeroCard(
+          video: video,
+          isLive: isLive,
+          liveTitle: liveStatus?.title,
+          liveVideoId: liveStatus?.videoId,
+        );
+      },
     );
   }
+}
 
-  Widget _buildVideoCard({
-    required String title,
-    required String speaker,
-    required List<Color> gradientColors,
-    String? artworkUrl,
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background: artwork or gradient
-            if (artworkUrl != null)
-              Image.network(
-                artworkUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => _gradientBg(gradientColors),
-              )
-            else
-              _gradientBg(gradientColors),
-            // Dark overlay
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black87],
-                  stops: [0.0, 1.0],
-                ),
-              ),
-            ),
-            // Top-left: channel avatar + info (YouTube style)
-            Positioned(
-              top: 12,
-              left: 12,
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF333333),
-                    ),
-                    child: const Icon(
-                      Icons.church,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title.length > 20
-                            ? '${title.substring(0, 20)}...'
-                            : title,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        speaker,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Center: big red YouTube play button
-            const Center(
-              child: _YouTubePlayButton(),
-            ),
-            // Bottom footer bar
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                color: Colors.black.withValues(alpha: 0.6),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.share_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const Spacer(),
-                    const Icon(
-                      Icons.smart_display,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Watch on YouTube',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+class _VideoHeroCard extends StatelessWidget {
+  const _VideoHeroCard({
+    required this.video,
+    required this.isLive,
+    this.liveTitle,
+    this.liveVideoId,
+  });
+
+  final Sermon video;
+  final bool isLive;
+  final String? liveTitle;
+  final String? liveVideoId;
+
+  void _onTap(BuildContext context) {
+    final targetSermon = isLive && liveVideoId != null
+        ? Sermon(
+            id: 'live',
+            title: liveTitle ?? 'Live Stream',
+            speaker: 'Kharis Church',
+            audioUrl: '',
+            videoId: liveVideoId,
+            source: 'youtube',
+          )
+        : video;
+
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MediaPlayerScreen(sermon: targetSermon),
       ),
     );
   }
 
-  Widget _buildNullSkeleton() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        ClipRRect(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Skeleton(width: double.infinity, height: double.infinity, radius: 0),
-          ),
-        ),
-        SizedBox(height: AppSpacing.md),
-        SkeletonLine(width: 200),
-      ],
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    final title = isLive ? (liveTitle ?? 'Live Stream') : video.title;
+    final speaker = video.speaker;
+    final duration = video.duration != null ? video.formattedDuration : '';
+    final speakerDuration =
+        duration.isNotEmpty ? '$speaker  \u00b7  $duration' : speaker;
 
-  Widget _buildSundayHero(BuildContext context, Sermon video) {
-    final gradientColors = sermonGradient(video.artworkColor ?? 0);
+    // Real YouTube thumbnail (maxres, falling back to hq) fills the frame.
+    final vid = isLive ? liveVideoId : video.videoId;
+    final thumbUrl = (vid != null && vid.isNotEmpty)
+        ? 'https://img.youtube.com/vi/$vid/maxresdefault.jpg'
+        : video.artworkUrl;
+    final fallbackThumb = (vid != null && vid.isNotEmpty)
+        ? 'https://img.youtube.com/vi/$vid/hqdefault.jpg'
+        : null;
+
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute<void>(
-            builder: (context) => MediaPlayerScreen(sermon: video),
+      onTap: () => _onTap(context),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: .06),
+              width: 1,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x44000000),
+                blurRadius: 24,
+                offset: Offset(0, 8),
+              ),
+            ],
+            gradient: const LinearGradient(
+              begin: Alignment(-.8, -1),
+              end: Alignment(.6, 1),
+              colors: [
+                Color(0xFF4A1D8F),
+                Color(0xFF23104A),
+                Color(0xFF0C0A12),
+              ],
+            ),
           ),
-        );
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
+          clipBehavior: Clip.antiAlias,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background: artwork or gradient
-              if (video.artworkUrl != null)
-                Image.network(
-                  video.artworkUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _gradientBg(gradientColors),
-                )
-              else
-                _gradientBg(gradientColors),
-              // Bottom gradient scrim: transparent -> 85% black
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Color.fromRGBO(0, 0, 0, 0.85)],
-                    stops: [0.35, 1.0],
+              // Real video thumbnail, cover-fit to the 16:9 frame.
+              if (thumbUrl != null)
+                Positioned.fill(
+                  child: Image.network(
+                    thumbUrl,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, _, _) => fallbackThumb != null
+                        ? Image.network(
+                            fallbackThumb,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+
+              // Veil so the play button and text stay legible over the image.
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.16),
+                ),
+              ),
+
+              // Bottom scrim
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 130,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: .82),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              // Scrim content
+
+              // "Latest" or "LIVE" badge top-left
+              Positioned(
+                top: 14,
+                left: 14,
+                child: isLive
+                    ? _LivePill()
+                    : Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentPink,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Text(
+                          'Latest',
+                          style: AppTypography.labelMd.copyWith(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.4,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+              ),
+
+              // Center play button
+              Center(
+                child: Container(
+                  width: 62,
+                  height: 62,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Color(0xFF1A0A3B),
+                    size: 32,
+                  ),
+                ),
+              ),
+
+              // Bottom text
               Positioned(
                 bottom: 14,
-                left: 14,
-                right: 14,
+                left: 16,
+                right: 16,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // SUNDAY overline pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        'SUNDAY',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                    if (video.series != null && video.series!.isNotEmpty) ...[
+                      Text(
+                        video.series!.toUpperCase(),
+                        style: AppTypography.labelMd.copyWith(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
                           color: AppColors.primary,
-                          letterSpacing: 1.2,
+                          letterSpacing: 1.1,
+                          height: 1,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 5),
+                    ],
+                    Text(
+                      title,
+                      style: AppTypography.titleMd.copyWith(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.18,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
-                    // Title + WATCH NOW pill row
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            video.title,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              height: 1.2,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            'WATCH NOW',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 5),
+                    Text(
+                      speakerDuration,
+                      style: AppTypography.labelMd.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFFC9C2CE),
+                        letterSpacing: 0,
+                        height: 1,
+                      ),
                     ),
                   ],
                 ),
@@ -326,36 +261,102 @@ class LatestMessageCard extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _gradientBg(List<Color> colors) {
+/// Pulsing "LIVE" badge shown when a stream is active.
+class _LivePill extends StatefulWidget {
+  @override
+  State<_LivePill> createState() => _LivePillState();
+}
+
+class _LivePillState extends State<_LivePill>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _fade = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors,
-        ),
+        color: Colors.redAccent,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FadeTransition(
+            opacity: _fade,
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            'LIVE',
+            style: AppTypography.labelMd.copyWith(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 1.0,
+              height: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _YouTubePlayButton extends StatelessWidget {
-  const _YouTubePlayButton();
+class _HeroSkeleton extends StatelessWidget {
+  const _HeroSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 64,
-      height: 44,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF0000), // YouTube red
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Icon(
-        Icons.play_arrow_rounded,
-        color: Colors.white,
-        size: 36,
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4A1D8F), Color(0xFF0C0A12)],
+          ),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0x55FFFFFF),
+            ),
+          ),
+        ),
       ),
     );
   }

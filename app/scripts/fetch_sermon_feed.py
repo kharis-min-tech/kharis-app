@@ -69,6 +69,10 @@ def main() -> None:
         title = (t.get('title') or '').strip()
         desc = re.sub(r'\s+', ' ', (t.get('description') or '')).strip()[:200]
         art = t.get('artwork_url')
+        if not art:
+            # Tracks without custom art fall back to the uploader's avatar,
+            # exactly as SoundCloud does, so every episode shows real imagery.
+            art = (t.get('user') or {}).get('avatar_url')
         if art:
             art = art.replace('-large.', '-t500x500.')
         episodes.append({

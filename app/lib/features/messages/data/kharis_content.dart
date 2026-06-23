@@ -3,27 +3,50 @@
 
 const String kharisChannelId = 'UC4l8WmdF9ivMDQHHVOdYKqQ';
 
-/// Full-length Kharis YouTube uploads (shorts excluded). Newest first.
+/// Full-length Kharis YouTube uploads (Shorts excluded), newest first.
+///
+/// Used as the offline / web fallback when the live Atom feed is unreachable
+/// (web cross-origin CORS). Mobile fetches the live feed directly. Refreshed
+/// 2026-06-18.
 const List<Map<String, dynamic>> kharisVideos = [
   {
+    'videoId': 'DVmHLO1-23s',
+    'title': 'Minister Joe Mettle at Kharis Church',
+    'publishedAt': '2026-06-15T09:58:40+00:00',
+    'thumbnailUrl': 'https://img.youtube.com/vi/DVmHLO1-23s/hqdefault.jpg',
+    'source': 'youtube',
+    'type': 'video',
+  },
+  {
+    'videoId': 'z7COOD_kFH4',
+    'title': 'Acts Series | David Antwi',
+    'publishedAt': '2026-06-14T13:22:31+00:00',
+    'thumbnailUrl': 'https://img.youtube.com/vi/z7COOD_kFH4/hqdefault.jpg',
+    'source': 'youtube',
+    'type': 'video',
+  },
+  {
+    'videoId': 'MqImw7f3ZxY',
+    'title':
+        'Special Evening With His Eminence Archbishop Nicholas Duncan-Williams | Kharis Church',
+    'publishedAt': '2026-06-13T01:18:57+00:00',
+    'thumbnailUrl': 'https://img.youtube.com/vi/MqImw7f3ZxY/hqdefault.jpg',
+    'source': 'youtube',
+    'type': 'video',
+  },
+  {
     'videoId': 'Q5UKIwmy16k',
-    'title': 'The LOGOS Became Flesh | John 1:14 | David Antwi | Kharis Phase Two',
+    'title':
+        'The LOGOS Became Flesh | John 1:14 | David Antwi | Kharis Phase Two',
     'publishedAt': '2026-06-09T11:31:40+00:00',
     'thumbnailUrl': 'https://img.youtube.com/vi/Q5UKIwmy16k/hqdefault.jpg',
     'source': 'youtube',
     'type': 'video',
   },
   {
-    'videoId': '6t8e9cabDRE',
-    'title': 'We don\'t just ATTEND church, we SERVE at church! #churchlife #kharischurch #davidantwi #serving',
-    'publishedAt': '2026-06-09T11:30:01+00:00',
-    'thumbnailUrl': 'https://img.youtube.com/vi/6t8e9cabDRE/hqdefault.jpg',
-    'source': 'youtube',
-    'type': 'video',
-  },
-  {
     'videoId': 'rrgDXcKD1rc',
-    'title': 'The Importance Of Praying In The Morning | Archbishop Nicholas Duncan-Williams',
+    'title':
+        'The Importance Of Praying In The Morning | Archbishop Nicholas Duncan-Williams',
     'publishedAt': '2026-06-07T13:48:00+00:00',
     'thumbnailUrl': 'https://img.youtube.com/vi/rrgDXcKD1rc/hqdefault.jpg',
     'source': 'youtube',
@@ -39,7 +62,7 @@ const List<Map<String, dynamic>> kharisVideos = [
   },
   {
     'videoId': '5MkfCRyuyl8',
-    'title': 'The Fragrance - The Sweet  One | S1 E11 | Kharis Church',
+    'title': 'The Fragrance - The Sweet One | S1 E11 | Kharis Church',
     'publishedAt': '2026-05-31T19:00:06+00:00',
     'thumbnailUrl': 'https://img.youtube.com/vi/5MkfCRyuyl8/hqdefault.jpg',
     'source': 'youtube',
@@ -54,16 +77,9 @@ const List<Map<String, dynamic>> kharisVideos = [
     'type': 'video',
   },
   {
-    'videoId': '3gKNZ104LY4',
-    'title': 'The Fragrance - SATISFIED | S1 E10 | Kharis Church',
-    'publishedAt': '2026-05-24T19:00:06+00:00',
-    'thumbnailUrl': 'https://img.youtube.com/vi/3gKNZ104LY4/hqdefault.jpg',
-    'source': 'youtube',
-    'type': 'video',
-  },
-  {
     'videoId': 'mAIYDzd8GRk',
-    'title': 'Righteousness, Self-control and the Judgement to come | Acts 24 |David Antwi',
+    'title':
+        'Righteousness, Self-control and the Judgement to come | Acts 24 | David Antwi',
     'publishedAt': '2026-05-24T13:40:59+00:00',
     'thumbnailUrl': 'https://img.youtube.com/vi/mAIYDzd8GRk/hqdefault.jpg',
     'source': 'youtube',

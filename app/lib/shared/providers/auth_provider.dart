@@ -3,16 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/onboarding/data/auth_repository.dart';
+import '../../features/onboarding/data/firebase_auth_repository.dart';
 import '../models/user.dart';
-import 'onboarding_provider.dart';
 
-// ── Repository provider ───────────────────────────────────────────────────────
+// ── Repository providers ──────────────────────────────────────────────────────
 
+/// Concrete Firebase-backed repository — exposes profile editing and admin
+/// checks beyond the [AuthRepository] interface.
+final firebaseAuthRepositoryProvider = Provider<FirebaseAuthRepository>((ref) {
+  return FirebaseAuthRepository();
+});
+
+/// Auth repository as the abstract interface used by most callers.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  final repo = TestAuthRepository(prefs);
-  ref.onDispose(repo.dispose);
-  return repo;
+  return ref.watch(firebaseAuthRepositoryProvider);
 });
 
 // ── Auth state providers ──────────────────────────────────────────────────────
@@ -30,13 +34,20 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
       );
 });
 
+/// True when the signed-in user is an admin (profile role or `admin` claim).
+final isAdminProvider = FutureProvider<bool>((ref) async {
+  final user = ref.watch(currentUserProvider).valueOrNull;
+  if (user == null) return false;
+  if (user.role == 'admin') return true;
+  return ref.read(firebaseAuthRepositoryProvider).isCurrentUserAdmin();
+});
+
 // ── Router notifier ───────────────────────────────────────────────────────────
 
 /// [ChangeNotifier] that pings [GoRouter] whenever auth state changes,
 /// causing redirect logic to re-evaluate the current location.
 class RouterNotifier extends ChangeNotifier {
   RouterNotifier(this._ref) {
-    // Listen without rebuilding this provider — only notify the router.
     _ref.listen<AsyncValue<User?>>(currentUserProvider, (_, _) {
       notifyListeners();
     });
@@ -45,10 +56,8 @@ class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
 
   /// Called by [GoRouter] on every navigation and after [notifyListeners].
-  ///
-  /// Reads auth state synchronously from the repository to avoid stream lag.
   String? redirect(BuildContext context, GoRouterState state) {
-    // Prototype mode: no auth gating. All routes accessible.
+    // Browsing is open; sign-in unlocks the profile + admin tools. No gating.
     return null;
   }
 }

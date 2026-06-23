@@ -1,173 +1,191 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Brand gradients cycled across news cards (used when no imageUrl).
-const _kNewsGradients = [
-  [Color(0xFF8B0A50), Color(0xFFC0305A)],
+// Brand gradient pairs cycled across announcement cards.
+const _kCardGradients = [
+  [Color(0xFF6B1E8B), Color(0xFF2A0A52)],
   [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
   [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
+  [Color(0xFF0A2A1A), Color(0xFF059669)],
+  [Color(0xFF3B1A0A), Color(0xFFF59E0B)],
 ];
 
-String _age(DateTime published) {
-  final diff = DateTime.now().difference(published);
-  if (diff.inDays >= 60) return '${diff.inDays ~/ 30} months ago';
-  if (diff.inDays >= 30) return '1 month ago';
-  if (diff.inDays >= 14) return '${diff.inDays ~/ 7} weeks ago';
-  if (diff.inDays >= 7) return '1 week ago';
-  if (diff.inDays >= 1) return '${diff.inDays} days ago';
-  return 'Today';
-}
-
-class NewsSection extends ConsumerWidget {
-  const NewsSection({super.key});
+/// "Announcements" horizontal carousel wired to newsProvider.
+class AnnouncementsCarousel extends ConsumerWidget {
+  const AnnouncementsCarousel({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final newsAsync = ref.watch(newsProvider);
     final items = newsAsync.valueOrNull ?? const <NewsItem>[];
-    if (items.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'News & Updates',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          height: 200,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.zero,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-            itemBuilder: (context, index) => _NewsCard(
-              item: items[index],
-              gradientColors:
-                  _kNewsGradients[index % _kNewsGradients.length],
+    if (items.isEmpty) {
+      return const SizedBox(
+        height: 148,
+        child: Center(
+          child: Text(
+            'No announcements',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 13,
             ),
           ),
         ),
-      ],
+      );
+    }
+
+    return SizedBox(
+      height: 148,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return Padding(
+            padding: EdgeInsets.only(right: i < items.length - 1 ? 12 : 0),
+            child: _AnnouncementCard(
+              item: item,
+              gradientColors: _kCardGradients[i % _kCardGradients.length],
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
-class _NewsCard extends StatelessWidget {
-  const _NewsCard({required this.item, required this.gradientColors});
+class _AnnouncementCard extends StatelessWidget {
+  const _AnnouncementCard({
+    required this.item,
+    required this.gradientColors,
+  });
 
   final NewsItem item;
   final List<Color> gradientColors;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradientColors,
+    return GestureDetector(
+      onTap: () => context.go('/calendar'),
+      child: Container(
+        width: 210,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: .06),
+            width: 1,
+          ),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradientColors,
+          ),
         ),
-      ),
-      child: Stack(
-        children: [
-          // Content at bottom
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Admin-set image over the gradient, under the scrim.
+            if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+              Positioned.fill(
+                child: Image.network(
+                  item.imageUrl!,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.7),
+              ),
+            // Bottom scrim
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 100,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: .65),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Content
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tag pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: .25),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        item.type.toUpperCase(),
+                        style: AppTypography.labelMd.copyWith(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.9,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Title
+                    Text(
+                      item.title,
+                      style: AppTypography.titleMd.copyWith(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.15,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (item.body != null && item.body!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        item.body!,
+                        style: AppTypography.bodySm.copyWith(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.white.withValues(alpha: .82),
+                          height: 1.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        'Kharis Church',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white54,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _age(item.publishedAt),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      item.type,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

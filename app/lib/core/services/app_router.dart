@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import '../../features/giving/presentation/screens/giving_screen.dart';
 import '../../features/home/presentation/screens/dashboard_shell.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
+import '../../features/browse/presentation/screens/browse_screen.dart';
 import '../../features/messages/presentation/screens/messages_screen.dart';
 import '../../features/onboarding/presentation/screens/branch_selection_screen.dart';
 import '../../features/onboarding/presentation/screens/login_screen.dart';
@@ -17,6 +18,12 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/home/presentation/screens/reading_screen.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
+import '../../features/settings/presentation/screens/edit_profile_screen.dart';
+import '../../features/admin/presentation/screens/admin_hub_screen.dart';
+import '../../features/admin/presentation/screens/admin_announcements_screen.dart';
+import '../../features/admin/presentation/screens/admin_events_screen.dart';
+import '../../features/admin/presentation/screens/admin_branches_screen.dart';
+import '../../features/admin/presentation/screens/admin_users_screen.dart';
 import '../../shared/providers/auth_provider.dart';
 
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
@@ -74,6 +81,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home',
                 builder: (context, state) => const HomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'browse',
+                    builder: (context, state) => const BrowseScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -128,6 +141,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notes',
         builder: (context, state) => const NotesScreen(),
+      ),
+
+      // ── Profile (overlays shell) ──────────────────────────────────────────
+      GoRoute(
+        path: '/profile/edit',
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+
+      // ── Admin console (overlays shell) ────────────────────────────────────
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminHubScreen(),
+      ),
+      GoRoute(
+        path: '/admin/announcements',
+        builder: (context, state) => const AdminAnnouncementsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/events',
+        builder: (context, state) => const AdminEventsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/branches',
+        builder: (context, state) => const AdminBranchesScreen(),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (context, state) => const AdminUsersScreen(),
       ),
     ],
   );

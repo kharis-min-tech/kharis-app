@@ -16,6 +16,22 @@
   -->
   <base href="$FLUTTER_BASE_HREF">
 
+  <!-- Online-first: evict any previously-installed Flutter service worker and
+       its cached app shell so a new deploy always loads immediately, instead
+       of showing a stale build until a later reload. -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (r) { r.unregister(); });
+      }).catch(function () {});
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then(function (keys) {
+        keys.forEach(function (k) { caches.delete(k); });
+      }).catch(function () {});
+    }
+  </script>
+
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">

@@ -8,6 +8,7 @@ class User {
     required this.displayName,
     required this.role,
     this.branch,
+    this.photoUrl,
     required this.createdAt,
   });
 
@@ -16,6 +17,7 @@ class User {
   final String displayName;
   final String role;
   final String? branch;
+  final String? photoUrl;
   final DateTime createdAt;
 
   Map<String, dynamic> toJson() => {
@@ -24,6 +26,7 @@ class User {
         'displayName': displayName,
         'role': role,
         'branch': branch,
+        'photoUrl': photoUrl,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -33,6 +36,7 @@ class User {
         displayName: json['displayName'] as String,
         role: json['role'] as String,
         branch: json['branch'] as String?,
+        photoUrl: json['photoUrl'] as String?,
         createdAt: DateTime.parse(json['createdAt'] as String),
       );
 
@@ -42,6 +46,7 @@ class User {
     String? displayName,
     String? role,
     String? branch,
+    String? photoUrl,
     DateTime? createdAt,
   }) =>
       User(
@@ -50,6 +55,7 @@ class User {
         displayName: displayName ?? this.displayName,
         role: role ?? this.role,
         branch: branch ?? this.branch,
+        photoUrl: photoUrl ?? this.photoUrl,
         createdAt: createdAt ?? this.createdAt,
       );
 

@@ -41,6 +41,41 @@ class NewsRepository {
         .defaultIfEmpty(_fallback);
   }
 
+  // ── Admin writes ────────────────────────────────────────────────────────────
+
+  Future<void> addNews({
+    required String title,
+    required String type,
+    String? body,
+    String? imageUrl,
+  }) {
+    return _firestore.collection('news').add({
+      'title': title,
+      'type': type,
+      'body': body,
+      'imageUrl': imageUrl,
+      'publishedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateNews(
+    String id, {
+    required String title,
+    required String type,
+    String? body,
+    String? imageUrl,
+  }) {
+    return _firestore.collection('news').doc(id).update({
+      'title': title,
+      'type': type,
+      'body': body,
+      'imageUrl': imageUrl,
+    });
+  }
+
+  Future<void> deleteNews(String id) =>
+      _firestore.collection('news').doc(id).delete();
+
   NewsItem _docToNews(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     return NewsItem(

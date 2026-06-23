@@ -8,9 +8,33 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper: user has admin custom claim
+    // Helper: admin via custom claim OR a profile role of 'admin'.
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.admin == true;
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+      );
+    }
+
+    // users — each user manages their own profile; admins manage all profiles
+    // and are the only ones who may change a role (no self-promotion).
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == uid
+                    && request.resource.data.role in ['member', 'guest', 'new_here'];
+      allow update: if isAdmin()
+                    || (isAuthenticated() && request.auth.uid == uid
+                        && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // branches — publicly readable, writable only by admin
+    match /branches/{branchId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // sermons — publicly readable, writable only by admin
@@ -37,7 +61,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // config (e.g. live status) — publicly readable, admin writable
+    // config (e.g. live status, featured video) — publicly readable, admin writable
     match /config/{docId} {
       allow read: if true;
       allow write: if isAdmin();

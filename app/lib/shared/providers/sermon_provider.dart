@@ -121,10 +121,6 @@ final librarySermonsProvider = Provider<List<Sermon>>((ref) {
   );
 });
 
-// ── Currently playing sermon ──────────────────────────────────────────────────
-
-final currentSermonProvider = StateProvider<Sermon?>((ref) => null);
-
 // ── Videos (YouTube non-shorts, LIVE from feed) ──────────────────────────────
 
 final videoRepositoryProvider = Provider<VideoRepository>(

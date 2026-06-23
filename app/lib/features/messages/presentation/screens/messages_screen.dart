@@ -1,22 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
 import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/core/utils/artwork_gradient.dart';
-import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
-import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/shared/widgets/skeleton.dart';
-import 'package:kharis_app/shared/widgets/press_effect.dart';
+import '../widgets/sermon_list_item.dart';
 
-/// Messages tab - the sermon library as a podcast show page.
-///
-/// Layout mirrors a Spotify show page in the Kharis system: show header,
-/// Following pill, Episodes/About tabs, episode feed with descriptions,
-/// per-episode action row, and an accent play button per episode.
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
 
@@ -24,548 +18,460 @@ class MessagesScreen extends ConsumerStatefulWidget {
   ConsumerState<MessagesScreen> createState() => _MessagesScreenState();
 }
 
-/// Rows kept mounted per scroll window. The window grows seamlessly as the
-/// user scrolls (no visible paging) but bounds layout cost for the
-/// 1,470-episode catalogue.
-const int _kWindowSize = 100;
-
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
-  final _searchController = TextEditingController();
-  String _searchQuery = '';
-  bool _searchOpen = false;
-  int _tab = 0; // 0 = Episodes, 1 = About
-  int _window = _kWindowSize;
-  bool _growScheduled = false;
+  // Key used to scroll the "All Messages" header into view when a topic is tapped.
+  final _listHeaderKey = GlobalKey();
 
-  /// Grows the window after the current frame. Called from itemBuilder, so
-  /// it must never setState synchronously (mid-build/layout drops it).
-  void _growWindow(int total) {
-    if (_growScheduled || _window >= total) return;
-    _growScheduled = true;
+  void _scrollToList() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _window = (_window + _kWindowSize).clamp(0, total);
-        _growScheduled = false;
-      });
+      final ctx = _listHeaderKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOut,
+        );
+      }
     });
-  }
-
-  void _resetWindow() => _window = _kWindowSize;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Categories: skip 'All' for the topic carousel.
+    final categories = ref
+        .watch(categoryLabelsProvider)
+        .where((c) => c != 'All')
+        .toList();
+
+    // Filtered + sorted sermon list.
+    final sermons = ref.watch(librarySermonsProvider);
+
+    // Raw async for loading detection and per-category counts.
     final sermonsAsync = ref.watch(sermonsProvider);
+
+    // Playback state from audio_provider only (no collision with sermon_provider).
+    final currentSermon = ref.watch(currentSermonProvider);
+    final playerState = ref.watch(playerStateProvider).valueOrNull;
+
+    // Active sort.
+    final sort = ref.watch(sermonSortProvider);
+
+    // Active category filter: drives the highlighted topic card, the dynamic
+    // "All Messages" -> category title, and the removable filter chip below.
+    final selectedCategory = ref.watch(selectedCategoryProvider);
+    final isFiltered = selectedCategory != 'All';
+
+    // Build category -> count map from the unfiltered list.
+    final allSermons = sermonsAsync.valueOrNull ?? const [];
+    final Map<String, int> categoryCounts = {};
+    for (final s in allSermons) {
+      if (s.category != null) {
+        categoryCounts[s.category!] = (categoryCounts[s.category!] ?? 0) + 1;
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
-        child: sermonsAsync.when(
-          loading: () => _buildSkeletonPage(),
-          error: (_, _) => _ErrorState(
-            onRetry: () => ref.invalidate(sermonsProvider),
-          ),
-          data: (sermons) => _buildShowPage(context, sermons),
+        bottom: false,
+        child: CustomScrollView(
+          slivers: [
+            // ── 1. Header ────────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Messages',
+                      style: AppTypography.headlineLg.copyWith(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.heading,
+                        letterSpacing: -0.18,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Sermons & teachings · streamed from Kharis',
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 13,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 28)),
+
+            // ── 2a. "Find encouragement" label ───────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Find encouragement',
+                      style: AppTypography.bodyLg.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.heading,
+                        letterSpacing: -0.18,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () {
+                        ref.read(selectedCategoryProvider.notifier).state =
+                            'All';
+                        _scrollToList();
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        'See all',
+                        style: AppTypography.labelMd.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── 2b. Topic playlist carousel (150x150 cards) ──────────────────
+            SliverToBoxAdapter(
+              child: SizedBox(
+                // 150px card + 8px gap + ~34px count label
+                height: 196,
+                child: categories.isEmpty
+                    ? const SizedBox.shrink()
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.marginMobile,
+                        ),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: categories.length,
+                        itemBuilder: (context, index) {
+                          final cat = categories[index];
+                          final count = categoryCounts[cat] ?? 0;
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: index < categories.length - 1 ? 12 : 0,
+                            ),
+                            child: _TopicCard(
+                              category: cat,
+                              count: count,
+                              gradientIndex: index,
+                              active: selectedCategory == cat,
+                              onTap: () {
+                                // Tap to filter; tap the active topic to clear.
+                                ref
+                                        .read(selectedCategoryProvider.notifier)
+                                        .state =
+                                    selectedCategory == cat ? 'All' : cat;
+                                _scrollToList();
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 28)),
+
+            // ── 3. "All Messages" row + Newest/Oldest sort pills ─────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                key: _listHeaderKey,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            isFiltered ? selectedCategory : 'All Messages',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.bodyLg.copyWith(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.heading,
+                              letterSpacing: -0.18,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _SortPill(
+                          label: 'Newest',
+                          active: sort == SermonSort.newest,
+                          onTap: () => ref
+                              .read(sermonSortProvider.notifier)
+                              .state = SermonSort.newest,
+                        ),
+                        const SizedBox(width: 8),
+                        _SortPill(
+                          label: 'Oldest',
+                          active: sort == SermonSort.oldest,
+                          onTap: () => ref
+                              .read(sermonSortProvider.notifier)
+                              .state = SermonSort.oldest,
+                        ),
+                      ],
+                    ),
+                    if (isFiltered) ...[
+                      const SizedBox(height: 12),
+                      _FilterChip(
+                        label: selectedCategory,
+                        count: sermons.length,
+                        onClear: () => ref
+                            .read(selectedCategoryProvider.notifier)
+                            .state = 'All',
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // ── 4. Sermon list (unlimited, no batch labels) ──────────────────
+            if (sermons.isEmpty && sermonsAsync.isLoading)
+              // Loading skeletons while data is in flight
+              SliverList.builder(
+                itemCount: 6,
+                itemBuilder: (_, _) => const _SermonRowSkeleton(),
+              )
+            else
+              SliverList.builder(
+                itemCount: sermons.length,
+                itemBuilder: (context, index) {
+                  final sermon = sermons[index];
+                  final isCurrent = currentSermon?.id == sermon.id;
+                  final isPlaying =
+                      isCurrent && (playerState?.playing ?? false);
+                  final dateLabel = sermon.publishedAt != null
+                      ? DateFormat('MMM yyyy').format(sermon.publishedAt!)
+                      : '';
+                  return SermonListItem(
+                    key: ValueKey(sermon.id),
+                    title: sermon.title,
+                    speaker: sermon.speaker,
+                    category: sermon.category,
+                    durationLabel: sermon.formattedDuration,
+                    dateLabel: dateLabel,
+                    artworkColor: sermon.artworkColor,
+                    artworkUrl: sermon.artworkUrl,
+                    listIndex: index,
+                    isPlaying: isPlaying,
+                    onTap: () {
+                      // Audio only: start playback; mini player handles navigation.
+                      ref.read(audioPlayerServiceProvider).play(sermon);
+                    },
+                  );
+                },
+              ),
+
+            // ── Bottom pad: clears mini player + tab bar ─────────────────────
+            const SliverPadding(padding: EdgeInsets.only(bottom: 150)),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildShowPage(BuildContext context, List<Sermon> allSermons) {
-    final library = ref.watch(librarySermonsProvider);
-    final query = _searchQuery.toLowerCase();
-    final episodes = query.isEmpty
-        ? library
-        : library
-            .where((s) => s.title.toLowerCase().contains(query))
-            .toList();
-    final visible = episodes.take(_window).toList();
-    final hasMore = episodes.length > visible.length;
-    final showArt =
-        allSermons.isNotEmpty ? allSermons.first.artworkUrl : null;
+// ── Topic playlist card (150x150) ─────────────────────────────────────────────
 
-    return RefreshIndicator(
-      color: AppColors.secondary,
-      backgroundColor: AppColors.surfaceElevated,
-      onRefresh: () async => ref.invalidate(sermonsProvider),
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _ShowHeader(artworkUrl: showArt)),
-          SliverToBoxAdapter(child: _actionRow()),
-          if (_searchOpen) SliverToBoxAdapter(child: _searchField()),
-          SliverToBoxAdapter(child: _tabs()),
-          if (_tab == 0) ...[
-            SliverToBoxAdapter(child: _filterRow(episodes.length)),
-            if (visible.isEmpty)
-              const SliverToBoxAdapter(child: _EmptyState())
-            else
-              SliverList.separated(
-                itemCount: visible.length,
-                separatorBuilder: (_, _) => const Divider(
-                  color: AppColors.surfaceSubtle,
-                  height: 1,
-                  thickness: 1,
-                ),
-                itemBuilder: (context, i) {
-                  // Laying out one of the trailing rows = user reached the
-                  // window edge: grow it seamlessly.
-                  if (hasMore && i >= visible.length - 10) {
-                    _growWindow(episodes.length);
-                  }
-                  return _EpisodeTile(sermon: visible[i]);
-                },
+class _TopicCard extends StatelessWidget {
+  const _TopicCard({
+    required this.category,
+    required this.count,
+    required this.gradientIndex,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String category;
+  final int count;
+  final int gradientIndex;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = sermonGradient(gradientIndex);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 150,
+            height: 150,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: colors,
               ),
-            if (hasMore)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        color: AppColors.secondary,
-                        strokeWidth: 2.5,
+              border: active
+                  ? Border.all(color: AppColors.secondary, width: 2.5)
+                  : null,
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: AppColors.secondary.withValues(alpha: 0.35),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Stack(
+              children: [
+                // Bottom scrim
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 90,
+                    decoration: const BoxDecoration(
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xBB000000)],
                       ),
                     ),
                   ),
                 ),
-              ),
-            const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.xl),
+                // Category title above the play button
+                Positioned(
+                  bottom: 44,
+                  left: 10,
+                  right: 10,
+                  child: Text(
+                    category,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyLg.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                // Play button (gold check when this topic is the active filter)
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.secondary : Colors.white,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                    ),
+                    child: Icon(
+                      active ? Icons.check_rounded : Icons.play_arrow_rounded,
+                      color:
+                          active ? AppColors.onSecondary : AppColors.surfaceDark,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ] else
-            const SliverToBoxAdapter(child: _AboutTab()),
-        ],
-      ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // "{n} messages" count label, or the active-filter state in gold.
+        Text(
+          active ? 'Filtering · $count' : '$count messages',
+          style: AppTypography.bodySm.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: active ? AppColors.secondary : const Color(0xFFCFC8D4),
+          ),
+        ),
+      ],
     );
   }
+}
 
-  // ── Action row: Following pill + bell + search + more ─────────────────────
+// ── Active filter chip (tap to clear back to All) ─────────────────────────────
 
-  Widget _actionRow() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0,
-      ),
-      child: Row(
-        children: [
-          OutlinedButton(
-            onPressed: () {},
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.secondary, width: 1.2),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg, vertical: 6,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(99),
-              ),
-            ),
-            child: Text(
-              'Following',
-              style: GoogleFonts.plusJakartaSans(
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.count,
+    required this.onClear,
+  });
+
+  final String label;
+  final int count;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onClear,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 7, 10, 7),
+        decoration: BoxDecoration(
+          color: AppColors.secondary.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: AppColors.secondary.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$label · $count',
+              style: AppTypography.labelMd.copyWith(
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 color: AppColors.secondary,
               ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: AppColors.textMuted,
-              size: 22,
-            ),
-          ),
-          IconButton(
-            onPressed: () => setState(() {
-              _searchOpen = !_searchOpen;
-              if (!_searchOpen) {
-                _searchController.clear();
-                _searchQuery = '';
-                _resetWindow();
-              }
-            }),
-            icon: Icon(
-              _searchOpen ? Icons.close_rounded : Icons.search_rounded,
-              color: _searchOpen ? AppColors.secondary : AppColors.textMuted,
-              size: 22,
-            ),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.more_horiz_rounded,
-              color: AppColors.textMuted,
-              size: 22,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _searchField() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0,
-      ),
-      child: TextField(
-        controller: _searchController,
-        autofocus: true,
-        onChanged: (v) => setState(() {
-          _searchQuery = v;
-          _resetWindow();
-        }),
-        style: GoogleFonts.plusJakartaSans(color: AppColors.onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Search episodes...',
-          hintStyle:
-              GoogleFonts.plusJakartaSans(color: AppColors.textMuted, fontSize: 14),
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: AppColors.textMuted, size: 20),
-          filled: true,
-          fillColor: AppColors.surfaceSubtle,
-          isDense: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Episodes | About tabs ──────────────────────────────────────────────────
-
-  Widget _tabs() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0,
-      ),
-      child: Row(
-        children: [
-          _TabLabel(
-            label: 'Episodes',
-            active: _tab == 0,
-            onTap: () => setState(() => _tab = 0),
-          ),
-          const SizedBox(width: AppSpacing.xl),
-          _TabLabel(
-            label: 'About',
-            active: _tab == 1,
-            onTap: () => setState(() => _tab = 1),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Sort • Filter row ──────────────────────────────────────────────────────
-
-  Widget _filterRow(int matchCount) {
-    final sort = ref.watch(sermonSortProvider);
-    final category = ref.watch(selectedCategoryProvider);
-    final label = category == 'All' ? 'All Episodes' : category;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.sm,
-      ),
-      child: GestureDetector(
-        onTap: _showSortFilterSheet,
-        child: Row(
-          children: [
-            const Icon(Icons.tune_rounded,
-                color: AppColors.onSurface, size: 18),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                '${sort.label} • $label',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text(
-              '$matchCount episodes',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                color: AppColors.textMuted,
-              ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.close_rounded,
+              size: 16,
+              color: AppColors.secondary,
             ),
           ],
         ),
       ),
     );
   }
-
-  void _showSortFilterSheet() {
-    final labels = ref.read(categoryLabelsProvider);
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.surfaceElevated,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(sheetContext).size.height * 0.75,
-            ),
-            child: Consumer(
-              builder: (context, sheetRef, _) {
-                final sort = sheetRef.watch(sermonSortProvider);
-                final category = sheetRef.watch(selectedCategoryProvider);
-
-                return ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: AppSpacing.lg,
-                  ),
-                  children: [
-                    _sheetHeading('Sort by'),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.lg,
-                        vertical: AppSpacing.sm,
-                      ),
-                      child: Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
-                        children: [
-                          for (final s in SermonSort.values)
-                            ChoiceChip(
-                              label: Text(s.label),
-                              selected: sort == s,
-                              showCheckmark: false,
-                              selectedColor:
-                                  AppColors.secondary.withValues(alpha: 0.18),
-                              backgroundColor: AppColors.surfaceSubtle,
-                              side: BorderSide(
-                                color: sort == s
-                                    ? AppColors.secondary
-                                    : Colors.transparent,
-                              ),
-                              labelStyle: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: sort == s
-                                    ? AppColors.secondary
-                                    : AppColors.onSurfaceVariant,
-                              ),
-                              onSelected: (_) {
-                                sheetRef
-                                    .read(sermonSortProvider.notifier)
-                                    .state = s;
-                                setState(_resetWindow);
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _sheetHeading('Category'),
-                    for (final c in labels)
-                      ListTile(
-                        dense: true,
-                        title: Text(
-                          c == 'All' ? 'All Episodes' : c,
-                          style: GoogleFonts.plusJakartaSans(
-                            color: category == c
-                                ? AppColors.secondary
-                                : AppColors.onSurface,
-                            fontWeight: category == c
-                                ? FontWeight.w700
-                                : FontWeight.w400,
-                            fontSize: 14,
-                          ),
-                        ),
-                        trailing: category == c
-                            ? const Icon(Icons.check_rounded,
-                                color: AppColors.secondary, size: 20)
-                            : null,
-                        onTap: () {
-                          sheetRef
-                              .read(selectedCategoryProvider.notifier)
-                              .state = c;
-                          setState(_resetWindow);
-                          Navigator.of(sheetContext).pop();
-                        },
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _sheetHeading(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      child: Text(
-        text.toUpperCase(),
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.1,
-          color: AppColors.textMuted,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSkeletonPage() {
-    return CustomScrollView(
-      physics: const NeverScrollableScrollPhysics(),
-      slivers: [
-        // Header skeleton: 96px art square + 2 lines
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Skeleton(width: 96, height: 96),
-                const SizedBox(width: AppSpacing.lg),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SkeletonLine(width: 160),
-                    SizedBox(height: AppSpacing.sm),
-                    SkeletonLine(width: 100),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        // 4 episode-row skeletons
-        SliverList.separated(
-          itemCount: 4,
-          separatorBuilder: (_, _) => const Divider(
-            color: AppColors.surfaceSubtle,
-            height: 1,
-            thickness: 1,
-          ),
-          itemBuilder: (_, _) => const _EpisodeRowSkeleton(),
-        ),
-      ],
-    );
-  }
-
 }
 
-// ── Show header ───────────────────────────────────────────────────────────────
+// ── Sort pill (gold active, glass inactive) ────────────────────────────────────
 
-class _ShowHeader extends StatelessWidget {
-  const _ShowHeader({this.artworkUrl});
-
-  final String? artworkUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 96,
-              height: 96,
-              child: artworkUrl != null
-                  ? Image.network(
-                      artworkUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const _ArtFallback(size: 96),
-                    )
-                  : const _ArtFallback(size: 96),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Messages by David Antwi',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
-                    height: 1.2,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Kharis Church',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ArtFallback extends StatelessWidget {
-  const _ArtFallback({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: sermonGradient(0),
-        ),
-      ),
-      child: Icon(Icons.podcasts_rounded,
-          color: Colors.white, size: size * 0.4),
-    );
-  }
-}
-
-// ── Tab label with accent underline ──────────────────────────────────────────
-
-class _TabLabel extends StatelessWidget {
-  const _TabLabel({
+class _SortPill extends StatelessWidget {
+  const _SortPill({
     required this.label,
     required this.active,
     required this.onTap,
@@ -579,426 +485,90 @@ class _TabLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? AppColors.onSurface : AppColors.textMuted,
-            ),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.secondary
+              : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: active
+              ? null
+              : Border.all(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  width: 1,
+                ),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.labelMd.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: active ? AppColors.onSecondary : AppColors.onSurface,
           ),
-          const SizedBox(height: 6),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Skeleton row (loading state) ──────────────────────────────────────────────
+
+class _SermonRowSkeleton extends StatelessWidget {
+  const _SermonRowSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      child: Row(
+        children: [
+          // Art placeholder
           Container(
-            height: 2.5,
-            width: 28,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              color: active ? AppColors.secondary : Colors.transparent,
-              borderRadius: BorderRadius.circular(2),
+              color: AppColors.surfaceSubtle,
+              borderRadius: BorderRadius.circular(11),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Episode tile (Spotify-style feed row) ─────────────────────────────────────
-
-class _EpisodeTile extends ConsumerWidget {
-  const _EpisodeTile({required this.sermon});
-
-  final Sermon sermon;
-
-  void _open(BuildContext context) {
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        builder: (context) => MediaPlayerScreen(sermon: sermon),
-      ),
-    );
-  }
-
-  static String _relativeDate(DateTime? dt) {
-    if (dt == null) return '';
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(dt.year, dt.month, dt.day);
-    final diff = today.difference(day).inDays;
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Yesterday';
-    if (diff < 7) return DateFormat('EEE').format(dt);
-    if (dt.year == now.year) return DateFormat('d MMM').format(dt);
-    return DateFormat('d MMM yyyy').format(dt);
-  }
-
-  static String _durationLabel(Duration? d) {
-    if (d == null) return '';
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    return h > 0 ? '${h}h ${m}min' : '${m}min';
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = sermonGradient(sermon.artworkColor ?? 0);
-    final meta = [
-      _relativeDate(sermon.publishedAt),
-      _durationLabel(sermon.duration),
-    ].where((s) => s.isNotEmpty).join(' • ');
-
-    return Semantics(
-      button: true,
-      label: 'Play ${sermon.title}',
-      child: InkWell(
-        onTap: () => _open(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg, vertical: AppSpacing.lg,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Artwork + title
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+          const SizedBox(width: 12),
+          // Text placeholders
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: sermon.artworkUrl != null
-                        ? Image.network(
-                            sermon.artworkUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: palette,
-                                ),
-                              ),
-                            ),
-                          )
-                        : Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: palette,
-                              ),
-                            ),
-                          ),
+                Container(
+                  height: 14,
+                  width: 180,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSubtle,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    sermon.title,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 6),
+                Container(
+                  height: 12,
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSubtle,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ],
             ),
-
-            // Description
-            if (sermon.description != null &&
-                sermon.description!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.md),
-              _ExpandableDescription(text: sermon.description!),
-            ],
-
-            // Meta
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              meta,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textMuted,
-              ),
-            ),
-
-            // Actions
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                const Icon(Icons.add_circle_outline_rounded,
-                    color: AppColors.textMuted, size: 22),
-                const SizedBox(width: AppSpacing.xl),
-                const Icon(Icons.arrow_circle_down_outlined,
-                    color: AppColors.textMuted, size: 22),
-                const SizedBox(width: AppSpacing.xl),
-                const Icon(Icons.ios_share_rounded,
-                    color: AppColors.textMuted, size: 20),
-                const SizedBox(width: AppSpacing.xl),
-                const Icon(Icons.more_horiz_rounded,
-                    color: AppColors.textMuted, size: 22),
-                const Spacer(),
-                Semantics(
-                  button: true,
-                  label: 'Play ${sermon.title}',
-                  excludeSemantics: true,
-                child: PressEffect(
-                  onTap: () => _open(context),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.secondary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  }
-}
-
-// ── Expandable description (per-tile expand/collapse) ─────────────────────────
-
-class _ExpandableDescription extends StatefulWidget {
-  const _ExpandableDescription({required this.text});
-
-  final String text;
-
-  @override
-  State<_ExpandableDescription> createState() => _ExpandableDescriptionState();
-}
-
-class _ExpandableDescriptionState extends State<_ExpandableDescription> {
-  bool _expanded = false;
-
-  static bool _doesOverflow(
-      BuildContext context, String text, TextStyle style, double maxWidth) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: Directionality.of(context),
-      maxLines: 2,
-    )..layout(maxWidth: maxWidth);
-    return tp.didExceedMaxLines;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final style = GoogleFonts.plusJakartaSans(
-      fontSize: 12.5,
-      color: AppColors.onSurfaceVariant,
-      height: 1.45,
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final overflows = _doesOverflow(
-            context, widget.text, style, constraints.maxWidth);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedCrossFade(
-              firstChild: Text(
-                widget.text,
-                style: style,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              secondChild: Text(widget.text, style: style),
-              crossFadeState: _expanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 200),
-            ),
-            if (overflows)
-              GestureDetector(
-                onTap: () => setState(() => _expanded = !_expanded),
-                child: Text(
-                  _expanded ? 'less' : 'more',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ── About tab ─────────────────────────────────────────────────────────────────
-
-class _AboutTab extends StatelessWidget {
-  const _AboutTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Weekly messages from Kharis Church with Rev Dr David Antwi. '
-            'Sermons, prayer series, and teaching from every branch - '
-            'new episodes every week.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: AppColors.onSurfaceVariant,
-              height: 1.6,
-            ),
           ),
-          const SizedBox(height: AppSpacing.xl),
-          Text(
-            'Hosted by Rev Dr David Antwi',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface,
+          const SizedBox(width: 8),
+          // 3-dot placeholder
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Kharis Church • Audio via SoundCloud',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              color: AppColors.textMuted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Empty + error states ──────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      child: Center(
-        child: Column(
-          children: [
-            const Icon(Icons.search_off_rounded,
-                color: AppColors.textMuted, size: 40),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'No episodes match',
-              style: GoogleFonts.plusJakartaSans(
-                color: AppColors.onSurfaceVariant,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off_rounded,
-              color: AppColors.textMuted, size: 40),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Could not load episodes',
-            style: GoogleFonts.plusJakartaSans(
-              color: AppColors.onSurfaceVariant,
-              fontSize: 14,
-            ),
-          ),
-          TextButton(
-            onPressed: onRetry,
-            child: Text(
-              'Retry',
-              style: GoogleFonts.plusJakartaSans(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Skeleton for episode row ──────────────────────────────────────────────────
-
-class _EpisodeRowSkeleton extends StatelessWidget {
-  const _EpisodeRowSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg, vertical: AppSpacing.lg,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Skeleton(width: 56, height: 56, radius: 6),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    SkeletonLine(width: double.infinity),
-                    SizedBox(height: AppSpacing.sm),
-                    SkeletonLine(width: 140),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: const [
-              SkeletonLine(width: 22, height: 22),
-              SizedBox(width: AppSpacing.xl),
-              SkeletonLine(width: 22, height: 22),
-              SizedBox(width: AppSpacing.xl),
-              SkeletonLine(width: 22, height: 22),
-              Spacer(),
-              Skeleton(width: 40, height: 40, radius: 99),
-            ],
           ),
         ],
       ),

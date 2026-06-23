@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 
 /// Row of secondary player actions shown below the playback controls.
-/// Currently exposes the Notes action; extend with additional icons as needed.
+/// Currently exposes the Notes action; extend with additional buttons as needed.
 class PlayerActions extends ConsumerWidget {
   const PlayerActions({super.key});
 
@@ -32,14 +33,14 @@ class PlayerActions extends ConsumerWidget {
 
     Navigator.of(context)
         .push<void>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => NoteEditorScreen(
-          sermon: sermon,
-          positionMs: position.inMilliseconds,
-        ),
-      ),
-    )
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => NoteEditorScreen(
+              sermon: sermon,
+              positionMs: position.inMilliseconds,
+            ),
+          ),
+        )
         .then((_) {
       // Bump revision so any open NotesScreen list stays fresh.
       ref.read(notesRevisionProvider.notifier).state++;
@@ -47,7 +48,7 @@ class PlayerActions extends ConsumerWidget {
   }
 }
 
-// ── Private icon+label button ─────────────────────────────────────────────────
+// ── Private icon + label button ───────────────────────────────────────────────
 
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
@@ -67,13 +68,15 @@ class _ActionButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white70, size: 26),
+          Icon(icon, color: AppColors.onSurfaceVariant, size: 26),
           const SizedBox(height: AppSpacing.xs),
           Text(
             label,
-            style: GoogleFonts.plusJakartaSans(
+            style: AppTypography.labelMd.copyWith(
               fontSize: 11,
-              color: Colors.white70,
+              fontWeight: FontWeight.w500,
+              color: AppColors.onSurfaceVariant,
+              letterSpacing: 0,
             ),
           ),
         ],

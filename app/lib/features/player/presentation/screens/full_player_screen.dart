@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/utils/artwork_gradient.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/shared/widgets/artwork_image.dart';
+
+import '../widgets/player_actions.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/seek_bar.dart';
 
+/// Spotify-style Now Playing screen.
+///
+/// The ambient background is a vertical gradient derived from
+/// sermonGradient(sermon.artworkColor): the palette's primary colour at the
+/// top bleeding into AppColors.canvas at the bottom (65% stop). The full
+/// artwork square is the dominant element. Playback controls sit below,
+/// and secondary actions (Notes) appear at the bottom.
 class FullPlayerScreen extends ConsumerWidget {
   const FullPlayerScreen({super.key});
 
@@ -13,166 +26,194 @@ class FullPlayerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sermon = ref.watch(currentSermonProvider);
     final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-    final duration =
-        ref.watch(durationProvider).valueOrNull ?? Duration.zero;
+    final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
     final service = ref.read(audioPlayerServiceProvider);
 
+    // Derive ambient colour from the sermon's artwork gradient palette.
+    final gradColors = sermonGradient(sermon?.artworkColor ?? 0);
+    final ambientTop = gradColors[0];
+
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFE8E8EC), Color(0xFFBFC2C8)],
+            colors: [
+              ambientTop,       // artwork-derived colour at top
+              AppColors.canvas, // deepest black at ~65%
+            ],
+            stops: const [0.0, 0.65],
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Top row: thumbnail + title/speaker + close + add ─────────
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: Row(
                   children: [
-                    // Artwork thumbnail
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppColors.primary, Color(0xFF9B5DE5)],
+                    // Collapse chevron
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white,
+                          size: 28,
                         ),
                       ),
-                      child: sermon?.artworkUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                sermon!.artworkUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => const Icon(
-                                  Icons.music_note_rounded,
-                                  color: Colors.white,
-                                  size: 28,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.music_note_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
                     ),
-                    const SizedBox(width: 12),
-                    // Title + speaker
+
+                    // "NOW PLAYING" centred label
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sermon?.title ?? 'No sermon loaded',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1A1A1A),
-                              height: 1.2,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            sermon?.speaker ?? '',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              color: const Color(0xFF6B6B6B),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                      child: Text(
+                        'NOW PLAYING',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.labelMd.copyWith(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.4,
+                          color: AppColors.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                    // Close button
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.close,
-                        color: Color(0xFF1A1A1A),
-                        size: 24,
+
+                    // 3-dot: shows secondary actions in a bottom sheet
+                    GestureDetector(
+                      onTap: () => _showActionsSheet(context),
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Icon(
+                          Icons.more_vert_rounded,
+                          color: Colors.white.withValues(alpha: 0.7),
+                          size: 22,
+                        ),
                       ),
-                      padding: EdgeInsets.zero,
-                    ),
-                    // Add button
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(
-                        Icons.add_circle_outline,
-                        color: Color(0xFF1A1A1A),
-                        size: 24,
-                      ),
-                      padding: EdgeInsets.zero,
                     ),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: 32),
+              const SizedBox(height: 20),
 
-                // ── Seek bar ─────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SeekBar(
-                    position: position,
-                    duration: duration,
-                    onSeek: (d) => service.seek(d),
+              // Large artwork: ~82% of screen width, radius 14, coloured shadow
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: ambientTop.withValues(alpha: 0.55),
+                          blurRadius: 40,
+                          offset: const Offset(0, 16),
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ArtworkImage(
+                      url: sermon?.artworkUrl,
+                      gradientIndex: sermon?.artworkColor ?? 0,
+                      radius: 14,
+                    ),
                   ),
                 ),
+              ),
 
-                const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
-                // ── Controls ─────────────────────────────────────────────────
-                const PlayerControls(),
-
-                const Spacer(),
-
-                // ── Bottom row: bluetooth | share + queue ────────────────────
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Icon(
-                        Icons.bluetooth,
-                        color: Color(0xFF6B6B6B),
-                        size: 24,
+              // Title and speaker, left-aligned
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      sermon?.title ?? 'No sermon loaded',
+                      style: AppTypography.headlineLgMobile.copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.heading,
+                        height: 1.2,
+                        letterSpacing: -0.3,
                       ),
-                      Row(
-                        children: const [
-                          Icon(
-                            Icons.ios_share,
-                            color: Color(0xFF6B6B6B),
-                            size: 24,
-                          ),
-                          SizedBox(width: 20),
-                          Icon(
-                            Icons.queue_music_rounded,
-                            color: Color(0xFF6B6B6B),
-                            size: 24,
-                          ),
-                        ],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      sermon?.speaker ?? '',
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.onSurfaceVariant,
                       ),
-                    ],
-                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Seek bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: SeekBar(
+                  position: position,
+                  duration: duration,
+                  onSeek: (d) => service.seek(d),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Playback controls (shuffle / -15s / play-pause / +15s / repeat)
+              const PlayerControls(),
+
+              const Spacer(),
+
+              // Secondary actions row at the bottom
+              const PlayerActions(),
+
+              const SizedBox(height: 20),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  void _showActionsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl),
+        ),
+      ),
+      builder: (ctx) {
+        final bottomPad = MediaQuery.of(ctx).viewPadding.bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(24, 20, 24, 20 + bottomPad),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [PlayerActions()],
+          ),
+        );
+      },
     );
   }
 }

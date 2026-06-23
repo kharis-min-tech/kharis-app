@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
 
+/// A selectable branch row: a vibrant gradient thumbnail, the branch name and
+/// location, and a gold check when chosen. The selected card gains a gold
+/// tint, border and soft glow.
 class BranchTile extends StatelessWidget {
   const BranchTile({
     super.key,
     required this.name,
     required this.subtitle,
     required this.gradientColors,
+    this.imageUrl,
     required this.isSelected,
     required this.onTap,
   });
@@ -15,6 +19,7 @@ class BranchTile extends StatelessWidget {
   final String name;
   final String subtitle;
   final List<Color> gradientColors;
+  final String? imageUrl;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -27,45 +32,69 @@ class BranchTile extends StatelessWidget {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0x991E1E1E), // rgba(30,30,30,0.6)
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected
+              ? AppColors.secondary.withValues(alpha: 0.1)
+              : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isSelected
-                ? AppColors.secondary.withValues(alpha: 0.30)
-                : Colors.white.withValues(alpha: 0.05),
-            width: 1,
+                ? AppColors.secondary.withValues(alpha: 0.55)
+                : Colors.white.withValues(alpha: 0.07),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.secondary.withValues(alpha: 0.3),
+                    blurRadius: 24,
+                    spreadRadius: -6,
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           children: [
-            // ── Gradient image placeholder ─────────────────────────────
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 58,
+                height: 58,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomRight,
+                          colors: gradientColors,
+                        ),
+                      ),
+                    ),
+                    if (imageUrl != null)
+                      Image.network(
+                        imageUrl!,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    // Brand tint so any photo stays on the dark palette.
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            gradientColors.first.withValues(alpha: 0.45),
+                            gradientColors.last.withValues(alpha: 0.3),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              child: const Icon(
-                Icons.church_rounded,
-                color: Colors.white54,
-                size: 28,
               ),
             ),
             const SizedBox(width: 14),
-
-            // ── Text ──────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,33 +102,37 @@ class BranchTile extends StatelessWidget {
                 children: [
                   Text(
                     name,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+                    style: AppTypography.titleMd.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.18,
+                      color: AppColors.heading,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: AppTypography.bodySm.copyWith(
                       fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.onSurfaceVariant,
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ],
               ),
             ),
-
-            // ── Selection indicator ───────────────────────────────────
             if (isSelected)
-              const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(
-                  Icons.check_circle_rounded,
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
                   color: AppColors.secondary,
-                  size: 22,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: AppColors.onSecondary,
+                  size: 14,
                 ),
               ),
           ],

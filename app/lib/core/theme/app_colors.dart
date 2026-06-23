@@ -29,6 +29,9 @@ abstract final class AppColors {
   /// App background — deepest layer.
   static const Color surfaceDark = Color(0xFF131313);
 
+  /// Deepest canvas behind the app shell.
+  static const Color canvas = Color(0xFF08070A);
+
   /// Cards, bottom bar — +1px white 10% border.
   static const Color surfaceElevated = Color(0xFF1E1E1E);
 
@@ -43,14 +46,20 @@ abstract final class AppColors {
 
   // ── Content ────────────────────────────────────────────────────────────────
 
-  /// Primary text on dark surfaces.
-  static const Color onSurface = Color(0xFFE5E2E1);
+  /// Headings (h1, section titles) — brightest text.
+  static const Color heading = Color(0xFFF2EEF4);
 
-  /// Body / secondary text.
-  static const Color onSurfaceVariant = Color(0xFFCCC3D3);
+  /// Primary / body text on dark surfaces.
+  static const Color onSurface = Color(0xFFE9E6EA);
 
-  /// Muted text, inactive icons.
-  static const Color textMuted = Color(0xFF968E9D);
+  /// Secondary / supporting text — neutral grey.
+  static const Color onSurfaceVariant = Color(0xFF9A929E);
+
+  /// Muted text, captions.
+  static const Color textMuted = Color(0xFF8B838F);
+
+  /// Faint text, chevrons, footer links, inactive icons.
+  static const Color textFaint = Color(0xFF6E6A70);
 
   // ── Outline / dividers ─────────────────────────────────────────────────────
 
@@ -62,4 +71,7 @@ abstract final class AppColors {
   static const Color error = Color(0xFFFFB4AB);
   static const Color errorContainer = Color(0xFF93000A);
   static const Color success = Color(0xFF22C55E);
+
+  /// Vivid pink — "Latest" badge, notification dot, live accents.
+  static const Color accentPink = Color(0xFFF531B3);
 }

@@ -120,6 +120,77 @@ class EventRepository {
     }
   }
 
+  // ── Admin writes ────────────────────────────────────────────────────────────
+
+  Future<void> addEvent({
+    required String title,
+    String? description,
+    String? location,
+    String? branch,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? imageUrl,
+    bool isFeatured = false,
+  }) {
+    return _firestore.collection('events').add(_toData(
+          title: title,
+          description: description,
+          location: location,
+          branch: branch,
+          startTime: startTime,
+          endTime: endTime,
+          imageUrl: imageUrl,
+          isFeatured: isFeatured,
+        ));
+  }
+
+  Future<void> updateEvent(
+    String id, {
+    required String title,
+    String? description,
+    String? location,
+    String? branch,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? imageUrl,
+    bool isFeatured = false,
+  }) {
+    return _firestore.collection('events').doc(id).update(_toData(
+          title: title,
+          description: description,
+          location: location,
+          branch: branch,
+          startTime: startTime,
+          endTime: endTime,
+          imageUrl: imageUrl,
+          isFeatured: isFeatured,
+        ));
+  }
+
+  Future<void> deleteEvent(String id) =>
+      _firestore.collection('events').doc(id).delete();
+
+  Map<String, Object?> _toData({
+    required String title,
+    String? description,
+    String? location,
+    String? branch,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? imageUrl,
+    bool isFeatured = false,
+  }) =>
+      {
+        'title': title,
+        'description': description,
+        'location': location,
+        'branch': branch,
+        'startTime': Timestamp.fromDate(startTime),
+        'endTime': Timestamp.fromDate(endTime),
+        'imageUrl': imageUrl,
+        'isFeatured': isFeatured,
+      };
+
   // ── Mapping ────────────────────────────────────────────────────────────────
 
   Event _docToEvent(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>

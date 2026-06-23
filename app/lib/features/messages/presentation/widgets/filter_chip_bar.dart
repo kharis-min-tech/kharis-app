@@ -1,51 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
 
-/// A horizontally scrollable row of filter chips.
+/// Horizontal row of sort/filter pills.
 ///
-/// The active chip has an orange border, orange text, and a 10 % orange
-/// background fill. Inactive chips use [AppColors.surfaceSubtle] background
-/// and [AppColors.onSurfaceVariant] text.
-class FilterChipBar extends StatelessWidget {
-  const FilterChipBar({
+/// Active pill: gold bg + dark text. Inactive: glass bg + white border.
+class SortPillBar extends StatelessWidget {
+  const SortPillBar({
     super.key,
     required this.labels,
-    required this.selectedIndex,
+    required this.activeIndex,
     required this.onSelected,
-    this.padding = const EdgeInsets.symmetric(horizontal: 16),
+    this.padding = const EdgeInsets.symmetric(horizontal: 20),
   });
 
   final List<String> labels;
-  final int selectedIndex;
+  final int activeIndex;
   final void Function(int index) onSelected;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        padding: padding,
-        scrollDirection: Axis.horizontal,
-        itemCount: labels.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final active = i == selectedIndex;
-          return _FilterChip(
-            label: labels[i],
-            active: active,
-            onTap: () => onSelected(i),
-          );
-        },
+    return Padding(
+      padding: padding,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < labels.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _SortPill(
+              label: labels[i],
+              active: i == activeIndex,
+              onTap: () => onSelected(i),
+            ),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
+class _SortPill extends StatelessWidget {
+  const _SortPill({
     required this.label,
     required this.active,
     required this.onTap,
@@ -60,27 +58,26 @@ class _FilterChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: active
-              ? AppColors.secondary.withValues(alpha: 0.10)
-              : AppColors.surfaceSubtle,
+              ? AppColors.secondary
+              : Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: active
-              ? Border.all(color: AppColors.secondary, width: 1.5)
-              : Border.all(color: Colors.transparent, width: 1.5),
+              ? null
+              : Border.all(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  width: 1,
+                ),
         ),
-        child: Center(
-          child: Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              color: active ? AppColors.secondary : AppColors.onSurfaceVariant,
-              height: 1.0,
-            ),
+        child: Text(
+          label,
+          style: AppTypography.labelMd.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: active ? AppColors.onSecondary : AppColors.onSurface,
           ),
         ),
       ),
