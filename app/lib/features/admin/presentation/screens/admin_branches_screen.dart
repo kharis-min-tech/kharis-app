@@ -227,6 +227,30 @@ class _BranchCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (branch.address != null || branch.meetingDays != null || branch.meetingTime != null) ...[
+                    const SizedBox(height: 2),
+                    if (branch.address != null)
+                      Text(
+                        branch.address!,
+                        style: AppTypography.labelMd.copyWith(
+                          color: AppColors.textFaint,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    if (branch.meetingDays != null || branch.meetingTime != null)
+                      Text(
+                        [
+                          if (branch.meetingDays != null) branch.meetingDays!,
+                          if (branch.meetingTime != null) branch.meetingTime!,
+                        ].join(', '),
+                        style: AppTypography.labelMd.copyWith(
+                          color: AppColors.textFaint,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                   const SizedBox(height: AppSpacing.xs),
                   // Gradient swatch pill
                   Row(
@@ -314,6 +338,9 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
   late final TextEditingController _endHexCtrl;
   late final TextEditingController _imageUrlCtrl;
   late final TextEditingController _orderCtrl;
+  late final TextEditingController _addressCtrl;
+  late final TextEditingController _meetingDaysCtrl;
+  late final TextEditingController _meetingTimeCtrl;
 
   Color _gradientStart = const Color(0xFF3B2A6B);
   Color _gradientEnd = const Color(0xFF7C3AED);
@@ -339,6 +366,9 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
     _orderCtrl = TextEditingController(
       text: (b?.order ?? 99).toString(),
     );
+    _addressCtrl = TextEditingController(text: b?.address ?? '');
+    _meetingDaysCtrl = TextEditingController(text: b?.meetingDays ?? '');
+    _meetingTimeCtrl = TextEditingController(text: b?.meetingTime ?? '');
   }
 
   @override
@@ -349,6 +379,9 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
     _endHexCtrl.dispose();
     _imageUrlCtrl.dispose();
     _orderCtrl.dispose();
+    _addressCtrl.dispose();
+    _meetingDaysCtrl.dispose();
+    _meetingTimeCtrl.dispose();
     super.dispose();
   }
 
@@ -508,6 +541,41 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
               ),
               const SizedBox(height: AppSpacing.sm),
 
+              // Venue Address
+              _label('Venue Address (optional)'),
+              const SizedBox(height: AppSpacing.xs),
+              TextFormField(
+                controller: _addressCtrl,
+                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                decoration: _deco(hint: 'e.g. 123 Church Street, London'),
+                textInputAction: TextInputAction.next,
+                maxLines: 2,
+                minLines: 1,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Meeting Days
+              _label('Meeting Days (optional)'),
+              const SizedBox(height: AppSpacing.xs),
+              TextFormField(
+                controller: _meetingDaysCtrl,
+                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                decoration: _deco(hint: 'e.g. Sundays'),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Meeting Time
+              _label('Meeting Time (optional)'),
+              const SizedBox(height: AppSpacing.xs),
+              TextFormField(
+                controller: _meetingTimeCtrl,
+                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                decoration: _deco(hint: 'e.g. 10:00 AM'),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
               // Order
               _label('Order'),
               const SizedBox(height: AppSpacing.xs),
@@ -581,6 +649,15 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
           ? null
           : _imageUrlCtrl.text.trim();
       final order = int.parse(_orderCtrl.text.trim());
+      final address = _addressCtrl.text.trim().isEmpty
+          ? null
+          : _addressCtrl.text.trim();
+      final meetingDays = _meetingDaysCtrl.text.trim().isEmpty
+          ? null
+          : _meetingDaysCtrl.text.trim();
+      final meetingTime = _meetingTimeCtrl.text.trim().isEmpty
+          ? null
+          : _meetingTimeCtrl.text.trim();
 
       if (widget.branch == null) {
         await widget.repo.addBranch(
@@ -590,6 +667,9 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
           gradientEnd: endColor,
           imageUrl: imageUrl,
           order: order,
+          address: address,
+          meetingDays: meetingDays,
+          meetingTime: meetingTime,
         );
         widget.onSuccess('Branch added.');
       } else {
@@ -601,6 +681,9 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
           gradientEnd: endColor,
           imageUrl: imageUrl,
           order: order,
+          address: address,
+          meetingDays: meetingDays,
+          meetingTime: meetingTime,
         );
         widget.onSuccess('Branch updated.');
       }

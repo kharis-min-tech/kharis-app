@@ -139,6 +139,16 @@ class FirebaseAuthRepository implements AuthRepository {
     return user;
   }
 
+  /// Persists notification preference toggles to the user's Firestore doc.
+  Future<void> updateNotificationPrefs(Map<String, bool> prefs) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    await _firestore.collection('users').doc(uid).set(
+      {'notificationPrefs': prefs},
+      SetOptions(merge: true),
+    );
+  }
+
   /// True when the current user is an admin (custom claim or profile role).
   Future<bool> isCurrentUserAdmin() async {
     final fbUser = _auth.currentUser;

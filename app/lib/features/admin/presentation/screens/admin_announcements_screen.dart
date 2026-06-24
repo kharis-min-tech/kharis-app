@@ -3,10 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/admin_provider.dart';
 
 // ── News type options ──────────────────────────────────────────────────────────
 
 const _newsTypes = ['Announcement', 'Event', 'Ministry', 'Notice'];
+
+// Fallback branch list if branchesProvider has not loaded yet.
+const _kFallbackBranches = [
+  'London', 'Manchester', 'Birmingham', 'Reading',
+  'Chatham', 'Croydon', 'Medway', 'Accra', 'Freetown',
+];
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -81,6 +88,10 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
   void _openForm(BuildContext context, WidgetRef ref, {NewsItem? item}) {
     final messenger = ScaffoldMessenger.of(context);
     final repo = ref.read(newsRepositoryProvider);
+    final branches = ref.read(branchesProvider).valueOrNull
+            ?.map((b) => b.name)
+            .toList() ??
+        _kFallbackBranches;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -88,6 +99,7 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
       builder: (_) => _NewsFormSheet(
         item: item,
         repo: repo,
+        branches: branches,
         onSuccess: (msg) => messenger.showSnackBar(
           SnackBar(
             content: Text(msg),
@@ -210,6 +222,8 @@ class _NewsCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
+                  _BranchChip(branch: item.branch),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     item.title,
                     style: AppTypography.bodyLg.copyWith(
@@ -287,12 +301,40 @@ class _TypeChip extends StatelessWidget {
   }
 }
 
+
+// ── Branch chip ───────────────────────────────────────────────────────────────
+
+class _BranchChip extends StatelessWidget {
+  const _BranchChip({required this.branch});
+
+  final String? branch;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = branch ?? 'All Branches';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.onSurfaceVariant.withValues(alpha: 0.12),
+        borderRadius: AppRadius.pillBorder,
+      ),
+      child: Text(
+        label,
+        style: AppTypography.labelMd.copyWith(
+          color: AppColors.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
 // ── Add / Edit form sheet ─────────────────────────────────────────────────────
 
 class _NewsFormSheet extends StatefulWidget {
   const _NewsFormSheet({
     this.item,
     required this.repo,
+    required this.branches,
     required this.onSuccess,
     required this.onError,
   });
@@ -300,6 +342,7 @@ class _NewsFormSheet extends StatefulWidget {
   final NewsItem? item;
   final NewsRepository repo;
   final void Function(String) onSuccess;
+  final List<String> branches;
   final void Function(String) onError;
 
   @override
@@ -312,6 +355,7 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
   late final TextEditingController _bodyCtrl;
   late final TextEditingController _imageUrlCtrl;
   late String _type;
+  String? _branch;
   bool _saving = false;
 
   @override
@@ -321,6 +365,7 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
     _bodyCtrl = TextEditingController(text: widget.item?.body ?? '');
     _imageUrlCtrl = TextEditingController(text: widget.item?.imageUrl ?? '');
     _type = widget.item?.type ?? _newsTypes.first;
+    _branch = widget.item?.branch;
   }
 
   @override
@@ -399,6 +444,26 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
               ),
               const SizedBox(height: AppSpacing.sm),
 
+              // Branch scope
+              _inputLabel('Branch Scope'),
+              const SizedBox(height: AppSpacing.xs),
+              DropdownButtonFormField<String?>(
+                initialValue: _branch,
+                dropdownColor: AppColors.surfaceContainer,
+                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                decoration: _inputDeco(),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('All Branches (Church-wide)'),
+                  ),
+                  ...widget.branches.map(
+                    (b) => DropdownMenuItem<String?>(value: b, child: Text(b)),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _branch = v),
+              ),
+
               // Body
               _inputLabel('Body (optional)'),
               const SizedBox(height: AppSpacing.xs),
@@ -476,6 +541,7 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
           type: _type,
           body: body,
           imageUrl: imageUrl,
+          branch: _branch,
         );
         widget.onSuccess('Announcement added.');
       } else {
@@ -485,6 +551,7 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
           type: _type,
           body: body,
           imageUrl: imageUrl,
+          branch: _branch,
         );
         widget.onSuccess('Announcement updated.');
       }

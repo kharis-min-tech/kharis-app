@@ -10,6 +10,7 @@ class NewsItem {
     required this.publishedAt,
     this.body,
     this.imageUrl,
+    this.branch,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class NewsItem {
   final DateTime publishedAt;
   final String? body;
   final String? imageUrl;
+  final String? branch;
 }
 
 /// Streams news/announcements from the Firestore `news` collection.
@@ -48,12 +50,14 @@ class NewsRepository {
     required String type,
     String? body,
     String? imageUrl,
+    String? branch,
   }) {
     return _firestore.collection('news').add({
       'title': title,
       'type': type,
       'body': body,
       'imageUrl': imageUrl,
+      'branch': branch,
       'publishedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -64,12 +68,14 @@ class NewsRepository {
     required String type,
     String? body,
     String? imageUrl,
+    String? branch,
   }) {
     return _firestore.collection('news').doc(id).update({
       'title': title,
       'type': type,
       'body': body,
       'imageUrl': imageUrl,
+      'branch': branch,
     });
   }
 
@@ -86,6 +92,7 @@ class NewsRepository {
           (data['publishedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       body: data['body'] as String?,
       imageUrl: data['imageUrl'] as String?,
+      branch: data['branch'] as String?,
     );
   }
 
@@ -96,6 +103,7 @@ class NewsRepository {
       type: 'Event',
       publishedAt: DateTime(2026, 6, 1),
       body: '1st - 21st June 2026',
+      branch: null,
     ),
   ];
 }

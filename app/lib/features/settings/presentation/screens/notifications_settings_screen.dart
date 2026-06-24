@@ -1,22 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-
-// ── Toggle state providers (session-scoped) ───────────────────────────────────
-
-final _serviceRemindersProvider = StateProvider<bool>((ref) => true);
-final _eventsProvider = StateProvider<bool>((ref) => true);
-final _dailyReadingProvider = StateProvider<bool>((ref) => true);
-final _newSermonsProvider = StateProvider<bool>((ref) => true);
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class NotificationsSettingsScreen extends ConsumerWidget {
+class NotificationsSettingsScreen extends ConsumerStatefulWidget {
   const NotificationsSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsSettingsScreen> createState() =>
+      _NotificationsSettingsScreenState();
+}
+
+class _NotificationsSettingsScreenState
+    extends ConsumerState<NotificationsSettingsScreen> {
+  // Local copy of prefs - initialized once from Firestore, then updated
+  // optimistically on every toggle.
+  Map<String, bool>? _prefs;
+
+  void _onToggle(String key, bool value) {
+    setState(() {
+      _prefs = {...?_prefs, key: value};
+    });
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (user != null && user.role != 'guest') {
+      ref
+          .read(firebaseAuthRepositoryProvider)
+          .updateNotificationPrefs(Map.unmodifiable(_prefs!));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefsAsync = ref.watch(notificationPrefsProvider);
+
+    // Hydrate local copy once from the first Firestore emission.
+    if (_prefs == null) {
+      prefsAsync.whenData((prefs) {
+        _prefs = Map.of(prefs);
+      });
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
@@ -40,44 +65,60 @@ class NotificationsSettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
               child: Text(
                 'Notifications',
-                style: GoogleFonts.plusJakartaSans(
+                style: AppTypography.titleMd.copyWith(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: AppColors.onSurface,
                 ),
               ),
             ),
-            // Toggle rows
+            // Content area
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    _ToggleRow(
-                      label: 'Service Reminders',
-                      subtitle: 'Reminders before services start',
-                      provider: _serviceRemindersProvider,
-                    ),
-                    const SizedBox(height: 14),
-                    _ToggleRow(
-                      label: 'Events',
-                      subtitle: 'Updates on upcoming events',
-                      provider: _eventsProvider,
-                    ),
-                    const SizedBox(height: 14),
-                    _ToggleRow(
-                      label: 'Daily Reading',
-                      subtitle: 'Your daily scripture notification',
-                      provider: _dailyReadingProvider,
-                    ),
-                    const SizedBox(height: 14),
-                    _ToggleRow(
-                      label: 'New Sermons',
-                      subtitle: 'Alert when new sermons are added',
-                      provider: _newSermonsProvider,
-                    ),
-                  ],
+              child: prefsAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.secondary,
+                    strokeWidth: 2,
+                  ),
                 ),
+                error: (err, _) => const SizedBox.shrink(),
+                data: (_) {
+                  final prefs = _prefs ?? const {};
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        _ToggleRow(
+                          label: 'Service Reminders',
+                          subtitle: 'Reminders before services start',
+                          value: prefs['serviceReminders'] ?? true,
+                          onChanged: (v) => _onToggle('serviceReminders', v),
+                        ),
+                        const SizedBox(height: 14),
+                        _ToggleRow(
+                          label: 'Events',
+                          subtitle: 'Updates on upcoming events',
+                          value: prefs['events'] ?? true,
+                          onChanged: (v) => _onToggle('events', v),
+                        ),
+                        const SizedBox(height: 14),
+                        _ToggleRow(
+                          label: 'Daily Reading',
+                          subtitle: 'Your daily scripture notification',
+                          value: prefs['dailyReading'] ?? true,
+                          onChanged: (v) => _onToggle('dailyReading', v),
+                        ),
+                        const SizedBox(height: 14),
+                        _ToggleRow(
+                          label: 'New Sermons',
+                          subtitle: 'Alert when new sermons are added',
+                          value: prefs['newSermons'] ?? true,
+                          onChanged: (v) => _onToggle('newSermons', v),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -89,20 +130,21 @@ class NotificationsSettingsScreen extends ConsumerWidget {
 
 // ── Toggle row widget ─────────────────────────────────────────────────────────
 
-class _ToggleRow extends ConsumerWidget {
+class _ToggleRow extends StatelessWidget {
   const _ToggleRow({
     required this.label,
     required this.subtitle,
-    required this.provider,
+    required this.value,
+    required this.onChanged,
   });
 
   final String label;
   final String subtitle;
-  final StateProvider<bool> provider;
+  final bool value;
+  final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final enabled = ref.watch(provider);
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
@@ -117,7 +159,7 @@ class _ToggleRow extends ConsumerWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: AppTypography.bodyLg.copyWith(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                     color: AppColors.onSurface,
@@ -126,8 +168,8 @@ class _ToggleRow extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
+                  style: AppTypography.labelMd.copyWith(
+                    fontWeight: FontWeight.w400,
                     color: AppColors.textMuted,
                   ),
                 ),
@@ -135,8 +177,8 @@ class _ToggleRow extends ConsumerWidget {
             ),
           ),
           Switch(
-            value: enabled,
-            onChanged: (v) => ref.read(provider.notifier).state = v,
+            value: value,
+            onChanged: onChanged,
             activeThumbColor: Colors.white,
             activeTrackColor: AppColors.secondary,
             inactiveThumbColor: AppColors.textMuted,

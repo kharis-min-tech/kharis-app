@@ -13,6 +13,9 @@ class Branch {
     required this.gradientEnd,
     this.imageUrl,
     this.order = 0,
+    this.address,
+    this.meetingDays,
+    this.meetingTime,
   });
 
   final String id;
@@ -22,6 +25,9 @@ class Branch {
   final Color gradientEnd;
   final String? imageUrl;
   final int order;
+  final String? address;
+  final String? meetingDays;
+  final String? meetingTime;
 
   List<Color> get gradient => [gradientStart, gradientEnd];
 
@@ -68,6 +74,9 @@ class BranchRepository {
     required Color gradientEnd,
     String? imageUrl,
     int order = 99,
+    String? address,
+    String? meetingDays,
+    String? meetingTime,
   }) {
     return _firestore.collection('branches').add(_data(
           name: name,
@@ -76,6 +85,9 @@ class BranchRepository {
           gradientEnd: gradientEnd,
           imageUrl: imageUrl,
           order: order,
+          address: address,
+          meetingDays: meetingDays,
+          meetingTime: meetingTime,
         ));
   }
 
@@ -87,6 +99,9 @@ class BranchRepository {
     required Color gradientEnd,
     String? imageUrl,
     int order = 99,
+    String? address,
+    String? meetingDays,
+    String? meetingTime,
   }) {
     return _firestore.collection('branches').doc(id).update(_data(
           name: name,
@@ -95,6 +110,9 @@ class BranchRepository {
           gradientEnd: gradientEnd,
           imageUrl: imageUrl,
           order: order,
+          address: address,
+          meetingDays: meetingDays,
+          meetingTime: meetingTime,
         ));
   }
 
@@ -108,6 +126,9 @@ class BranchRepository {
     required Color gradientEnd,
     String? imageUrl,
     required int order,
+    String? address,
+    String? meetingDays,
+    String? meetingTime,
   }) =>
       {
         'name': name,
@@ -116,6 +137,9 @@ class BranchRepository {
         'gradientEnd': Branch.toHex(gradientEnd),
         'imageUrl': imageUrl,
         'order': order,
+        'address': address,
+        'meetingDays': meetingDays,
+        'meetingTime': meetingTime,
       };
 
   Branch _map(String id, Map<String, dynamic> data) => Branch(
@@ -128,6 +152,9 @@ class BranchRepository {
             Branch.parseHex(data['gradientEnd'] as String?, const Color(0xFF7C3AED)),
         imageUrl: data['imageUrl'] as String?,
         order: (data['order'] as num?)?.toInt() ?? 0,
+        address: data['address'] as String?,
+        meetingDays: data['meetingDays'] as String?,
+        meetingTime: data['meetingTime'] as String?,
       );
 
   /// Built-in branches, used to seed Firestore and as an offline fallback.
@@ -144,6 +171,9 @@ class BranchRepository {
       imageUrl:
           '$_thumb/4/43/Elizabeth_Tower%2C_June_2022.jpg/330px-Elizabeth_Tower%2C_June_2022.jpg',
       order: 0,
+      address: 'London, United Kingdom',
+      meetingDays: 'Sundays',
+      meetingTime: '10:00 AM',
     ),
     Branch(
       id: 'manchester',
@@ -154,6 +184,9 @@ class BranchRepository {
       imageUrl:
           '$_thumb/7/7f/Manchester_Town_Hall_from_Lloyd_St.jpg/330px-Manchester_Town_Hall_from_Lloyd_St.jpg',
       order: 1,
+      address: 'Manchester, United Kingdom',
+      meetingDays: 'Sundays',
+      meetingTime: '10:30 AM',
     ),
     Branch(
       id: 'birmingham',
@@ -214,6 +247,9 @@ class BranchRepository {
       imageUrl:
           '$_thumb/4/4a/Independence_Arch_-_Accra%2C_Ghana1.jpg/330px-Independence_Arch_-_Accra%2C_Ghana1.jpg',
       order: 7,
+      address: 'Accra, Ghana',
+      meetingDays: 'Sundays',
+      meetingTime: '9:00 AM',
     ),
     Branch(
       id: 'freetown',

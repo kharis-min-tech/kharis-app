@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -42,6 +43,37 @@ final isAdminProvider = FutureProvider<bool>((ref) async {
   return ref.read(firebaseAuthRepositoryProvider).isCurrentUserAdmin();
 });
 
+// ── Notification preferences ──────────────────────────────────────────────────
+
+const _kDefaultNotificationPrefs = <String, bool>{
+  'serviceReminders': true,
+  'events': true,
+  'dailyReading': true,
+  'newSermons': true,
+};
+
+/// Streams notification preference toggles from the user's Firestore doc.
+/// Returns defaults for unauthenticated or guest sessions.
+final notificationPrefsProvider = StreamProvider<Map<String, bool>>((ref) {
+  final user = ref.watch(currentUserProvider).valueOrNull;
+  if (user == null || user.role == 'guest') {
+    return Stream.value(Map.unmodifiable(_kDefaultNotificationPrefs));
+  }
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.id)
+      .snapshots()
+      .map((snap) {
+    final raw = snap.data()?['notificationPrefs'] as Map<String, dynamic>?;
+    if (raw == null) return Map.unmodifiable(_kDefaultNotificationPrefs);
+    return {
+      'serviceReminders': (raw['serviceReminders'] as bool?) ?? true,
+      'events': (raw['events'] as bool?) ?? true,
+      'dailyReading': (raw['dailyReading'] as bool?) ?? true,
+      'newSermons': (raw['newSermons'] as bool?) ?? true,
+    };
+  });
+});
 // ── Router notifier ───────────────────────────────────────────────────────────
 
 /// [ChangeNotifier] that pings [GoRouter] whenever auth state changes,

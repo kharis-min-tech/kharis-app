@@ -5,15 +5,16 @@ import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-
-const _branchName = 'Kharis London';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 class CalendarScreen extends ConsumerWidget {
   const CalendarScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final eventsAsync = ref.watch(upcomingEventsProvider(_branchName));
+    final userBranch = ref.watch(currentUserProvider).valueOrNull?.branch;
+    final branchName = userBranch ?? 'Kharis London';
+    final eventsAsync = ref.watch(upcomingEventsProvider(branchName));
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
@@ -76,7 +77,7 @@ class CalendarScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Check back soon for events at $_branchName.',
+                            'Check back soon for events at $branchName.',
                             style: AppTypography.bodySm.copyWith(
                               fontSize: 13,
                               color: AppColors.textFaint,
@@ -112,11 +113,13 @@ class CalendarScreen extends ConsumerWidget {
 
 // ── Header ─────────────────────────────────────────────────────────────────────
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   const _Header();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final branchName =
+        ref.watch(currentUserProvider).valueOrNull?.branch ?? 'Kharis London';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -130,7 +133,7 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Upcoming at $_branchName',
+          'Upcoming at $branchName',
           style: AppTypography.bodySm.copyWith(
             fontSize: 13,
             color: AppColors.onSurfaceVariant,
