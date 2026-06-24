@@ -80,14 +80,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const SizedBox(height: 56),
 
-                // ── Dove icon ───────────────────────────────────────────────
+                // ── Dove logo ──────────────────────────────────────────────
                 Center(
-                  child: SizedBox(
+                  child: Image.asset(
+                    'assets/figma/dove_logo.png',
                     width: 72,
                     height: 72,
-                    child: CustomPaint(
-                      painter: _DovePainter(color: AppColors.primary),
-                    ),
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -301,90 +300,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
-}
-
-// ── Dove painter (matches splash_screen.dart silhouette) ─────────────────────
-
-class _DovePainter extends CustomPainter {
-  const _DovePainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    final w = size.width;
-    final h = size.height;
-
-    // Body
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * 0.50, h * 0.38)
-        ..cubicTo(w * 0.28, h * 0.30, w * 0.08, h * 0.45, w * 0.12, h * 0.62)
-        ..cubicTo(w * 0.15, h * 0.74, w * 0.30, h * 0.78, w * 0.42, h * 0.72)
-        ..cubicTo(w * 0.50, h * 0.68, w * 0.56, h * 0.70, w * 0.62, h * 0.76)
-        ..cubicTo(w * 0.70, h * 0.84, w * 0.80, h * 0.80, w * 0.82, h * 0.70)
-        ..cubicTo(w * 0.85, h * 0.55, w * 0.72, h * 0.42, w * 0.50, h * 0.38)
-        ..close(),
-      paint,
-    );
-
-    // Left wing
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * 0.42, h * 0.50)
-        ..cubicTo(w * 0.28, h * 0.32, w * 0.05, h * 0.28, w * 0.05, h * 0.44)
-        ..cubicTo(w * 0.05, h * 0.52, w * 0.20, h * 0.56, w * 0.38, h * 0.58)
-        ..close(),
-      paint,
-    );
-
-    // Right wing
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * 0.58, h * 0.48)
-        ..cubicTo(w * 0.72, h * 0.30, w * 0.95, h * 0.26, w * 0.95, h * 0.42)
-        ..cubicTo(w * 0.95, h * 0.50, w * 0.80, h * 0.55, w * 0.62, h * 0.56)
-        ..close(),
-      paint,
-    );
-
-    // Head
-    canvas.drawPath(
-      Path()
-        ..addOval(Rect.fromCenter(
-          center: Offset(w * 0.50, h * 0.28),
-          width: w * 0.22,
-          height: h * 0.22,
-        )),
-      paint,
-    );
-
-    // Beak
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * 0.50, h * 0.22)
-        ..lineTo(w * 0.38, h * 0.18)
-        ..lineTo(w * 0.46, h * 0.26)
-        ..close(),
-      paint,
-    );
-
-    // Tail
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * 0.62, h * 0.72)
-        ..cubicTo(w * 0.72, h * 0.82, w * 0.85, h * 0.90, w * 0.88, h * 0.82)
-        ..cubicTo(w * 0.90, h * 0.76, w * 0.80, h * 0.68, w * 0.68, h * 0.68)
-        ..close(),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_DovePainter old) => old.color != color;
 }

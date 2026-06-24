@@ -85,6 +85,13 @@ class AdminHubScreen extends ConsumerWidget {
                 subtitle: 'View members and manage roles',
                 route: '/admin/users',
               ),
+              SizedBox(height: AppSpacing.sm),
+              _HubCard(
+                icon: Icons.menu_book_rounded,
+                title: 'Bible Reading',
+                subtitle: 'Set daily scripture readings and prayers',
+                route: '/admin/bible-reading',
+              ),
             ],
           );
         },

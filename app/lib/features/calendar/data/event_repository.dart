@@ -76,12 +76,7 @@ class EventRepository {
       final snapshot = await query.get();
       return snapshot.docs.map(_docToEvent).toList();
     } catch (_) {
-      if (branch != null) {
-        return _mockEvents
-            .where((e) => e.branch == null || e.branch == branch)
-            .toList();
-      }
-      return List.of(_mockEvents);
+      return const [];
     }
   }
 
@@ -102,10 +97,10 @@ class EventRepository {
           if (branch == null) return true;
           return e.branch == null || e.branch == branch;
         }).toList();
-        return events.isEmpty && branch == null ? List.of(_mockEvents) : events;
+        return events;
       });
     } catch (_) {
-      yield List.of(_mockEvents);
+      yield const [];
     }
   }
 
@@ -116,7 +111,7 @@ class EventRepository {
       if (!doc.exists || doc.data() == null) return null;
       return _mapData(doc.id, doc.data()!);
     } catch (_) {
-      return _mockEvents.where((e) => e.id == id).firstOrNull;
+      return null;
     }
   }
 
@@ -209,38 +204,4 @@ class EventRepository {
       isFeatured: data['isFeatured'] as bool? ?? false,
     );
   }
-
-  // ── Mock data ──────────────────────────────────────────────────────────────
-
-  static final _mockEvents = [
-    Event(
-      id: 'mock_event_1',
-      title: 'Sunday Service',
-      description: 'Join us for our weekly Sunday worship service.',
-      location: 'Main Auditorium',
-      branch: null,
-      startTime: DateTime.now().add(const Duration(days: 2, hours: 9)),
-      endTime: DateTime.now().add(const Duration(days: 2, hours: 11)),
-      isFeatured: true,
-    ),
-    Event(
-      id: 'mock_event_2',
-      title: 'Prayer Night',
-      description: 'A night of corporate prayer and worship.',
-      location: 'Chapel',
-      branch: 'Main',
-      startTime: DateTime.now().add(const Duration(days: 4, hours: 19)),
-      endTime: DateTime.now().add(const Duration(days: 4, hours: 21)),
-    ),
-    Event(
-      id: 'mock_event_3',
-      title: 'Youth Conference',
-      description: 'Annual youth gathering with speakers and workshops.',
-      location: 'Community Hall',
-      branch: null,
-      startTime: DateTime.now().add(const Duration(days: 10, hours: 9)),
-      endTime: DateTime.now().add(const Duration(days: 10, hours: 17)),
-      isFeatured: true,
-    ),
-  ];
 }

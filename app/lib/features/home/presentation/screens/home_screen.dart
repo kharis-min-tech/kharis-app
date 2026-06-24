@@ -6,6 +6,7 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import '../widgets/latest_message_card.dart';
 import '../widgets/todays_reading_card.dart';
 import '../widgets/news_section.dart';
+import 'notifications_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -253,39 +254,46 @@ class _HomeHeader extends StatelessWidget {
         const SizedBox(width: 8),
 
         // Bell button with pink notification dot
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: .06),
-              ),
-              child: const Icon(
-                Icons.notifications_outlined,
-                color: Color(0xFFCFC8D4),
-                size: 20,
-              ),
+        GestureDetector(
+          onTap: () => Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const NotificationsScreen(),
             ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                width: 8,
-                height: 8,
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.accentPink,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.surfaceDark,
-                    width: 1.5,
+                  color: Colors.white.withValues(alpha: .06),
+                ),
+                child: const Icon(
+                  Icons.notifications_outlined,
+                  color: Color(0xFFCFC8D4),
+                  size: 20,
+                ),
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentPink,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.surfaceDark,
+                      width: 1.5,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

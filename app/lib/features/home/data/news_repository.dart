@@ -40,7 +40,7 @@ class NewsRepository {
         .snapshots()
         .map((snap) => snap.docs.map(_docToNews).toList())
         .handleError((Object _) {})
-        .defaultIfEmpty(_fallback);
+        .defaultIfEmpty(const []);
   }
 
   // ── Admin writes ────────────────────────────────────────────────────────────
@@ -96,16 +96,6 @@ class NewsRepository {
     );
   }
 
-  static final _fallback = [
-    NewsItem(
-      id: 'fallback-fast',
-      title: '21 Days Prayer & Fasting',
-      type: 'Event',
-      publishedAt: DateTime(2026, 6, 1),
-      body: '1st - 21st June 2026',
-      branch: null,
-    ),
-  ];
 }
 
 extension<T> on Stream<List<T>> {

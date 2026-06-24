@@ -99,6 +99,37 @@ class DailyContentRepository {
     );
   }
 
+  // ── Write methods (admin) ──────────────────────────────────────────────────
+
+  /// Creates or overwrites the dailyContent document for [dateKey] (YYYY-MM-DD).
+  Future<void> setContent(String dateKey, DailyContent content) {
+    return _firestore.collection('dailyContent').doc(dateKey).set({
+      'reading': {
+        'book': content.reading.book,
+        'chapter': content.reading.chapter,
+        'verse': content.reading.verse,
+      },
+      'prayer': content.prayer,
+      'prayerReference': content.prayerReference,
+    });
+  }
+
+  /// Deletes the dailyContent document for [dateKey].
+  Future<void> deleteContent(String dateKey) =>
+      _firestore.collection('dailyContent').doc(dateKey).delete();
+
+  /// Streams the most recent dailyContent documents for the admin list view.
+  Stream<List<MapEntry<String, DailyContent>>> watchRecentContent({int limit = 30}) {
+    return _firestore
+        .collection('dailyContent')
+        .orderBy(FieldPath.documentId, descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => MapEntry(d.id, _mapData(d.data())))
+            .toList());
+  }
+
   // ── Fallback ───────────────────────────────────────────────────────────────
 
   static const _hardcodedContent = DailyContent(
