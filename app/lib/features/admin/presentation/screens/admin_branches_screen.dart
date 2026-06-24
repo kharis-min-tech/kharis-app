@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:go_router/go_router.dart';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -67,6 +68,10 @@ class AdminBranchesScreen extends ConsumerWidget {
               branch: sorted[i],
               onEdit: () => _openForm(context, ref, branch: sorted[i]),
               onDelete: () => _confirmDelete(context, ref, sorted[i]),
+              onTap: () => context.push(
+                '/admin/branches/${sorted[i].id}',
+                extra: sorted[i].name,
+              ),
             ),
           );
         },
@@ -160,15 +165,19 @@ class _BranchCard extends StatelessWidget {
     required this.branch,
     required this.onEdit,
     required this.onDelete,
+    required this.onTap,
   });
 
   final Branch branch;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: AppRadius.cardBorder,
@@ -267,6 +276,19 @@ class _BranchCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(Icons.tune, size: 12, color: AppColors.textFaint),
+                      const SizedBox(width: 2),
+                      Text(
+                        'Customize',
+                        style: AppTypography.labelMd.copyWith(
+                          color: AppColors.textFaint,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -288,6 +310,7 @@ class _BranchCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

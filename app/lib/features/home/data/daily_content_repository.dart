@@ -114,6 +114,37 @@ class DailyContentRepository {
     });
   }
 
+  /// Batch-creates a sequential reading series: one chapter per day starting
+  /// from [startDate] for [days] days, beginning at [book] chapter [startChapter].
+  Future<int> batchSetContent({
+    required String book,
+    required int startChapter,
+    required DateTime startDate,
+    required int days,
+    String prayer = '',
+  }) async {
+    final batch = _firestore.batch();
+    for (var i = 0; i < days; i++) {
+      final date = startDate.add(Duration(days: i));
+      final chapter = startChapter + i;
+      final key = _dateKey(date);
+      final ref = _firestore.collection('dailyContent').doc(key);
+      batch.set(ref, {
+        'reading': {
+          'book': book,
+          'chapter': chapter,
+          'verse': '1-end',
+        },
+        'prayer': prayer.isNotEmpty
+            ? prayer
+            : 'Lord, speak to us through $book $chapter today.',
+        'prayerReference': '$book $chapter:1',
+      });
+    }
+    await batch.commit();
+    return days;
+  }
+
   /// Deletes the dailyContent document for [dateKey].
   Future<void> deleteContent(String dateKey) =>
       _firestore.collection('dailyContent').doc(dateKey).delete();

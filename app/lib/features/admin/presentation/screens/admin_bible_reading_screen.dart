@@ -33,6 +33,16 @@ class AdminBibleReadingScreen extends ConsumerWidget {
           style: AppTypography.titleMd.copyWith(color: AppColors.heading),
         ),
         iconTheme: const IconThemeData(color: AppColors.heading),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _openSeriesForm(context, ref),
+            icon: const Icon(Icons.date_range, size: 18, color: AppColors.secondary),
+            label: Text(
+              'Series',
+              style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.secondary,
@@ -103,6 +113,31 @@ class AdminBibleReadingScreen extends ConsumerWidget {
       builder: (_) => _ReadingFormSheet(
         dateKey: dateKey,
         content: content,
+        repo: repo,
+        onSuccess: (msg) => messenger.showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: AppColors.surfaceElevated,
+          ),
+        ),
+        onError: (msg) => messenger.showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: AppColors.errorContainer,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openSeriesForm(BuildContext context, WidgetRef ref) {
+    final messenger = ScaffoldMessenger.of(context);
+    final repo = ref.read(dailyContentRepositoryProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SeriesFormSheet(
         repo: repo,
         onSuccess: (msg) => messenger.showSnackBar(
           SnackBar(
@@ -629,4 +664,330 @@ class _ReadingFormSheetState extends State<_ReadingFormSheet> {
         errorStyle:
             AppTypography.labelMd.copyWith(color: AppColors.error),
       );
+}
+
+// ── Bible books with chapter counts ──────────────────────────────────────────
+
+const _bibleBooks = <String, int>{
+  'Genesis': 50, 'Exodus': 40, 'Leviticus': 27, 'Numbers': 36,
+  'Deuteronomy': 34, 'Joshua': 24, 'Judges': 21, 'Ruth': 4,
+  '1 Samuel': 31, '2 Samuel': 24, '1 Kings': 22, '2 Kings': 25,
+  '1 Chronicles': 29, '2 Chronicles': 36, 'Ezra': 10, 'Nehemiah': 13,
+  'Esther': 10, 'Job': 42, 'Psalms': 150, 'Proverbs': 31,
+  'Ecclesiastes': 12, 'Song of Solomon': 8, 'Isaiah': 66, 'Jeremiah': 52,
+  'Lamentations': 5, 'Ezekiel': 48, 'Daniel': 12, 'Hosea': 14,
+  'Joel': 3, 'Amos': 9, 'Obadiah': 1, 'Jonah': 4,
+  'Micah': 7, 'Nahum': 3, 'Habakkuk': 3, 'Zephaniah': 3,
+  'Haggai': 2, 'Zechariah': 14, 'Malachi': 4,
+  'Matthew': 28, 'Mark': 16, 'Luke': 24, 'John': 21,
+  'Acts': 28, 'Romans': 16, '1 Corinthians': 16, '2 Corinthians': 13,
+  'Galatians': 6, 'Ephesians': 6, 'Philippians': 4, 'Colossians': 4,
+  '1 Thessalonians': 5, '2 Thessalonians': 3, '1 Timothy': 6, '2 Timothy': 4,
+  'Titus': 3, 'Philemon': 1, 'Hebrews': 13, 'James': 5,
+  '1 Peter': 5, '2 Peter': 3, '1 John': 5, '2 John': 1,
+  '3 John': 1, 'Jude': 1, 'Revelation': 22,
+};
+
+// ── Generate Series form sheet ───────────────────────────────────────────────
+
+class _SeriesFormSheet extends StatefulWidget {
+  const _SeriesFormSheet({
+    required this.repo,
+    required this.onSuccess,
+    required this.onError,
+  });
+
+  final DailyContentRepository repo;
+  final void Function(String) onSuccess;
+  final void Function(String) onError;
+
+  @override
+  State<_SeriesFormSheet> createState() => _SeriesFormSheetState();
+}
+
+class _SeriesFormSheetState extends State<_SeriesFormSheet> {
+  String? _selectedBook;
+  int _startChapter = 1;
+  int _endChapter = 1;
+  DateTime _startDate = DateTime.now();
+  bool _saving = false;
+
+  int get _totalChapters => _bibleBooks[_selectedBook] ?? 1;
+  int get _dayCount => (_endChapter - _startChapter + 1).clamp(1, 366);
+  DateTime get _endDate => _startDate.add(Duration(days: _dayCount - 1));
+
+  String _fmtDate(DateTime dt) {
+    const m = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${m[dt.month - 1]} ${dt.day}, ${dt.year}';
+  }
+
+
+  Future<void> _pickStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+      builder: (ctx, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.secondary,
+            surface: AppColors.surfaceDark,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _startDate = picked);
+  }
+
+  Future<void> _generate() async {
+    if (_selectedBook == null) return;
+    setState(() => _saving = true);
+    try {
+      final count = await widget.repo.batchSetContent(
+        book: _selectedBook!,
+        startChapter: _startChapter,
+        startDate: _startDate,
+        days: _dayCount,
+      );
+      widget.onSuccess('Created $count readings: $_selectedBook $_startChapter-$_endChapter');
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      widget.onError('Failed: $e');
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      padding: EdgeInsets.only(
+        left: AppSpacing.md, right: AppSpacing.md,
+        top: AppSpacing.md,
+        bottom: AppSpacing.md + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.outlineVariant,
+                  borderRadius: AppRadius.pillBorder,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Generate Reading Series',
+              style: AppTypography.titleMd.copyWith(color: AppColors.heading),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'One chapter per day, auto-assigned to dates',
+              style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // ── Book dropdown ──────────────────────────────────────────────
+            Text('Book', style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant)),
+            const SizedBox(height: AppSpacing.xs),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedBook,
+              dropdownColor: AppColors.surfaceElevated,
+              style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+              decoration: InputDecoration(
+                hintText: 'Select a book',
+                hintStyle: AppTypography.bodyLg.copyWith(color: AppColors.textFaint),
+                filled: true,
+                fillColor: AppColors.surfaceSubtle,
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.inputBorder,
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: _bibleBooks.keys.map((book) => DropdownMenuItem(
+                value: book,
+                child: Text('$book (${_bibleBooks[book]} ch)'),
+              )).toList(),
+              onChanged: (book) {
+                if (book == null) return;
+                setState(() {
+                  _selectedBook = book;
+                  _startChapter = 1;
+                  _endChapter = _bibleBooks[book]!;
+                });
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // ── Chapter range ──────────────────────────────────────────────
+            if (_selectedBook != null) ...[
+              Text('Chapter Range', style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant)),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _startChapter,
+                      dropdownColor: AppColors.surfaceElevated,
+                      style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                      decoration: InputDecoration(
+                        labelText: 'From',
+                        labelStyle: AppTypography.labelMd.copyWith(color: AppColors.textMuted),
+                        filled: true, fillColor: AppColors.surfaceSubtle,
+                        border: OutlineInputBorder(borderRadius: AppRadius.inputBorder, borderSide: BorderSide.none),
+                      ),
+                      items: List.generate(_totalChapters, (i) => DropdownMenuItem(
+                        value: i + 1,
+                        child: Text('${i + 1}'),
+                      )),
+                      onChanged: (v) => setState(() {
+                        _startChapter = v ?? 1;
+                        if (_endChapter < _startChapter) _endChapter = _startChapter;
+                      }),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('to', style: AppTypography.bodyLg.copyWith(color: AppColors.textMuted)),
+                  ),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _endChapter,
+                      dropdownColor: AppColors.surfaceElevated,
+                      style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                      decoration: InputDecoration(
+                        labelText: 'To',
+                        labelStyle: AppTypography.labelMd.copyWith(color: AppColors.textMuted),
+                        filled: true, fillColor: AppColors.surfaceSubtle,
+                        border: OutlineInputBorder(borderRadius: AppRadius.inputBorder, borderSide: BorderSide.none),
+                      ),
+                      items: List.generate(
+                        _totalChapters - _startChapter + 1,
+                        (i) => DropdownMenuItem(
+                          value: _startChapter + i,
+                          child: Text('${_startChapter + i}'),
+                        ),
+                      ),
+                      onChanged: (v) => setState(() => _endChapter = v ?? _startChapter),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // ── Start date ─────────────────────────────────────────────
+              Text('Start Date', style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant)),
+              const SizedBox(height: AppSpacing.xs),
+              GestureDetector(
+                onTap: _pickStartDate,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSubtle,
+                    borderRadius: AppRadius.inputBorder,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 18, color: AppColors.secondary),
+                      const SizedBox(width: 10),
+                      Text(
+                        _fmtDate(_startDate),
+                        style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // ── Preview ────────────────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: AppRadius.cardBorder,
+                  border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Preview',
+                      style: AppTypography.labelMd.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '$_selectedBook $_startChapter - $_endChapter',
+                      style: AppTypography.bodyLg.copyWith(
+                        color: AppColors.heading,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '$_dayCount days: ${_fmtDate(_startDate)} to ${_fmtDate(_endDate)}',
+                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Day 1: $_selectedBook $_startChapter  ...  Day $_dayCount: $_selectedBook $_endChapter',
+                      style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // ── Generate button ────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _saving ? null : _generate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: AppColors.onSecondary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.cardBorder,
+                    ),
+                  ),
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onSecondary),
+                        )
+                      : const Icon(Icons.auto_awesome),
+                  label: Text(
+                    _saving ? 'Generating...' : 'Generate $_dayCount Readings',
+                    style: AppTypography.labelMd.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
+      ),
+    );
+  }
 }

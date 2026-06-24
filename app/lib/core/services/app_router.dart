@@ -25,6 +25,7 @@ import '../../features/admin/presentation/screens/admin_events_screen.dart';
 import '../../features/admin/presentation/screens/admin_branches_screen.dart';
 import '../../features/admin/presentation/screens/admin_users_screen.dart';
 import '../../features/admin/presentation/screens/admin_bible_reading_screen.dart';
+import '../../features/admin/presentation/screens/admin_branch_detail_screen.dart';
 import '../../shared/providers/auth_provider.dart';
 
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
@@ -174,6 +175,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/bible-reading',
         builder: (context, state) => const AdminBibleReadingScreen(),
+      ),
+      GoRoute(
+        path: '/admin/branches/:id',
+        builder: (context, state) => AdminBranchDetailScreen(
+          branchId: state.pathParameters['id']!,
+          branchName: state.extra as String? ?? '',
+        ),
       ),
     ],
   );
