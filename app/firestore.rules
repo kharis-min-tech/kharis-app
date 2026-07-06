@@ -1,0 +1,125 @@
+rules_version = '2';
+
+// Kharis Church App — Firestore Security Rules
+// Remote CMS model: public reads on content, admin-only writes.
+// Admin status is determined by either the profile `role == 'admin'`
+// or a Firebase custom claim `admin == true`.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isProfileAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().role == 'admin';
+    }
+
+    function isCustomClaimAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isAdmin() {
+      return isProfileAdmin() || isCustomClaimAdmin();
+    }
+
+    // ── User profiles ─────────────────────────────────────────────────────────
+    // Each user can read/update their own profile.
+    // Admins can read all profiles and change roles.
+    // The `role` field is locked: only admins can set it.
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId
+                    && request.resource.data.role in ['member', 'guest', 'new_here'];
+      allow update: if isAdmin()
+                    || (isSignedIn() && request.auth.uid == userId
+                        && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // ── Sermons (audio + video) ───────────────────────────────────────────────
+    // Public read. Admin-only write.
+
+    match /sermons/{sermonId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+    // Public read. Admin-only write.
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── News & announcements ──────────────────────────────────────────────────
+    // Public read. Admin-only write.
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Daily content (readings + prayers) ────────────────────────────────────
+    // Public read. Admin-only write.
+
+    match /dailyContent/{dateKey} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Branches ──────────────────────────────────────────────────────────────
+    // Public read. Admin-only write.
+
+    match /branches/{branchId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Config (live status, app config) ──────────────────────────────────────
+    // Public read. Admin-only write.
+
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Visitors (connect cards) ──────────────────────────────────────────────
+    // Anyone can submit a visitor card (create). Admin-only read/manage.
+
+    match /visitors/{visitorId} {
+      allow create: if request.resource.data.keys().hasAll(['name', 'createdAt'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() < 200;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Testimonies ───────────────────────────────────────────────────────────
+    // Anyone can submit a testimony (create). Admin-only read/manage.
+
+    match /testimonies/{testimonyId} {
+      allow create: if request.resource.data.keys().hasAll(['text', 'createdAt'])
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() <= 2000;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

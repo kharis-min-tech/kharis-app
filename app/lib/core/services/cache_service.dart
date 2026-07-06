@@ -81,6 +81,31 @@ class CacheService {
     return value as T;
   }
 
+  // ── Recently played ────────────────────────────────────────────────────────
+
+  /// Stores an ordered list of sermon IDs recently played (most recent first).
+  static const _recentlyPlayedKey = 'recently_played';
+
+  void addRecentlyPlayed(String sermonId) {
+    final list = getRecentlyPlayed();
+    list.remove(sermonId);
+    list.insert(0, sermonId);
+    // Keep at most 20 entries.
+    if (list.length > 20) list.removeRange(20, list.length);
+    _preferencesBox.put(_recentlyPlayedKey, jsonEncode(list));
+  }
+
+  List<String> getRecentlyPlayed() {
+    final raw = _preferencesBox.get(_recentlyPlayedKey);
+    if (raw == null) return [];
+    try {
+      final decoded = jsonDecode(raw as String) as List<dynamic>;
+      return decoded.cast<String>();
+    } catch (_) {
+      return [];
+    }
+  }
+
   // ── Clear ─────────────────────────────────────────────────────────────────
 
   Future<void> clearAll() async {

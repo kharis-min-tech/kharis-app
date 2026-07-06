@@ -563,6 +563,11 @@
   </header>
 
   <nav class="tab-nav">
+    <button class="tab-btn" data-tab="sermons">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      Sermons
+      <span class="count-badge" id="sermons-count">—</span>
+    </button>
     <button class="tab-btn active" data-tab="events">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Events
@@ -587,9 +592,29 @@
       Submissions
       <span class="count-badge" id="subs-count">—</span>
     </button>
+    <button class="tab-btn" data-tab="branches">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+      Branches
+      <span class="count-badge" id="branches-count">—</span>
+    </button>
   </nav>
 
   <div class="content-area">
+
+    <!-- ── Sermons Tab ──────────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-sermons">
+      <div class="pane-layout">
+        <div class="card" style="max-width:100%">
+          <div class="card-title"><span class="dot"></span> Sermon Library (Auto-synced from YouTube & SoundCloud)</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Sermons are automatically synced every hour. Toggle the star to feature a sermon on the mobile app's Messages page.</p>
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <input type="text" id="sermon-search" placeholder="Search by title, speaker…" style="flex:1;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:14px;" />
+            <button class="btn btn-secondary" id="refresh-sermons" style="font-size:12px;padding:6px 12px;">Refresh</button>
+          </div>
+          <div id="sermons-list"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- ── Events Tab ──────────────────────────────────────────────────────── -->
     <div class="tab-pane active" id="tab-events">
@@ -847,6 +872,59 @@
       </div>
     </div>
 
+    <!-- ── Branches Tab ──────────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-branches">
+      <div class="pane-layout">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Add / Edit Branch</div>
+          <form id="branch-form">
+            <div class="field">
+              <label for="br-name">Branch Name *</label>
+              <input type="text" id="br-name" placeholder="Kharis London" required />
+            </div>
+            <div class="field">
+              <label for="br-location">Location</label>
+              <input type="text" id="br-location" placeholder="United Kingdom" />
+            </div>
+            <div class="field">
+              <label for="br-description">Description</label>
+              <input type="text" id="br-description" placeholder="Main Campus" />
+            </div>
+            <div class="field">
+              <label for="br-address">Meeting Address</label>
+              <input type="text" id="br-address" placeholder="123 High Street, London" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="br-meeting-day">Meeting Day</label>
+                <select id="br-meeting-day">
+                  <option value="">Select day</option>
+                  <option>Sunday</option><option>Monday</option><option>Tuesday</option>
+                  <option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="br-meeting-time">Meeting Time</label>
+                <input type="time" id="br-meeting-time" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="br-order">Display Order</label>
+              <input type="number" id="br-order" placeholder="1" min="0" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="branch-submit-btn">Save Branch</button>
+          </form>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div class="card-title"><span class="dot"></span> Existing Branches</div>
+            <button class="btn btn-secondary" id="refresh-branches" style="font-size:12px;padding:6px 12px;">Refresh</button>
+          </div>
+          <div id="branches-list"></div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /.content-area -->
 </div><!-- /#admin-panel -->
 
@@ -894,9 +972,12 @@ import {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   Timestamp,
+  serverTimestamp,
   query,
   orderBy,
+  limit,
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -981,6 +1062,9 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    // Lazy-load data for the tab
+    if (btn.dataset.tab === 'sermons') loadSermons();
+    if (btn.dataset.tab === 'branches') loadBranches();
   });
 });
 
@@ -1398,6 +1482,185 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 // Also set it immediately in case DOMContentLoaded already fired
 setDefaultNewsDate();
+
+// ── Sermons Tab ─────────────────────────────────────────────────────────
+async function loadSermons() {
+  const list = document.getElementById('sermons-list');
+  list.innerHTML = '<p style="color:var(--muted);">Loading sermons…</p>';
+  try {
+    const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
+    document.getElementById('sermons-count').textContent = snap.size;
+    if (snap.empty) {
+      list.innerHTML = '<p style="color:var(--muted);">No sermons yet. They will appear here automatically once the YouTube/SoundCloud sync runs.</p>';
+      return;
+    }
+    renderSermonList(snap.docs);
+  } catch (err) {
+    list.innerHTML = `<p style="color:var(--danger);">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+function renderSermonList(docs) {
+  const list = document.getElementById('sermons-list');
+  list.innerHTML = docs.map(d => {
+    const s = d.data();
+    const date = s.publishedAt?.toDate ? s.publishedAt.toDate() : new Date();
+    const featured = s.isFeatured === true;
+    const sourceIcon = s.source === 'youtube' ? '▶' : '🎵';
+    const sourceLabel = s.source === 'youtube' ? 'YouTube' : 'SoundCloud';
+    const dur = s.duration ? formatDuration(s.duration) : '';
+    return `<div class="item-card" data-id="${d.id}">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        ${s.thumbnailUrl ? `<img src="${escHtml(s.thumbnailUrl)}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : `<div style="width:64px;height:64px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">${sourceIcon}</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <strong style="font-size:14px;">${escHtml(s.title || 'Untitled')}</strong>
+            <button class="feature-btn" data-id="${d.id}" data-featured="${featured}" style="background:none;border:none;cursor:pointer;font-size:18px;color:${featured ? 'var(--orange)' : 'var(--muted)'};" title="${featured ? 'Unfeature' : 'Feature'}">${featured ? '★' : '☆'}</button>
+          </div>
+          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''}</div>
+          ${s.description ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(s.description.substring(0, 100))}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Attach feature toggle listeners
+  list.querySelectorAll('.feature-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const isFeatured = btn.dataset.featured === 'true';
+      try {
+        await updateDoc(doc(db, 'sermons', id), { isFeatured: !isFeatured, updatedAt: serverTimestamp() });
+        toast(`${!isFeatured ? 'Featured' : 'Unfeatured'} sermon`);
+        loadSermons();
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
+    });
+  });
+}
+
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+  }
+  return `${m}m ${s}s`;
+}
+
+// Sermon search
+document.getElementById('sermon-search').addEventListener('input', async (e) => {
+  const term = e.target.value.toLowerCase().trim();
+  const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
+  const filtered = snap.docs.filter(d => {
+    const s = d.data();
+    return (s.title || '').toLowerCase().includes(term) || (s.speaker || '').toLowerCase().includes(term);
+  });
+  renderSermonList(filtered);
+});
+
+document.getElementById('refresh-sermons').addEventListener('click', loadSermons);
+
+// ── Branches Tab ────────────────────────────────────────────────────────
+async function loadBranches() {
+  const list = document.getElementById('branches-list');
+  list.innerHTML = '<p style="color:var(--muted);">Loading branches…</p>';
+  try {
+    const snap = await getDocs(query(collection(db, 'branches'), orderBy('order', 'asc')));
+    document.getElementById('branches-count').textContent = snap.size;
+    if (snap.empty) {
+      list.innerHTML = '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
+      return;
+    }
+    list.innerHTML = snap.docs.map(d => {
+      const b = d.data();
+      const meeting = [b.meetingDay, b.meetingTime].filter(Boolean).join(' at ') || 'Not set';
+      return `<div class="item-card" data-id="${d.id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <strong>${escHtml(b.name || 'Unnamed')}</strong>
+            <div class="item-card-meta">${escHtml(b.location || '')} ${b.location ? '·' : ''} ${escHtml(meeting)}</div>
+            ${b.address ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;">📍 ${escHtml(b.address)}</div>` : ''}
+            ${b.description ? `<div style="color:var(--muted);font-size:12px;">${escHtml(b.description)}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary branch-edit-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;">Edit</button>
+            <button class="btn btn-secondary branch-delete-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;color:var(--danger);">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Attach listeners
+    list.querySelectorAll('.branch-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => editBranch(btn.dataset.id));
+    });
+    list.querySelectorAll('.branch-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this branch?')) return;
+        await deleteDoc(doc(db, 'branches', btn.dataset.id));
+        toast('Branch deleted');
+        loadBranches();
+      });
+    });
+  } catch (err) {
+    list.innerHTML = `<p style="color:var(--danger);">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+async function editBranch(id) {
+  const d = await getDoc(doc(db, 'branches', id));
+  if (!d.exists()) return;
+  const b = d.data();
+  document.getElementById('br-name').value = b.name || '';
+  document.getElementById('br-location').value = b.location || '';
+  document.getElementById('br-description').value = b.description || '';
+  document.getElementById('br-address').value = b.address || '';
+  document.getElementById('br-meeting-day').value = b.meetingDay || '';
+  document.getElementById('br-meeting-time').value = b.meetingTime || '';
+  document.getElementById('br-order').value = b.order ?? '';
+  document.getElementById('branch-form').dataset.editId = id;
+  document.getElementById('branch-submit-btn').textContent = 'Update Branch';
+}
+
+document.getElementById('branch-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const editId = e.target.dataset.editId;
+  const data = {
+    name: document.getElementById('br-name').value.trim(),
+    location: document.getElementById('br-location').value.trim(),
+    description: document.getElementById('br-description').value.trim(),
+    address: document.getElementById('br-address').value.trim(),
+    meetingDay: document.getElementById('br-meeting-day').value,
+    meetingTime: document.getElementById('br-meeting-time').value,
+    order: parseInt(document.getElementById('br-order').value || '0', 10),
+    updatedAt: serverTimestamp(),
+  };
+  const btn = document.getElementById('branch-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    if (editId) {
+      await updateDoc(doc(db, 'branches', editId), data);
+    } else {
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db, 'branches'), data);
+    }
+    toast(editId ? 'Branch updated' : 'Branch created');
+    e.target.reset();
+    delete e.target.dataset.editId;
+    btn.textContent = 'Save Branch';
+    loadBranches();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+    btn.textContent = 'Save Branch';
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('refresh-branches').addEventListener('click', loadBranches);
 
 </script>
 </body>

@@ -83,6 +83,100 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
     }
   }
 
+  // ── Admin writes ────────────────────────────────────────────────────────────
+
+  /// Adds a new sermon to the Firestore `sermons` collection.
+  Future<String> addSermon({
+    required String title,
+    required String speaker,
+    required String audioUrl,
+    String? artworkUrl,
+    int? durationSeconds,
+    DateTime? publishedAt,
+    String? series,
+    String? description,
+    String? category,
+    String? videoId,
+    String? source,
+    bool isFeatured = false,
+  }) async {
+    final ref = await _firestore.collection('sermons').add({
+      'title': title,
+      'speaker': speaker,
+      'audioUrl': audioUrl,
+      'thumbnailUrl': artworkUrl,
+      'artworkUrl': artworkUrl,
+      'duration': durationSeconds,
+      'publishedAt': publishedAt != null
+          ? Timestamp.fromDate(publishedAt)
+          : FieldValue.serverTimestamp(),
+      'series': series,
+      'description': description,
+      'category': category ?? sermonCategory(title),
+      'videoId': videoId,
+      'source': source ?? 'soundcloud',
+      'isFeatured': isFeatured,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  }
+
+  /// Updates an existing sermon document.
+  Future<void> updateSermon(
+    String id, {
+    String? title,
+    String? speaker,
+    String? audioUrl,
+    String? artworkUrl,
+    int? durationSeconds,
+    DateTime? publishedAt,
+    String? series,
+    String? description,
+    String? category,
+    String? videoId,
+    String? source,
+    bool? isFeatured,
+  }) {
+    final data = <String, dynamic>{};
+    if (title != null) {
+      data['title'] = title;
+      data['category'] = category ?? sermonCategory(title);
+    }
+    if (speaker != null) data['speaker'] = speaker;
+    if (audioUrl != null) data['audioUrl'] = audioUrl;
+    if (artworkUrl != null) {
+      data['thumbnailUrl'] = artworkUrl;
+      data['artworkUrl'] = artworkUrl;
+    }
+    if (durationSeconds != null) data['duration'] = durationSeconds;
+    if (publishedAt != null) data['publishedAt'] = Timestamp.fromDate(publishedAt);
+    if (series != null) data['series'] = series;
+    if (description != null) data['description'] = description;
+    if (category != null) data['category'] = category;
+    if (videoId != null) data['videoId'] = videoId;
+    if (source != null) data['source'] = source;
+    if (isFeatured != null) data['isFeatured'] = isFeatured;
+    return _firestore.collection('sermons').doc(id).update(data);
+  }
+
+  /// Deletes a sermon document.
+  Future<void> deleteSermon(String id) =>
+      _firestore.collection('sermons').doc(id).delete();
+
+  /// Toggles the featured flag on a sermon.
+  Future<void> setFeatured(String id, bool featured) =>
+      _firestore.collection('sermons').doc(id).update({'isFeatured': featured});
+
+  /// Streams sermons for the admin panel, newest first.
+  Stream<List<Sermon>> watchSermons({int limit = 100}) {
+    return _firestore
+        .collection('sermons')
+        .orderBy('publishedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs.map(_docToSermon).toList());
+  }
+
   /// Prefix search on the `title` field using Firestore range queries.
   ///
   /// Falls back to in-memory filter over mock data when Firestore is
@@ -134,6 +228,7 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
           sermonCategory(data['title'] as String? ?? ''),
       videoId: data['videoId'] as String?,
       source: data['source'] as String?,
+      isFeatured: data['isFeatured'] as bool? ?? false,
     );
   }
 }

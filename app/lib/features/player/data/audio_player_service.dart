@@ -93,6 +93,7 @@ class AudioPlayerService {
   /// starts playback immediately.
   Future<void> play(Sermon sermon) async {
     _currentSermon = sermon;
+    _cache.addRecentlyPlayed(sermon.id);
     if (Firebase.apps.isNotEmpty) {
       // Fire-and-forget engagement event; never blocks playback.
       unawaited(FirebaseAnalytics.instance.logEvent(

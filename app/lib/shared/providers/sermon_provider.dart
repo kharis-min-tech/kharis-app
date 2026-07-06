@@ -12,6 +12,7 @@ import '../../features/messages/data/kharis_content.dart';
 import '../../features/messages/data/sermon_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
 import '../models/sermon.dart';
+import 'audio_provider.dart';
 import 'cache_provider.dart';
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -132,6 +133,73 @@ final videoRepositoryProvider = Provider<VideoRepository>(
 final videosProvider = FutureProvider<List<Sermon>>((ref) async {
   final repo = ref.watch(videoRepositoryProvider);
   return repo.getVideos();
+});
+
+// ── Admin: sermon management (Firestore realtime) ────────────────────────────
+
+/// Admin-only realtime stream of Firestore-managed sermons for the CMS panel.
+/// Only works when [kUseFirebase] is true; otherwise emits an empty list.
+final adminSermonsProvider = StreamProvider<List<Sermon>>((ref) {
+  if (!kUseFirebase) return Stream.value(const []);
+  try {
+    return (ref.watch(sermonRepositoryProvider) as FirestoreSermonRepository)
+        .watchSermons();
+  } catch (_) {
+    return Stream.value(const []);
+  }
+});
+
+/// Featured sermons for the Messages page hero.
+final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
+  final sermons = ref.watch(librarySermonsProvider);
+  final firestoreFeatured = ref.watch(adminSermonsProvider).valueOrNull ?? [];
+  // Prefer explicitly featured docs from Firestore, fall back to the 3 newest.
+  final featured = firestoreFeatured.where((s) => s.isFeatured).toList();
+  if (featured.isNotEmpty) return featured.take(5).toList();
+  return sermons.take(3).toList();
+});
+
+// ── Recently played ───────────────────────────────────────────────────────────
+
+/// Sermons the user has recently played, ordered most-recent first.
+/// Driven by the [CacheService] playback history. Re-evaluates whenever
+/// playback state changes (so the list updates right after a new play).
+final recentlyPlayedProvider = Provider<List<Sermon>>((ref) {
+  // Watch player state so the list refreshes after each new play.
+  ref.watch(playerStateProvider);
+  final cache = ref.read(cacheServiceProvider);
+  final ids = cache.getRecentlyPlayed();
+  if (ids.isEmpty) return const [];
+  final allSermons = ref.watch(sermonsProvider).valueOrNull ?? const [];
+  final byId = {for (final s in allSermons) s.id: s};
+  return ids
+      .map((id) => byId[id])
+      .whereType<Sermon>()
+      .take(10)
+      .toList();
+});
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+/// Active search query for the Messages library. Empty string = no search.
+final sermonSearchProvider = StateProvider<String>((ref) => '');
+
+/// Search results: sermons whose title, speaker, or category contains the
+/// query (case-insensitive). Empty when no query is active.
+final searchResultsProvider = Provider<List<Sermon>>((ref) {
+  final query = ref.watch(sermonSearchProvider).trim().toLowerCase();
+  if (query.isEmpty) return const [];
+  final sermons = ref.watch(sermonsProvider).valueOrNull ?? const [];
+  return sermons.where((s) {
+    final title = s.title.toLowerCase();
+    final speaker = s.speaker.toLowerCase();
+    final category = (s.category ?? '').toLowerCase();
+    return title.contains(query) ||
+        speaker.contains(query) ||
+        category.contains(query);
+  }).toList()
+    ..sort((a, b) => (b.publishedAt ?? DateTime(0))
+        .compareTo(a.publishedAt ?? DateTime(0)));
 });
 
 // ── Events ────────────────────────────────────────────────────────────────────

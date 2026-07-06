@@ -16,6 +16,7 @@ class Sermon {
     this.category,
     this.videoId,
     this.source,
+    this.isFeatured = false,
   });
 
   /// Returns true if this is a YouTube video (has videoId, no audioUrl)
@@ -48,6 +49,9 @@ class Sermon {
   /// Content source: 'youtube', 'soundcloud', etc.
   final String? source;
 
+  /// Whether this sermon is featured on the Messages home.
+  final bool isFeatured;
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   String get formattedDuration {
@@ -74,6 +78,7 @@ class Sermon {
     String? category,
     String? videoId,
     String? source,
+    bool? isFeatured,
   }) {
     return Sermon(
       id: id ?? this.id,
@@ -89,6 +94,7 @@ class Sermon {
       category: category ?? this.category,
       videoId: videoId ?? this.videoId,
       source: source ?? this.source,
+      isFeatured: isFeatured ?? this.isFeatured,
     );
   }
 
@@ -106,23 +112,25 @@ class Sermon {
         other.series == series &&
         other.description == description &&
         other.artworkColor == artworkColor &&
-        other.category == category;
+        other.category == category &&
+        other.isFeatured == isFeatured;
   }
 
   @override
   int get hashCode => Object.hash(
-        id,
-        title,
-        speaker,
-        audioUrl,
-        artworkUrl,
-        duration,
-        publishedAt,
-        series,
-        description,
-        artworkColor,
-        category,
-      );
+   id,
+   title,
+   speaker,
+   audioUrl,
+   artworkUrl,
+   duration,
+   publishedAt,
+   series,
+   description,
+   artworkColor,
+   category,
+   isFeatured,
+ );
 
   @override
   String toString() =>

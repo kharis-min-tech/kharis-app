@@ -92,6 +92,13 @@ class AdminHubScreen extends ConsumerWidget {
                 subtitle: 'Set daily scripture readings and prayers',
                 route: '/admin/bible-reading',
               ),
+              SizedBox(height: AppSpacing.sm),
+              _HubCard(
+                icon: Icons.mic_rounded,
+                title: 'Sermons',
+                subtitle: 'Add, edit, feature, and manage preached messages',
+                route: '/admin/sermons',
+              ),
             ],
           );
         },
