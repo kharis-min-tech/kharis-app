@@ -883,12 +883,16 @@
               <input type="text" id="br-name" placeholder="Kharis London" required />
             </div>
             <div class="field">
-              <label for="br-location">Location</label>
-              <input type="text" id="br-location" placeholder="United Kingdom" />
+              <label for="br-subtitle">Subtitle / Location</label>
+              <input type="text" id="br-subtitle" placeholder="United Kingdom" />
             </div>
             <div class="field">
               <label for="br-description">Description</label>
               <input type="text" id="br-description" placeholder="Main Campus" />
+            </div>
+            <div class="field">
+              <label for="br-image">Image URL (landmark photo)</label>
+              <input type="url" id="br-image" placeholder="https://…" />
             </div>
             <div class="field">
               <label for="br-address">Meeting Address</label>
@@ -896,16 +900,22 @@
             </div>
             <div class="field-row">
               <div class="field">
-                <label for="br-meeting-day">Meeting Day</label>
-                <select id="br-meeting-day">
-                  <option value="">Select day</option>
-                  <option>Sunday</option><option>Monday</option><option>Tuesday</option>
-                  <option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option>
-                </select>
+                <label for="br-meeting-days">Meeting Day(s)</label>
+                <input type="text" id="br-meeting-days" placeholder="e.g. Sunday or Wed & Fri" />
               </div>
               <div class="field">
                 <label for="br-meeting-time">Meeting Time</label>
                 <input type="time" id="br-meeting-time" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="br-gradient-start">Gradient Start (hex)</label>
+                <input type="text" id="br-gradient-start" placeholder="#6B34FA" />
+              </div>
+              <div class="field">
+                <label for="br-gradient-end">Gradient End (hex)</label>
+                <input type="text" id="br-gradient-end" placeholder="#FD7F20" />
               </div>
             </div>
             <div class="field">
@@ -1576,12 +1586,13 @@ async function loadBranches() {
     }
     list.innerHTML = snap.docs.map(d => {
       const b = d.data();
-      const meeting = [b.meetingDay, b.meetingTime].filter(Boolean).join(' at ') || 'Not set';
+      const meeting = [b.meetingDays || b.meetingDay, b.meetingTime].filter(Boolean).join(' at ') || 'Not set';
+      const subtitle = b.subtitle || b.location || '';
       return `<div class="item-card" data-id="${d.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <div>
             <strong>${escHtml(b.name || 'Unnamed')}</strong>
-            <div class="item-card-meta">${escHtml(b.location || '')} ${b.location ? '·' : ''} ${escHtml(meeting)}</div>
+            <div class="item-card-meta">${escHtml(subtitle)} ${subtitle ? '·' : ''} ${escHtml(meeting)}</div>
             ${b.address ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;">📍 ${escHtml(b.address)}</div>` : ''}
             ${b.description ? `<div style="color:var(--muted);font-size:12px;">${escHtml(b.description)}</div>` : ''}
           </div>
@@ -1615,11 +1626,14 @@ async function editBranch(id) {
   if (!d.exists()) return;
   const b = d.data();
   document.getElementById('br-name').value = b.name || '';
-  document.getElementById('br-location').value = b.location || '';
+  document.getElementById('br-subtitle').value = b.subtitle || b.location || '';
   document.getElementById('br-description').value = b.description || '';
+  document.getElementById('br-image').value = b.imageUrl || '';
   document.getElementById('br-address').value = b.address || '';
-  document.getElementById('br-meeting-day').value = b.meetingDay || '';
+  document.getElementById('br-meeting-days').value = b.meetingDays || b.meetingDay || '';
   document.getElementById('br-meeting-time').value = b.meetingTime || '';
+  document.getElementById('br-gradient-start').value = b.gradientStart || '';
+  document.getElementById('br-gradient-end').value = b.gradientEnd || '';
   document.getElementById('br-order').value = b.order ?? '';
   document.getElementById('branch-form').dataset.editId = id;
   document.getElementById('branch-submit-btn').textContent = 'Update Branch';
@@ -1628,13 +1642,28 @@ async function editBranch(id) {
 document.getElementById('branch-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const editId = e.target.dataset.editId;
+  const normHex = (v) => {
+    v = v.trim();
+    if (!v) return null;
+    if (!v.startsWith('#')) v = '#' + v;
+    return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : undefined;
+  };
+  const gradientStart = normHex(document.getElementById('br-gradient-start').value);
+  const gradientEnd = normHex(document.getElementById('br-gradient-end').value);
+  if (gradientStart === undefined || gradientEnd === undefined) {
+    toast('Gradient colours must be 6-digit hex, e.g. #6B34FA', 'error');
+    return;
+  }
   const data = {
     name: document.getElementById('br-name').value.trim(),
-    location: document.getElementById('br-location').value.trim(),
+    subtitle: document.getElementById('br-subtitle').value.trim(),
     description: document.getElementById('br-description').value.trim(),
-    address: document.getElementById('br-address').value.trim(),
-    meetingDay: document.getElementById('br-meeting-day').value,
-    meetingTime: document.getElementById('br-meeting-time').value,
+    imageUrl: document.getElementById('br-image').value.trim() || null,
+    address: document.getElementById('br-address').value.trim() || null,
+    meetingDays: document.getElementById('br-meeting-days').value.trim() || null,
+    meetingTime: document.getElementById('br-meeting-time').value || null,
+    gradientStart,
+    gradientEnd,
     order: parseInt(document.getElementById('br-order').value || '0', 10),
     updatedAt: serverTimestamp(),
   };
