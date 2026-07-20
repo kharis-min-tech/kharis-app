@@ -366,7 +366,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
   late final TextEditingController _meetingTimeCtrl;
 
   Color _gradientStart = const Color(0xFF3B2A6B);
-  Color _gradientEnd = const Color(0xFF7C3AED);
+  Color _gradientEnd = const Color(0xFF9A8FB8);
   bool _saving = false;
 
   static final _hexRegex = RegExp(r'^#[0-9A-Fa-f]{6}$');
@@ -383,7 +383,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
     _startHexCtrl = TextEditingController(text: startHex);
     _endHexCtrl = TextEditingController(text: endHex);
     _gradientStart = Branch.parseHex(startHex, const Color(0xFF3B2A6B));
-    _gradientEnd = Branch.parseHex(endHex, const Color(0xFF7C3AED));
+    _gradientEnd = Branch.parseHex(endHex, const Color(0xFF9A8FB8));
 
     _imageUrlCtrl = TextEditingController(text: b?.imageUrl ?? '');
     _orderCtrl = TextEditingController(
@@ -666,7 +666,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
       );
       final endColor = Branch.parseHex(
         _endHexCtrl.text.trim(),
-        const Color(0xFF7C3AED),
+        const Color(0xFF9A8FB8),
       );
       final imageUrl = _imageUrlCtrl.text.trim().isEmpty
           ? null

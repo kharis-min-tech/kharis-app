@@ -149,7 +149,7 @@ class _TopBar extends StatelessWidget {
               ),
               child: const Icon(
                 Icons.chevron_left_rounded,
-                color: Color(0xFFCFC8D4),
+                color: Color(0xFFCDC9C4),
                 size: 24,
               ),
             ),

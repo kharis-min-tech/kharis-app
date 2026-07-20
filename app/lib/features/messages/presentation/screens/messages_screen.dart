@@ -976,7 +976,7 @@ class _TopicCard extends StatelessWidget {
           style: AppTypography.bodySm.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: active ? AppColors.secondary : const Color(0xFFCFC8D4),
+            color: active ? AppColors.secondary : const Color(0xFFCDC9C4),
           ),
         ),
       ],

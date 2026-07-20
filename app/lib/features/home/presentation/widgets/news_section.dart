@@ -9,7 +9,7 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 // Brand gradient pairs cycled across announcement cards.
 const _kCardGradients = [
   [Color(0xFF6B1E8B), Color(0xFF2A0A52)],
-  [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
+  [Color(0xFF1C1410), Color(0xFFFD7F20)],
   [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
   [Color(0xFF0A2A1A), Color(0xFF059669)],
   [Color(0xFF3B1A0A), Color(0xFFF59E0B)],

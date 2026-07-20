@@ -76,7 +76,7 @@ ThemeData kharisTheme() {
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.secondary,
         foregroundColor: AppColors.onSecondary,
-        disabledBackgroundColor: Color(0x66E9C349),
+        disabledBackgroundColor: Color(0x66FD7F20),
         disabledForegroundColor: AppColors.onSecondary,
         elevation: 0,
         shadowColor: Colors.transparent,

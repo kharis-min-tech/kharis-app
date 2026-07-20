@@ -106,9 +106,9 @@ class _VideoHeroCard extends StatelessWidget {
               begin: Alignment(-.8, -1),
               end: Alignment(.6, 1),
               colors: [
-                Color(0xFF4A1D8F),
-                Color(0xFF23104A),
-                Color(0xFF0C0A12),
+                Color(0xFF3A2414),
+                Color(0xFF1C1410),
+                Color(0xFF0A0908),
               ],
             ),
           ),
@@ -199,7 +199,7 @@ class _VideoHeroCard extends StatelessWidget {
                   ),
                   child: const Icon(
                     Icons.play_arrow_rounded,
-                    color: Color(0xFF1A0A3B),
+                    color: Color(0xFF1C1410),
                     size: 32,
                   ),
                 ),
@@ -344,7 +344,7 @@ class _HeroSkeleton extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF4A1D8F), Color(0xFF0C0A12)],
+            colors: [Color(0xFF3A2414), Color(0xFF0A0908)],
           ),
         ),
         child: const Center(

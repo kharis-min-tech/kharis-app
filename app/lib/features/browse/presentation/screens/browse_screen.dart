@@ -29,7 +29,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     [Color(0xFF1D4ED8), Color(0xFF60A5FA)],
     [Color(0xFF047857), Color(0xFF34D399)],
     [Color(0xFF9F1239), Color(0xFFFB7185)],
-    [Color(0xFF8A5A10), Color(0xFFE9C349)],
+    [Color(0xFF7A3D0E), Color(0xFFFD7F20)],
   ];
 
   @override
@@ -172,7 +172,7 @@ class _TopBar extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.06),
             ),
             child: const Icon(Icons.home_outlined,
-                color: Color(0xFFCFC8D4), size: 20),
+                color: Color(0xFFCDC9C4), size: 20),
           ),
         ),
       ],

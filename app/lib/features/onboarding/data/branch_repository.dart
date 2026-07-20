@@ -149,7 +149,7 @@ class BranchRepository {
         gradientStart:
             Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF3B2A6B)),
         gradientEnd:
-            Branch.parseHex(data['gradientEnd'] as String?, const Color(0xFF7C3AED)),
+            Branch.parseHex(data['gradientEnd'] as String?, const Color(0xFF9A8FB8)),
         imageUrl: data['imageUrl'] as String?,
         order: (data['order'] as num?)?.toInt() ?? 0,
         address: data['address'] as String?,
@@ -167,7 +167,7 @@ class BranchRepository {
       name: 'Kharis London',
       subtitle: 'United Kingdom · Main Campus',
       gradientStart: const Color(0xFF3B2A6B),
-      gradientEnd: const Color(0xFF7C3AED),
+      gradientEnd: const Color(0xFF9A8FB8),
       imageUrl:
           '$_thumb/4/43/Elizabeth_Tower%2C_June_2022.jpg/330px-Elizabeth_Tower%2C_June_2022.jpg',
       order: 0,
@@ -243,7 +243,7 @@ class BranchRepository {
       name: 'Kharis Accra',
       subtitle: 'Ghana · International Campus',
       gradientStart: const Color(0xFF8A5A10),
-      gradientEnd: const Color(0xFFE9C349),
+      gradientEnd: const Color(0xFFFD7F20),
       imageUrl:
           '$_thumb/4/4a/Independence_Arch_-_Accra%2C_Ghana1.jpg/330px-Independence_Arch_-_Accra%2C_Ghana1.jpg',
       order: 7,
