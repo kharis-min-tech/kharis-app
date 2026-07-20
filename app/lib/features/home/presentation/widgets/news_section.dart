@@ -8,11 +8,11 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 // Brand gradient pairs cycled across announcement cards.
 const _kCardGradients = [
-  [Color(0xFF6B1E8B), Color(0xFF2A0A52)],
-  [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
-  [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
-  [Color(0xFF0A2A1A), Color(0xFF059669)],
-  [Color(0xFF3B1A0A), Color(0xFFF59E0B)],
+  [Color(0xFF4A3670), Color(0xFF241230)],   // royal plum → deep plum
+  [Color(0xFF1E1433), Color(0xFF8F76C9)],   // deep violet → muted violet
+  [Color(0xFF2A0F1E), Color(0xFFC98BA8)],   // aubergine → dusty rose
+  [Color(0xFF1B0F2E), Color(0xFFB9A6E8)],   // indigo plum → soft lavender
+  [Color(0xFF33200A), Color(0xFFD9B36C)],   // bronze → champagne gold
 ];
 
 /// "Announcements" horizontal carousel wired to newsProvider.
