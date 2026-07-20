@@ -365,8 +365,8 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
   late final TextEditingController _meetingDaysCtrl;
   late final TextEditingController _meetingTimeCtrl;
 
-  Color _gradientStart = const Color(0xFF3B2A6B);
-  Color _gradientEnd = const Color(0xFF7C3AED);
+  Color _gradientStart = const Color(0xFF4A3670);
+  Color _gradientEnd = const Color(0xFFB9A6E8);
   bool _saving = false;
 
   static final _hexRegex = RegExp(r'^#[0-9A-Fa-f]{6}$');
@@ -378,12 +378,12 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
     _nameCtrl = TextEditingController(text: b?.name ?? '');
     _subtitleCtrl = TextEditingController(text: b?.subtitle ?? '');
 
-    final startHex = b != null ? Branch.toHex(b.gradientStart) : '#3B2A6B';
-    final endHex = b != null ? Branch.toHex(b.gradientEnd) : '#7C3AED';
+    final startHex = b != null ? Branch.toHex(b.gradientStart) : '#4A3670';
+    final endHex = b != null ? Branch.toHex(b.gradientEnd) : '#B9A6E8';
     _startHexCtrl = TextEditingController(text: startHex);
     _endHexCtrl = TextEditingController(text: endHex);
-    _gradientStart = Branch.parseHex(startHex, const Color(0xFF3B2A6B));
-    _gradientEnd = Branch.parseHex(endHex, const Color(0xFF7C3AED));
+    _gradientStart = Branch.parseHex(startHex, const Color(0xFF4A3670));
+    _gradientEnd = Branch.parseHex(endHex, const Color(0xFFB9A6E8));
 
     _imageUrlCtrl = TextEditingController(text: b?.imageUrl ?? '');
     _orderCtrl = TextEditingController(
@@ -507,7 +507,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
                       style: AppTypography.bodyLg.copyWith(
                         color: AppColors.onSurface,
                       ),
-                      decoration: _deco(hint: '#3B2A6B').copyWith(
+                      decoration: _deco(hint: '#4A3670').copyWith(
                         prefixText: 'Start: ',
                         prefixStyle: AppTypography.labelMd.copyWith(
                           color: AppColors.onSurfaceVariant,
@@ -531,7 +531,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
                       style: AppTypography.bodyLg.copyWith(
                         color: AppColors.onSurface,
                       ),
-                      decoration: _deco(hint: '#7C3AED').copyWith(
+                      decoration: _deco(hint: '#B9A6E8').copyWith(
                         prefixText: 'End: ',
                         prefixStyle: AppTypography.labelMd.copyWith(
                           color: AppColors.onSurfaceVariant,
@@ -662,11 +662,11 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
       final subtitle = _subtitleCtrl.text.trim();
       final startColor = Branch.parseHex(
         _startHexCtrl.text.trim(),
-        const Color(0xFF3B2A6B),
+        const Color(0xFF4A3670),
       );
       final endColor = Branch.parseHex(
         _endHexCtrl.text.trim(),
-        const Color(0xFF7C3AED),
+        const Color(0xFFB9A6E8),
       );
       final imageUrl = _imageUrlCtrl.text.trim().isEmpty
           ? null

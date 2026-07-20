@@ -8,10 +8,10 @@ abstract final class AppShadows {
     BorderSide(color: Color(0x1AFFFFFF), width: 1),
   );
 
-  /// 2px gold border — applied to focused inputs and active interactive
-  /// elements.
+  /// 2px champagne-gold border — applied to focused inputs and active
+  /// interactive elements.
   static const Border focusBorder = Border.fromBorderSide(
-    BorderSide(color: Color(0xFFE9C349), width: 2),
+    BorderSide(color: Color(0xFFD9B36C), width: 2),
   );
 
   /// Blur sigma for glassmorphic surfaces (mini player, overlays).

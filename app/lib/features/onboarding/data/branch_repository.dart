@@ -147,9 +147,9 @@ class BranchRepository {
         name: data['name'] as String? ?? '',
         subtitle: data['subtitle'] as String? ?? '',
         gradientStart:
-            Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF3B2A6B)),
+            Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF4A3670)),
         gradientEnd:
-            Branch.parseHex(data['gradientEnd'] as String?, const Color(0xFF7C3AED)),
+            Branch.parseHex(data['gradientEnd'] as String?, const Color(0xFFB9A6E8)),
         imageUrl: data['imageUrl'] as String?,
         order: (data['order'] as num?)?.toInt() ?? 0,
         address: data['address'] as String?,
@@ -166,8 +166,8 @@ class BranchRepository {
       id: 'london',
       name: 'Kharis London',
       subtitle: 'United Kingdom · Main Campus',
-      gradientStart: const Color(0xFF3B2A6B),
-      gradientEnd: const Color(0xFF7C3AED),
+      gradientStart: const Color(0xFF4A3670),
+      gradientEnd: const Color(0xFFB9A6E8),
       imageUrl:
           '$_thumb/4/43/Elizabeth_Tower%2C_June_2022.jpg/330px-Elizabeth_Tower%2C_June_2022.jpg',
       order: 0,
@@ -192,8 +192,8 @@ class BranchRepository {
       id: 'birmingham',
       name: 'Kharis Birmingham',
       subtitle: 'United Kingdom · Midlands',
-      gradientStart: const Color(0xFF5B1F4F),
-      gradientEnd: const Color(0xFFC0297F),
+      gradientStart: const Color(0xFF4E2340),
+      gradientEnd: const Color(0xFFC98BA8),
       imageUrl:
           '$_thumb/e/ec/Selfridges_Building%2C_Birmingham_%282012%29.jpg/330px-Selfridges_Building%2C_Birmingham_%282012%29.jpg',
       order: 2,
@@ -242,8 +242,8 @@ class BranchRepository {
       id: 'accra',
       name: 'Kharis Accra',
       subtitle: 'Ghana · International Campus',
-      gradientStart: const Color(0xFF8A5A10),
-      gradientEnd: const Color(0xFFE9C349),
+      gradientStart: const Color(0xFF6B5426),
+      gradientEnd: const Color(0xFFD9B36C),
       imageUrl:
           '$_thumb/4/4a/Independence_Arch_-_Accra%2C_Ghana1.jpg/330px-Independence_Arch_-_Accra%2C_Ghana1.jpg',
       order: 7,

@@ -220,8 +220,8 @@ class _ProfileCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF7C3AED).withValues(alpha: 0.22),
-              const Color(0xFFD5029A).withValues(alpha: 0.14),
+              const Color(0xFFB9A6E8).withValues(alpha: 0.22),
+              const Color(0xFFD8B8C6).withValues(alpha: 0.14),
             ],
           ),
           border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
@@ -292,7 +292,7 @@ class _Avatar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF7C3AED), Color(0xFFD7029A)],
+          colors: [Color(0xFF4A3670), Color(0xFFB9A6E8)],
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -336,8 +336,8 @@ class _SignedOutCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF7C3AED).withValues(alpha: 0.22),
-            const Color(0xFFD5029A).withValues(alpha: 0.14),
+            const Color(0xFFB9A6E8).withValues(alpha: 0.22),
+            const Color(0xFFD8B8C6).withValues(alpha: 0.14),
           ],
         ),
         border: Border.all(color: Colors.white.withValues(alpha: 0.07)),

@@ -17,7 +17,7 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.surfaceDark,
       body: RefreshIndicator(
         color: AppColors.secondary,
-        backgroundColor: const Color(0xFF1E1A2E),
+        backgroundColor: const Color(0xFF201226),
         edgeOffset: MediaQuery.of(context).padding.top,
         onRefresh: () async {
           ref.invalidate(videosProvider);
@@ -184,7 +184,7 @@ class _HomeHeader extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment(-0.6, -1),
               end: Alignment(0.6, 1),
-              colors: [Color(0xFF7C3AED), Color(0xFFD7029A)],
+              colors: [Color(0xFF4A3670), Color(0xFFB9A6E8)],
             ),
           ),
           child: Center(
@@ -245,7 +245,7 @@ class _HomeHeader extends StatelessWidget {
             ),
             child: const Icon(
               Icons.search_rounded,
-              color: Color(0xFFCFC8D4),
+              color: Color(0xFFD3C8DA),
               size: 20,
             ),
           ),
@@ -272,7 +272,7 @@ class _HomeHeader extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.notifications_outlined,
-                  color: Color(0xFFCFC8D4),
+                  color: Color(0xFFD3C8DA),
                   size: 20,
                 ),
               ),
@@ -312,10 +312,10 @@ class _BranchChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0x1AE9C349),
+        color: const Color(0x1AD9B36C),
         borderRadius: BorderRadius.circular(AppRadius.pill),
         border: Border.all(
-          color: const Color(0x38E9C349),
+          color: const Color(0x38D9B36C),
           width: 1,
         ),
       ),

@@ -22,14 +22,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   String _query = '';
 
   static const _tileGradients = <List<Color>>[
-    [Color(0xFF6D4AFF), Color(0xFF9F7AEA)],
-    [Color(0xFF8E1A57), Color(0xFFD43F8D)],
+    [Color(0xFF4A3670), Color(0xFFB9A6E8)],
+    [Color(0xFF4E2340), Color(0xFFC98BA8)],
     [Color(0xFF0E7490), Color(0xFF22D3EE)],
     [Color(0xFFC2410C), Color(0xFFFB923C)],
     [Color(0xFF1D4ED8), Color(0xFF60A5FA)],
     [Color(0xFF047857), Color(0xFF34D399)],
     [Color(0xFF9F1239), Color(0xFFFB7185)],
-    [Color(0xFF8A5A10), Color(0xFFE9C349)],
+    [Color(0xFF6B5426), Color(0xFFD9B36C)],
   ];
 
   @override
