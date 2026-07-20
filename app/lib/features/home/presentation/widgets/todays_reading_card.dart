@@ -56,17 +56,11 @@ class _ReadingCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0x33E9C349),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0x33FD7F20), width: 1),
         gradient: const LinearGradient(
           begin: Alignment(-1, -1),
           end: Alignment(1, 1),
-          colors: [
-            Color(0x24E9C349),
-            Color(0x1A7C3AED),
-          ],
+          colors: [Color(0x14FD7F20), Color(0x0F6B34FA)],
         ),
       ),
       child: Column(
@@ -126,7 +120,7 @@ class _ReadingCard extends StatelessWidget {
               style: AppTypography.bodySm.copyWith(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w400,
-                color: const Color(0xFFCFC8D4),
+                color: AppColors.onSurfaceVariant,
                 height: 1.4,
               ),
             ),
@@ -200,10 +194,10 @@ class _ReadingCard extends StatelessWidget {
                     vertical: 11,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .06),
+                    color: const Color(0x0A000000),
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: .08),
+                      color: const Color(0x14000000),
                       width: 1,
                     ),
                   ),

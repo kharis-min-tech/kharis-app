@@ -72,8 +72,9 @@ class _VideoHeroCard extends StatelessWidget {
     final title = isLive ? (liveTitle ?? 'Live Stream') : video.title;
     final speaker = video.speaker;
     final duration = video.duration != null ? video.formattedDuration : '';
-    final speakerDuration =
-        duration.isNotEmpty ? '$speaker  \u00b7  $duration' : speaker;
+    final speakerDuration = duration.isNotEmpty
+        ? '$speaker  \u00b7  $duration'
+        : speaker;
 
     // Real YouTube thumbnail (maxres, falling back to hq) fills the frame.
     final vid = isLive ? liveVideoId : video.videoId;
@@ -91,10 +92,7 @@ class _VideoHeroCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: .06),
-              width: 1,
-            ),
+            border: Border.all(color: const Color(0x14000000), width: 1),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x44000000),
@@ -105,11 +103,7 @@ class _VideoHeroCard extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment(-.8, -1),
               end: Alignment(.6, 1),
-              colors: [
-                Color(0xFF4A1D8F),
-                Color(0xFF23104A),
-                Color(0xFF0C0A12),
-              ],
+              colors: [Color(0xFF4A1D8F), Color(0xFF23104A), Color(0xFF0C0A12)],
             ),
           ),
           clipBehavior: Clip.antiAlias,
@@ -135,9 +129,7 @@ class _VideoHeroCard extends StatelessWidget {
 
               // Veil so the play button and text stay legible over the image.
               Positioned.fill(
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.16),
-                ),
+                child: ColoredBox(color: Colors.black.withValues(alpha: 0.16)),
               ),
 
               // Bottom scrim
@@ -199,7 +191,7 @@ class _VideoHeroCard extends StatelessWidget {
                   ),
                   child: const Icon(
                     Icons.play_arrow_rounded,
-                    color: Color(0xFF1A0A3B),
+                    color: Color(0xFF32363D),
                     size: 32,
                   ),
                 ),
@@ -281,9 +273,10 @@ class _LivePillState extends State<_LivePill>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _fade = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _fade = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override

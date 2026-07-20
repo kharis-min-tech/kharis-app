@@ -34,15 +34,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _saving = true);
     try {
       final photo = _photoController.text.trim();
-      await ref.read(firebaseAuthRepositoryProvider).updateProfile(
+      await ref
+          .read(firebaseAuthRepositoryProvider)
+          .updateProfile(
             displayName: _nameController.text.trim(),
             branch: _branch,
             photoUrl: photo.isEmpty ? null : photo,
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile updated')));
         context.pop();
       }
     } catch (_) {
@@ -99,8 +101,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 _field(
                   controller: _nameController,
                   hint: 'Your name',
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Name is required'
+                      : null,
                 ),
                 const SizedBox(height: 20),
                 _label('Home branch'),
@@ -125,8 +128,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.secondary,
                       foregroundColor: AppColors.onSecondary,
-                      disabledBackgroundColor:
-                          AppColors.secondary.withValues(alpha: 0.5),
+                      disabledBackgroundColor: AppColors.secondary.withValues(
+                        alpha: 0.5,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
@@ -159,16 +163,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: 8),
-        child: Text(
-          text,
-          style: AppTypography.labelMd.copyWith(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurfaceVariant,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(left: 2, bottom: 8),
+    child: Text(
+      text,
+      style: AppTypography.labelMd.copyWith(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: AppColors.onSurfaceVariant,
+      ),
+    ),
+  );
 
   Widget _field({
     required TextEditingController controller,
@@ -188,12 +192,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         hintText: hint,
         hintStyle: AppTypography.bodySm.copyWith(color: AppColors.textFaint),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: AppColors.surfaceSubtle,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          borderSide: const BorderSide(color: AppColors.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -228,9 +234,9 @@ class _BranchDropdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: AppColors.surfaceSubtle,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String?>(
@@ -241,7 +247,10 @@ class _BranchDropdown extends StatelessWidget {
             'Select your branch',
             style: AppTypography.bodySm.copyWith(color: AppColors.textFaint),
           ),
-          icon: const Icon(Icons.expand_more, color: AppColors.onSurfaceVariant),
+          icon: const Icon(
+            Icons.expand_more,
+            color: AppColors.onSurfaceVariant,
+          ),
           style: AppTypography.bodySm.copyWith(
             fontSize: 15,
             color: AppColors.onSurface,

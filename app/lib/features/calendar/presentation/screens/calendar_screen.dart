@@ -41,8 +41,10 @@ class CalendarScreen extends ConsumerWidget {
               ),
               error: (_, _) => SliverToBoxAdapter(
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 60),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 60,
+                  ),
                   child: Center(
                     child: Text(
                       'Unable to load events.',
@@ -160,10 +162,8 @@ class _EventCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
-        ),
+        color: AppColors.surfaceElevated,
+        border: Border.all(color: AppColors.outlineVariant),
         borderRadius: BorderRadius.circular(AppRadius.lg), // 16
       ),
       padding: const EdgeInsets.all(15),
@@ -203,7 +203,7 @@ class _EventCard extends StatelessWidget {
             width: 1,
             height: 42,
             margin: const EdgeInsets.symmetric(horizontal: 14),
-            color: Colors.white.withValues(alpha: 0.1),
+            color: AppColors.outlineVariant,
           ),
 
           // Title + time

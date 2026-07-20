@@ -11,7 +11,7 @@ const _kCardGradients = [
   [Color(0xFF6B1E8B), Color(0xFF2A0A52)],
   [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
   [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
-  [Color(0xFF0A2A1A), Color(0xFF059669)],
+  [Color(0xFF1A0A2A), Color(0xFF7C3AED)],
   [Color(0xFF3B1A0A), Color(0xFFF59E0B)],
 ];
 
@@ -35,10 +35,7 @@ class AnnouncementsCarousel extends ConsumerWidget {
         child: Center(
           child: Text(
             'No announcements',
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
         ),
       );
@@ -66,10 +63,7 @@ class AnnouncementsCarousel extends ConsumerWidget {
 }
 
 class _AnnouncementCard extends StatelessWidget {
-  const _AnnouncementCard({
-    required this.item,
-    required this.gradientColors,
-  });
+  const _AnnouncementCard({required this.item, required this.gradientColors});
 
   final NewsItem item;
   final List<Color> gradientColors;
@@ -82,10 +76,7 @@ class _AnnouncementCard extends StatelessWidget {
         width: 210,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: .06),
-            width: 1,
-          ),
+          border: Border.all(color: const Color(0x14000000), width: 1),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

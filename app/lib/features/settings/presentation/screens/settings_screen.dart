@@ -20,7 +20,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
     final isAdmin = ref.watch(isAdminProvider).valueOrNull ?? false;
-    final signedIn = user != null && user.role != 'guest' && user.email.isNotEmpty;
+    final signedIn =
+        user != null && user.role != 'guest' && user.email.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
@@ -224,7 +225,7 @@ class _ProfileCard extends StatelessWidget {
               const Color(0xFFD5029A).withValues(alpha: 0.14),
             ],
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+          border: Border.all(color: AppColors.outlineVariant),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
@@ -268,7 +269,11 @@ class _ProfileCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textFaint, size: 20),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textFaint,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -311,15 +316,15 @@ class _Avatar extends StatelessWidget {
   }
 
   Widget _initialText() => Center(
-        child: Text(
-          initial,
-          style: AppTypography.bodySm.copyWith(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-      );
+    child: Text(
+      initial,
+      style: AppTypography.bodySm.copyWith(
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        color: Colors.white,
+      ),
+    ),
+  );
 }
 
 // ── Signed-out card ───────────────────────────────────────────────────────────
@@ -340,7 +345,7 @@ class _SignedOutCard extends StatelessWidget {
             const Color(0xFFD5029A).withValues(alpha: 0.14),
           ],
         ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        border: Border.all(color: AppColors.outlineVariant),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -410,9 +415,7 @@ class _PillButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: filled ? AppColors.secondary : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: filled
-              ? null
-              : Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          border: filled ? null : Border.all(color: AppColors.outlineVariant),
         ),
         child: Text(
           label,
@@ -511,7 +514,7 @@ class _MoreMenuItem extends StatelessWidget {
             ? null
             : const BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Color(0x0DFFFFFF), width: 1),
+                  bottom: BorderSide(color: AppColors.outlineVariant, width: 1),
                 ),
               ),
         child: Row(
@@ -520,7 +523,7 @@ class _MoreMenuItem extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
+                color: AppColors.surfaceSubtle,
                 borderRadius: BorderRadius.circular(11),
               ),
               alignment: Alignment.center,
@@ -537,7 +540,11 @@ class _MoreMenuItem extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textFaint, size: 20),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textFaint,
+              size: 20,
+            ),
           ],
         ),
       ),

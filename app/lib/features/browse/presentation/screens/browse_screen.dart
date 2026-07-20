@@ -29,7 +29,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     [Color(0xFF1D4ED8), Color(0xFF60A5FA)],
     [Color(0xFF047857), Color(0xFF34D399)],
     [Color(0xFF9F1239), Color(0xFFFB7185)],
-    [Color(0xFF8A5A10), Color(0xFFE9C349)],
+    [Color(0xFF8A5A10), Color(0xFFFD7F20)],
   ];
 
   @override
@@ -55,8 +55,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final categories =
-        ref.watch(categoryLabelsProvider).where((c) => c != 'All').toList();
+    final categories = ref
+        .watch(categoryLabelsProvider)
+        .where((c) => c != 'All')
+        .toList();
     final allSermons = ref.watch(sermonsProvider).valueOrNull ?? const [];
     final results = _search(allSermons);
     final searching = _query.trim().isNotEmpty;
@@ -113,8 +115,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverGrid(
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 14,
                     mainAxisSpacing: 14,
@@ -149,8 +150,11 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Image.asset('assets/figma/dove_logo.png', height: 22,
-            color: Colors.white),
+        Image.asset(
+          'assets/figma/dove_logo.png',
+          height: 22,
+          color: AppColors.primary,
+        ),
         const SizedBox(width: 8),
         Text(
           'DISCOVER',
@@ -169,10 +173,13 @@ class _TopBar extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.06),
+              color: AppColors.surfaceSubtle,
             ),
-            child: const Icon(Icons.home_outlined,
-                color: Color(0xFFCFC8D4), size: 20),
+            child: const Icon(
+              Icons.home_outlined,
+              color: AppColors.heading,
+              size: 20,
+            ),
           ),
         ),
       ],
@@ -199,29 +206,31 @@ class _SearchField extends StatelessWidget {
       decoration: InputDecoration(
         isDense: true,
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
+        fillColor: AppColors.surfaceSubtle,
         hintText: 'Artists, messages, or topics',
         hintStyle: AppTypography.bodySm.copyWith(
           fontSize: 14,
           color: AppColors.textMuted,
         ),
-        prefixIcon: const Icon(Icons.search_rounded,
-            color: AppColors.textMuted, size: 20),
+        prefixIcon: const Icon(
+          Icons.search_rounded,
+          color: AppColors.textMuted,
+          size: 20,
+        ),
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          borderSide: const BorderSide(color: AppColors.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          borderSide: const BorderSide(color: AppColors.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-              color: AppColors.secondary.withValues(alpha: 0.5)),
+            color: AppColors.secondary.withValues(alpha: 0.5),
+          ),
         ),
       ),
     );
@@ -274,7 +283,8 @@ class _CategoryTile extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: Colors.black.withValues(alpha: 0.18),
                   border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.4)),
+                    color: Colors.white.withValues(alpha: 0.4),
+                  ),
                 ),
                 child: Center(
                   child: Container(
@@ -309,9 +319,7 @@ class _ResultsSliver extends ConsumerWidget {
           child: Center(
             child: Text(
               'No messages match your search.',
-              style: AppTypography.bodySm.copyWith(
-                color: AppColors.textMuted,
-              ),
+              style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
             ),
           ),
         ),

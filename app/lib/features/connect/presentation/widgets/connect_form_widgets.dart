@@ -47,7 +47,7 @@ class ConnectFormField extends StatelessWidget {
       maxLength: maxLength,
       style: GoogleFonts.plusJakartaSans(
         fontSize: 15,
-        color: Colors.white,
+        color: AppColors.heading,
       ),
       decoration: InputDecoration(
         labelText: label,
@@ -122,18 +122,16 @@ class ConnectBranchDropdown extends StatelessWidget {
           ),
           dropdownColor: AppColors.surfaceElevated,
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted),
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: AppColors.textMuted,
+          ),
           style: GoogleFonts.plusJakartaSans(
             fontSize: 15,
-            color: Colors.white,
+            color: AppColors.heading,
           ),
           items: kConnectBranches
-              .map(
-                (b) => DropdownMenuItem(
-                  value: b,
-                  child: Text(b),
-                ),
-              )
+              .map((b) => DropdownMenuItem(value: b, child: Text(b)))
               .toList(),
           onChanged: onChanged,
         ),

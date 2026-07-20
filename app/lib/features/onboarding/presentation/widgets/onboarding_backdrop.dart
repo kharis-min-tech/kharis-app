@@ -5,15 +5,15 @@ import 'package:kharis_app/core/theme/app_colors.dart';
 /// Layered backdrop for the welcome screen, matching the final design.
 ///
 /// On the [AppColors.surfaceDark] screen, three layers stack back to front:
-///   1. A warm gold radial glow pooled near the top, behind the hero.
-///   2. A soft lavender radial glow rising from the bottom edge.
-///   3. A faint gold diagonal pinstripe texture for a premium, printed feel.
+///   1. A warm orange radial glow pooled near the top, behind the hero.
+///   2. A soft purple radial glow rising from the bottom edge.
+///   3. A faint orange diagonal pinstripe texture for a premium, printed feel.
 class OnboardingBackdrop extends StatelessWidget {
   const OnboardingBackdrop({super.key, required this.child});
 
   final Widget child;
 
-  static const _gold = Color(0xFFD4AF37);
+  static const _gold = Color(0xFFFD7F20);
 
   @override
   Widget build(BuildContext context) {

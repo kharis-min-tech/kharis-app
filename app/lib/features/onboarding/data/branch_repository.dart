@@ -48,20 +48,18 @@ class Branch {
 /// onboarding branch picker always has content.
 class BranchRepository {
   BranchRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
   Stream<List<Branch>> watchBranches() async* {
     try {
-      yield* _firestore
-          .collection('branches')
-          .orderBy('order')
-          .snapshots()
-          .map((snap) {
-        final list = snap.docs.map((d) => _map(d.id, d.data())).toList();
-        return list.isEmpty ? seedBranches : list;
-      });
+      yield* _firestore.collection('branches').orderBy('order').snapshots().map(
+        (snap) {
+          final list = snap.docs.map((d) => _map(d.id, d.data())).toList();
+          return list.isEmpty ? seedBranches : list;
+        },
+      );
     } catch (_) {
       yield seedBranches;
     }
@@ -78,17 +76,21 @@ class BranchRepository {
     String? meetingDays,
     String? meetingTime,
   }) {
-    return _firestore.collection('branches').add(_data(
-          name: name,
-          subtitle: subtitle,
-          gradientStart: gradientStart,
-          gradientEnd: gradientEnd,
-          imageUrl: imageUrl,
-          order: order,
-          address: address,
-          meetingDays: meetingDays,
-          meetingTime: meetingTime,
-        ));
+    return _firestore
+        .collection('branches')
+        .add(
+          _data(
+            name: name,
+            subtitle: subtitle,
+            gradientStart: gradientStart,
+            gradientEnd: gradientEnd,
+            imageUrl: imageUrl,
+            order: order,
+            address: address,
+            meetingDays: meetingDays,
+            meetingTime: meetingTime,
+          ),
+        );
   }
 
   Future<void> updateBranch(
@@ -103,17 +105,22 @@ class BranchRepository {
     String? meetingDays,
     String? meetingTime,
   }) {
-    return _firestore.collection('branches').doc(id).update(_data(
-          name: name,
-          subtitle: subtitle,
-          gradientStart: gradientStart,
-          gradientEnd: gradientEnd,
-          imageUrl: imageUrl,
-          order: order,
-          address: address,
-          meetingDays: meetingDays,
-          meetingTime: meetingTime,
-        ));
+    return _firestore
+        .collection('branches')
+        .doc(id)
+        .update(
+          _data(
+            name: name,
+            subtitle: subtitle,
+            gradientStart: gradientStart,
+            gradientEnd: gradientEnd,
+            imageUrl: imageUrl,
+            order: order,
+            address: address,
+            meetingDays: meetingDays,
+            meetingTime: meetingTime,
+          ),
+        );
   }
 
   Future<void> deleteBranch(String id) =>
@@ -129,33 +136,36 @@ class BranchRepository {
     String? address,
     String? meetingDays,
     String? meetingTime,
-  }) =>
-      {
-        'name': name,
-        'subtitle': subtitle,
-        'gradientStart': Branch.toHex(gradientStart),
-        'gradientEnd': Branch.toHex(gradientEnd),
-        'imageUrl': imageUrl,
-        'order': order,
-        'address': address,
-        'meetingDays': meetingDays,
-        'meetingTime': meetingTime,
-      };
+  }) => {
+    'name': name,
+    'subtitle': subtitle,
+    'gradientStart': Branch.toHex(gradientStart),
+    'gradientEnd': Branch.toHex(gradientEnd),
+    'imageUrl': imageUrl,
+    'order': order,
+    'address': address,
+    'meetingDays': meetingDays,
+    'meetingTime': meetingTime,
+  };
 
   Branch _map(String id, Map<String, dynamic> data) => Branch(
-        id: id,
-        name: data['name'] as String? ?? '',
-        subtitle: data['subtitle'] as String? ?? '',
-        gradientStart:
-            Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF3B2A6B)),
-        gradientEnd:
-            Branch.parseHex(data['gradientEnd'] as String?, const Color(0xFF7C3AED)),
-        imageUrl: data['imageUrl'] as String?,
-        order: (data['order'] as num?)?.toInt() ?? 0,
-        address: data['address'] as String?,
-        meetingDays: data['meetingDays'] as String?,
-        meetingTime: data['meetingTime'] as String?,
-      );
+    id: id,
+    name: data['name'] as String? ?? '',
+    subtitle: data['subtitle'] as String? ?? '',
+    gradientStart: Branch.parseHex(
+      data['gradientStart'] as String?,
+      const Color(0xFF3B2A6B),
+    ),
+    gradientEnd: Branch.parseHex(
+      data['gradientEnd'] as String?,
+      const Color(0xFF7C3AED),
+    ),
+    imageUrl: data['imageUrl'] as String?,
+    order: (data['order'] as num?)?.toInt() ?? 0,
+    address: data['address'] as String?,
+    meetingDays: data['meetingDays'] as String?,
+    meetingTime: data['meetingTime'] as String?,
+  );
 
   /// Built-in branches, used to seed Firestore and as an offline fallback.
   /// Landmark images are open-licensed (Wikimedia Commons).
@@ -179,8 +189,8 @@ class BranchRepository {
       id: 'manchester',
       name: 'Kharis Manchester',
       subtitle: 'United Kingdom · North Branch',
-      gradientStart: const Color(0xFF1F2937),
-      gradientEnd: const Color(0xFF4B5563),
+      gradientStart: const Color(0xFF4A21AE),
+      gradientEnd: const Color(0xFF6B34FA),
       imageUrl:
           '$_thumb/7/7f/Manchester_Town_Hall_from_Lloyd_St.jpg/330px-Manchester_Town_Hall_from_Lloyd_St.jpg',
       order: 1,
@@ -202,8 +212,8 @@ class BranchRepository {
       id: 'reading',
       name: 'Kharis Reading',
       subtitle: 'United Kingdom · South East',
-      gradientStart: const Color(0xFF0E7490),
-      gradientEnd: const Color(0xFF22D3EE),
+      gradientStart: const Color(0xFFC2410C),
+      gradientEnd: const Color(0xFFFD7F20),
       imageUrl:
           '$_thumb/c/c4/The_Blade%2C_Abbey_Square%2C_Reading.jpg/330px-The_Blade%2C_Abbey_Square%2C_Reading.jpg',
       order: 3,
@@ -232,8 +242,8 @@ class BranchRepository {
       id: 'medway',
       name: 'Kharis Medway',
       subtitle: 'United Kingdom · Kent',
-      gradientStart: const Color(0xFF1D4ED8),
-      gradientEnd: const Color(0xFF60A5FA),
+      gradientStart: const Color(0xFF800654),
+      gradientEnd: const Color(0xFFC0297F),
       imageUrl:
           '$_thumb/3/3c/Rochester_Castle_from_main_approach.jpg/330px-Rochester_Castle_from_main_approach.jpg',
       order: 6,
@@ -242,8 +252,8 @@ class BranchRepository {
       id: 'accra',
       name: 'Kharis Accra',
       subtitle: 'Ghana · International Campus',
-      gradientStart: const Color(0xFF8A5A10),
-      gradientEnd: const Color(0xFFE9C349),
+      gradientStart: const Color(0xFF7A3B0A),
+      gradientEnd: const Color(0xFFFD7F20),
       imageUrl:
           '$_thumb/4/4a/Independence_Arch_-_Accra%2C_Ghana1.jpg/330px-Independence_Arch_-_Accra%2C_Ghana1.jpg',
       order: 7,
@@ -255,8 +265,8 @@ class BranchRepository {
       id: 'freetown',
       name: 'Kharis Freetown',
       subtitle: 'Sierra Leone · West Africa',
-      gradientStart: const Color(0xFF047857),
-      gradientEnd: const Color(0xFF34D399),
+      gradientStart: const Color(0xFF6B34FA),
+      gradientEnd: const Color(0xFF9D6BFF),
       imageUrl:
           '$_thumb/c/c3/St._George%27s_Cathedral_Freetown.jpg/330px-St._George%27s_Cathedral_Freetown.jpg',
       order: 8,

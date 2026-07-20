@@ -17,7 +17,7 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.surfaceDark,
       body: RefreshIndicator(
         color: AppColors.secondary,
-        backgroundColor: const Color(0xFF1E1A2E),
+        backgroundColor: AppColors.surfaceElevated,
         edgeOffset: MediaQuery.of(context).padding.top,
         onRefresh: () async {
           ref.invalidate(videosProvider);
@@ -184,7 +184,7 @@ class _HomeHeader extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment(-0.6, -1),
               end: Alignment(0.6, 1),
-              colors: [Color(0xFF7C3AED), Color(0xFFD7029A)],
+              colors: [Color(0xFF6B34FA), Color(0xFFD7029A)],
             ),
           ),
           child: Center(
@@ -241,11 +241,11 @@ class _HomeHeader extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: .06),
+              color: AppColors.surfaceSubtle,
             ),
             child: const Icon(
               Icons.search_rounded,
-              color: Color(0xFFCFC8D4),
+              color: AppColors.heading,
               size: 20,
             ),
           ),
@@ -268,11 +268,11 @@ class _HomeHeader extends StatelessWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: .06),
+                  color: AppColors.surfaceSubtle,
                 ),
                 child: const Icon(
                   Icons.notifications_outlined,
-                  color: Color(0xFFCFC8D4),
+                  color: AppColors.heading,
                   size: 20,
                 ),
               ),
@@ -312,12 +312,9 @@ class _BranchChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0x1AE9C349),
+        color: const Color(0x1AFD7F20),
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(
-          color: const Color(0x38E9C349),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0x38FD7F20), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

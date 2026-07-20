@@ -6,7 +6,7 @@ import 'package:kharis_app/core/theme/app_typography.dart';
 
 /// Horizontal row of sort/filter pills.
 ///
-/// Active pill: gold bg + dark text. Inactive: glass bg + white border.
+/// Active pill: orange bg + white text. Inactive: subtle bg + hairline.
 class SortPillBar extends StatelessWidget {
   const SortPillBar({
     super.key,
@@ -61,16 +61,11 @@ class _SortPill extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active
-              ? AppColors.secondary
-              : Colors.white.withValues(alpha: 0.06),
+          color: active ? AppColors.secondary : AppColors.surfaceSubtle,
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: active
               ? null
-              : Border.all(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  width: 1,
-                ),
+              : Border.all(color: AppColors.outlineVariant, width: 1),
         ),
         child: Text(
           label,

@@ -7,10 +7,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 class PlaylistScreen extends ConsumerWidget {
-  const PlaylistScreen({
-    super.key,
-    this.playlistName = 'ACTS SERIES',
-  });
+  const PlaylistScreen({super.key, this.playlistName = 'ACTS SERIES'});
 
   final String playlistName;
 
@@ -52,7 +49,7 @@ class PlaylistScreen extends ConsumerWidget {
                     child: Image.asset(
                       'assets/figma/dove_logo.png',
                       height: 32,
-                      color: Colors.white,
+                      color: AppColors.heading,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -62,7 +59,7 @@ class PlaylistScreen extends ConsumerWidget {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AppColors.heading,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -121,7 +118,7 @@ class PlaylistScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Divider(color: Color(0xFF252525)),
+                  const Divider(color: AppColors.outlineVariant),
                 ],
               ),
             ),
@@ -142,50 +139,47 @@ class PlaylistScreen extends ConsumerWidget {
 
             // ── Episode list ─────────────────────────────────────────────
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final sermon = sermons[index];
-                  final durationStr = sermon.duration != null
-                      ? '${sermon.duration!.inMinutes} min'
-                      : '';
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 4,
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final sermon = sermons[index];
+                final durationStr = sermon.duration != null
+                    ? '${sermon.duration!.inMinutes} min'
+                    : '';
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 4,
+                  ),
+                  leading: IconButton(
+                    onPressed: () => audioService.play(sermon),
+                    icon: const Icon(
+                      Icons.play_circle_rounded,
+                      color: AppColors.primary,
+                      size: 32,
                     ),
-                    leading: IconButton(
-                      onPressed: () => audioService.play(sermon),
-                      icon: const Icon(
-                        Icons.play_circle_rounded,
-                        color: AppColors.primary,
-                        size: 32,
-                      ),
-                      padding: EdgeInsets.zero,
+                    padding: EdgeInsets.zero,
+                  ),
+                  title: Text(
+                    sermon.title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
                     ),
-                    title: Text(
-                      sermon.title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurface,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    durationStr.isNotEmpty
+                        ? '${sermon.speaker} · $durationStr'
+                        : sermon.speaker,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
                     ),
-                    subtitle: Text(
-                      durationStr.isNotEmpty
-                          ? '${sermon.speaker} · $durationStr'
-                          : sermon.speaker,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                    onTap: () => audioService.play(sermon),
-                  );
-                },
-                childCount: sermons.length,
-              ),
+                  ),
+                  onTap: () => audioService.play(sermon),
+                );
+              }, childCount: sermons.length),
             ),
 
             // Bottom padding

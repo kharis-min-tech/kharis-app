@@ -34,12 +34,12 @@ class BranchTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.secondary.withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.04),
+              : AppColors.surfaceSubtle,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isSelected
                 ? AppColors.secondary.withValues(alpha: 0.55)
-                : Colors.white.withValues(alpha: 0.07),
+                : AppColors.outlineVariant,
           ),
           boxShadow: isSelected
               ? [

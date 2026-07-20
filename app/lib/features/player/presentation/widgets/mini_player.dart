@@ -24,15 +24,13 @@ class MiniPlayer extends ConsumerWidget {
 
     final playerState = ref.watch(playerStateProvider).valueOrNull;
     final isPlaying = playerState?.playing ?? false;
-    final position =
-        ref.watch(positionProvider).valueOrNull ?? Duration.zero;
+    final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
     final rawDuration =
         ref.watch(durationProvider).valueOrNull ?? Duration.zero;
     final service = ref.read(audioPlayerServiceProvider);
 
     final progress = rawDuration.inMilliseconds > 0
-        ? (position.inMilliseconds / rawDuration.inMilliseconds)
-            .clamp(0.0, 1.0)
+        ? (position.inMilliseconds / rawDuration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
 
     return Semantics(
@@ -42,13 +40,10 @@ class MiniPlayer extends ConsumerWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.outlineVariant, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.32),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -164,16 +159,13 @@ class _ProgressLine extends StatelessWidget {
           Container(
             width: double.infinity,
             height: 2,
-            color: Colors.white.withValues(alpha: 0.1),
+            color: AppColors.outlineVariant,
           ),
           // Fill
           FractionallySizedBox(
             widthFactor: progress.clamp(0.0, 1.0),
             alignment: Alignment.centerLeft,
-            child: Container(
-              height: 2,
-              color: AppColors.heading,
-            ),
+            child: Container(height: 2, color: AppColors.heading),
           ),
         ],
       ),

@@ -1,77 +1,79 @@
 import 'package:flutter/material.dart';
 
-/// Kharis Church design-system colour tokens — v2.
-/// CRITICAL: secondary (gold) = CTAs, active nav, progress.
-///           primary (lavender) = brand, gradients, decorative.
+/// Kharis Church design-system colour tokens — v6 "Daylight".
+/// LIGHT theme faithful to kharis.org (see DESIGN.md).
+/// CRITICAL: secondary (orange #FD7F20) = CTAs, active nav, progress.
+///           primary (purple #6B34FA) = identity, decorative use only.
 abstract final class AppColors {
   // ── Brand ──────────────────────────────────────────────────────────────────
 
-  /// Lavender purple — branding, gradients, secondary decorative use.
-  static const Color primary = Color(0xFFD6BAFF);
+  /// Brand purple — identity marks, decorative use. Never for buttons.
+  static const Color primary = Color(0xFF6B34FA);
 
   /// Text/icon on primary surfaces.
-  static const Color onPrimary = Color(0xFF41107E);
+  static const Color onPrimary = Color(0xFFFFFFFF);
 
-  /// Stronger purple — containers, pills.
-  static const Color primaryContainer = Color(0xFFBD92FF);
+  /// Soft purple tint — containers, pills.
+  static const Color primaryContainer = Color(0xFFEDE6FE);
 
-  /// Gold — PRIMARY CTAs, active nav, Live badges, progress bars.
-  static const Color secondary = Color(0xFFE9C349);
+  /// Orange — PRIMARY CTAs, active nav, Live badges, progress bars.
+  static const Color secondary = Color(0xFFFD7F20);
 
-  /// Text/icon on gold (secondary) surfaces.
-  static const Color onSecondary = Color(0xFF3C2F00);
+  /// Text/icon on orange (secondary) surfaces.
+  static const Color onSecondary = Color(0xFFFFFFFF);
 
-  /// Warm grey — tertiary accents.
-  static const Color tertiary = Color(0xFFC8C6C5);
+  /// Magenta — feature-icon accent (icon boxes on kharis.org).
+  static const Color tertiary = Color(0xFF800654);
 
-  // ── Surfaces (dark mode) ───────────────────────────────────────────────────
+  // ── Surfaces (light mode) ──────────────────────────────────────────────────
 
-  /// App background — deepest layer.
-  static const Color surfaceDark = Color(0xFF131313);
+  /// App background — website page white. (Token name kept from the dark
+  /// era; this is the scaffold/app background.)
+  static const Color surfaceDark = Color(0xFFFFFFFF);
 
   /// Deepest canvas behind the app shell.
-  static const Color canvas = Color(0xFF08070A);
+  static const Color canvas = Color(0xFFFFFFFF);
 
-  /// Cards, bottom bar — +1px white 10% border.
-  static const Color surfaceElevated = Color(0xFF1E1E1E);
+  /// Cards, bottom bar — pair with AppShadows.cardShadow.
+  static const Color surfaceElevated = Color(0xFFFDFDFD);
 
   /// Inputs, secondary surfaces.
-  static const Color surfaceSubtle = Color(0xFF2A2A2A);
+  static const Color surfaceSubtle = Color(0xFFF1F3F8);
 
-  /// Container surfaces (bottom sheets, separators).
-  static const Color surfaceContainer = Color(0xFF201F1F);
+  /// Container surfaces (bottom sheets, separators) — section-alt tint.
+  static const Color surfaceContainer = Color(0xFFF9FAFE);
 
-  /// Low-emphasis container (mini player, deep backgrounds).
-  static const Color surfaceContainerLow = Color(0xFF1C1B1B);
+  /// Low-emphasis container (mini player, deep backgrounds) — section-alt.
+  static const Color surfaceContainerLow = Color(0xFFF9FAFE);
 
   // ── Content ────────────────────────────────────────────────────────────────
 
-  /// Headings (h1, section titles) — brightest text.
-  static const Color heading = Color(0xFFF2EEF4);
+  /// Headings (h1, section titles) — darkest text.
+  static const Color heading = Color(0xFF32363D);
 
-  /// Primary / body text on dark surfaces.
-  static const Color onSurface = Color(0xFFE9E6EA);
+  /// Primary / body text on light surfaces.
+  static const Color onSurface = Color(0xFF32363D);
 
-  /// Secondary / supporting text — neutral grey.
-  static const Color onSurfaceVariant = Color(0xFF9A929E);
+  /// Secondary / supporting text — body grey.
+  static const Color onSurfaceVariant = Color(0xFF7A7A7A);
 
   /// Muted text, captions.
-  static const Color textMuted = Color(0xFF8B838F);
+  static const Color textMuted = Color(0xFF999999);
 
   /// Faint text, chevrons, footer links, inactive icons.
-  static const Color textFaint = Color(0xFF6E6A70);
+  static const Color textFaint = Color(0xFF999999);
 
   // ── Outline / dividers ─────────────────────────────────────────────────────
 
-  static const Color outline = Color(0xFF968E9D);
-  static const Color outlineVariant = Color(0xFF4A4451);
+  static const Color outline = Color(0xFFC9C5CF);
+  static const Color outlineVariant = Color(0xFFE7E4EC);
 
   // ── Semantic states ────────────────────────────────────────────────────────
 
-  static const Color error = Color(0xFFFFB4AB);
-  static const Color errorContainer = Color(0xFF93000A);
-  static const Color success = Color(0xFF22C55E);
+  static const Color error = Color(0xFFBA1A1A);
+  static const Color errorContainer = Color(0xFFFFDAD6);
+  static const Color success = Color(0xFF15803D);
 
-  /// Vivid pink — "Latest" badge, notification dot, live accents.
-  static const Color accentPink = Color(0xFFF531B3);
+  /// Orange accent — "Latest" badge, notification dot, live accents.
+  static const Color accentPink = Color(0xFFFD7F20);
 }

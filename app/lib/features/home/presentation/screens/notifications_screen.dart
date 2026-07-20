@@ -55,9 +55,7 @@ class NotificationsScreen extends ConsumerWidget {
       body: Builder(
         builder: (context) {
           if (newsAsync.isLoading || eventsAsync.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           final newsItems = newsAsync.valueOrNull ?? [];
@@ -68,24 +66,28 @@ class NotificationsScreen extends ConsumerWidget {
           // Announcements - church-wide (null branch) or matching user branch.
           for (final n in newsItems) {
             if (n.branch == null || n.branch == userBranch) {
-              items.add(_NotifItem(
-                icon: Icons.campaign_rounded,
-                title: n.title,
-                body: n.body,
-                date: n.publishedAt,
-              ));
+              items.add(
+                _NotifItem(
+                  icon: Icons.campaign_rounded,
+                  title: n.title,
+                  body: n.body,
+                  date: n.publishedAt,
+                ),
+              );
             }
           }
 
           // Events - church-wide or matching user branch.
           for (final e in events) {
             if (e.branch == null || e.branch == userBranch) {
-              items.add(_NotifItem(
-                icon: Icons.event_rounded,
-                title: e.title,
-                body: e.description,
-                date: e.startTime,
-              ));
+              items.add(
+                _NotifItem(
+                  icon: Icons.event_rounded,
+                  title: e.title,
+                  body: e.description,
+                  date: e.startTime,
+                ),
+              );
             }
           }
 
@@ -106,10 +108,8 @@ class NotificationsScreen extends ConsumerWidget {
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: items.length,
-            separatorBuilder: (_, _) => Divider(
-              color: Colors.white.withValues(alpha: .06),
-              height: 1,
-            ),
+            separatorBuilder: (_, _) =>
+                const Divider(color: Color(0x14000000), height: 1),
             itemBuilder: (context, index) {
               final item = items[index];
               return ListTile(
@@ -122,13 +122,9 @@ class NotificationsScreen extends ConsumerWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: .08),
+                    color: AppColors.surfaceSubtle,
                   ),
-                  child: Icon(
-                    item.icon,
-                    color: AppColors.secondary,
-                    size: 20,
-                  ),
+                  child: Icon(item.icon, color: AppColors.secondary, size: 20),
                 ),
                 title: Text(
                   item.title,

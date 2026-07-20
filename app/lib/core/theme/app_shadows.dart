@@ -1,34 +1,38 @@
 import 'package:flutter/material.dart';
 
-/// Shadow / border decoration tokens — Kharis Church design system v2.
-/// No box shadows — elevation via colour contrast and borders only.
+/// Shadow / border decoration tokens — Kharis Church design system v6
+/// "Daylight". Cards use the kharis.org shadow (0 0 30px rgba(0,0,0,0.18));
+/// buttons carry no shadow.
 abstract final class AppShadows {
-  /// 1px white 10% border — applied to cards and elevated surfaces.
+  /// 1px hairline border — applied to cards and elevated surfaces.
   static const Border cardBorder = Border.fromBorderSide(
-    BorderSide(color: Color(0x1AFFFFFF), width: 1),
+    BorderSide(color: Color(0x14000000), width: 1),
   );
 
-  /// 2px gold border — applied to focused inputs and active interactive
+  /// Website card shadow — 0 0 30px rgba(0,0,0,0.18).
+  static const List<BoxShadow> cardShadow = [
+    BoxShadow(color: Color(0x2E000000), blurRadius: 30),
+  ];
+
+  /// 2px orange border — applied to focused inputs and active interactive
   /// elements.
   static const Border focusBorder = Border.fromBorderSide(
-    BorderSide(color: Color(0xFFE9C349), width: 2),
+    BorderSide(color: Color(0xFFFD7F20), width: 2),
   );
 
-  /// Blur sigma for glassmorphic surfaces (mini player, overlays).
+  /// Blur sigma for blurred surfaces (mini player, overlays).
   static const double glassmorphicBlurSigma = 30;
 
-  /// Glassmorphic decoration — bottom nav background gradient.
+  /// Bottom nav background fade — white bar over content.
   static const BoxDecoration glassMorphicDecoration = BoxDecoration(
     gradient: LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        Color(0x00131313), // surfaceDark transparent
-        Color(0xFF131313), // surfaceDark opaque
+        Color(0x00FFFFFF), // white transparent
+        Color(0xFFFFFFFF), // white opaque
       ],
     ),
-    border: Border(
-      top: BorderSide(color: Color(0x1AFFFFFF), width: 1),
-    ),
+    border: Border(top: BorderSide(color: Color(0x14000000), width: 1)),
   );
 }

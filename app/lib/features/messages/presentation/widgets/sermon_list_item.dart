@@ -93,11 +93,13 @@ class _SermonListItemState extends State<SermonListItem>
   @override
   Widget build(BuildContext context) {
     final cat = widget.category ?? '';
-    final speakerLine =
-        cat.isNotEmpty ? '${widget.speaker} · $cat' : widget.speaker;
-    final metaLine = [widget.dateLabel, widget.durationLabel]
-        .where((s) => s.isNotEmpty)
-        .join(' · ');
+    final speakerLine = cat.isNotEmpty
+        ? '${widget.speaker} · $cat'
+        : widget.speaker;
+    final metaLine = [
+      widget.dateLabel,
+      widget.durationLabel,
+    ].where((s) => s.isNotEmpty).join(' · ');
 
     return InkWell(
       onTap: widget.onTap,
@@ -164,7 +166,7 @@ class _SermonListItemState extends State<SermonListItem>
               ),
             ),
             const SizedBox(width: 8),
-            // ── 3-dot button (34px circle, white.06) ──────────────────────────
+            // ── 3-dot button (34px circle, subtle bg) ─────────────────────────
             GestureDetector(
               onTap: widget.onMoreTap,
               behavior: HitTestBehavior.opaque,
@@ -172,7 +174,7 @@ class _SermonListItemState extends State<SermonListItem>
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: AppColors.surfaceSubtle,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: const Icon(

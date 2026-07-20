@@ -11,7 +11,6 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 // Scoped to the onboarding flow, discarded once the router pops this screen.
 final _selectedBranchProvider = StateProvider<String?>((ref) => null);
 
-
 class BranchSelectionScreen extends ConsumerWidget {
   const BranchSelectionScreen({super.key});
 
@@ -19,7 +18,8 @@ class BranchSelectionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(_selectedBranchProvider);
     final branches =
-        ref.watch(branchesProvider).valueOrNull ?? BranchRepository.seedBranches;
+        ref.watch(branchesProvider).valueOrNull ??
+        BranchRepository.seedBranches;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
@@ -73,9 +73,9 @@ class BranchSelectionScreen extends ConsumerWidget {
                         gradientColors: branch.gradient,
                         imageUrl: branch.imageUrl,
                         isSelected: selected == branch.name,
-                        onTap: () => ref
-                            .read(_selectedBranchProvider.notifier)
-                            .state = branch.name,
+                        onTap: () =>
+                            ref.read(_selectedBranchProvider.notifier).state =
+                                branch.name,
                       );
                     },
                   ),
@@ -110,7 +110,10 @@ class BranchSelectionScreen extends ConsumerWidget {
   /// Persists the chosen branch to the signed-in profile (best effort), then
   /// continues into the app.
   Future<void> _confirm(
-      BuildContext context, WidgetRef ref, String? branch) async {
+    BuildContext context,
+    WidgetRef ref,
+    String? branch,
+  ) async {
     if (branch != null) {
       final user = ref.read(currentUserProvider).valueOrNull;
       final repo = ref.read(firebaseAuthRepositoryProvider);
@@ -144,12 +147,12 @@ class _TopBar extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
+                color: AppColors.surfaceSubtle,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.chevron_left_rounded,
-                color: Color(0xFFCFC8D4),
+                color: AppColors.onSurface,
                 size: 24,
               ),
             ),
@@ -158,7 +161,7 @@ class _TopBar extends StatelessWidget {
         Image.asset(
           'assets/figma/dove_logo.png',
           height: 30,
-          color: Colors.white,
+          color: AppColors.primary,
         ),
       ],
     );

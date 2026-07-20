@@ -109,7 +109,7 @@ class _TopBar extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .06),
+                color: AppColors.surfaceSubtle,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -150,15 +150,15 @@ class _ChromeBar extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .04),
+        color: AppColors.surfaceContainer,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(14),
           topRight: Radius.circular(14),
         ),
         border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          left: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          right: BorderSide(color: Colors.white.withValues(alpha: .06)),
+          top: BorderSide(color: AppColors.outlineVariant),
+          left: BorderSide(color: AppColors.outlineVariant),
+          right: BorderSide(color: AppColors.outlineVariant),
         ),
       ),
       child: Row(
@@ -213,15 +213,15 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 26, 22, 26),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1820),
+        color: AppColors.surfaceElevated,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
         ),
         border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          left: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          right: BorderSide(color: Colors.white.withValues(alpha: .06)),
+          bottom: BorderSide(color: AppColors.outlineVariant),
+          left: BorderSide(color: AppColors.outlineVariant),
+          right: BorderSide(color: AppColors.outlineVariant),
         ),
       ),
       child: done
@@ -277,16 +277,12 @@ class _FormState extends StatelessWidget {
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFBD92FF), Color(0xFFE9C349)],
-            ),
+            color: AppColors.tertiary,
             borderRadius: BorderRadius.circular(18),
           ),
           child: const Icon(
             Icons.favorite_rounded,
-            color: Color(0xFF1A1820),
+            color: AppColors.surfaceElevated,
             size: 28,
           ),
         ),
@@ -325,7 +321,8 @@ class _FormState extends StatelessWidget {
               Expanded(
                 child: _AmountButton(
                   label: '\$${_kPresets[i]}',
-                  isSelected: selectedAmount == _kPresets[i] &&
+                  isSelected:
+                      selectedAmount == _kPresets[i] &&
                       customController.text.isEmpty,
                   onTap: () => onAmountSelected(_kPresets[i]),
                 ),
@@ -347,11 +344,7 @@ class _FormState extends StatelessWidget {
         const SizedBox(height: 10),
 
         // Fund selector.
-        _FundSelector(
-          value: fund,
-          funds: _kFunds,
-          onChanged: onFundChanged,
-        ),
+        _FundSelector(value: fund, funds: _kFunds, onChanged: onFundChanged),
         const SizedBox(height: 24),
 
         // Gold CTA.
@@ -362,9 +355,7 @@ class _FormState extends StatelessWidget {
             icon: const Icon(Icons.favorite_rounded, size: 18),
             label: Text(
               'Give $displayAmount',
-              style: AppTypography.bodyLg.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.w800),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.secondary,
@@ -443,11 +434,9 @@ class _SuccessState extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .06),
+              color: AppColors.surfaceSubtle,
               borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: .08),
-              ),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             child: Text(
               'Give Again',
@@ -474,9 +463,9 @@ class _FooterPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .03),
+          color: AppColors.surfaceContainer,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: Colors.white.withValues(alpha: .05)),
+          border: Border.all(color: AppColors.outlineVariant),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -543,13 +532,11 @@ class _AmountButton extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.secondary
-              : Colors.white.withValues(alpha: .05),
+          color: isSelected ? AppColors.secondary : AppColors.surfaceSubtle,
           borderRadius: BorderRadius.circular(12),
           border: isSelected
               ? null
-              : Border.all(color: Colors.white.withValues(alpha: .08)),
+              : Border.all(color: AppColors.outlineVariant),
         ),
         child: Center(
           child: Text(
@@ -569,10 +556,7 @@ class _AmountButton extends StatelessWidget {
 // ── Custom Amount Field ───────────────────────────────────────────────────────
 
 class _CustomAmountField extends StatelessWidget {
-  const _CustomAmountField({
-    required this.controller,
-    required this.onChanged,
-  });
+  const _CustomAmountField({required this.controller, required this.onChanged});
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
@@ -583,9 +567,7 @@ class _CustomAmountField extends StatelessWidget {
       controller: controller,
       onChanged: onChanged,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
-      ],
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
       style: AppTypography.bodySm.copyWith(
         fontSize: 15,
         color: AppColors.onSurface,
@@ -604,21 +586,22 @@ class _CustomAmountField extends StatelessWidget {
           color: AppColors.secondary,
         ),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: .05),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        fillColor: AppColors.surfaceSubtle,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: .08)),
+          borderSide: BorderSide(color: AppColors.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: .08)),
+          borderSide: BorderSide(color: AppColors.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.secondary, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
         ),
       ),
     );
@@ -644,15 +627,15 @@ class _FundSelector extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .05),
+        color: AppColors.surfaceSubtle,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          dropdownColor: const Color(0xFF1A1820),
+          dropdownColor: AppColors.surfaceElevated,
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
             color: AppColors.textFaint,

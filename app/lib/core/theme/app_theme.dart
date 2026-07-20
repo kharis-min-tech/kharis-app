@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
 import 'app_radius.dart';
 import 'app_typography.dart';
 
-/// Returns the Kharis Church [ThemeData] — v2 design system.
+/// Returns the Kharis Church [ThemeData] — v6 "Daylight" design system.
 ///
-/// Seed: secondary (gold) so Material3 generates a coherent palette from the
-/// CTA colour.  Scaffold background is surfaceDark. Cards carry the 1px white
-/// 10% border. ElevatedButtons are gold with dark text.
+/// Light theme faithful to kharis.org. Seed: secondary (orange) so Material3
+/// generates a coherent palette from the CTA colour. Scaffold background is
+/// white. Cards are #FDFDFD with the website card shadow. ElevatedButtons are
+/// solid orange with white text — no gradient, no shadow.
 ///
 /// Usage:
 /// ```dart
@@ -17,32 +19,33 @@ import 'app_typography.dart';
 /// )
 /// ```
 ThemeData kharisTheme() {
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.secondary,
-    brightness: Brightness.dark,
-  ).copyWith(
-    primary: AppColors.primary,
-    onPrimary: AppColors.onPrimary,
-    primaryContainer: AppColors.primaryContainer,
-    secondary: AppColors.secondary,
-    onSecondary: AppColors.onSecondary,
-    tertiary: AppColors.tertiary,
-    surface: AppColors.surfaceDark,
-    onSurface: AppColors.onSurface,
-    onSurfaceVariant: AppColors.onSurfaceVariant,
-    surfaceContainerHighest: AppColors.surfaceElevated,
-    surfaceContainer: AppColors.surfaceContainer,
-    surfaceContainerLow: AppColors.surfaceContainerLow,
-    error: AppColors.error,
-    errorContainer: AppColors.errorContainer,
-    onError: AppColors.onSurface,
-    outline: AppColors.outline,
-    outlineVariant: AppColors.outlineVariant,
-  );
+  final colorScheme =
+      ColorScheme.fromSeed(
+        seedColor: AppColors.secondary,
+        brightness: Brightness.light,
+      ).copyWith(
+        primary: AppColors.primary,
+        onPrimary: AppColors.onPrimary,
+        primaryContainer: AppColors.primaryContainer,
+        secondary: AppColors.secondary,
+        onSecondary: AppColors.onSecondary,
+        tertiary: AppColors.tertiary,
+        surface: AppColors.surfaceDark,
+        onSurface: AppColors.onSurface,
+        onSurfaceVariant: AppColors.onSurfaceVariant,
+        surfaceContainerHighest: AppColors.surfaceElevated,
+        surfaceContainer: AppColors.surfaceContainer,
+        surfaceContainerLow: AppColors.surfaceContainerLow,
+        error: AppColors.error,
+        errorContainer: AppColors.errorContainer,
+        onError: Colors.white,
+        outline: AppColors.outline,
+        outlineVariant: AppColors.outlineVariant,
+      );
 
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
     colorScheme: colorScheme,
 
     // ── Scaffold ─────────────────────────────────────────────────────────────
@@ -60,47 +63,46 @@ ThemeData kharisTheme() {
       labelMedium: AppTypography.labelMd,
     ),
 
-    // ── Cards ─────────────────────────────────────────────────────────────────
+    // ── Cards — #FDFDFD with website card shadow ─────────────────────────────
     cardTheme: CardThemeData(
       color: AppColors.surfaceElevated,
       elevation: 0,
-      shadowColor: Colors.transparent,
+      shadowColor: const Color(0x2E000000),
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.cardBorder,
-        side: const BorderSide(color: Color(0x1AFFFFFF), width: 1),
+        side: const BorderSide(color: Color(0x14000000), width: 1),
       ),
     ),
 
-    // ── Elevated button — gold CTA, 8px radius ──────────────────────────────
+    // ── Elevated button — solid orange CTA, white text ───────────────────────
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.secondary,
         foregroundColor: AppColors.onSecondary,
-        disabledBackgroundColor: Color(0x66E9C349),
+        disabledBackgroundColor: const Color(0x66FD7F20),
         disabledForegroundColor: AppColors.onSecondary,
         elevation: 0,
         shadowColor: Colors.transparent,
         textStyle: AppTypography.labelMd,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.buttonBorder,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.buttonBorder),
         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
       ),
     ),
 
-    // ── App bar ───────────────────────────────────────────────────────────────
+    // ── App bar — dark status-bar icons on light background ──────────────────
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
       foregroundColor: AppColors.onSurface,
-      titleTextStyle: AppTypography.titleMd,
+      titleTextStyle: AppTypography.titleMd.copyWith(color: AppColors.heading),
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
     ),
 
-    // ── Bottom navigation — gold active, textMuted inactive ──────────────────
+    // ── Bottom navigation — white bar, orange active, #999999 inactive ───────
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
-      backgroundColor: AppColors.surfaceElevated,
+      backgroundColor: Colors.white,
       selectedItemColor: AppColors.secondary,
       unselectedItemColor: AppColors.textMuted,
       type: BottomNavigationBarType.fixed,

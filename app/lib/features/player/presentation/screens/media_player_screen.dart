@@ -63,7 +63,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      // Immersive player: intentionally dark in both video and audio modes so
+      // the white controls/scrims stay legible (artwork-driven, theme-independent).
+      backgroundColor: Colors.black,
       body: _isVideo ? _buildVideoPlayer() : _buildAudioPlayer(),
     );
   }
@@ -81,9 +83,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                 aspectRatio: 16 / 9,
                 child: kIsWeb
                     ? YoutubeWebEmbed(videoId: widget.sermon.videoId!)
-                    : YoutubePlayer(
-                        controller: _youtubeController!,
-                      ),
+                    : YoutubePlayer(controller: _youtubeController!),
               ),
             ),
           ),
@@ -154,7 +154,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 32),
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              color: Colors.white,
+              size: 32,
+            ),
             onPressed: () => Navigator.of(context).pop(),
           ),
           const Spacer(),
@@ -185,13 +189,14 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       ),
       clipBehavior: Clip.antiAlias,
       child: widget.sermon.artworkUrl != null
-          ? Image.network(
-              widget.sermon.artworkUrl!,
-              fit: BoxFit.cover,
-            )
+          ? Image.network(widget.sermon.artworkUrl!, fit: BoxFit.cover)
           : Container(
               color: AppColors.surfaceElevated,
-              child: const Icon(Icons.music_note, size: 80, color: Colors.white54),
+              child: const Icon(
+                Icons.music_note,
+                size: 80,
+                color: AppColors.textMuted,
+              ),
             ),
     );
   }
@@ -327,7 +332,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           iconSize: 40,
           icon: const Icon(Icons.forward_10, color: Colors.white),
           onPressed: () {
-            final duration = ref.read(durationProvider).valueOrNull ?? Duration.zero;
+            final duration =
+                ref.read(durationProvider).valueOrNull ?? Duration.zero;
             final newPos = position + const Duration(seconds: 15);
             service.seek(newPos > duration ? duration : newPos);
           },

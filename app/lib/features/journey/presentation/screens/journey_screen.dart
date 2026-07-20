@@ -11,9 +11,9 @@ import 'package:kharis_app/features/connect/presentation/screens/new_here_screen
 /// Persisted set of completed step indices (0-3).
 final _completedStepsProvider =
     StateNotifierProvider<_CompletedStepsNotifier, Set<int>>((ref) {
-  final cache = ref.read(cacheServiceProvider);
-  return _CompletedStepsNotifier(cache);
-});
+      final cache = ref.read(cacheServiceProvider);
+      return _CompletedStepsNotifier(cache);
+    });
 
 class _CompletedStepsNotifier extends StateNotifier<Set<int>> {
   _CompletedStepsNotifier(this._cache) : super(_load(_cache));
@@ -315,10 +315,7 @@ class _CompletePill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: done ? AppColors.secondary : Colors.transparent,
-          border: Border.all(
-            color: AppColors.secondary,
-            width: 1.5,
-          ),
+          border: Border.all(color: AppColors.secondary, width: 1.5),
           borderRadius: BorderRadius.circular(100),
         ),
         child: Row(
@@ -358,10 +355,7 @@ class _CelebrationCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF1A1040),
-            Color(0xFF1A1A2E),
-          ],
+          colors: [AppColors.primaryContainer, AppColors.surfaceContainer],
         ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
@@ -419,7 +413,11 @@ class _CelebrationCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+                  const Icon(
+                    Icons.arrow_forward,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                 ],
               ),
             ),

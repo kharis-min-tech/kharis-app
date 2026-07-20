@@ -54,8 +54,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Color(0xF5131313), // rgba(19,19,19,.96)
-                      Color(0xF5131313),
+                      Color(0xF5FFFFFF), // rgba(255,255,255,.96)
+                      Color(0xF5FFFFFF),
                     ],
                     stops: [0.0, 0.38, 1.0],
                   ),
@@ -116,8 +116,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 }
 
 /// Single tab item: icon 24 + label 10.5px w600.
-/// Active color: [AppColors.secondary] (gold).
-/// Inactive color: [AppColors.textFaint] (#6e6a70).
+/// Active color: [AppColors.secondary] (orange).
+/// Inactive color: [AppColors.textMuted] (#999999).
 class _TabItem extends StatelessWidget {
   const _TabItem({
     required this.icon,
@@ -138,7 +138,7 @@ class _TabItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = index == currentIndex;
-    final color = isActive ? AppColors.secondary : AppColors.textFaint;
+    final color = isActive ? AppColors.secondary : AppColors.textMuted;
 
     return GestureDetector(
       onTap: () => onTap(index),
@@ -152,11 +152,7 @@ class _TabItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isActive ? activeIcon : icon,
-                size: 24,
-                color: color,
-              ),
+              Icon(isActive ? activeIcon : icon, size: 24, color: color),
               const SizedBox(height: 3),
               Text(
                 label,
