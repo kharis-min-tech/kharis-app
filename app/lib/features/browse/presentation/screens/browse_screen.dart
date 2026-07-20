@@ -29,7 +29,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     [Color(0xFF1D4ED8), Color(0xFF60A5FA)],
     [Color(0xFF047857), Color(0xFF34D399)],
     [Color(0xFF9F1239), Color(0xFFFB7185)],
-    [Color(0xFF8A5A10), Color(0xFFE9C349)],
+    [Color(0xFF7A4520), Color(0xFFC4794A)],
   ];
 
   @override

@@ -280,7 +280,7 @@ class _FormState extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFBD92FF), Color(0xFFE9C349)],
+              colors: [Color(0xFF8FA8CC), Color(0xFFC4794A)],
             ),
             borderRadius: BorderRadius.circular(18),
           ),

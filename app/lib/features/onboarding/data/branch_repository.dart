@@ -242,8 +242,8 @@ class BranchRepository {
       id: 'accra',
       name: 'Kharis Accra',
       subtitle: 'Ghana · International Campus',
-      gradientStart: const Color(0xFF8A5A10),
-      gradientEnd: const Color(0xFFE9C349),
+      gradientStart: const Color(0xFF7A4520),
+      gradientEnd: const Color(0xFFC4794A),
       imageUrl:
           '$_thumb/4/4a/Independence_Arch_-_Accra%2C_Ghana1.jpg/330px-Independence_Arch_-_Accra%2C_Ghana1.jpg',
       order: 7,
