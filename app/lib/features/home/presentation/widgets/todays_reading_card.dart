@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Gold/purple gradient card showing today's Bible reading with Read + Listen.
+/// Navy/copper gradient card showing today's Bible reading with Read + Listen.
 class TodaysReadingCard extends ConsumerWidget {
   const TodaysReadingCard({super.key});
 

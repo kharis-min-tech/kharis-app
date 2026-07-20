@@ -5,7 +5,7 @@ import 'package:kharis_app/features/player/presentation/screens/media_player_scr
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Hero card: "Latest from Kharis" YouTube video in dark purple 16:9 card.
+/// Hero card: "Latest from Kharis" YouTube video in dark navy 16:9 card.
 /// When live, shows a "LIVE" pill instead of the "Latest" badge.
 class LatestMessageCard extends ConsumerWidget {
   const LatestMessageCard({super.key});

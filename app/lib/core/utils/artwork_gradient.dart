@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 
 // 10 distinct gradient pairs for sermon artwork, cycling by index.
 // Each pair is [startColor, endColor] for topLeft → bottomRight.
+// Midnight & Copper v3: muted, cinematic pairs — no vivid pop.
 const _kGradients = <List<Color>>[
-  [Color(0xFF1A0A3B), Color(0xFF6B34FA)],   // purple → deep blue/violet
-  [Color(0xFF0A2A0A), Color(0xFF059669)],   // green → emerald
-  [Color(0xFF3B1A0A), Color(0xFFF59E0B)],   // orange → amber
-  [Color(0xFF0A1A3B), Color(0xFF4F46E5)],   // blue → indigo
-  [Color(0xFF2A0A1A), Color(0xFFE11D48)],   // magenta → rose
-  [Color(0xFF0A2A2A), Color(0xFF06B6D4)],   // teal → cyan
-  [Color(0xFF2A1A0A), Color(0xFF92400E)],   // amber → brown
-  [Color(0xFF0A1E2E), Color(0xFF38BDF8)],   // sky blue → blue
-  [Color(0xFF1A0A2A), Color(0xFF8B5CF6)],   // deep purple → violet
-  [Color(0xFF0A1A0A), Color(0xFF65A30D)],   // forest → olive
+  [Color(0xFF0E1B33), Color(0xFF3E5C8F)],   // midnight navy → steel blue
+  [Color(0xFF1C1206), Color(0xFFC4794A)],   // deep bronze → copper
+  [Color(0xFF0A2A21), Color(0xFF2E7D64)],   // deep pine → muted emerald
+  [Color(0xFF101828), Color(0xFF5A7DAB)],   // midnight → dusty blue
+  [Color(0xFF251015), Color(0xFF8F4A5B)],   // wine → muted rose
+  [Color(0xFF0A2328), Color(0xFF3B7A8A)],   // deep teal → slate teal
+  [Color(0xFF231409), Color(0xFF8A5A2E)],   // umber → bronze
+  [Color(0xFF0D1F2E), Color(0xFF6B93B8)],   // deep sky → steel
+  [Color(0xFF161226), Color(0xFF5E5488)],   // indigo slate → muted violet
+  [Color(0xFF12200E), Color(0xFF6B7D3F)],   // forest → olive
 ];
 
 /// Returns a two-stop gradient colour list for sermon artwork.

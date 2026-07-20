@@ -184,7 +184,7 @@ class _HomeHeader extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment(-0.6, -1),
               end: Alignment(0.6, 1),
-              colors: [Color(0xFF7C3AED), Color(0xFFD7029A)],
+              colors: [AppColors.secondary, AppColors.accentPink],
             ),
           ),
           child: Center(
