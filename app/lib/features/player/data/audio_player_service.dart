@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/core/services/cache_service.dart';
+import 'package:kharis_app/core/constants/http_constants.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 
 /// Wraps [AudioPlayer] (just_audio) with a sermon-aware API.
@@ -105,7 +106,10 @@ class AudioPlayerService {
         },
       ));
     }
-    await _player.setUrl(sermon.audioUrl);
+    await _player.setUrl(
+      sermon.audioUrl,
+      headers: const {'User-Agent': kBrowserUserAgent},
+    );
 
     // Restore saved position if it falls in the resumable window.
     final savedMs = _cache.getPlaybackPosition(sermon.id);

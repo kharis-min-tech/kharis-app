@@ -7,9 +7,9 @@ import '../../features/home/data/daily_content_repository.dart';
 import '../../features/home/data/news_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
+import '../../features/messages/data/kharis_api_sermon_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/kharis_content.dart';
-import '../../features/messages/data/sermon_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
 import '../models/sermon.dart';
 import 'audio_provider.dart';
@@ -18,8 +18,9 @@ import 'cache_provider.dart';
 // ── Repository ────────────────────────────────────────────────────────────────
 
 final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
-  if (kUseFirebase) return FirestoreSermonRepository();
-  return SermonRepository();
+  // Kharis public sermon API (yetanothersermon.host). Falls back to the bundled
+  // catalogue via sermonsProvider's catch if the network is unreachable.
+  return KharisApiSermonRepository();
 });
 
 // ── Sermons (live fetch) ──────────────────────────────────────────────────────
@@ -142,8 +143,7 @@ final videosProvider = FutureProvider<List<Sermon>>((ref) async {
 final adminSermonsProvider = StreamProvider<List<Sermon>>((ref) {
   if (!kUseFirebase) return Stream.value(const []);
   try {
-    return (ref.watch(sermonRepositoryProvider) as FirestoreSermonRepository)
-        .watchSermons();
+    return FirestoreSermonRepository().watchSermons();
   } catch (_) {
     return Stream.value(const []);
   }
