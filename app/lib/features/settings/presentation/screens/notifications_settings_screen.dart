@@ -43,7 +43,7 @@ class _NotificationsSettingsScreenState
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,7 +55,7 @@ class _NotificationsSettingsScreenState
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(
                   Icons.arrow_back_ios_new,
-                  color: AppColors.onSurface,
+                  color: AppColors.textPrimary,
                   size: 20,
                 ),
               ),
@@ -65,11 +65,8 @@ class _NotificationsSettingsScreenState
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
               child: Text(
                 'Notifications',
-                style: AppTypography.titleMd.copyWith(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
-                ),
+                style: AppTypography.display(size: 26, weight: FontWeight.w700)
+                    .copyWith(color: AppColors.textPrimary),
               ),
             ),
             // Content area
@@ -147,8 +144,9 @@ class _ToggleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.cardWhite,
+        borderRadius: AppRadius.cardBorder,
+        boxShadow: AppShadows.card,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
@@ -159,19 +157,14 @@ class _ToggleRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: AppTypography.bodyLg.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onSurface,
-                  ),
+                  style: AppTypography.ui(size: 15, weight: FontWeight.w600)
+                      .copyWith(color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: AppTypography.labelMd.copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.textMuted,
-                  ),
+                  style: AppTypography.ui(size: 12)
+                      .copyWith(color: AppColors.textMutedLight),
                 ),
               ],
             ),
@@ -181,8 +174,8 @@ class _ToggleRow extends StatelessWidget {
             onChanged: onChanged,
             activeThumbColor: Colors.white,
             activeTrackColor: AppColors.secondary,
-            inactiveThumbColor: AppColors.textMuted,
-            inactiveTrackColor: AppColors.surfaceSubtle,
+            inactiveThumbColor: AppColors.cardWhite,
+            inactiveTrackColor: AppColors.dividerLight,
           ),
         ],
       ),

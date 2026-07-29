@@ -72,18 +72,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.canvas,
+      backgroundColor: AppColors.lightBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.heading),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         title: Text(
           'Edit Profile',
-          style: AppTypography.bodyLg.copyWith(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.heading,
-          ),
+          style: AppTypography.display(size: 18, weight: FontWeight.w700)
+              .copyWith(color: AppColors.textPrimary),
         ),
       ),
       body: SafeArea(
@@ -162,11 +159,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         padding: const EdgeInsets.only(left: 2, bottom: 8),
         child: Text(
           text,
-          style: AppTypography.labelMd.copyWith(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurfaceVariant,
-          ),
+          style: AppTypography.ui(size: 13, weight: FontWeight.w600)
+              .copyWith(color: AppColors.textPrimary),
         ),
       );
 
@@ -180,32 +174,30 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       controller: controller,
       validator: validator,
       keyboardType: keyboardType,
-      style: AppTypography.bodySm.copyWith(
-        fontSize: 15,
-        color: AppColors.onSurface,
-      ),
+      style: AppTypography.ui(size: 15).copyWith(color: AppColors.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: AppTypography.bodySm.copyWith(color: AppColors.textFaint),
+        hintStyle:
+            AppTypography.ui(size: 15).copyWith(color: AppColors.textMutedLight),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
+        fillColor: AppColors.cardWhite,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          borderRadius: AppRadius.inputBorder,
+          borderSide: const BorderSide(color: AppColors.dividerLight),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.inputBorder,
           borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.error),
+          borderRadius: AppRadius.inputBorder,
+          borderSide: const BorderSide(color: AppColors.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.error, width: 1.4),
+          borderRadius: AppRadius.inputBorder,
+          borderSide: const BorderSide(color: AppColors.danger, width: 1.4),
         ),
       ),
     );
@@ -228,24 +220,21 @@ class _BranchDropdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: AppColors.cardWhite,
+        borderRadius: AppRadius.inputBorder,
+        border: Border.all(color: AppColors.dividerLight),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String?>(
           value: value,
           isExpanded: true,
-          dropdownColor: AppColors.surfaceElevated,
+          dropdownColor: AppColors.cardWhite,
           hint: Text(
             'Select your branch',
-            style: AppTypography.bodySm.copyWith(color: AppColors.textFaint),
+            style: AppTypography.ui(size: 15).copyWith(color: AppColors.textMutedLight),
           ),
-          icon: const Icon(Icons.expand_more, color: AppColors.onSurfaceVariant),
-          style: AppTypography.bodySm.copyWith(
-            fontSize: 15,
-            color: AppColors.onSurface,
-          ),
+          icon: const Icon(Icons.expand_more, color: AppColors.textMutedLight),
+          style: AppTypography.ui(size: 15).copyWith(color: AppColors.textPrimary),
           items: [
             for (final name in names)
               DropdownMenuItem<String?>(value: name, child: Text(name)),

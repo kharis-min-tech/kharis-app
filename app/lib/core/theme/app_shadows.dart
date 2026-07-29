@@ -14,6 +14,16 @@ abstract final class AppShadows {
     BorderSide(color: Color(0xFFE9C349), width: 2),
   );
 
+  /// Soft card shadow on light surfaces — `0 2px 12px rgba(30,20,60,.05)`.
+  static const List<BoxShadow> card = [
+    BoxShadow(color: Color(0x0D1E143C), offset: Offset(0, 2), blurRadius: 12),
+  ];
+
+  /// Mini-player lift — `0 12px 30px rgba(0,0,0,.4)`.
+  static const List<BoxShadow> miniPlayer = [
+    BoxShadow(color: Color(0x66000000), offset: Offset(0, 12), blurRadius: 30),
+  ];
+
   /// Blur sigma for glassmorphic surfaces (mini player, overlays).
   static const double glassmorphicBlurSigma = 30;
 

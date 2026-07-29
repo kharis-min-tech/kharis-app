@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/features/journey/data/journey_content.dart';
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
@@ -11,8 +10,7 @@ import 'package:kharis_app/features/connect/presentation/screens/new_here_screen
 /// Persisted set of completed step indices (0-3).
 final _completedStepsProvider =
     StateNotifierProvider<_CompletedStepsNotifier, Set<int>>((ref) {
-  final cache = ref.read(cacheServiceProvider);
-  return _CompletedStepsNotifier(cache);
+  return _CompletedStepsNotifier(ref.watch(cacheServiceProvider));
 });
 
 class _CompletedStepsNotifier extends StateNotifier<Set<int>> {
@@ -23,29 +21,23 @@ class _CompletedStepsNotifier extends StateNotifier<Set<int>> {
   static const _key = 'journey_completed_steps';
 
   static Set<int> _load(dynamic cache) {
-    final raw = cache.getPreference<String>(_key, '');
-    if (raw.isEmpty) return {};
-    return raw
-        .split(',')
-        .map((s) => int.tryParse(s.trim()))
-        .whereType<int>()
-        .toSet();
+    final raw = cache.getStringList(_key) as List<String>?;
+    if (raw == null) return <int>{};
+    return raw.map(int.parse).toSet();
   }
 
   void toggle(int index) {
     final next = Set<int>.from(state);
-    if (next.contains(index)) {
-      next.remove(index);
-    } else {
-      next.add(index);
-    }
+    if (!next.add(index)) next.remove(index);
     state = next;
-    _cache.cachePreference(_key, next.isEmpty ? '' : next.join(','));
+    _cache.setStringList(_key, next.map((e) => e.toString()).toList());
   }
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
+/// "Your Journey" — scripture-forward growth path (design-handoff v3).
+/// Calm light warm surface, Newsreader serif scripture, gold progress accents.
 class JourneyScreen extends ConsumerWidget {
   const JourneyScreen({super.key});
 
@@ -55,7 +47,7 @@ class JourneyScreen extends ConsumerWidget {
     final allDone = completed.length == kJourneySteps.length;
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -69,7 +61,7 @@ class JourneyScreen extends ConsumerWidget {
                 onTap: () => Navigator.of(context).maybePop(),
                 child: const Icon(
                   Icons.chevron_left,
-                  color: AppColors.textMuted,
+                  color: AppColors.textMutedLight,
                   size: 28,
                 ),
               ),
@@ -79,21 +71,16 @@ class JourneyScreen extends ConsumerWidget {
               // Heading
               Text(
                 'Your Journey',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
-                ),
+                style: AppTypography.display(size: 28, weight: FontWeight.w700)
+                    .copyWith(color: AppColors.textPrimary),
               ),
 
               const SizedBox(height: 6),
 
               Text(
-                'Salvation - Baptism - Holy Spirit - Next Steps',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  color: AppColors.textMuted,
-                ),
+                'Salvation \u00B7 Baptism \u00B7 Holy Spirit \u00B7 Next Steps',
+                style: AppTypography.serif(size: 15, italic: true)
+                    .copyWith(color: AppColors.textMutedLight),
               ),
 
               const SizedBox(height: 32),
@@ -169,7 +156,7 @@ class _StepCard extends StatelessWidget {
                     child: Center(
                       child: Container(
                         width: 2,
-                        color: AppColors.surfaceSubtle,
+                        color: AppColors.dividerLight,
                       ),
                     ),
                   ),
@@ -185,8 +172,9 @@ class _StepCard extends StatelessWidget {
               padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.cardWhite,
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  boxShadow: AppShadows.card,
                 ),
                 padding: const EdgeInsets.all(18),
                 child: Column(
@@ -195,23 +183,23 @@ class _StepCard extends StatelessWidget {
                     // Title
                     Text(
                       step.title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onSurface,
+                      style: AppTypography.ui(
+                        size: 17,
+                        weight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
                     ),
 
                     const SizedBox(height: 10),
 
-                    // Scripture quote
+                    // Scripture quote (serif, scripture-forward)
                     Text(
                       step.scripture,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic,
+                      style: AppTypography.serif(
+                        size: 15,
+                        italic: true,
+                        height: 1.55,
                         color: AppColors.primary,
-                        height: 1.5,
                       ),
                     ),
 
@@ -220,9 +208,9 @@ class _StepCard extends StatelessWidget {
                     // Scripture ref
                     Text(
                       step.scriptureRef,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                      style: AppTypography.ui(
+                        size: 12,
+                        weight: FontWeight.w600,
                         color: AppColors.primary,
                       ),
                     ),
@@ -232,10 +220,10 @@ class _StepCard extends StatelessWidget {
                     // Body
                     Text(
                       step.body,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
+                      style: AppTypography.ui(
+                        size: 14,
                         height: 1.6,
+                        color: AppColors.textMutedLight,
                       ),
                     ),
 
@@ -272,24 +260,17 @@ class _RailCircle extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: done
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.secondary, AppColors.secondary],
-              )
-            : null,
-        color: done ? null : AppColors.surfaceSubtle,
+        color: done ? AppColors.secondary : AppColors.chipLight,
       ),
       child: Center(
         child: done
-            ? const Icon(Icons.check, color: Colors.white, size: 16)
+            ? const Icon(Icons.check, color: AppColors.onSecondary, size: 16)
             : Text(
                 '$number',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMuted,
+                style: AppTypography.ui(
+                  size: 13,
+                  weight: FontWeight.w700,
+                  color: AppColors.primary,
                 ),
               ),
       ),
@@ -319,21 +300,21 @@ class _CompletePill extends StatelessWidget {
             color: AppColors.secondary,
             width: 1.5,
           ),
-          borderRadius: BorderRadius.circular(100),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (done) ...[
-              const Icon(Icons.check, color: Colors.white, size: 14),
+              const Icon(Icons.check, color: AppColors.onSecondary, size: 14),
               const SizedBox(width: 6),
             ],
             Text(
               done ? 'Completed' : 'Mark complete',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: done ? Colors.white : AppColors.secondary,
+              style: AppTypography.ui(
+                size: 13,
+                weight: FontWeight.w600,
+                color: done ? AppColors.onSecondary : AppColors.hqStroke,
               ),
             ),
           ],
@@ -358,16 +339,9 @@ class _CelebrationCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF1A1040),
-            Color(0xFF1A1A2E),
-          ],
+          colors: [AppColors.primary, AppColors.primaryDeep],
         ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -375,21 +349,19 @@ class _CelebrationCard extends StatelessWidget {
         children: [
           Text(
             'Welcome to new life in Christ.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.onSurface,
-            ),
+            style: AppTypography.display(size: 20, weight: FontWeight.w700)
+                .copyWith(color: AppColors.onPrimary),
           ),
 
           const SizedBox(height: 10),
 
           Text(
             'Speak to any team member on Sunday. We want to celebrate with you.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: AppColors.onSurfaceVariant,
-              height: 1.6,
+            style: AppTypography.serif(
+              size: 15,
+              italic: true,
+              height: 1.55,
+              color: AppColors.darkMuted3,
             ),
           ),
 
@@ -400,26 +372,23 @@ class _CelebrationCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [AppColors.secondary, AppColors.secondary],
-                ),
-                borderRadius: BorderRadius.circular(100),
+                color: AppColors.secondary,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'New Here? Connect',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                    style: AppTypography.ui(
+                      size: 14,
+                      weight: FontWeight.w700,
+                      color: AppColors.onSecondary,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+                  const Icon(Icons.arrow_forward,
+                      color: AppColors.onSecondary, size: 16),
                 ],
               ),
             ),

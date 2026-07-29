@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/core/theme/app_radius.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
-import 'package:kharis_app/features/onboarding/presentation/widgets/onboarding_backdrop.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/role_card.dart';
 import 'package:kharis_app/shared/widgets/language_bottom_sheet.dart';
 
-class RoleSelectionScreen extends StatefulWidget {
+/// Role selection (design-handoff v3) — light screen. Pick how the user relates
+/// to Kharis; every role continues to branch selection.
+class RoleSelectionScreen extends ConsumerStatefulWidget {
   const RoleSelectionScreen({super.key});
 
   @override
-  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+  ConsumerState<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
 }
 
-class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
+class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
   String _selectedLanguage = 'English (UK)';
 
   Future<void> _openLanguageSheet() async {
@@ -27,117 +31,89 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     }
   }
 
+  void _select(String role) {
+    ref.read(onboardingRepositoryProvider).saveRole(role);
+    context.go('/branch-selection');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
-      body: OnboardingBackdrop(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(26, 8, 26, 30),
-                      child: Column(
-                        children: [
-                          // Centered hero: logo, wordmark, headline, choices.
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const _LogoHalo(),
-                                const SizedBox(height: 18),
-                                Text(
-                                  'KHARIS CHURCH',
-                                  style: AppTypography.labelMd.copyWith(
-                                    fontSize: 13,
-                                    letterSpacing: 4.16,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.secondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Experience Grace. Embody Faith.',
-                                  style: AppTypography.bodySm.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 34),
-                                Text(
-                                  'Welcome to\nKharis Church',
-                                  style: AppTypography.displayLg.copyWith(
-                                    fontSize: 30,
-                                    height: 1.18,
-                                    letterSpacing: -0.6,
-                                    color: AppColors.heading,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 12),
-                                ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 290),
-                                  child: Text(
-                                    'A digital sanctuary for sermons, worship '
-                                    "and community. Tell us how you'd like to "
-                                    'begin.',
-                                    style: AppTypography.bodySm.copyWith(
-                                      fontSize: 14,
-                                      height: 1.6,
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                const SizedBox(height: 30),
-                                RoleCard(
-                                  icon: Icons.person_outline_rounded,
-                                  title: 'I am a Member',
-                                  description: 'Personalized dashboard, giving '
-                                      '& groups',
-                                  accent: AppColors.secondary,
-                                  onTap: () => context.go('/branch-selection'),
-                                ),
-                                const SizedBox(height: 12),
-                                RoleCard(
-                                  icon: Icons.explore_outlined,
-                                  title: 'I am a Visitor',
-                                  description:
-                                      'Explore sermons, events & community',
-                                  accent: AppColors.primary,
-                                  onTap: () => context.go('/branch-selection'),
-                                ),
-                              ],
-                            ),
-                          ),
+      backgroundColor: AppColors.lightBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Image.asset(AppAssets.dovePurple, width: 34, height: 34),
+              const SizedBox(height: 18),
+              Text(
+                'Welcome home',
+                style: AppTypography.display(size: 30, weight: FontWeight.w700)
+                    .copyWith(color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'How do you journey with Kharis?',
+                style: AppTypography.serif(size: 17, italic: true)
+                    .copyWith(color: AppColors.textMutedLight),
+              ),
+              const SizedBox(height: 22),
 
-                          const SizedBox(height: 24),
-                          _LanguagePill(
-                            label: _selectedLanguage,
-                            onTap: _openLanguageSheet,
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _FooterLink(label: 'Privacy Policy', onTap: () {}),
-                              const SizedBox(width: 22),
-                              _FooterLink(
-                                  label: 'Terms of Service', onTap: () {}),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+              // Community photo banner with gradient caption.
+              const _CommunityBanner(),
+              const SizedBox(height: 22),
+
+              RoleCard(
+                icon: Icons.home_outlined,
+                title: 'Member',
+                description: 'I call Kharis my church home',
+                accent: AppColors.primary,
+                onTap: () => _select('member'),
+              ),
+              const SizedBox(height: 12),
+              RoleCard(
+                icon: Icons.auto_awesome_outlined,
+                title: 'New here',
+                description: 'First time — help me settle in',
+                accent: AppColors.secondary,
+                onTap: () => _select('new_here'),
+              ),
+              const SizedBox(height: 12),
+              RoleCard(
+                icon: Icons.explore_outlined,
+                title: 'Visitor',
+                description: 'Just exploring for now',
+                accent: AppColors.primary,
+                onTap: () => _select('visitor'),
+              ),
+              const SizedBox(height: 12),
+              RoleCard(
+                icon: Icons.volunteer_activism_outlined,
+                title: 'Partner',
+                description: 'I support Kharis in ministry',
+                accent: AppColors.secondary,
+                onTap: () => _select('partner'),
+              ),
+
+              const SizedBox(height: 26),
+              Center(
+                child: _LanguagePill(
+                  label: _selectedLanguage,
+                  onTap: _openLanguageSheet,
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _FooterLink(label: 'Privacy Policy', onTap: () {}),
+                  const SizedBox(width: 22),
+                  _FooterLink(label: 'Terms of Service', onTap: () {}),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -145,36 +121,41 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   }
 }
 
-class _LogoHalo extends StatelessWidget {
-  const _LogoHalo();
+class _CommunityBanner extends StatelessWidget {
+  const _CommunityBanner();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 104,
-      height: 104,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          center: Alignment(0, -0.3),
-          colors: [Color(0x2ED4AF37), Color(0x99141416)],
-        ),
-        border: Border.all(
-          color: AppColors.secondary.withValues(alpha: 0.25),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.secondary.withValues(alpha: 0.12),
-            blurRadius: 50,
-          ),
-        ],
-      ),
-      child: Center(
-        child: Image.asset(
-          'assets/figma/dove_logo.png',
-          width: 64,
-          height: 64,
-          color: Colors.white,
+    return ClipRRect(
+      borderRadius: AppRadius.cardBorder,
+      child: SizedBox(
+        height: 118,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(AppAssets.communityRole, fit: BoxFit.cover),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Color(0xB3000000), Color(0x00000000)],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  'One family, many stories',
+                  style: AppTypography.ui(size: 14, weight: FontWeight.w700)
+                      .copyWith(color: Colors.white),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -189,33 +170,30 @@ class _LanguagePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: AppRadius.pillBorder,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+          color: AppColors.cardWhite,
+          borderRadius: AppRadius.pillBorder,
+          border: Border.all(color: AppColors.dividerLight),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.language_rounded,
-                color: Color(0xFFB8B1BD), size: 15),
+                size: 16, color: AppColors.textMutedLight),
             const SizedBox(width: 8),
             Text(
               label,
-              style: AppTypography.labelMd.copyWith(
-                fontSize: 12,
-                letterSpacing: 0,
-                color: const Color(0xFFB8B1BD),
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTypography.ui(size: 13, weight: FontWeight.w600)
+                  .copyWith(color: AppColors.textPrimary),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
             const Icon(Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFFB8B1BD), size: 16),
+                size: 18, color: AppColors.textMutedLight),
           ],
         ),
       ),
@@ -231,17 +209,12 @@ class _FooterLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Text(
         label,
-        style: AppTypography.labelMd.copyWith(
-          fontSize: 11,
-          letterSpacing: 0,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF5C5760),
-        ),
+        style: AppTypography.ui(size: 12, weight: FontWeight.w500)
+            .copyWith(color: AppColors.textMutedLight),
       ),
     );
   }

@@ -17,17 +17,20 @@ abstract final class AppRadius {
   /// 24 px — banners, large containers.
   static const double xl = 24;
 
-  /// 8 px — standard CTA buttons (Kharis v2).
-  static const double button = 8;
+  /// 15 px — standard CTA buttons (design-handoff).
+  static const double button = 15;
 
-  /// 16 px — media/content cards.
-  static const double card = 16;
+  /// 18 px — media/content cards (design-handoff).
+  static const double card = 18;
 
-  /// 8 px — form inputs.
-  static const double input = 8;
+  /// 15 px — form inputs / search.
+  static const double input = 15;
 
   /// 9999 px — chips, tags, fully-rounded pills.
   static const double pill = 9999;
+
+  /// 13 px — icon tiles (`ib`), mini-player.
+  static const double tile = 13;
 
   // ── Composed BorderRadius ──────────────────────────────────────────────────
 
@@ -39,6 +42,9 @@ abstract final class AppRadius {
 
   /// BorderRadius for form inputs.
   static BorderRadius get inputBorder => BorderRadius.circular(input);
+
+  /// BorderRadius for icon tiles / mini-player.
+  static BorderRadius get tileBorder => BorderRadius.circular(tile);
 
   /// BorderRadius for chips and pill-shaped tags.
   static BorderRadius get pillBorder => BorderRadius.circular(pill);

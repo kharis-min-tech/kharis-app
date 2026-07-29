@@ -36,7 +36,7 @@ class AnnouncementsCarousel extends ConsumerWidget {
           child: Text(
             'No announcements',
             style: TextStyle(
-              color: AppColors.textMuted,
+              color: AppColors.textMutedLight,
               fontSize: 13,
             ),
           ),
@@ -81,11 +81,8 @@ class _AnnouncementCard extends StatelessWidget {
       child: Container(
         width: 210,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: .06),
-            width: 1,
-          ),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          boxShadow: AppShadows.card,
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

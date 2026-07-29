@@ -4,16 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_shadows.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
-/// Persistent mini player shown above the tab bar when a sermon is loaded.
+/// Persistent mini player shown above the tab bar when a sermon is loaded —
+/// dark design-handoff (v3).
 ///
-/// Layout (bottom up): 2-px progress line + content row (art | title/speaker
-/// | play/pause icon). AppColors.surfaceDark card with a subtle border and
-/// shadow. Tap the body to push /player; the play/pause button is isolated.
-/// Hidden entirely when currentSermonProvider is null.
+/// A 58-px [AppColors.darkSurface] bar (radius [AppRadius.tile], lifted by
+/// [AppShadows.miniPlayer]) with the artwork thumbnail, title/speaker, and a
+/// play/pause button, plus a gold progress line pinned to the bottom edge.
+/// Tapping the body pushes `/player`; the play/pause button is isolated.
+/// Hidden entirely when [currentSermonProvider] is null.
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
 
@@ -38,48 +41,38 @@ class MiniPlayer extends ConsumerWidget {
     return Semantics(
       label: 'Now playing: ${sermon.title} by ${sermon.speaker}',
       child: Container(
+        height: 58,
         margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.32),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: AppColors.darkSurface,
+          borderRadius: BorderRadius.circular(AppRadius.tile),
+          boxShadow: AppShadows.miniPlayer,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          borderRadius: BorderRadius.circular(AppRadius.tile),
+          child: Stack(
             children: [
-              // Content row: tap navigates to full player
+              // Content row: tap navigates to the full player.
               GestureDetector(
                 onTap: () => context.push('/player'),
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 6, 8),
                   child: Row(
                     children: [
-                      // Album artwork
+                      // Album artwork.
                       SizedBox(
-                        width: 44,
-                        height: 44,
+                        width: 42,
+                        height: 42,
                         child: ArtworkImage(
                           url: sermon.artworkUrl,
                           gradientIndex: sermon.artworkColor ?? 0,
-                          radius: 8,
+                          radius: 9,
                         ),
                       ),
                       const SizedBox(width: 12),
 
-                      // Title and speaker
+                      // Title and speaker.
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,11 +80,11 @@ class MiniPlayer extends ConsumerWidget {
                           children: [
                             Text(
                               sermon.title,
-                              style: AppTypography.bodySm.copyWith(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.heading,
+                              style: AppTypography.ui(
+                                size: 12.5,
+                                weight: FontWeight.w600,
                                 height: 1.25,
+                                color: Colors.white,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -99,11 +92,10 @@ class MiniPlayer extends ConsumerWidget {
                             const SizedBox(height: 2),
                             Text(
                               sermon.speaker,
-                              style: AppTypography.bodySm.copyWith(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w400,
-                                color: AppColors.onSurfaceVariant,
+                              style: AppTypography.ui(
+                                size: 11,
                                 height: 1.25,
+                                color: AppColors.darkMuted,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -112,7 +104,7 @@ class MiniPlayer extends ConsumerWidget {
                         ),
                       ),
 
-                      // Play / pause icon button (does not navigate)
+                      // Play / pause icon button (does not navigate).
                       Semantics(
                         button: true,
                         label: isPlaying ? 'Pause' : 'Play',
@@ -126,8 +118,8 @@ class MiniPlayer extends ConsumerWidget {
                               isPlaying
                                   ? Icons.pause_rounded
                                   : Icons.play_arrow_rounded,
-                              color: AppColors.heading,
-                              size: 28,
+                              color: Colors.white,
+                              size: 26,
                             ),
                           ),
                         ),
@@ -137,8 +129,13 @@ class MiniPlayer extends ConsumerWidget {
                 ),
               ),
 
-              // Progress line pinned to the bottom
-              _ProgressLine(progress: progress),
+              // Gold progress line pinned to the bottom edge.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _ProgressLine(progress: progress),
+              ),
             ],
           ),
         ),
@@ -147,7 +144,7 @@ class MiniPlayer extends ConsumerWidget {
   }
 }
 
-// ── Progress line (height 2, AppColors.heading fill) ─────────────────────────
+// ── Progress line (height 3, gold fill) ──────────────────────────────────────
 
 class _ProgressLine extends StatelessWidget {
   const _ProgressLine({required this.progress});
@@ -157,22 +154,20 @@ class _ProgressLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 2,
+      height: 3,
       child: Stack(
         children: [
-          // Track background
           Container(
             width: double.infinity,
-            height: 2,
-            color: Colors.white.withValues(alpha: 0.1),
+            height: 3,
+            color: Colors.white.withValues(alpha: 0.08),
           ),
-          // Fill
           FractionallySizedBox(
             widthFactor: progress.clamp(0.0, 1.0),
             alignment: Alignment.centerLeft,
             child: Container(
-              height: 2,
-              color: AppColors.heading,
+              height: 3,
+              color: AppColors.gold,
             ),
           ),
         ],

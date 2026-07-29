@@ -4,130 +4,108 @@ import 'app_colors.dart';
 import 'app_radius.dart';
 import 'app_typography.dart';
 
-/// Returns the Kharis Church [ThemeData] — v2 design system.
+/// Returns the Kharis Church [ThemeData] — v3 design system (design-handoff).
 ///
-/// Seed: secondary (gold) so Material3 generates a coherent palette from the
-/// CTA colour.  Scaffold background is surfaceDark. Cards carry the 1px white
-/// 10% border. ElevatedButtons are gold with dark text.
-///
-/// Usage:
-/// ```dart
-/// MaterialApp(
-///   theme: kharisTheme(),
-/// )
-/// ```
+/// **Light-first**: scaffold is [AppColors.lightBg], body text is
+/// [AppColors.textPrimary]. Dark screens (Splash, Messages, Player) set their
+/// own dark backgrounds and colours explicitly. Cards are white with an 18px
+/// radius and a soft shadow; the primary CTA is gold with a 15px radius.
 ThemeData kharisTheme() {
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.secondary,
-    brightness: Brightness.dark,
+    seedColor: AppColors.primary,
+    brightness: Brightness.light,
   ).copyWith(
     primary: AppColors.primary,
     onPrimary: AppColors.onPrimary,
     primaryContainer: AppColors.primaryContainer,
+    onPrimaryContainer: AppColors.onPrimary,
     secondary: AppColors.secondary,
     onSecondary: AppColors.onSecondary,
     tertiary: AppColors.tertiary,
-    surface: AppColors.surfaceDark,
-    onSurface: AppColors.onSurface,
-    onSurfaceVariant: AppColors.onSurfaceVariant,
-    surfaceContainerHighest: AppColors.surfaceElevated,
-    surfaceContainer: AppColors.surfaceContainer,
-    surfaceContainerLow: AppColors.surfaceContainerLow,
-    error: AppColors.error,
-    errorContainer: AppColors.errorContainer,
-    onError: AppColors.onSurface,
-    outline: AppColors.outline,
-    outlineVariant: AppColors.outlineVariant,
+    surface: AppColors.cardWhite,
+    onSurface: AppColors.textPrimary,
+    onSurfaceVariant: AppColors.textMutedLight,
+    error: AppColors.danger,
+    onError: Colors.white,
+    outlineVariant: AppColors.dividerLight,
   );
 
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
     colorScheme: colorScheme,
+    scaffoldBackgroundColor: AppColors.lightBg,
 
-    // ── Scaffold ─────────────────────────────────────────────────────────────
-    scaffoldBackgroundColor: AppColors.surfaceDark,
-
-    // ── Text ─────────────────────────────────────────────────────────────────
+    // ── Text — Hanken body, dark ink on light ──────────────────────────────
     textTheme: TextTheme(
-      displayLarge: AppTypography.displayLg,
-      headlineLarge: AppTypography.headlineLg,
-      headlineMedium: AppTypography.headlineLgMobile,
-      headlineSmall: AppTypography.titleMd,
-      bodyLarge: AppTypography.bodyLg,
-      bodySmall: AppTypography.bodySm,
-      labelSmall: AppTypography.labelMd,
-      labelMedium: AppTypography.labelMd,
+      displayLarge: AppTypography.displayLg.copyWith(color: AppColors.textPrimary),
+      headlineLarge: AppTypography.headlineLg.copyWith(color: AppColors.textPrimary),
+      headlineMedium:
+          AppTypography.headlineLgMobile.copyWith(color: AppColors.textPrimary),
+      headlineSmall: AppTypography.titleMd.copyWith(color: AppColors.textPrimary),
+      titleMedium: AppTypography.titleMd.copyWith(color: AppColors.textPrimary),
+      bodyLarge: AppTypography.bodyLg.copyWith(color: AppColors.textPrimary),
+      bodyMedium: AppTypography.bodyLg.copyWith(color: AppColors.textPrimary),
+      bodySmall: AppTypography.bodySm.copyWith(color: AppColors.textMutedLight),
+      labelSmall: AppTypography.labelMd.copyWith(color: AppColors.textMutedLight),
+      labelMedium: AppTypography.labelMd.copyWith(color: AppColors.textPrimary),
     ),
 
-    // ── Cards ─────────────────────────────────────────────────────────────────
+    // ── Cards — white, 18px, soft shadow ────────────────────────────────────
     cardTheme: CardThemeData(
-      color: AppColors.surfaceElevated,
+      color: AppColors.cardWhite,
       elevation: 0,
       shadowColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppRadius.cardBorder,
-        side: const BorderSide(color: Color(0x1AFFFFFF), width: 1),
-      ),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
     ),
 
-    // ── Elevated button — gold CTA, 8px radius ──────────────────────────────
+    // ── Elevated button — gold CTA, 15px radius, gold ink ──────────────────
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.secondary,
         foregroundColor: AppColors.onSecondary,
-        disabledBackgroundColor: Color(0x66E9C349),
+        disabledBackgroundColor: const Color(0x66F8B537),
         disabledForegroundColor: AppColors.onSecondary,
         elevation: 0,
         shadowColor: Colors.transparent,
-        textStyle: AppTypography.labelMd,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.buttonBorder,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+        textStyle: AppTypography.ui(size: 16, weight: FontWeight.w700),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.buttonBorder),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       ),
     ),
 
-    // ── App bar ───────────────────────────────────────────────────────────────
+    // ── App bar — transparent, Bricolage title, ink foreground ─────────────
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
-      foregroundColor: AppColors.onSurface,
-      titleTextStyle: AppTypography.titleMd,
+      foregroundColor: AppColors.textPrimary,
+      titleTextStyle: AppTypography.display(size: 20, weight: FontWeight.w700)
+          .copyWith(color: AppColors.textPrimary),
     ),
 
-    // ── Bottom navigation — gold active, textMuted inactive ──────────────────
-    bottomNavigationBarTheme: BottomNavigationBarThemeData(
-      backgroundColor: AppColors.surfaceElevated,
-      selectedItemColor: AppColors.secondary,
-      unselectedItemColor: AppColors.textMuted,
-      type: BottomNavigationBarType.fixed,
-      elevation: 0,
-      selectedLabelStyle: AppTypography.labelMd,
-      unselectedLabelStyle: AppTypography.labelMd,
-    ),
-
-    // ── Input decoration ──────────────────────────────────────────────────────
+    // ── Input — white fill, 15px, gold focus ────────────────────────────────
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surfaceSubtle,
+      fillColor: AppColors.cardWhite,
+      hintStyle: AppTypography.bodySm.copyWith(color: AppColors.textMutedLight),
       border: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: AppColors.dividerLight),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: AppColors.dividerLight),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: const BorderSide(color: AppColors.secondary, width: 2),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: const BorderSide(color: AppColors.error, width: 1),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),

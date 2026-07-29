@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,8 +11,8 @@ import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart
 ///
 /// Uses [StatefulNavigationShell] from [StatefulShellRoute.indexedStack] so
 /// every branch gets its own navigator and state is preserved between tab
-/// switches. Custom tab bar replaces the Material BottomNavigationBar with a
-/// gradient + BackdropFilter blur panel per spec.
+/// switches. Light tab bar (design-handoff v3): a white surface with a top
+/// hairline; the active tab is gold, inactive tabs are muted grey.
 class DashboardShell extends ConsumerStatefulWidget {
   const DashboardShell({super.key, required this.navigationShell});
 
@@ -38,75 +37,64 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
     return Scaffold(
       extendBody: true,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.lightBg,
       body: widget.navigationShell,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (currentSermon != null) const MiniPlayer(),
-          ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Color(0xF5131313), // rgba(19,19,19,.96)
-                      Color(0xF5131313),
-                    ],
-                    stops: [0.0, 0.38, 1.0],
-                  ),
-                ),
-                padding: EdgeInsets.fromLTRB(6, 10, 6, 26 + safeBottom),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _TabItem(
-                      icon: Icons.home_outlined,
-                      activeIcon: Icons.home,
-                      label: 'Home',
-                      index: 0,
-                      currentIndex: widget.navigationShell.currentIndex,
-                      onTap: _onTap,
-                    ),
-                    _TabItem(
-                      icon: Icons.play_circle_outline,
-                      activeIcon: Icons.play_circle,
-                      label: 'Messages',
-                      index: 1,
-                      currentIndex: widget.navigationShell.currentIndex,
-                      onTap: _onTap,
-                    ),
-                    _TabItem(
-                      icon: Icons.volunteer_activism_outlined,
-                      activeIcon: Icons.volunteer_activism,
-                      label: 'Giving',
-                      index: 2,
-                      currentIndex: widget.navigationShell.currentIndex,
-                      onTap: _onTap,
-                    ),
-                    _TabItem(
-                      icon: Icons.calendar_today_outlined,
-                      activeIcon: Icons.calendar_today,
-                      label: 'Calendar',
-                      index: 3,
-                      currentIndex: widget.navigationShell.currentIndex,
-                      onTap: _onTap,
-                    ),
-                    _TabItem(
-                      icon: Icons.more_horiz,
-                      activeIcon: Icons.more_horiz,
-                      label: 'More',
-                      index: 4,
-                      currentIndex: widget.navigationShell.currentIndex,
-                      onTap: _onTap,
-                    ),
-                  ],
-                ),
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.cardWhite,
+              border: Border(
+                top: BorderSide(color: AppColors.dividerLight, width: 1),
               ),
+            ),
+            padding: EdgeInsets.fromLTRB(6, 10, 6, 12 + safeBottom),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _TabItem(
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home,
+                  label: 'Home',
+                  index: 0,
+                  currentIndex: widget.navigationShell.currentIndex,
+                  onTap: _onTap,
+                ),
+                _TabItem(
+                  icon: Icons.play_circle_outline,
+                  activeIcon: Icons.play_circle,
+                  label: 'Messages',
+                  index: 1,
+                  currentIndex: widget.navigationShell.currentIndex,
+                  onTap: _onTap,
+                ),
+                _TabItem(
+                  icon: Icons.volunteer_activism_outlined,
+                  activeIcon: Icons.volunteer_activism,
+                  label: 'Giving',
+                  index: 2,
+                  currentIndex: widget.navigationShell.currentIndex,
+                  onTap: _onTap,
+                ),
+                _TabItem(
+                  icon: Icons.calendar_today_outlined,
+                  activeIcon: Icons.calendar_today,
+                  label: 'Events',
+                  index: 3,
+                  currentIndex: widget.navigationShell.currentIndex,
+                  onTap: _onTap,
+                ),
+                _TabItem(
+                  icon: Icons.more_horiz,
+                  activeIcon: Icons.more_horiz,
+                  label: 'More',
+                  index: 4,
+                  currentIndex: widget.navigationShell.currentIndex,
+                  onTap: _onTap,
+                ),
+              ],
             ),
           ),
         ],
@@ -117,7 +105,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
 /// Single tab item: icon 24 + label 10.5px w600.
 /// Active color: [AppColors.secondary] (gold).
-/// Inactive color: [AppColors.textFaint] (#6e6a70).
+/// Inactive color: [AppColors.textMutedLight].
 class _TabItem extends StatelessWidget {
   const _TabItem({
     required this.icon,
@@ -138,7 +126,7 @@ class _TabItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = index == currentIndex;
-    final color = isActive ? AppColors.secondary : AppColors.textFaint;
+    final color = isActive ? AppColors.secondary : AppColors.textMutedLight;
 
     return GestureDetector(
       onTap: () => onTap(index),

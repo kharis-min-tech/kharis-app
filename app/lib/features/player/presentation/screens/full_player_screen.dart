@@ -4,21 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/core/theme/app_radius.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
-import 'package:kharis_app/core/utils/artwork_gradient.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
+import 'media_player_screen.dart';
 import '../widgets/player_actions.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/seek_bar.dart';
 
-/// Spotify-style Now Playing screen.
+/// Full-screen Now Playing — dark design-handoff (v3).
 ///
-/// The ambient background is a vertical gradient derived from
-/// sermonGradient(sermon.artworkColor): the palette's primary colour at the
-/// top bleeding into AppColors.canvas at the bottom (65% stop). The full
-/// artwork square is the dominant element. Playback controls sit below,
-/// and secondary actions (Notes) appear at the bottom.
+/// Rises over the current tab. Purple→ink ambient gradient. Top row is a
+/// collapse chevron, the centred series label, and an overflow menu. A large
+/// square artwork dominates, followed by the title + speaker·scripture line
+/// with a like heart, an Audio/Video segmented toggle, the waveform scrubber,
+/// transport controls, and the secondary action row (Notes / Playlist / Share).
 class FullPlayerScreen extends ConsumerWidget {
   const FullPlayerScreen({super.key});
 
@@ -29,165 +30,173 @@ class FullPlayerScreen extends ConsumerWidget {
     final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
     final service = ref.read(audioPlayerServiceProvider);
 
-    // Derive ambient colour from the sermon's artwork gradient palette.
-    final gradColors = sermonGradient(sermon?.artworkColor ?? 0);
-    final ambientTop = gradColors[0];
+    final series = (sermon?.series ?? sermon?.category ?? 'Now playing')
+        .toUpperCase();
+    final subtitle = _subtitle(sermon);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: BoxDecoration(
+      backgroundColor: AppColors.ink,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              ambientTop,       // artwork-derived colour at top
-              AppColors.canvas, // deepest black at ~65%
+              Color(0xFF3A1D6E),
+              Color(0xFF1A0F33),
+              AppColors.ink,
             ],
-            stops: const [0.0, 0.65],
+            stops: [0.0, 0.44, 1.0],
           ),
         ),
         child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top bar
+              // ── Top bar ───────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
                 child: Row(
                   children: [
-                    // Collapse chevron
-                    GestureDetector(
+                    _IconTapTarget(
+                      icon: Icons.keyboard_arrow_down_rounded,
+                      size: 28,
                       onTap: () => Navigator.of(context).pop(),
-                      child: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: const Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
                     ),
-
-                    // "NOW PLAYING" centred label
                     Expanded(
                       child: Text(
-                        'NOW PLAYING',
+                        series,
                         textAlign: TextAlign.center,
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.4,
-                          color: AppColors.onSurfaceVariant,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.ui(
+                          size: 10,
+                          weight: FontWeight.w600,
+                          letterSpacing: 1.0,
+                          color: AppColors.darkMuted2,
                         ),
                       ),
                     ),
-
-                    // 3-dot: shows secondary actions in a bottom sheet
-                    GestureDetector(
+                    _IconTapTarget(
+                      icon: Icons.more_horiz_rounded,
+                      size: 22,
                       onTap: () => _showActionsSheet(context),
-                      child: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: Icon(
-                          Icons.more_vert_rounded,
-                          color: Colors.white.withValues(alpha: 0.7),
-                          size: 22,
-                        ),
-                      ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
-
-              // Large artwork: ~82% of screen width, radius 14, coloured shadow
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: ambientTop.withValues(alpha: 0.55),
-                          blurRadius: 40,
-                          offset: const Offset(0, 16),
-                          spreadRadius: 2,
+              // ── Scrollable body ───────────────────────────────────────────
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Large square artwork.
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.card),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary
+                                      .withValues(alpha: 0.5),
+                                  blurRadius: 60,
+                                  offset: const Offset(0, 28),
+                                  spreadRadius: -20,
+                                ),
+                              ],
+                            ),
+                            child: ArtworkImage(
+                              url: sermon?.artworkUrl,
+                              gradientIndex: sermon?.artworkColor ?? 0,
+                              radius: AppRadius.card,
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: ArtworkImage(
-                      url: sermon?.artworkUrl,
-                      gradientIndex: sermon?.artworkColor ?? 0,
-                      radius: 14,
-                    ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Title + scripture line + like heart.
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  sermon?.title ?? 'No sermon loaded',
+                                  style: AppTypography.display(
+                                    size: 22,
+                                    weight: FontWeight.w700,
+                                    height: 1.08,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (subtitle.isNotEmpty) ...[
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    subtitle,
+                                    style: AppTypography.ui(
+                                      size: 13.5,
+                                      color: AppColors.darkMuted2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const _LikeButton(),
+                        ],
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // Audio / Video segmented toggle.
+                      _MediaToggle(sermon: sermon),
+
+                      const SizedBox(height: 22),
+
+                      // Waveform scrubber.
+                      SeekBar(
+                        position: position,
+                        duration: duration,
+                        onSeek: (d) => service.seek(d),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // Transport controls.
+                      const PlayerControls(),
+
+                      const SizedBox(height: 26),
+
+                      // Secondary actions.
+                      Container(
+                        padding: const EdgeInsets.only(top: 18),
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            top: BorderSide(color: Color(0x17FFFFFF)),
+                          ),
+                        ),
+                        child: const PlayerActions(),
+                      ),
+                    ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 28),
-
-              // Title and speaker, left-aligned
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      sermon?.title ?? 'No sermon loaded',
-                      style: AppTypography.headlineLgMobile.copyWith(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.heading,
-                        height: 1.2,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      sermon?.speaker ?? '',
-                      style: AppTypography.bodySm.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Seek bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: SeekBar(
-                  position: position,
-                  duration: duration,
-                  onSeek: (d) => service.seek(d),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Playback controls (shuffle / -15s / play-pause / +15s / repeat)
-              const PlayerControls(),
-
-              const Spacer(),
-
-              // Secondary actions row at the bottom
-              const PlayerActions(),
-
-              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -195,25 +204,165 @@ class FullPlayerScreen extends ConsumerWidget {
     );
   }
 
+  static String _subtitle(Sermon? sermon) {
+    if (sermon == null) return '';
+    final speaker = sermon.speaker;
+    final extra = sermon.category ?? sermon.series;
+    if (extra != null && extra.isNotEmpty && extra != speaker) {
+      return '$speaker · $extra';
+    }
+    return speaker;
+  }
+
   void _showActionsSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.darkSurface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppRadius.xl),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       builder: (ctx) {
         final bottomPad = MediaQuery.of(ctx).viewPadding.bottom;
         return Padding(
-          padding: EdgeInsets.fromLTRB(24, 20, 24, 20 + bottomPad),
+          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomPad),
           child: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [PlayerActions()],
           ),
         );
       },
+    );
+  }
+}
+
+// ── Like heart (local UI toggle) ──────────────────────────────────────────────
+
+class _LikeButton extends StatefulWidget {
+  const _LikeButton();
+
+  @override
+  State<_LikeButton> createState() => _LikeButtonState();
+}
+
+class _LikeButtonState extends State<_LikeButton> {
+  bool _liked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: _liked ? 'Unlike' : 'Like',
+      child: GestureDetector(
+        onTap: () => setState(() => _liked = !_liked),
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 2, left: 6),
+          child: Icon(
+            _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            color: AppColors.gold,
+            size: 24,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Audio / Video segmented toggle ────────────────────────────────────────────
+
+class _MediaToggle extends StatelessWidget {
+  const _MediaToggle({required this.sermon});
+
+  final Sermon? sermon;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasVideo = sermon?.videoId != null;
+    return Row(
+      children: [
+        const _ToggleChip(label: 'Audio', active: true),
+        const SizedBox(width: 9),
+        _ToggleChip(
+          label: 'Video',
+          active: false,
+          enabled: hasVideo,
+          onTap: hasVideo
+              ? () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => MediaPlayerScreen(sermon: sermon!),
+                    ),
+                  )
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _ToggleChip extends StatelessWidget {
+  const _ToggleChip({
+    required this.label,
+    required this.active,
+    this.enabled = true,
+    this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg = active ? AppColors.gold : AppColors.darkSurface2;
+    final Color fg = active
+        ? AppColors.goldInk
+        : (enabled ? AppColors.darkMuted : AppColors.darkMuted.withValues(alpha: 0.4));
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.ui(
+            size: 13,
+            weight: FontWeight.w600,
+            color: fg,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Top-bar icon tap target ───────────────────────────────────────────────────
+
+class _IconTapTarget extends StatelessWidget {
+  const _IconTapTarget({
+    required this.icon,
+    required this.size,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final double size;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Icon(icon, color: Colors.white, size: size),
+      ),
     );
   }
 }

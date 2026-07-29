@@ -29,6 +29,9 @@ class OnboardingRepository {
     ]);
   }
 
+  /// Persists the selected role before branch selection completes onboarding.
+  Future<void> saveRole(String role) => _prefs.setString(_roleKey, role);
+
   Future<void> reset() async {
     await Future.wait([
       _prefs.remove(_completedKey),

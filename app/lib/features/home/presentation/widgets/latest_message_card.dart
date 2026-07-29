@@ -5,8 +5,8 @@ import 'package:kharis_app/features/player/presentation/screens/media_player_scr
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Hero card: "Latest from Kharis" YouTube video in dark purple 16:9 card.
-/// When live, shows a "LIVE" pill instead of the "Latest" badge.
+/// Featured hero sermon card. Shows the latest message artwork with a
+/// LIVE/Latest state pill, gold EQ mark, and a gold "Watch full" CTA.
 class LatestMessageCard extends ConsumerWidget {
   const LatestMessageCard({super.key});
 
@@ -90,18 +90,8 @@ class _VideoHeroCard extends StatelessWidget {
         aspectRatio: 16 / 9,
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: .06),
-              width: 1,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x44000000),
-                blurRadius: 24,
-                offset: Offset(0, 8),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            boxShadow: AppShadows.card,
             gradient: const LinearGradient(
               begin: Alignment(-.8, -1),
               end: Alignment(.6, 1),
@@ -133,7 +123,7 @@ class _VideoHeroCard extends StatelessWidget {
                   ),
                 ),
 
-              // Veil so the play button and text stay legible over the image.
+              // Veil so text stays legible over the image.
               Positioned.fill(
                 child: ColoredBox(
                   color: Colors.black.withValues(alpha: 0.16),
@@ -145,7 +135,7 @@ class _VideoHeroCard extends StatelessWidget {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: 130,
+                height: 140,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -188,24 +178,18 @@ class _VideoHeroCard extends StatelessWidget {
                       ),
               ),
 
-              // Center play button
-              Center(
-                child: Container(
-                  width: 62,
-                  height: 62,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Color(0xFF1A0A3B),
-                    size: 32,
-                  ),
+              // Gold EQ mark top-right
+              const Positioned(
+                top: 14,
+                right: 14,
+                child: Icon(
+                  Icons.graphic_eq,
+                  color: AppColors.secondary,
+                  size: 22,
                 ),
               ),
 
-              // Bottom text
+              // Bottom content: title + "Watch full" CTA
               Positioned(
                 bottom: 14,
                 left: 16,
@@ -220,7 +204,7 @@ class _VideoHeroCard extends StatelessWidget {
                         style: AppTypography.labelMd.copyWith(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
+                          color: AppColors.darkMuted3,
                           letterSpacing: 1.1,
                           height: 1,
                         ),
@@ -231,26 +215,67 @@ class _VideoHeroCard extends StatelessWidget {
                     ],
                     Text(
                       title,
-                      style: AppTypography.titleMd.copyWith(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: -0.18,
-                        height: 1.2,
-                      ),
+                      style: AppTypography.display(
+                        size: 19,
+                        weight: FontWeight.w700,
+                      ).copyWith(color: Colors.white, height: 1.15),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      speakerDuration,
-                      style: AppTypography.labelMd.copyWith(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFFC9C2CE),
-                        letterSpacing: 0,
-                        height: 1,
-                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        // Watch full (gold CTA)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.pill),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.play_arrow_rounded,
+                                color: AppColors.onSecondary,
+                                size: 17,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Watch full',
+                                style: AppTypography.ui(
+                                  size: 13,
+                                  weight: FontWeight.w800,
+                                ).copyWith(
+                                  color: AppColors.onSecondary,
+                                  height: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Speaker · duration
+                        Expanded(
+                          child: Text(
+                            speakerDuration,
+                            style: AppTypography.ui(
+                              size: 12,
+                              weight: FontWeight.w500,
+                            ).copyWith(
+                              color: Colors.white.withValues(alpha: .78),
+                              height: 1,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -340,7 +365,8 @@ class _HeroSkeleton extends StatelessWidget {
       aspectRatio: 16 / 9,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          boxShadow: AppShadows.card,
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

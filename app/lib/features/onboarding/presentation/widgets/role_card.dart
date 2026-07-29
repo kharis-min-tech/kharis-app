@@ -1,11 +1,12 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_shadows.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
 
-/// A full-width onboarding choice row: a translucent [accent] icon tile,
-/// title, supporting line and trailing chevron, on a glass surface.
+/// A full-width onboarding choice row (design-handoff v3): a white card with a
+/// tinted [accent] icon tile, title, supporting line and trailing chevron.
+/// Presses scale to .97 per the design motion spec.
 class RoleCard extends StatefulWidget {
   const RoleCard({
     super.key,
@@ -29,8 +30,6 @@ class RoleCard extends StatefulWidget {
 class _RoleCardState extends State<RoleCard> {
   bool _pressed = false;
 
-  static const _radius = 18.0;
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -44,63 +43,51 @@ class _RoleCardState extends State<RoleCard> {
         scale: _pressed ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(_radius),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardWhite,
+            borderRadius: AppRadius.cardBorder,
+            boxShadow: AppShadows.card,
+          ),
+          child: Row(
+            children: [
+              // Tinted icon tile (44px, radius 13).
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: widget.accent.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.tileBorder,
+                ),
+                child: Icon(widget.icon, color: widget.accent, size: 22),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: widget.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(13),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: AppTypography.ui(size: 16, weight: FontWeight.w700)
+                          .copyWith(color: AppColors.textPrimary),
                     ),
-                    child: Icon(widget.icon, color: widget.accent, size: 22),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: AppTypography.titleMd.copyWith(
-                            fontSize: 16,
-                            color: AppColors.heading,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          widget.description,
-                          style: AppTypography.bodySm.copyWith(
-                            fontSize: 12.5,
-                            color: AppColors.textMuted,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.description,
+                      style: AppTypography.ui(size: 13)
+                          .copyWith(color: AppColors.textMutedLight, height: 1.3),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.textFaint,
-                    size: 20,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textMutedLight,
+                size: 22,
+              ),
+            ],
           ),
         ),
       ),

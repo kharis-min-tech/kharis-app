@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/onboarding/data/auth_repository.dart';
 import '../../features/onboarding/data/firebase_auth_repository.dart';
 import '../models/user.dart';
+import 'onboarding_provider.dart';
 
 // ── Repository providers ──────────────────────────────────────────────────────
 
@@ -89,7 +90,14 @@ class RouterNotifier extends ChangeNotifier {
 
   /// Called by [GoRouter] on every navigation and after [notifyListeners].
   String? redirect(BuildContext context, GoRouterState state) {
-    // Browsing is open; sign-in unlocks the profile + admin tools. No gating.
+    // One-time welcome: once onboarding is complete (or the user is signed in),
+    // the '/' splash entry routes straight to Home. Only '/' is gated, so
+    // "Switch Branch" (/branch-selection) and re-onboarding still work.
+    if (state.matchedLocation == '/') {
+      final completed = _ref.read(onboardingCompletedProvider);
+      final authed = _ref.read(isAuthenticatedProvider);
+      if (completed || authed) return '/home';
+    }
     return null;
   }
 }

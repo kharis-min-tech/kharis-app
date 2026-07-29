@@ -88,7 +88,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.ink,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -102,11 +102,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   children: [
                     Text(
                       'Messages',
-                      style: AppTypography.headlineLg.copyWith(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.heading,
-                        letterSpacing: -0.18,
+                      style: AppTypography.display(
+                        size: 30,
+                        weight: FontWeight.w700,
+                        height: 1.0,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -114,7 +114,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       'Sermons & teachings · streamed from Kharis',
                       style: AppTypography.bodySm.copyWith(
                         fontSize: 13,
-                        color: AppColors.onSurfaceVariant,
+                        color: AppColors.darkMuted,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -142,7 +142,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   child: Text(
                     '${searchResults.length} result${searchResults.length == 1 ? '' : 's'} for "$searchQuery"',
                     style: AppTypography.bodySm.copyWith(
-                      color: AppColors.textMuted,
+                      color: AppColors.darkMuted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -155,7 +155,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                     child: Center(
                       child: Text(
                         'No sermons found',
-                        style: TextStyle(color: AppColors.textMuted),
+                        style: TextStyle(color: AppColors.darkMuted),
                       ),
                     ),
                   ),
@@ -218,7 +218,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       style: AppTypography.bodyLg.copyWith(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.heading,
+                        color: Colors.white,
                         letterSpacing: -0.18,
                       ),
                     ),
@@ -270,7 +270,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         style: AppTypography.bodyLg.copyWith(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.heading,
+                          color: Colors.white,
                           letterSpacing: -0.18,
                         ),
                       ),
@@ -287,7 +287,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           style: AppTypography.labelMd.copyWith(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
+                            color: AppColors.darkMuted,
                           ),
                         ),
                       ),
@@ -354,7 +354,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                               style: AppTypography.bodyLg.copyWith(
                                 fontSize: 19,
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.heading,
+                                color: Colors.white,
                                 letterSpacing: -0.18,
                               ),
                             ),
@@ -458,22 +458,22 @@ class _SearchBar extends StatelessWidget {
         final hasText = value.text.isNotEmpty;
         return Container(
           decoration: BoxDecoration(
-            color: AppColors.surfaceSubtle,
+            color: AppColors.darkSurface2,
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: TextField(
             controller: controller,
             onChanged: onChanged,
-            style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+            style: AppTypography.bodyLg.copyWith(color: AppColors.darkMuted3),
             cursorColor: AppColors.secondary,
             decoration: InputDecoration(
               hintText: 'Search sermons, speakers, topics...',
               hintStyle:
-                  AppTypography.bodySm.copyWith(color: AppColors.textFaint),
+                  AppTypography.bodySm.copyWith(color: AppColors.darkMuted),
               prefixIcon: const Icon(
                 Icons.search_rounded,
                 size: 20,
-                color: AppColors.textMuted,
+                color: AppColors.darkMuted,
               ),
               suffixIcon: hasText
                   ? GestureDetector(
@@ -481,7 +481,7 @@ class _SearchBar extends StatelessWidget {
                       child: const Icon(
                         Icons.close_rounded,
                         size: 18,
-                        color: AppColors.textMuted,
+                color: AppColors.darkMuted,
                       ),
                     )
                   : null,
@@ -497,7 +497,7 @@ class _SearchBar extends StatelessWidget {
               disabledBorder: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
               filled: true,
-              fillColor: AppColors.surfaceSubtle,
+              fillColor: AppColors.darkSurface2,
             ),
           ),
         );
@@ -850,7 +850,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
               style: AppTypography.labelMd.copyWith(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.onSurface,
+                color: AppColors.darkMuted3,
                 height: 1.3,
               ),
             ),
@@ -961,7 +961,7 @@ class _TopicCard extends StatelessWidget {
                     child: Icon(
                       active ? Icons.check_rounded : Icons.play_arrow_rounded,
                       color:
-                          active ? AppColors.onSecondary : AppColors.surfaceDark,
+                          active ? AppColors.onSecondary : AppColors.ink,
                       size: 20,
                     ),
                   ),
@@ -976,7 +976,7 @@ class _TopicCard extends StatelessWidget {
           style: AppTypography.bodySm.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: active ? AppColors.secondary : const Color(0xFFCFC8D4),
+            color: active ? AppColors.secondary : AppColors.darkMuted,
           ),
         ),
       ],
@@ -1057,23 +1057,15 @@ class _SortPill extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active
-              ? AppColors.secondary
-              : Colors.white.withValues(alpha: 0.06),
+          color: active ? AppColors.secondary : AppColors.darkSurface2,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: active
-              ? null
-              : Border.all(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  width: 1,
-                ),
         ),
         child: Text(
           label,
           style: AppTypography.labelMd.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: active ? AppColors.onSecondary : AppColors.onSurface,
+            color: active ? AppColors.onSecondary : AppColors.darkMuted,
           ),
         ),
       ),
@@ -1096,7 +1088,7 @@ class _SermonRowSkeleton extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AppColors.surfaceSubtle,
+              color: AppColors.darkSurface2,
               borderRadius: BorderRadius.circular(11),
             ),
           ),
@@ -1109,7 +1101,7 @@ class _SermonRowSkeleton extends StatelessWidget {
                   height: 14,
                   width: 180,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceSubtle,
+                    color: AppColors.darkSurface2,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -1118,7 +1110,7 @@ class _SermonRowSkeleton extends StatelessWidget {
                   height: 12,
                   width: 120,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceSubtle,
+                    color: AppColors.darkSurface2,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -1130,7 +1122,7 @@ class _SermonRowSkeleton extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
+              color: AppColors.darkSurface2,
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
           ),

@@ -1,59 +1,95 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Type scale — Kharis Church design system v2.
-/// All styles use Plus Jakarta Sans via google_fonts.
+/// Type scale — Kharis Church design system v3 (design-handoff).
+///
+/// Three families:
+/// - **Display** — Bricolage Grotesque 700, ls −0.015em. Screen titles,
+///   "Kharis" wordmark, big headings.
+/// - **UI / body** — Hanken Grotesk 400–800. Labels, buttons, list rows, nav.
+/// - **Serif accent** — Newsreader (often italic). Scripture, taglines,
+///   devotional reading.
+///
+/// Existing v2 getter names are retained (re-pointed to the new families) so
+/// every screen keeps compiling; use [display]/[ui]/[serif] for custom sizes.
 abstract final class AppTypography {
-  // ── 7-step scale ──────────────────────────────────────────────────────────
+  // ── Font builders ──────────────────────────────────────────────────────────
 
-  /// 48 px · 800 weight · lh 56 · ls −0.02em
-  static TextStyle get displayLg => GoogleFonts.plusJakartaSans(
-        fontSize: 48,
-        fontWeight: FontWeight.w800,
-        height: 56 / 48,
-        letterSpacing: 48 * -0.02,
+  /// Bricolage Grotesque display font (headings, wordmark).
+  static TextStyle display({
+    double size = 27,
+    FontWeight weight = FontWeight.w700,
+    double? height,
+    Color? color,
+  }) =>
+      GoogleFonts.bricolageGrotesque(
+        fontSize: size,
+        fontWeight: weight,
+        height: height,
+        letterSpacing: size * -0.015,
+        color: color,
       );
 
-  /// 32 px · 700 weight · lh 40 · ls −0.01em
-  static TextStyle get headlineLg => GoogleFonts.plusJakartaSans(
-        fontSize: 32,
-        fontWeight: FontWeight.w700,
-        height: 40 / 32,
-        letterSpacing: 32 * -0.01,
+  /// Hanken Grotesk UI / body font.
+  static TextStyle ui({
+    double size = 15,
+    FontWeight weight = FontWeight.w400,
+    double? height,
+    double? letterSpacing,
+    Color? color,
+  }) =>
+      GoogleFonts.hankenGrotesk(
+        fontSize: size,
+        fontWeight: weight,
+        height: height,
+        letterSpacing: letterSpacing,
+        color: color,
       );
 
-  /// 28 px · 700 weight · lh 36 — mobile headline
-  static TextStyle get headlineLgMobile => GoogleFonts.plusJakartaSans(
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
-        height: 36 / 28,
+  /// Newsreader serif accent (scripture, taglines).
+  static TextStyle serif({
+    double size = 18,
+    FontWeight weight = FontWeight.w400,
+    bool italic = false,
+    double? height,
+    Color? color,
+  }) =>
+      GoogleFonts.newsreader(
+        fontSize: size,
+        fontWeight: weight,
+        fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+        height: height,
+        color: color,
       );
 
-  /// 20 px · 600 weight · lh 28
-  static TextStyle get titleMd => GoogleFonts.plusJakartaSans(
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-        height: 28 / 20,
-      );
+  // ── Retained scale (re-pointed to new families) ────────────────────────────
 
-  /// 16 px · 400 weight · lh 24
-  static TextStyle get bodyLg => GoogleFonts.plusJakartaSans(
-        fontSize: 16,
-        fontWeight: FontWeight.w400,
-        height: 24 / 16,
-      );
+  /// 48 px · Bricolage 700 · lh 56 — hero display.
+  static TextStyle get displayLg =>
+      display(size: 48, weight: FontWeight.w700, height: 56 / 48);
 
-  /// 14 px · 400 weight · lh 20
-  static TextStyle get bodySm => GoogleFonts.plusJakartaSans(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        height: 20 / 14,
-      );
+  /// 32 px · Bricolage 700 · lh 40 — screen title.
+  static TextStyle get headlineLg =>
+      display(size: 32, weight: FontWeight.w700, height: 40 / 32);
 
-  /// 12 px · 600 weight · lh 16 · ls 0.05em
-  static TextStyle get labelMd => GoogleFonts.plusJakartaSans(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
+  /// 28 px · Bricolage 700 · lh 36 — mobile headline.
+  static TextStyle get headlineLgMobile =>
+      display(size: 28, weight: FontWeight.w700, height: 36 / 28);
+
+  /// 20 px · Hanken 600 · lh 28 — card / list-row title.
+  static TextStyle get titleMd =>
+      ui(size: 20, weight: FontWeight.w600, height: 28 / 20);
+
+  /// 16 px · Hanken 400 · lh 24 — body.
+  static TextStyle get bodyLg => ui(size: 16, height: 24 / 16);
+
+  /// 14 px · Hanken 400 · lh 20 — small body.
+  static TextStyle get bodySm => ui(size: 14, height: 20 / 14);
+
+  /// 12 px · Hanken 600 · lh 16 · ls 0.05em — label / eyebrow.
+  static TextStyle get labelMd => ui(
+        size: 12,
+        weight: FontWeight.w600,
         height: 16 / 12,
         letterSpacing: 12 * 0.05,
       );

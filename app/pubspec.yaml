@@ -90,6 +90,7 @@ flutter:
     - assets/figma/
     - assets/icon/
     - assets/data/
+    - assets/design/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -121,6 +122,7 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/icon.png"
-  adaptive_icon_background: "#0D0D0D"
-  adaptive_icon_foreground: "assets/icon/icon.png"
+  adaptive_icon_background: "#5D3FD3"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
   min_sdk_android: 21
+  remove_alpha_ios: true

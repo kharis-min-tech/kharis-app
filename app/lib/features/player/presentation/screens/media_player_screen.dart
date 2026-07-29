@@ -1,20 +1,23 @@
-import 'dart:ui';
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
+import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
-import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
+import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
-/// Unified media player for audio and YouTube video content.
-/// Design follows Spotify-like full-screen player from MOBBIN references.
+/// Unified media player for audio and YouTube video content — dark
+/// design-handoff (v3). Audio playback mirrors the full Now Playing screen
+/// (purple→ink wash, gold transport, waveform scrubber); video hosts the
+/// YouTube player under the same dark chrome.
 class MediaPlayerScreen extends ConsumerStatefulWidget {
   const MediaPlayerScreen({super.key, required this.sermon});
 
@@ -26,7 +29,7 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
 
 class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   YoutubePlayerController? _youtubeController;
-  double _playbackSpeed = 1.0;
+  bool _liked = false;
 
   bool get _isVideo => widget.sermon.isYouTubeVideo;
 
@@ -34,6 +37,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   void initState() {
     super.initState();
     if (_isVideo && widget.sermon.videoId != null) {
+      // Only one audio source at a time: pause any playing sermon audio so it
+      // does not clash with the YouTube player.
+      ref.read(audioPlayerServiceProvider).pause();
       // On web we render a direct iframe embed (YoutubeWebEmbed) instead of
       // youtube_player_iframe, whose platform view fails silently in
       // release builds. Only create the controller on mobile/desktop.
@@ -63,34 +69,41 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.ink,
       body: _isVideo ? _buildVideoPlayer() : _buildAudioPlayer(),
     );
   }
 
+  BoxDecoration get _gradient => const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF3A1D6E), Color(0xFF1A0F33), AppColors.ink],
+          stops: [0.0, 0.44, 1.0],
+        ),
+      );
+
   Widget _buildVideoPlayer() {
-    return SafeArea(
-      child: Column(
-        children: [
-          // Header with back button
-          _buildHeader(),
-          // Video player
-          Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: kIsWeb
-                    ? YoutubeWebEmbed(videoId: widget.sermon.videoId!)
-                    : YoutubePlayer(
-                        controller: _youtubeController!,
-                      ),
+    return DecoratedBox(
+      decoration: _gradient,
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: kIsWeb
+                      ? YoutubeWebEmbed(videoId: widget.sermon.videoId!)
+                      : YoutubePlayer(controller: _youtubeController!),
+                ),
               ),
             ),
-          ),
-          // Video info
-          _buildMediaInfo(),
-          const SizedBox(height: AppSpacing.xl),
-        ],
+            _buildInfoRow(),
+            const SizedBox(height: 28),
+          ],
+        ),
       ),
     );
   }
@@ -98,282 +111,196 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   Widget _buildAudioPlayer() {
     final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
     final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
-    final playerState = ref.watch(playerStateProvider).valueOrNull;
-    final isPlaying = playerState?.playing ?? false;
+    final service = ref.read(audioPlayerServiceProvider);
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Blurred artwork background
-        if (widget.sermon.artworkUrl != null)
-          ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-            child: Image.network(
-              widget.sermon.artworkUrl!,
-              fit: BoxFit.cover,
-              color: Colors.black.withValues(alpha: 0.5),
-              colorBlendMode: BlendMode.darken,
+    return DecoratedBox(
+      decoration: _gradient,
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildArtwork(),
+                    const SizedBox(height: 24),
+                    _buildInfoRow(),
+                    const SizedBox(height: 22),
+                    SeekBar(
+                      position: position,
+                      duration: duration,
+                      onSeek: (d) => service.seek(d),
+                    ),
+                    const SizedBox(height: 18),
+                    const PlayerControls(),
+                    const SizedBox(height: 26),
+                    Container(
+                      padding: const EdgeInsets.only(top: 18),
+                      decoration: const BoxDecoration(
+                        border: Border(top: BorderSide(color: Color(0x17FFFFFF))),
+                      ),
+                      child: const PlayerActions(),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        // Dark overlay
-        Container(color: Colors.black.withValues(alpha: 0.6)),
-        // Content
-        SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              const Spacer(),
-              // Large artwork
-              _buildArtwork(),
-              const SizedBox(height: AppSpacing.xl),
-              // Title and speaker
-              _buildMediaInfo(),
-              const Spacer(),
-              // Seek bar
-              _buildSeekBar(position, duration),
-              const SizedBox(height: AppSpacing.lg),
-              // Controls
-              _buildAudioControls(isPlaying),
-              const SizedBox(height: AppSpacing.md),
-              // Speed selector
-              _buildSpeedSelector(),
-              const SizedBox(height: AppSpacing.lg),
-              // Secondary actions (Notes, etc.)
-              const PlayerActions(),
-              const SizedBox(height: AppSpacing.xl),
-            ],
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildHeader() {
+    final series =
+        (widget.sermon.series ?? widget.sermon.category ?? 'Now playing')
+            .toUpperCase();
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 32),
-            onPressed: () => Navigator.of(context).pop(),
+          _iconButton(
+            Icons.keyboard_arrow_down_rounded,
+            28,
+            () => Navigator.of(context).pop(),
           ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.share_outlined, color: Colors.white),
-            onPressed: () {
-              // TODO: Share functionality
-            },
+          Expanded(
+            child: Text(
+              series,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.ui(
+                size: 10,
+                weight: FontWeight.w600,
+                letterSpacing: 1.0,
+                color: AppColors.darkMuted2,
+              ),
+            ),
+          ),
+          _iconButton(
+            Icons.ios_share_rounded,
+            20,
+            () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Share link copied'),
+                backgroundColor: AppColors.darkSurface,
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(milliseconds: 1700),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _iconButton(IconData icon, double size, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Icon(icon, color: Colors.white, size: size),
       ),
     );
   }
 
   Widget _buildArtwork() {
-    return Container(
-      width: 280,
-      height: 280,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: widget.sermon.artworkUrl != null
-          ? Image.network(
-              widget.sermon.artworkUrl!,
-              fit: BoxFit.cover,
-            )
-          : Container(
-              color: AppColors.surfaceElevated,
-              child: const Icon(Icons.music_note, size: 80, color: Colors.white54),
-            ),
-    );
-  }
-
-  Widget _buildMediaInfo() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-      child: Column(
-        children: [
-          Text(
-            widget.sermon.title,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.5),
+                blurRadius: 60,
+                offset: const Offset(0, 28),
+                spreadRadius: -20,
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            widget.sermon.speaker,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              color: AppColors.textMuted,
-            ),
+          child: ArtworkImage(
+            url: widget.sermon.artworkUrl,
+            gradientIndex: widget.sermon.artworkColor ?? 0,
+            radius: AppRadius.card,
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildSeekBar(Duration position, Duration duration) {
-    final progress = duration.inMilliseconds > 0
-        ? position.inMilliseconds / duration.inMilliseconds
-        : 0.0;
+  Widget _buildInfoRow() {
+    final speaker = widget.sermon.speaker;
+    final extra = widget.sermon.category ?? widget.sermon.series;
+    final subtitle = (extra != null && extra.isNotEmpty && extra != speaker)
+        ? '$speaker · $extra'
+        : speaker;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SliderTheme(
-            data: SliderThemeData(
-              trackHeight: 4,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              activeTrackColor: AppColors.secondary,
-              inactiveTrackColor: Colors.white24,
-              thumbColor: Colors.white,
-              overlayColor: AppColors.secondary.withValues(alpha: 0.2),
-            ),
-            child: Slider(
-              value: progress.clamp(0.0, 1.0),
-              onChanged: (value) {
-                final newPosition = Duration(
-                  milliseconds: (value * duration.inMilliseconds).round(),
-                );
-                ref.read(audioPlayerServiceProvider).seek(newPosition);
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _formatDuration(position),
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
+                  widget.sermon.title,
+                  style: AppTypography.display(
+                    size: 22,
+                    weight: FontWeight.w700,
+                    height: 1.08,
+                    color: Colors.white,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  _formatDuration(duration),
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    subtitle,
+                    style: AppTypography.ui(
+                      size: 13.5,
+                      color: AppColors.darkMuted2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                ],
               ],
             ),
           ),
+          const SizedBox(width: 12),
+          Semantics(
+            button: true,
+            label: _liked ? 'Unlike' : 'Like',
+            child: GestureDetector(
+              onTap: () => setState(() => _liked = !_liked),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2, left: 6),
+                child: Icon(
+                  _liked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: AppColors.gold,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
-  }
-
-  Widget _buildAudioControls(bool isPlaying) {
-    final service = ref.read(audioPlayerServiceProvider);
-    final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Skip back 15s
-        IconButton(
-          iconSize: 40,
-          icon: const Icon(Icons.replay_10, color: Colors.white),
-          onPressed: () {
-            final newPos = position - const Duration(seconds: 15);
-            service.seek(newPos < Duration.zero ? Duration.zero : newPos);
-          },
-        ),
-        const SizedBox(width: AppSpacing.lg),
-        // Play/Pause
-        Container(
-          width: 72,
-          height: 72,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            iconSize: 36,
-            icon: Icon(
-              isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.black,
-            ),
-            onPressed: () {
-              if (isPlaying) {
-                service.pause();
-              } else {
-                service.resume();
-              }
-            },
-          ),
-        ),
-        const SizedBox(width: AppSpacing.lg),
-        // Skip forward 15s
-        IconButton(
-          iconSize: 40,
-          icon: const Icon(Icons.forward_10, color: Colors.white),
-          onPressed: () {
-            final duration = ref.read(durationProvider).valueOrNull ?? Duration.zero;
-            final newPos = position + const Duration(seconds: 15);
-            service.seek(newPos > duration ? duration : newPos);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSpeedSelector() {
-    return GestureDetector(
-      onTap: _cycleSpeed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.white24),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          '${_playbackSpeed}x',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _cycleSpeed() {
-    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
-    final currentIndex = speeds.indexOf(_playbackSpeed);
-    final nextIndex = (currentIndex + 1) % speeds.length;
-    setState(() {
-      _playbackSpeed = speeds[nextIndex];
-    });
-    ref.read(audioPlayerServiceProvider).setSpeed(_playbackSpeed);
-  }
-
-  String _formatDuration(Duration d) {
-    final hours = d.inHours;
-    final minutes = d.inMinutes.remainder(60);
-    final seconds = d.inSeconds.remainder(60);
-    if (hours > 0) {
-      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 }

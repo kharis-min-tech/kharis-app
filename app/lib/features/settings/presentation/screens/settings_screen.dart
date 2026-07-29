@@ -11,8 +11,9 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 import 'notifications_settings_screen.dart';
 
-/// The profile hub: identity, account actions, admin entry (when admin), and
-/// the gateway between the signed-in user and the rest of the platform.
+/// The profile hub (design-handoff v3): a light "More" screen with the
+/// signed-in identity card, a grouped app list, and the sign-out action. All
+/// routing, providers, and auth logic are preserved — presentation only.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -23,105 +24,125 @@ class SettingsScreen extends ConsumerWidget {
     final signedIn = user != null && user.role != 'guest' && user.email.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 150),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 150),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Profile',
-                style: AppTypography.headlineLg.copyWith(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.heading,
-                ),
+                'More',
+                style: AppTypography.display(size: 30, weight: FontWeight.w700)
+                    .copyWith(color: AppColors.textPrimary),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               if (signedIn)
                 _ProfileCard(
                   user: user,
-                  onTap: () => context.push('/profile/edit'),
+                  onEdit: () => context.push('/profile/edit'),
                 )
               else
                 const _SignedOutCard(),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
 
               if (isAdmin) ...[
                 const _SectionLabel('Manage'),
-                _MoreMenuItem(
-                  icon: Icons.shield_outlined,
-                  label: 'Admin Console',
-                  accent: AppColors.secondary,
-                  onTap: () => context.push('/admin'),
-                  isLast: true,
+                const SizedBox(height: 8),
+                _MenuCard(
+                  children: [
+                    _MoreMenuItem(
+                      icon: Icons.shield_outlined,
+                      label: 'Admin Console',
+                      accent: AppColors.secondary,
+                      onTap: () => context.push('/admin'),
+                      isLast: true,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 22),
               ],
 
-              const _SectionLabel('Account'),
-              _MoreMenuItem(
-                icon: Icons.auto_stories,
-                label: 'Daily Reading',
-                onTap: () => context.push('/reading'),
-              ),
-              _MoreMenuItem(
-                icon: Icons.volunteer_activism,
-                label: 'My Giving History',
-                onTap: () => context.go('/giving'),
-              ),
-              _MoreMenuItem(
-                icon: Icons.sync_alt,
-                label: 'Switch Branch',
-                onTap: () => context.push('/branch-selection'),
-              ),
-              _MoreMenuItem(
-                icon: Icons.notifications_none,
-                label: 'Notifications',
-                onTap: () => Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const NotificationsSettingsScreen(),
+              const _SectionLabel('App'),
+              const SizedBox(height: 8),
+              _MenuCard(
+                children: [
+                  _MoreMenuItem(
+                    icon: Icons.auto_stories,
+                    label: 'Daily Reading',
+                    onTap: () => context.push('/reading'),
                   ),
-                ),
-              ),
-              _MoreMenuItem(
-                icon: Icons.help_outline,
-                label: 'Help & Support',
-                isLast: true,
-                onTap: () => unawaited(
-                  launchUrl(
-                    Uri.parse('https://kharis.org/help'),
-                    mode: LaunchMode.externalApplication,
+                  _MoreMenuItem(
+                    icon: Icons.volunteer_activism,
+                    label: 'My Giving History',
+                    accent: AppColors.success,
+                    onTap: () => context.go('/giving'),
                   ),
-                ),
+                  _MoreMenuItem(
+                    icon: Icons.sync_alt,
+                    label: 'Switch Branch',
+                    onTap: () => context.push('/branch-selection'),
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.notifications_none,
+                    label: 'Notifications',
+                    accent: AppColors.accentPink,
+                    onTap: () => Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const NotificationsSettingsScreen(),
+                      ),
+                    ),
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.help_outline,
+                    label: 'Help & Support',
+                    isLast: true,
+                    onTap: () => unawaited(
+                      launchUrl(
+                        Uri.parse('https://kharis.org/help'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 22),
 
               if (signedIn)
-                _AuthAction(
-                  label: 'SIGN OUT',
-                  color: AppColors.error,
-                  onTap: () => _confirmSignOut(context, ref),
+                _MenuCard(
+                  children: [
+                    _MoreMenuItem(
+                      icon: Icons.logout,
+                      label: 'Sign out',
+                      accent: AppColors.danger,
+                      danger: true,
+                      isLast: true,
+                      onTap: () => _confirmSignOut(context, ref),
+                    ),
+                  ],
                 )
               else
-                _AuthAction(
-                  label: 'SIGN IN',
-                  color: AppColors.secondary,
-                  onTap: () => context.push('/login'),
+                _MenuCard(
+                  children: [
+                    _MoreMenuItem(
+                      icon: Icons.login,
+                      label: 'Sign in',
+                      accent: AppColors.secondary,
+                      isLast: true,
+                      onTap: () => context.push('/login'),
+                    ),
+                  ],
                 ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 22),
               Center(
                 child: Text(
                   'Kharis Church v2.0.0',
-                  style: AppTypography.bodySm.copyWith(
-                    fontSize: 11,
-                    color: AppColors.textMuted,
-                  ),
+                  style: AppTypography.ui(size: 11)
+                      .copyWith(color: AppColors.textMutedLight),
                 ),
               ),
             ],
@@ -135,37 +156,33 @@ class SettingsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceElevated,
+        backgroundColor: AppColors.cardWhite,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
         title: Text(
           'Sign Out',
-          style: AppTypography.bodySm.copyWith(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.onSurface,
-          ),
+          style: AppTypography.ui(size: 16, weight: FontWeight.w700)
+              .copyWith(color: AppColors.textPrimary),
         ),
         content: Text(
           'Are you sure you want to sign out?',
-          style: AppTypography.bodySm.copyWith(
-            color: AppColors.onSurfaceVariant,
-          ),
+          style:
+              AppTypography.ui(size: 14).copyWith(color: AppColors.textMutedLight),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
               'Cancel',
-              style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
+              style: AppTypography.ui(size: 14, weight: FontWeight.w600)
+                  .copyWith(color: AppColors.textMutedLight),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               'Sign Out',
-              style: AppTypography.bodySm.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.error,
-              ),
+              style: AppTypography.ui(size: 14, weight: FontWeight.w700)
+                  .copyWith(color: AppColors.danger),
             ),
           ),
         ],
@@ -195,10 +212,10 @@ String _roleLabel(String role) {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.user, required this.onTap});
+  const _ProfileCard({required this.user, required this.onEdit});
 
   final User user;
-  final VoidCallback onTap;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -210,66 +227,67 @@ class _ProfileCard extends StatelessWidget {
       if (user.branch != null && user.branch!.isNotEmpty) user.branch!,
     ].join(' \u00b7 ');
 
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: AppRadius.cardBorder,
+        boxShadow: AppShadows.card,
+      ),
+      child: Row(
+        children: [
+          _Avatar(initial: initial, photoUrl: user.photoUrl),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.ui(size: 17, weight: FontWeight.w700)
+                      .copyWith(color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.ui(size: 13)
+                      .copyWith(color: AppColors.textMutedLight),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _EditButton(onTap: onEdit),
+        ],
+      ),
+    );
+  }
+}
+
+class _EditButton extends StatelessWidget {
+  const _EditButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF7C3AED).withValues(alpha: 0.22),
-              const Color(0xFFD5029A).withValues(alpha: 0.14),
-            ],
-          ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-          borderRadius: BorderRadius.circular(18),
+          color: AppColors.chipLight,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
-        child: Row(
-          children: [
-            _Avatar(initial: initial, photoUrl: user.photoUrl),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    user.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodySm.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.heading,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: AppTypography.bodySm.copyWith(
-                      fontSize: 12.5,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                  if (user.email.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      user.email,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodySm.copyWith(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: AppColors.textFaint, size: 20),
-          ],
+        child: Text(
+          'Edit',
+          style: AppTypography.ui(size: 13, weight: FontWeight.w700)
+              .copyWith(color: AppColors.primary),
         ),
       ),
     );
@@ -292,7 +310,7 @@ class _Avatar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF7C3AED), Color(0xFFD7029A)],
+          colors: [AppColors.primary, AppColors.secondary],
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -313,11 +331,8 @@ class _Avatar extends StatelessWidget {
   Widget _initialText() => Center(
         child: Text(
           initial,
-          style: AppTypography.bodySm.copyWith(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
+          style: AppTypography.display(size: 22, weight: FontWeight.w700)
+              .copyWith(color: AppColors.onPrimary),
         ),
       );
 }
@@ -330,38 +345,25 @@ class _SignedOutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF7C3AED).withValues(alpha: 0.22),
-            const Color(0xFFD5029A).withValues(alpha: 0.14),
-          ],
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.cardWhite,
+        borderRadius: AppRadius.cardBorder,
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Join the Kharis family',
-            style: AppTypography.bodyLg.copyWith(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppColors.heading,
-            ),
+            style: AppTypography.display(size: 18, weight: FontWeight.w700)
+                .copyWith(color: AppColors.textPrimary),
           ),
           const SizedBox(height: 6),
           Text(
             'Sign in to save your branch, follow along, and personalize your experience.',
-            style: AppTypography.bodySm.copyWith(
-              fontSize: 13,
-              height: 1.5,
-              color: AppColors.onSurfaceVariant,
-            ),
+            style: AppTypography.ui(size: 13, height: 1.5)
+                .copyWith(color: AppColors.textMutedLight),
           ),
           const SizedBox(height: 16),
           Row(
@@ -405,21 +407,19 @@ class _PillButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 44,
+        height: 46,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: filled ? AppColors.secondary : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.button),
           border: filled
               ? null
-              : Border.all(color: Colors.white.withValues(alpha: 0.18)),
+              : Border.all(color: AppColors.dividerLight, width: 1.5),
         ),
         child: Text(
           label,
-          style: AppTypography.labelMd.copyWith(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: filled ? AppColors.onSecondary : AppColors.onSurface,
+          style: AppTypography.ui(size: 14, weight: FontWeight.w700).copyWith(
+            color: filled ? AppColors.onSecondary : AppColors.textPrimary,
           ),
         ),
       ),
@@ -436,54 +436,37 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 4),
+      padding: const EdgeInsets.only(left: 4),
       child: Text(
         label.toUpperCase(),
-        style: AppTypography.labelMd.copyWith(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          color: AppColors.textMuted,
-        ),
+        style: AppTypography.ui(size: 11, weight: FontWeight.w700, letterSpacing: 1.2)
+            .copyWith(color: AppColors.textMutedLight),
       ),
     );
   }
 }
 
-// ── Auth action (sign in / sign out) ──────────────────────────────────────────
+// ── Menu card + rows ───────────────────────────────────────────────────────────
 
-class _AuthAction extends StatelessWidget {
-  const _AuthAction({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
+/// A grouped white card that wraps a set of [_MoreMenuItem] rows.
+class _MenuCard extends StatelessWidget {
+  const _MenuCard({required this.children});
 
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Center(
-        child: Text(
-          label,
-          style: AppTypography.labelMd.copyWith(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: color,
-            letterSpacing: 1.2,
-          ),
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: AppRadius.cardBorder,
+        boxShadow: AppShadows.card,
       ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
     );
   }
 }
-
-// ── Menu row ───────────────────────────────────────────────────────────────────
 
 class _MoreMenuItem extends StatelessWidget {
   const _MoreMenuItem({
@@ -491,6 +474,7 @@ class _MoreMenuItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.accent,
+    this.danger = false,
     this.isLast = false,
   });
 
@@ -498,46 +482,51 @@ class _MoreMenuItem extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final Color? accent;
+  final bool danger;
   final bool isLast;
 
   @override
   Widget build(BuildContext context) {
+    final tint = accent ?? AppColors.primary;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: isLast
             ? null
             : const BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Color(0x0DFFFFFF), width: 1),
+                  bottom: BorderSide(color: AppColors.dividerLight, width: 1),
                 ),
               ),
         child: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(11),
+                color: tint.withValues(alpha: 0.12),
+                borderRadius: AppRadius.tileBorder,
               ),
               alignment: Alignment.center,
-              child: Icon(icon, color: accent ?? AppColors.primary, size: 19),
+              child: Icon(icon, color: tint, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
-                style: AppTypography.bodySm.copyWith(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface,
+                style: AppTypography.ui(size: 15, weight: FontWeight.w600)
+                    .copyWith(
+                  color: danger ? AppColors.danger : AppColors.textPrimary,
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textFaint, size: 20),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMutedLight,
+              size: 22,
+            ),
           ],
         ),
       ),

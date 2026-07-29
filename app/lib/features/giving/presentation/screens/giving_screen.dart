@@ -1,88 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
+
+import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/giving/presentation/screens/giving_webview_screen.dart';
 
-// Displayed URL in the chrome bar (visual only, no actual webview).
-const String _kSecurePortal = 'giving.kharischurch.org/secure-portal';
+/// The secure Kharis giving portal (opened via the web-view / payment flow).
+const String _kGivingUrl = 'https://kharis.org/giving';
 
-const List<int> _kPresets = [10, 50, 100];
+/// Home branch shown in the "Giving to" selector.
+const String _kBranch = 'London (HQ)';
 
-const List<String> _kFunds = [
-  'General Tithes & Offering',
-  'Building Fund',
-  'Missions',
-  'Youth Ministry',
-];
-
-class GivingScreen extends StatefulWidget {
+/// Giving tab (design-handoff v3, light).
+///
+/// A calm, single-column giving landing: a scripture card, the branch the gift
+/// is directed to, a full-width **Give securely** call-to-action that opens the
+/// secure portal, and offline bank-transfer + campaign cards below.
+class GivingScreen extends StatelessWidget {
   const GivingScreen({super.key});
-
-  @override
-  State<GivingScreen> createState() => _GivingScreenState();
-}
-
-class _GivingScreenState extends State<GivingScreen> {
-  int _selectedAmount = 50;
-  final TextEditingController _customController = TextEditingController();
-  String _fund = _kFunds[0];
-  bool _done = false;
-
-  @override
-  void dispose() {
-    _customController.dispose();
-    super.dispose();
-  }
-
-  // Resolved display amount for the CTA and success copy.
-  String get _displayAmount {
-    final custom = _customController.text.trim();
-    if (custom.isNotEmpty) return '\$$custom';
-    return '\$$_selectedAmount';
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.lightBg,
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 150),
+          padding: const EdgeInsets.only(bottom: 140),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _TopBar(onClose: () => context.go('/home')),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
+                child: Text('Giving', style: AppTypography.headlineLgMobile),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _ChromeBar(url: _kSecurePortal),
-                    _Panel(
-                      done: _done,
-                      selectedAmount: _selectedAmount,
-                      customController: _customController,
-                      fund: _fund,
-                      displayAmount: _displayAmount,
-                      onAmountSelected: (v) => setState(() {
-                        _selectedAmount = v;
-                        _customController.clear();
-                      }),
-                      onCustomChanged: (_) => setState(() {}),
-                      onFundChanged: (v) => setState(() => _fund = v),
-                      onGive: () => setState(() => _done = true),
-                      onGiveAgain: () => setState(() {
-                        _done = false;
-                        _customController.clear();
-                        _selectedAmount = 50;
-                      }),
+                    const _ScriptureCard(),
+                    const SizedBox(height: 18),
+                    const _SectionLabel('GIVING TO'),
+                    const SizedBox(height: 9),
+                    _BranchSelector(
+                      branch: _kBranch,
+                      onTap: () => openGivingFlow(context, _kGivingUrl),
+                    ),
+                    const SizedBox(height: 14),
+                    _GiveSecurelyButton(
+                      onTap: () => openGivingFlow(context, _kGivingUrl),
+                    ),
+                    const SizedBox(height: 9),
+                    const _SecureNote(),
+                    const SizedBox(height: 22),
+                    const _BankTransferCard(),
+                    const SizedBox(height: 14),
+                    _CampaignCard(
+                      onTap: () => openGivingFlow(context, _kGivingUrl),
                     ),
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                child: _FooterPill(),
-              ),
             ],
           ),
         ),
@@ -91,409 +70,131 @@ class _GivingScreenState extends State<GivingScreen> {
   }
 }
 
-// ── Top Bar ─────────────────────────────────────────────────────────────────
+// ── Scripture card ────────────────────────────────────────────────────────────
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onClose});
-  final VoidCallback onClose;
+class _ScriptureCard extends StatelessWidget {
+  const _ScriptureCard();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-      child: Row(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: Stack(
         children: [
-          GestureDetector(
-            onTap: onClose,
-            child: Container(
-              width: 38,
-              height: 38,
+          // Base + accent wash approximating the prototype's layered gradient.
+          Positioned.fill(
+            child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .06),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.close_rounded,
-                color: AppColors.secondary,
-                size: 20,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'Kharis Giving',
-              textAlign: TextAlign.center,
-              style: AppTypography.bodySm.copyWith(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: AppColors.secondary,
-              ),
-            ),
-          ),
-          // Right spacer mirrors the close button width.
-          const SizedBox(width: 38),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Chrome Bar ───────────────────────────────────────────────────────────────
-
-class _ChromeBar extends StatelessWidget {
-  const _ChromeBar({required this.url});
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .04),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(14),
-          topRight: Radius.circular(14),
-        ),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          left: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          right: BorderSide(color: Colors.white.withValues(alpha: .06)),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.lock_rounded, size: 14, color: AppColors.secondary),
-          const SizedBox(width: 8),
-          Text(
-            url,
-            style: AppTypography.labelMd.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textMuted,
-              letterSpacing: 0,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Panel ────────────────────────────────────────────────────────────────────
-
-class _Panel extends StatelessWidget {
-  const _Panel({
-    required this.done,
-    required this.selectedAmount,
-    required this.customController,
-    required this.fund,
-    required this.displayAmount,
-    required this.onAmountSelected,
-    required this.onCustomChanged,
-    required this.onFundChanged,
-    required this.onGive,
-    required this.onGiveAgain,
-  });
-
-  final bool done;
-  final int selectedAmount;
-  final TextEditingController customController;
-  final String fund;
-  final String displayAmount;
-  final ValueChanged<int> onAmountSelected;
-  final ValueChanged<String> onCustomChanged;
-  final ValueChanged<String> onFundChanged;
-  final VoidCallback onGive;
-  final VoidCallback onGiveAgain;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(22, 26, 22, 26),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1820),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          left: BorderSide(color: Colors.white.withValues(alpha: .06)),
-          right: BorderSide(color: Colors.white.withValues(alpha: .06)),
-        ),
-      ),
-      child: done
-          ? _SuccessState(
-              displayAmount: displayAmount,
-              fund: fund,
-              onGiveAgain: onGiveAgain,
-            )
-          : _FormState(
-              selectedAmount: selectedAmount,
-              customController: customController,
-              fund: fund,
-              displayAmount: displayAmount,
-              onAmountSelected: onAmountSelected,
-              onCustomChanged: onCustomChanged,
-              onFundChanged: onFundChanged,
-              onGive: onGive,
-            ),
-    );
-  }
-}
-
-// ── Form State ────────────────────────────────────────────────────────────────
-
-class _FormState extends StatelessWidget {
-  const _FormState({
-    required this.selectedAmount,
-    required this.customController,
-    required this.fund,
-    required this.displayAmount,
-    required this.onAmountSelected,
-    required this.onCustomChanged,
-    required this.onFundChanged,
-    required this.onGive,
-  });
-
-  final int selectedAmount;
-  final TextEditingController customController;
-  final String fund;
-  final String displayAmount;
-  final ValueChanged<int> onAmountSelected;
-  final ValueChanged<String> onCustomChanged;
-  final ValueChanged<String> onFundChanged;
-  final VoidCallback onGive;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Icon tile: 60px gradient circle with heart icon.
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFBD92FF), Color(0xFFE9C349)],
-            ),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: const Icon(
-            Icons.favorite_rounded,
-            color: Color(0xFF1A1820),
-            size: 28,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Title.
-        Text(
-          'Generous Giving',
-          style: AppTypography.titleMd.copyWith(
-            fontSize: 25,
-            fontWeight: FontWeight.w800,
-            color: AppColors.heading,
-          ),
-        ),
-        const SizedBox(height: 6),
-
-        // Subtitle.
-        Text(
-          'Supporting our mission and community growth',
-          style: AppTypography.bodySm.copyWith(
-            fontSize: 13,
-            color: AppColors.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 22),
-
-        // Section label.
-        _SectionLabel('SELECT AMOUNT'),
-        const SizedBox(height: 10),
-
-        // 3-col amount grid.
-        Row(
-          children: [
-            for (int i = 0; i < _kPresets.length; i++) ...[
-              if (i > 0) const SizedBox(width: 10),
-              Expanded(
-                child: _AmountButton(
-                  label: '\$${_kPresets[i]}',
-                  isSelected: selectedAmount == _kPresets[i] &&
-                      customController.text.isEmpty,
-                  onTap: () => onAmountSelected(_kPresets[i]),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF2A1A6B), Color(0xFF0B0A12)],
                 ),
               ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 10),
-
-        // Custom amount field.
-        _CustomAmountField(
-          controller: customController,
-          onChanged: onCustomChanged,
-        ),
-        const SizedBox(height: 20),
-
-        // Fund section label.
-        _SectionLabel('GIVE TO'),
-        const SizedBox(height: 10),
-
-        // Fund selector.
-        _FundSelector(
-          value: fund,
-          funds: _kFunds,
-          onChanged: onFundChanged,
-        ),
-        const SizedBox(height: 24),
-
-        // Gold CTA.
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: onGive,
-            icon: const Icon(Icons.favorite_rounded, size: 18),
-            label: Text(
-              'Give $displayAmount',
-              style: AppTypography.bodyLg.copyWith(
-                fontWeight: FontWeight.w800,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(-0.75, -0.85),
+                    radius: 1.1,
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.85),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.55],
+                  ),
+                ),
               ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondary,
-              foregroundColor: AppColors.onSecondary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              elevation: 0,
             ),
           ),
-        ),
-      ],
+          // Dove watermark.
+          Positioned(
+            right: -14,
+            top: -10,
+            child: Opacity(
+              opacity: 0.12,
+              child: Image.asset(AppAssets.doveWhite, width: 96),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Giving is a response to the generosity of a good God.',
+                  style: AppTypography.serif(
+                    size: 20,
+                    italic: true,
+                    height: 1.3,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '2 Corinthians 9:7',
+                  style: AppTypography.ui(
+                    size: 12,
+                    color: AppColors.darkMuted2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ── Success State ─────────────────────────────────────────────────────────────
+// ── Branch selector ─────────────────────────────────────────────────────────
 
-class _SuccessState extends StatelessWidget {
-  const _SuccessState({
-    required this.displayAmount,
-    required this.fund,
-    required this.onGiveAgain,
-  });
+class _BranchSelector extends StatelessWidget {
+  const _BranchSelector({required this.branch, required this.onTap});
 
-  final String displayAmount;
-  final String fund;
-  final VoidCallback onGiveAgain;
+  final String branch;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const SizedBox(height: 16),
-        // Green check circle.
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: const Color(0xFF7CC278).withValues(alpha: .16),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.check_rounded,
-            size: 36,
-            color: Color(0xFF8FD58A),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        Text(
-          'Thank you!',
-          style: AppTypography.titleMd.copyWith(
-            fontSize: 23,
-            fontWeight: FontWeight.w800,
-            color: AppColors.heading,
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        Text(
-          'Your gift of $displayAmount toward $fund has been received.',
-          textAlign: TextAlign.center,
-          style: AppTypography.bodySm.copyWith(
-            fontSize: 14,
-            color: AppColors.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Give Again glass pill.
-        GestureDetector(
-          onTap: onGiveAgain,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .06),
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: .08),
-              ),
-            ),
-            child: Text(
-              'Give Again',
-              style: AppTypography.bodySm.copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.heading,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-}
-
-// ── Footer Pill ───────────────────────────────────────────────────────────────
-
-class _FooterPill extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .03),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: Colors.white.withValues(alpha: .05)),
+          color: AppColors.cardWhite,
+          borderRadius: AppRadius.cardBorder,
+          boxShadow: AppShadows.card,
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.shield_rounded,
-              size: 14,
-              color: AppColors.secondary,
-            ),
-            const SizedBox(width: 7),
-            Text(
-              'Secure official Kharis giving portal',
-              style: AppTypography.bodySm.copyWith(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-                color: AppColors.onSurfaceVariant,
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.chipLight,
+                borderRadius: AppRadius.tileBorder,
               ),
+              child: const Icon(
+                Icons.location_on_outlined,
+                size: 19,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                branch,
+                style: AppTypography.ui(
+                  size: 15,
+                  weight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 20,
+              color: AppColors.textMutedLight,
             ),
           ],
         ),
@@ -502,7 +203,262 @@ class _FooterPill extends StatelessWidget {
   }
 }
 
-// ── Shared Section Label ──────────────────────────────────────────────────────
+// ── Give securely CTA ─────────────────────────────────────────────────────────
+
+class _GiveSecurelyButton extends StatelessWidget {
+  const _GiveSecurelyButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 17),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.primary, AppColors.primaryDeep],
+          ),
+          borderRadius: AppRadius.buttonBorder,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Give securely',
+              style: AppTypography.ui(
+                size: 16,
+                weight: FontWeight.w700,
+                color: AppColors.onPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.north_east_rounded,
+              size: 17,
+              color: AppColors.onPrimary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Secure note ───────────────────────────────────────────────────────────────
+
+class _SecureNote extends StatelessWidget {
+  const _SecureNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.lock_outline_rounded,
+          size: 13,
+          color: AppColors.textMutedLight,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Opens the secure Kharis giving page',
+          style: AppTypography.ui(
+            size: 11.5,
+            color: AppColors.textMutedLight,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Bank transfer card ──────────────────────────────────────────────────────
+
+class _BankTransferCard extends StatelessWidget {
+  const _BankTransferCard();
+
+  static const List<(String, String)> _rows = [
+    ('Account', '80608335'),
+    ('Sort code', '20-71-82'),
+    ('SWIFT/BIC', 'BUKBGB22'),
+    ('IBAN', 'GB88BUKB20718280608335'),
+  ];
+
+  void _copy(BuildContext context) {
+    const details =
+        'Kharis Ministries\nAccount: 80608335\nSort code: 20-71-82\n'
+        'SWIFT/BIC: BUKBGB22\nIBAN: GB88BUKB20718280608335';
+    Clipboard.setData(const ClipboardData(text: details));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Bank details copied'),
+          duration: Duration(milliseconds: 1700),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF137A6D),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Bank Transfer',
+            style: AppTypography.ui(
+              size: 13,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Kharis Ministries',
+            style: AppTypography.display(size: 22, color: Colors.white),
+          ),
+          const SizedBox(height: 14),
+          for (final (label, value) in _rows) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    label,
+                    style: AppTypography.ui(
+                      size: 13.5,
+                      weight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: AppTypography.ui(
+                      size: label == 'IBAN' ? 11.5 : 13.5,
+                      weight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 7),
+          GestureDetector(
+            onTap: () => _copy(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
+                  const SizedBox(width: 7),
+                  Text(
+                    'Copy details',
+                    style: AppTypography.ui(
+                      size: 12.5,
+                      weight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Campaign card ─────────────────────────────────────────────────────────────
+
+class _CampaignCard extends StatelessWidget {
+  const _CampaignCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 150,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1A1205), Color(0xFF3A1240)],
+            ),
+          ),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Color(0xB3000000), Colors.transparent],
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Build God a House',
+                    style: AppTypography.display(size: 22, color: Colors.white),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    "We're believing for a permanent home "
+                    '\u2014 \u00A31.4M of \u00A33M raised',
+                    style: AppTypography.ui(
+                      size: 12,
+                      color: AppColors.darkMuted3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: 0.47,
+                      minHeight: 6,
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.secondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared section label ──────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text);
@@ -512,170 +468,11 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: AppTypography.labelMd.copyWith(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: const Color(0xFF7A747E),
+      style: AppTypography.ui(
+        size: 11,
+        weight: FontWeight.w700,
         letterSpacing: 1.1,
-      ),
-    );
-  }
-}
-
-// ── Amount Button ─────────────────────────────────────────────────────────────
-
-class _AmountButton extends StatelessWidget {
-  const _AmountButton({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.secondary
-              : Colors.white.withValues(alpha: .05),
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected
-              ? null
-              : Border.all(color: Colors.white.withValues(alpha: .08)),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: AppTypography.bodySm.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: isSelected ? AppColors.onSecondary : AppColors.onSurface,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Custom Amount Field ───────────────────────────────────────────────────────
-
-class _CustomAmountField extends StatelessWidget {
-  const _CustomAmountField({
-    required this.controller,
-    required this.onChanged,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
-      ],
-      style: AppTypography.bodySm.copyWith(
-        fontSize: 15,
-        color: AppColors.onSurface,
-      ),
-      cursorColor: AppColors.secondary,
-      decoration: InputDecoration(
-        hintText: 'Other amount',
-        hintStyle: AppTypography.bodySm.copyWith(
-          fontSize: 15,
-          color: AppColors.textMuted,
-        ),
-        prefixText: '\$ ',
-        prefixStyle: AppTypography.bodySm.copyWith(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: AppColors.secondary,
-        ),
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: .05),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: .08)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: .08)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.secondary, width: 1.5),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Fund Selector ─────────────────────────────────────────────────────────────
-
-class _FundSelector extends StatelessWidget {
-  const _FundSelector({
-    required this.value,
-    required this.funds,
-    required this.onChanged,
-  });
-
-  final String value;
-  final List<String> funds;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: const Color(0xFF1A1820),
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textFaint,
-          ),
-          items: funds
-              .map(
-                (f) => DropdownMenuItem<String>(
-                  value: f,
-                  child: Text(
-                    f,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodySm.copyWith(
-                      fontSize: 15,
-                      color: AppColors.onSurface,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
+        color: AppColors.textMutedLight,
       ),
     );
   }

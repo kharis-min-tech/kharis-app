@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_typography.dart';
 
+/// Splash / brand entry (design-handoff v3).
+///
+/// Full-bleed worship photo under a purple→magenta gradient wash, centred dove
+/// + "Kharis" wordmark + serif tagline, then a gold **Get started** CTA and a
+/// "Log in with iKharis" row. Button-driven (no auto-advance) so returning
+/// users are routed by the auth redirect and new users choose to begin.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -11,159 +19,128 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late final AnimationController _glowController;
-  late final Animation<double> _glowScale;
-  late final Animation<double> _glowOpacity;
-
-  late final AnimationController _entryController;
-  late final Animation<double> _entryOpacity;
-  late final Animation<double> _entryScale;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Glow pulse — loops
-    _glowController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-
-    _glowScale = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
-    );
-
-    _glowOpacity = Tween<double>(begin: 0.3, end: 0.7).animate(
-      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
-    );
-
-    // Entry fade-in (content) — runs once
-    _entryController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..forward();
-
-    _entryOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _entryController, curve: Curves.easeOut),
-    );
-
-    _entryScale = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _entryController, curve: Curves.easeOut),
-    );
-
-    // Navigate after 2.5 seconds
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (mounted) {
-        context.go('/role-selection');
-      }
-    });
-  }
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entry = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..forward();
 
   @override
   void dispose() {
-    _glowController.dispose();
-    _entryController.dispose();
+    _entry.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
-      body: Center(
-        child: FadeTransition(
-          opacity: _entryOpacity,
-          child: ScaleTransition(
-            scale: _entryScale,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _GlowingDove(
-                  glowScale: _glowScale,
-                  glowOpacity: _glowOpacity,
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'KHARIS',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: AppColors.onSurface,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Changing the world with a touch of His grace',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: AppColors.onSurfaceVariant,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
+      backgroundColor: AppColors.ink,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Full-bleed worship photo.
+          Image.asset(AppAssets.splashWorship, fit: BoxFit.cover),
+
+          // Purple → magenta gradient wash for legibility + brand.
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xE64A2AA8), // purple, ~90%
+                  Color(0xB35D3FD3), // purple, ~70%
+                  Color(0xE67A1F47), // magenta, ~90%
+                ],
+                stops: [0.0, 0.45, 1.0],
+              ),
             ),
           ),
-        ),
+
+          SafeArea(
+            child: FadeTransition(
+              opacity: _entry,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(26, 24, 26, 30),
+                child: Column(
+                  children: [
+                    const Spacer(flex: 3),
+                    Image.asset(AppAssets.doveWhite, width: 96, height: 96),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Kharis',
+                      style: AppTypography.display(size: 44, weight: FontWeight.w700)
+                          .copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Changing the world with a touch of His Grace',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.serif(
+                        size: 17,
+                        italic: true,
+                        height: 1.4,
+                      ).copyWith(color: const Color(0xFFE6DDFF)),
+                    ),
+                    const Spacer(flex: 4),
+
+                    // Gold primary CTA.
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => context.go('/role-selection'),
+                        child: const Text('Get started'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Log in with iKharis.
+                    _IKharisLoginRow(onTap: () => context.go('/login')),
+                    const SizedBox(height: 20),
+
+                    Text(
+                      'Establishing believers · Strengthening churches',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.labelMd.copyWith(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _GlowingDove extends StatelessWidget {
-  const _GlowingDove({
-    required this.glowScale,
-    required this.glowOpacity,
-  });
+class _IKharisLoginRow extends StatelessWidget {
+  const _IKharisLoginRow({required this.onTap});
 
-  final Animation<double> glowScale;
-  final Animation<double> glowOpacity;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 160,
-      height: 160,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Radial glow behind the dove
-          AnimatedBuilder(
-            animation: Listenable.merge([glowScale, glowOpacity]),
-            builder: (context, _) {
-              return Transform.scale(
-                scale: glowScale.value,
-                child: Opacity(
-                  opacity: glowOpacity.value,
-                  child: Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          AppColors.primary,
-                          AppColors.primary.withValues(alpha: 0.4),
-                          AppColors.primary.withValues(alpha: 0.0),
-                        ],
-                        stops: const [0.0, 0.45, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          // Real Figma dove logo (white line-art on transparent)
-          Image.asset(
-            'assets/figma/dove_logo.png',
-            width: 80,
-            height: 80,
-            color: Colors.white,
-          ),
-        ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppRadius.buttonBorder,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_outline_rounded, size: 18, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              'Log in with iKharis',
+              style: AppTypography.ui(size: 15, weight: FontWeight.w600)
+                  .copyWith(color: Colors.white),
+            ),
+          ],
+        ),
       ),
     );
   }

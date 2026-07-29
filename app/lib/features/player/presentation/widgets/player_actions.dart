@@ -8,22 +8,46 @@ import 'package:kharis_app/features/notes/presentation/screens/note_editor_scree
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 
-/// Row of secondary player actions shown below the playback controls.
-/// Currently exposes the Notes action; extend with additional buttons as needed.
+/// Row of secondary player actions shown below the transport controls —
+/// dark design-handoff (v3): Notes · Playlist · Share, each an icon over a
+/// small muted-lavender label. Notes opens the note editor for the current
+/// sermon at the current playback position; Playlist and Share confirm with a
+/// lightweight toast.
 class PlayerActions extends ConsumerWidget {
   const PlayerActions({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _ActionButton(
-          icon: Icons.edit_note_outlined,
+          icon: Icons.notes_rounded,
           label: 'Notes',
           onTap: () => _openNoteEditor(context, ref),
         ),
+        _ActionButton(
+          icon: Icons.add_rounded,
+          label: 'Playlist',
+          onTap: () => _toast(context, 'Added to playlist'),
+        ),
+        _ActionButton(
+          icon: Icons.ios_share_rounded,
+          label: 'Share',
+          onTap: () => _toast(context, 'Share link copied'),
+        ),
       ],
+    );
+  }
+
+  void _toast(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.darkSurface,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(milliseconds: 1700),
+      ),
     );
   }
 
@@ -65,18 +89,18 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.onSurfaceVariant, size: 26),
+          Icon(icon, color: AppColors.darkMuted2, size: 22),
           const SizedBox(height: AppSpacing.xs),
           Text(
             label,
-            style: AppTypography.labelMd.copyWith(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.onSurfaceVariant,
-              letterSpacing: 0,
+            style: AppTypography.ui(
+              size: 10,
+              weight: FontWeight.w600,
+              color: AppColors.darkMuted2,
             ),
           ),
         ],

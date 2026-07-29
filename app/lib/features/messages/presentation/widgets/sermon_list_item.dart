@@ -23,6 +23,7 @@ class SermonListItem extends StatefulWidget {
     this.isPlaying = false,
     this.onTap,
     this.onMoreTap,
+    this.progress = 0,
   });
 
   final String title;
@@ -36,6 +37,9 @@ class SermonListItem extends StatefulWidget {
   final bool isPlaying;
   final VoidCallback? onTap;
   final VoidCallback? onMoreTap;
+
+  /// Playback progress 0–1; renders a gold progress bar when > 0.
+  final double progress;
 
   @override
   State<SermonListItem> createState() => _SermonListItemState();
@@ -131,10 +135,10 @@ class _SermonListItemState extends State<SermonListItem>
                     widget.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodyLg.copyWith(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                    style: AppTypography.ui(
+                      size: 15,
+                      weight: FontWeight.w600,
+                      color: AppColors.darkMuted3,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -142,9 +146,9 @@ class _SermonListItemState extends State<SermonListItem>
                     speakerLine,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodySm.copyWith(
-                      fontSize: 12.5,
-                      color: AppColors.textMuted,
+                    style: AppTypography.ui(
+                      size: 12.5,
+                      color: AppColors.darkMuted,
                     ),
                   ),
                   if (metaLine.isNotEmpty) ...[
@@ -153,10 +157,23 @@ class _SermonListItemState extends State<SermonListItem>
                       metaLine,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.labelMd.copyWith(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textFaint,
+                      style: AppTypography.ui(
+                        size: 11,
+                        color: AppColors.darkMuted,
+                      ),
+                    ),
+                  ],
+                  if (widget.progress > 0) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      child: LinearProgressIndicator(
+                        value: widget.progress.clamp(0.0, 1.0),
+                        minHeight: 3,
+                        backgroundColor: AppColors.darkSurface,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.secondary,
+                        ),
                       ),
                     ),
                   ],
@@ -177,7 +194,7 @@ class _SermonListItemState extends State<SermonListItem>
                 ),
                 child: const Icon(
                   Icons.more_vert_rounded,
-                  color: AppColors.textMuted,
+                  color: AppColors.darkMuted,
                   size: 18,
                 ),
               ),
@@ -212,7 +229,7 @@ class _EqualizerBars extends StatelessWidget {
                 width: 4,
                 height: 20 * animations[i].value,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

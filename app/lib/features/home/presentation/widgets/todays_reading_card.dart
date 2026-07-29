@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Gold/purple gradient card showing today's Bible reading with Read + Listen.
+/// Purple gradient card showing today's Bible reading with a serif scripture
+/// line and Read now / Daily prayer actions (design-handoff v3, light screen).
 class TodaysReadingCard extends ConsumerWidget {
   const TodaysReadingCard({super.key});
 
@@ -14,20 +15,17 @@ class TodaysReadingCard extends ConsumerWidget {
 
     return contentAsync.when(
       loading: () => _ReadingCard(
-        plan: 'Devotional Plan',
         reference: 'Loading...',
         theme: '',
         verse: '',
       ),
       error: (_, _) => _ReadingCard(
-        plan: 'Devotional Plan',
         reference: 'Psalms 23:1-6',
         theme: 'Psalm 23:1',
         verse:
             'Lord, thank You for being my Shepherd. Lead me today in paths of righteousness.',
       ),
       data: (content) => _ReadingCard(
-        plan: 'Devotional Plan',
         reference: content.reading.reference,
         theme: content.prayerReference,
         verse: content.prayer,
@@ -38,109 +36,62 @@ class TodaysReadingCard extends ConsumerWidget {
 
 class _ReadingCard extends StatelessWidget {
   const _ReadingCard({
-    required this.plan,
     required this.reference,
     required this.theme,
     required this.verse,
   });
 
-  final String plan;
   final String reference;
   final String theme;
   final String verse;
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final dayOfYear = now.difference(DateTime(now.year)).inDays + 1;
+    final scripture = verse.isNotEmpty ? verse : theme;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0x33E9C349),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
         gradient: const LinearGradient(
-          begin: Alignment(-1, -1),
-          end: Alignment(1, 1),
-          colors: [
-            Color(0x24E9C349),
-            Color(0x1A7C3AED),
-          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, AppColors.primaryDeep],
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: "TODAY'S READING" label + plan right
-          Row(
-            children: [
-              const Icon(
-                Icons.menu_book_rounded,
-                color: AppColors.secondary,
-                size: 15,
-              ),
-              const SizedBox(width: 7),
-              Text(
-                "TODAY'S READING",
-                style: AppTypography.labelMd.copyWith(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.secondary,
-                  letterSpacing: 1.1,
-                  height: 1,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                plan,
-                style: AppTypography.labelMd.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textMuted,
-                  letterSpacing: 0,
-                  height: 1,
-                ),
-              ),
-            ],
+          // Eyebrow: TODAY'S READING · DAY N
+          Text(
+            "TODAY'S READING · DAY $dayOfYear",
+            style: AppTypography.ui(
+              size: 10.5,
+              weight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ).copyWith(color: AppColors.secondary, height: 1),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Reference (big heading)
+          // Reference (big display heading)
           Text(
             reference,
-            style: AppTypography.titleMd.copyWith(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.heading,
-              letterSpacing: -0.3,
-              height: 1.2,
-            ),
+            style: AppTypography.display(size: 27, weight: FontWeight.w700)
+                .copyWith(color: Colors.white, height: 1.1),
           ),
 
-          if (theme.isNotEmpty) ...[
-            const SizedBox(height: 5),
+          // Scripture / prayer line (serif italic)
+          if (scripture.isNotEmpty) ...[
+            const SizedBox(height: 12),
             Text(
-              theme,
-              style: AppTypography.bodySm.copyWith(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFFCFC8D4),
-                height: 1.4,
-              ),
-            ),
-          ],
-
-          if (verse.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              verse,
-              style: AppTypography.bodySm.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                fontStyle: FontStyle.italic,
-                color: AppColors.onSurfaceVariant,
+              scripture,
+              style: AppTypography.serif(size: 15.5, italic: true).copyWith(
+                color: Colors.white.withValues(alpha: .88),
                 height: 1.5,
               ),
               maxLines: 3,
@@ -153,12 +104,12 @@ class _ReadingCard extends StatelessWidget {
           // Action buttons
           Row(
             children: [
-              // Read button (gold pill)
+              // Read now (gold pill)
               GestureDetector(
                 onTap: () => context.push('/reading'),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
+                    horizontal: 18,
                     vertical: 11,
                   ),
                   decoration: BoxDecoration(
@@ -168,21 +119,18 @@ class _ReadingCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Text(
+                        'Read now',
+                        style: AppTypography.ui(
+                          size: 13.5,
+                          weight: FontWeight.w800,
+                        ).copyWith(color: AppColors.onSecondary, height: 1),
+                      ),
+                      const SizedBox(width: 6),
                       const Icon(
-                        Icons.menu_book_rounded,
+                        Icons.arrow_forward_rounded,
                         color: AppColors.onSecondary,
                         size: 15,
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        'Read',
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.onSecondary,
-                          letterSpacing: 0,
-                          height: 1,
-                        ),
                       ),
                     ],
                   ),
@@ -191,42 +139,28 @@ class _ReadingCard extends StatelessWidget {
 
               const SizedBox(width: 10),
 
-              // Listen button (glass pill)
+              // Daily prayer (translucent pill)
               GestureDetector(
                 onTap: () => context.push('/reading'),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
+                    horizontal: 18,
                     vertical: 11,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .06),
+                    color: Colors.white.withValues(alpha: .14),
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: .08),
+                      color: Colors.white.withValues(alpha: .18),
                       width: 1,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.play_arrow_rounded,
-                        color: AppColors.heading,
-                        size: 15,
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        'Listen',
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.heading,
-                          letterSpacing: 0,
-                          height: 1,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'Daily prayer',
+                    style: AppTypography.ui(
+                      size: 13.5,
+                      weight: FontWeight.w700,
+                    ).copyWith(color: Colors.white, height: 1),
                   ),
                 ),
               ),

@@ -59,25 +59,17 @@ class _SortPill extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: active
-              ? AppColors.secondary
-              : Colors.white.withValues(alpha: 0.06),
+          color: active ? AppColors.secondary : AppColors.darkSurface2,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: active
-              ? null
-              : Border.all(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  width: 1,
-                ),
         ),
         child: Text(
           label,
-          style: AppTypography.labelMd.copyWith(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: active ? AppColors.onSecondary : AppColors.onSurface,
+          style: AppTypography.ui(
+            size: 13,
+            weight: FontWeight.w600,
+            color: active ? AppColors.onSecondary : AppColors.darkMuted,
           ),
         ),
       ),

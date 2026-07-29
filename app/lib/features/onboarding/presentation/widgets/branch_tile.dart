@@ -1,142 +1,123 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
+import 'package:kharis_app/core/theme/app_shadows.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
 
-/// A selectable branch row: a vibrant gradient thumbnail, the branch name and
-/// location, and a gold check when chosen. The selected card gains a gold
-/// tint, border and soft glow.
+/// A branch row (design-handoff v3): a rounded city-landmark thumbnail, the
+/// branch name and region, and a gold **HQ** badge for the headquarters (warm
+/// tint). Tapping the row selects and proceeds.
 class BranchTile extends StatelessWidget {
   const BranchTile({
     super.key,
     required this.name,
-    required this.subtitle,
+    required this.region,
     required this.gradientColors,
-    this.imageUrl,
-    required this.isSelected,
     required this.onTap,
+    this.imageUrl,
+    this.isHq = false,
   });
 
   final String name;
-  final String subtitle;
+  final String region;
   final List<Color> gradientColors;
-  final String? imageUrl;
-  final bool isSelected;
   final VoidCallback onTap;
+  final String? imageUrl;
+  final bool isHq;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.all(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.secondary.withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.secondary.withValues(alpha: 0.55)
-                : Colors.white.withValues(alpha: 0.07),
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.secondary.withValues(alpha: 0.3),
-                    blurRadius: 24,
-                    spreadRadius: -6,
-                  ),
-                ]
+          color: isHq ? AppColors.hqTint : AppColors.cardWhite,
+          borderRadius: AppRadius.cardBorder,
+          border: isHq
+              ? Border.all(color: AppColors.hqStroke.withValues(alpha: 0.5))
               : null,
+          boxShadow: isHq ? null : AppShadows.card,
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SizedBox(
-                width: 58,
-                height: 58,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomRight,
-                          colors: gradientColors,
-                        ),
-                      ),
-                    ),
-                    if (imageUrl != null)
-                      Image.network(
-                        imageUrl!,
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                      ),
-                    // Brand tint so any photo stays on the dark palette.
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            gradientColors.first.withValues(alpha: 0.45),
-                            gradientColors.last.withValues(alpha: 0.3),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _Thumb(imageUrl: imageUrl, gradientColors: gradientColors),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     name,
-                    style: AppTypography.titleMd.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.18,
-                      color: AppColors.heading,
-                    ),
+                    style: AppTypography.ui(size: 16, weight: FontWeight.w700)
+                        .copyWith(color: AppColors.textPrimary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    subtitle,
-                    style: AppTypography.bodySm.copyWith(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                    ),
+                    region,
+                    style: AppTypography.ui(size: 13)
+                        .copyWith(color: AppColors.textMutedLight),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            if (isSelected)
+            if (isHq) ...[
+              const SizedBox(width: 8),
               Container(
-                margin: const EdgeInsets.only(left: 8),
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
                   color: AppColors.secondary,
-                  shape: BoxShape.circle,
+                  borderRadius: AppRadius.pillBorder,
                 ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: AppColors.onSecondary,
-                  size: 14,
+                child: Text(
+                  'HQ',
+                  style: AppTypography.ui(size: 11, weight: FontWeight.w800)
+                      .copyWith(color: AppColors.onSecondary, letterSpacing: 0.5),
                 ),
               ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _Thumb extends StatelessWidget {
+  const _Thumb({required this.imageUrl, required this.gradientColors});
+
+  final String? imageUrl;
+  final List<Color> gradientColors;
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: AppRadius.tileBorder,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: (imageUrl == null || imageUrl!.isEmpty)
+            ? gradient
+            : CachedNetworkImage(
+                imageUrl: imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => gradient,
+                errorWidget: (_, _, _) => gradient,
+              ),
       ),
     );
   }

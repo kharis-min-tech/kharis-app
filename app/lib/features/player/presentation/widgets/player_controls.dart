@@ -3,15 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
-/// Spotify-style playback controls.
+/// Transport controls — dark design-handoff (v3).
 ///
-/// Row layout: shuffle | -15s | play/pause | +15s | repeat
-/// The play/pause button is a 64-px filled circle (AppColors.heading) with a
-/// dark icon. A small spinner replaces the icon during loading/buffering.
-/// Shuffle and repeat are local visual toggles only (no backend wiring).
+/// Row layout: speed pill | skip-back 15 | play/pause | skip-forward 30 |
+/// repeat. The play/pause button is a 70-px gold circle with a dark icon and a
+/// soft gold glow; a spinner replaces the icon while buffering. Tapping the
+/// speed pill cycles 1× → 1.25× → 1.5× → 2× → 0.75× and applies the rate to the
+/// audio service. Repeat is a local visual toggle only.
 class PlayerControls extends ConsumerStatefulWidget {
   const PlayerControls({super.key});
 
@@ -20,8 +22,17 @@ class PlayerControls extends ConsumerStatefulWidget {
 }
 
 class _PlayerControlsState extends ConsumerState<PlayerControls> {
-  bool _shuffleOn = false;
+  static const List<double> _speeds = [1, 1.25, 1.5, 2, 0.75];
+
+  int _speedIndex = 0;
   bool _repeatOn = false;
+
+  double get _speed => _speeds[_speedIndex];
+
+  void _cycleSpeed() {
+    setState(() => _speedIndex = (_speedIndex + 1) % _speeds.length);
+    ref.read(audioPlayerServiceProvider).setSpeed(_speed);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,44 +56,82 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Shuffle toggle (visual only)
-          _SecondaryButton(
-            icon: Icons.shuffle_rounded,
-            active: _shuffleOn,
-            onTap: () => setState(() => _shuffleOn = !_shuffleOn),
-          ),
+          // Speed pill.
+          _SpeedPill(speed: _speed, onTap: _cycleSpeed),
 
-          // Skip back 15 seconds
+          // Skip back 15 seconds.
           _SkipButton(
-            onPressed: () => seekRelative(-15),
+            seconds: 15,
             isForward: false,
+            onPressed: () => seekRelative(-15),
           ),
 
-          // Play / Pause
+          // Play / Pause.
           _PlayPauseButton(
             isPlaying: isPlaying,
             isBuffering: isBuffering,
             onTap: () => isPlaying ? service.pause() : service.resume(),
           ),
 
-          // Skip forward 15 seconds
+          // Skip forward 30 seconds.
           _SkipButton(
-            onPressed: () => seekRelative(15),
+            seconds: 30,
             isForward: true,
+            onPressed: () => seekRelative(30),
           ),
 
-          // Repeat toggle (visual only)
-          _SecondaryButton(
-            icon: Icons.repeat_rounded,
+          // Repeat toggle (visual only).
+          _RepeatButton(
             active: _repeatOn,
             onTap: () => setState(() => _repeatOn = !_repeatOn),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Speed pill ────────────────────────────────────────────────────────────────
+
+class _SpeedPill extends StatelessWidget {
+  const _SpeedPill({required this.speed, required this.onTap});
+
+  final double speed;
+  final VoidCallback onTap;
+
+  String get _label {
+    final s = speed == speed.roundToDouble()
+        ? speed.toStringAsFixed(0)
+        : speed.toString();
+    return '${s}×';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: AppColors.gold.withValues(alpha: 0.5),
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          _label,
+          style: AppTypography.ui(
+            size: 12.5,
+            weight: FontWeight.w700,
+            color: AppColors.gold,
+          ),
+        ),
       ),
     );
   }
@@ -106,27 +155,34 @@ class _PlayPauseButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 64,
-        height: 64,
-        decoration: const BoxDecoration(
+        width: 70,
+        height: 70,
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.heading,
+          color: AppColors.gold,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gold.withValues(alpha: 0.5),
+              blurRadius: 22,
+              offset: const Offset(0, 12),
+              spreadRadius: -6,
+            ),
+          ],
         ),
         alignment: Alignment.center,
         child: isBuffering
-            ? SizedBox(
+            ? const SizedBox(
                 width: 26,
                 height: 26,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppColors.canvas,
-                  ),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AppColors.goldInk),
                 ),
               )
             : Icon(
                 isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: AppColors.canvas,
+                color: AppColors.goldInk,
                 size: 34,
               ),
       ),
@@ -134,24 +190,26 @@ class _PlayPauseButton extends StatelessWidget {
   }
 }
 
-// ── Skip +/- 15 seconds button ────────────────────────────────────────────────
+// ── Skip +/- seconds button ─────────────────────────────────────────────────
 
 class _SkipButton extends StatelessWidget {
   const _SkipButton({
-    required this.onPressed,
+    required this.seconds,
     required this.isForward,
+    required this.onPressed,
   });
 
-  final VoidCallback onPressed;
+  final int seconds;
   final bool isForward;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onPressed,
       child: SizedBox(
-        width: 44,
-        height: 44,
+        width: 46,
+        height: 46,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -161,16 +219,14 @@ class _SkipButton extends StatelessWidget {
               size: 32,
             ),
             Positioned(
-              bottom: 6,
+              bottom: 7,
               child: Text(
-                '15',
-                style: AppTypography.labelMd.copyWith(
-                  fontSize: 8,
+                '$seconds',
+                style: AppTypography.ui(
+                  size: 8,
+                  weight: FontWeight.w800,
                   color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
-                  letterSpacing: 0,
-                ),
+                ).copyWith(height: 1),
               ),
             ),
           ],
@@ -180,16 +236,11 @@ class _SkipButton extends StatelessWidget {
   }
 }
 
-// ── Secondary icon button (shuffle / repeat) ──────────────────────────────────
+// ── Repeat toggle ─────────────────────────────────────────────────────────────
 
-class _SecondaryButton extends StatelessWidget {
-  const _SecondaryButton({
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
+class _RepeatButton extends StatelessWidget {
+  const _RepeatButton({required this.active, required this.onTap});
 
-  final IconData icon;
   final bool active;
   final VoidCallback onTap;
 
@@ -198,17 +249,16 @@ class _SecondaryButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         child: Stack(
           alignment: Alignment.center,
           children: [
             Icon(
-              icon,
-              color: active ? AppColors.secondary : AppColors.textFaint,
+              Icons.repeat_rounded,
+              color: active ? AppColors.gold : AppColors.darkMuted,
               size: 22,
             ),
-            // Active indicator dot below the icon
             if (active)
               Positioned(
                 bottom: 4,
@@ -217,7 +267,7 @@ class _SecondaryButton extends StatelessWidget {
                   height: 4,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.secondary,
+                    color: AppColors.gold,
                   ),
                 ),
               ),

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/usfm_books.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -36,7 +35,21 @@ final passageProvider =
       ),
 );
 
+/// Reading-plan day counter, derived from today's day-of-year. Presentation
+/// only — keeps the devotional "Day N" label truthful to the calendar.
+int _readingPlanDay() {
+  final now = DateTime.now();
+  return now.difference(DateTime(now.year, 1, 1)).inDays + 1;
+}
+
+/// Warm superscript verse-number accent used on the light reading surface.
+const Color _verseAccent = Color(0xFFB8875F);
+
+/// Warm ink for long-form serif scripture (softer than pure text primary).
+const Color _scriptureInk = Color(0xFF2A2723);
+
 /// Full-screen reader for today's Bible reading with version switching.
+/// Design-handoff v3 — calm, scripture-forward, Newsreader serif on light warm.
 class ReadingScreen extends ConsumerWidget {
   const ReadingScreen({super.key});
 
@@ -45,28 +58,28 @@ class ReadingScreen extends ConsumerWidget {
     final contentAsync = ref.watch(dailyContentProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.lightBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: AppColors.onSurface),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          "Today's Reading",
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.1,
-            color: AppColors.textMuted,
+          'Reading plan \u00B7 Day ${_readingPlanDay()}',
+          style: AppTypography.ui(
+            size: 13,
+            weight: FontWeight.w700,
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: true,
       ),
       body: contentAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.secondary),
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
         error: (_, _) => _ErrorView(
           message: 'Could not load today\'s reading',
@@ -84,6 +97,8 @@ class ReadingScreen extends ConsumerWidget {
           return _PassageView(
             usfmId: usfm,
             fallbackReference: '${reading.book} ${reading.chapter}',
+            prayer: content.prayer,
+            prayerReference: content.prayerReference,
           );
         },
       ),
@@ -92,18 +107,25 @@ class ReadingScreen extends ConsumerWidget {
 }
 
 class _PassageView extends ConsumerWidget {
-  const _PassageView({required this.usfmId, required this.fallbackReference});
+  const _PassageView({
+    required this.usfmId,
+    required this.fallbackReference,
+    required this.prayer,
+    required this.prayerReference,
+  });
 
   final String usfmId;
   final String fallbackReference;
+  final String prayer;
+  final String prayerReference;
 
   void _showVersionSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surfaceElevated,
+      backgroundColor: AppColors.cardWhite,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
       ),
       builder: (sheetContext) => SafeArea(
         child: ConstrainedBox(
@@ -117,64 +139,63 @@ class _PassageView extends ConsumerWidget {
 
               return biblesAsync.when(
                 loading: () => const Padding(
-                  padding: EdgeInsets.all(AppSpacing.lg),
+                  padding: EdgeInsets.all(24),
                   child: Center(
-                    child: CircularProgressIndicator(color: AppColors.secondary),
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ),
                 ),
                 error: (_, _) => Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  padding: const EdgeInsets.all(24),
                   child: Text(
                     'Could not load versions',
-                    style: GoogleFonts.plusJakartaSans(color: AppColors.onSurfaceVariant),
+                    style: AppTypography.bodySm
+                        .copyWith(color: AppColors.textMutedLight),
                   ),
                 ),
                 data: (bibles) => ListView(
                   shrinkWrap: true,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg),
+                      padding: const EdgeInsets.symmetric(horizontal: 22),
                       child: Text(
                         'BIBLE VERSION',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: AppTypography.labelMd.copyWith(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.1,
-                          color: AppColors.textMuted,
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: 8),
                     for (final b in bibles)
                       ListTile(
                         dense: true,
                         title: Text(
                           b.abbreviation,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            fontWeight: b.id == selected.id
+                          style: AppTypography.ui(
+                            size: 14,
+                            weight: b.id == selected.id
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                             color: b.id == selected.id
-                                ? AppColors.secondary
-                                : AppColors.onSurface,
+                                ? AppColors.primary
+                                : AppColors.textPrimary,
                           ),
                         ),
                         subtitle: Text(
                           b.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            color: AppColors.textMuted,
+                          style: AppTypography.ui(
+                            size: 12,
+                            color: AppColors.textMutedLight,
                           ),
                         ),
                         trailing: b.id == selected.id
                             ? const Icon(Icons.check_rounded,
-                                color: AppColors.secondary, size: 20)
+                                color: AppColors.primary, size: 20)
                             : null,
                         onTap: () {
                           sheetRef
@@ -202,7 +223,7 @@ class _PassageView extends ConsumerWidget {
 
     return passageAsync.when(
       loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.secondary),
+        child: CircularProgressIndicator(color: AppColors.primary),
       ),
       error: (_, _) => _ErrorView(
         message: 'Could not load the passage in ${version.abbreviation}',
@@ -211,74 +232,59 @@ class _PassageView extends ConsumerWidget {
         )),
       ),
       data: (passage) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.xl,
-        ),
+        padding: const EdgeInsets.fromLTRB(30, 8, 30, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Eyebrow.
+            Text(
+              'TODAY\u2019S READING',
+              style: AppTypography.ui(
+                size: 11,
+                weight: FontWeight.w600,
+                letterSpacing: 11 * 0.09,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Reference (display) + version switcher.
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Text(
                     passage.reference.isNotEmpty
                         ? passage.reference
                         : fallbackReference,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
-                    ),
+                    style: AppTypography.display(size: 32, weight: FontWeight.w700)
+                        .copyWith(color: AppColors.textPrimary, height: 1.15),
                   ),
                 ),
-                Semantics(
-                  button: true,
-                  label: 'Change Bible version',
-                  child: GestureDetector(
-                    onTap: () => _showVersionSheet(context, ref),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md, vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.secondary, width: 1),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            passage.bibleAbbreviation,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                          const SizedBox(width: 3),
-                          const Icon(Icons.keyboard_arrow_down_rounded,
-                              color: AppColors.secondary, size: 16),
-                        ],
-                      ),
-                    ),
-                  ),
+                const SizedBox(width: 12),
+                _VersionPill(
+                  label: passage.bibleAbbreviation,
+                  onTap: () => _showVersionSheet(context, ref),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: 20),
             _PassageBody(blocks: passage.blocks),
             if (passage.copyright != null &&
                 passage.copyright!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: 20),
               Text(
                 passage.copyright!,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
+                style: AppTypography.ui(
+                  size: 11,
                   height: 1.5,
+                  color: AppColors.textMutedLight,
                 ),
               ),
             ],
+            const SizedBox(height: 26),
+            _DailyPrayer(prayer: prayer, reference: prayerReference),
+            const SizedBox(height: 22),
+            _ReadingActions(),
           ],
         ),
       ),
@@ -286,8 +292,51 @@ class _PassageView extends ConsumerWidget {
   }
 }
 
+/// Purple outlined version-switcher pill.
+class _VersionPill extends StatelessWidget {
+  const _VersionPill({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Change Bible version',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.primary, width: 1),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTypography.ui(
+                  size: 12,
+                  weight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 3),
+              const Icon(Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.primary, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Renders passage blocks with superscript verse numbers, poetry indents,
-/// headings, and superscriptions.
+/// headings, and superscriptions — all in Newsreader serif for a calm,
+/// scripture-forward reading tone.
 class _PassageBody extends StatelessWidget {
   const _PassageBody({required this.blocks});
 
@@ -295,46 +344,38 @@ class _PassageBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bodyStyle = GoogleFonts.plusJakartaSans(
-      fontSize: 17,
-      height: 1.8,
-      color: AppColors.onSurface.withValues(alpha: 0.92),
+    final bodyStyle = AppTypography.serif(
+      size: 18,
+      height: 1.62,
+      color: _scriptureInk,
     );
-    final verseStyle = GoogleFonts.plusJakartaSans(
-      fontSize: 11,
-      height: 1.8,
-      fontWeight: FontWeight.w700,
-      color: AppColors.primary,
+    final verseStyle = AppTypography.ui(
+      size: 12,
+      height: 1.62,
+      weight: FontWeight.w600,
+      color: _verseAccent,
     );
 
     final children = <Widget>[];
     for (final block in blocks) {
       if (block.isHeading) {
         children.add(Padding(
-          padding: const EdgeInsets.only(
-            top: AppSpacing.lg, bottom: AppSpacing.sm,
-          ),
+          padding: const EdgeInsets.only(top: 20, bottom: 8),
           child: Text(
             block.segments.map((s) => s.text).join(' '),
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.onSurface,
-            ),
+            style: AppTypography.display(size: 17, weight: FontWeight.w700)
+                .copyWith(color: AppColors.textPrimary),
           ),
         ));
         continue;
       }
       if (block.isSuperscription) {
         children.add(Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             block.segments.map((s) => s.text).join(' '),
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontStyle: FontStyle.italic,
-              color: AppColors.onSurfaceVariant,
-            ),
+            style: AppTypography.serif(size: 15, italic: true)
+                .copyWith(color: AppColors.textMutedLight),
           ),
         ));
         continue;
@@ -343,7 +384,13 @@ class _PassageBody extends StatelessWidget {
       final spans = <InlineSpan>[];
       for (final seg in block.segments) {
         if (seg.verse != null) {
-          spans.add(TextSpan(text: '${seg.verse} ', style: verseStyle));
+          spans.add(WidgetSpan(
+            alignment: PlaceholderAlignment.top,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Text('${seg.verse}', style: verseStyle),
+            ),
+          ));
         }
         if (seg.text.isNotEmpty) {
           spans.add(TextSpan(text: '${seg.text} '));
@@ -352,7 +399,7 @@ class _PassageBody extends StatelessWidget {
       children.add(Padding(
         padding: EdgeInsets.only(
           left: block.poetryIndent * 18.0,
-          bottom: block.styleClass.startsWith('q') ? 0 : AppSpacing.md,
+          bottom: block.styleClass.startsWith('q') ? 0 : 14,
         ),
         child: Text.rich(TextSpan(style: bodyStyle, children: spans)),
       ));
@@ -361,6 +408,154 @@ class _PassageBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
+    );
+  }
+}
+
+/// Calm serif daily-prayer card shown beneath the passage.
+class _DailyPrayer extends StatelessWidget {
+  const _DailyPrayer({required this.prayer, required this.reference});
+
+  final String prayer;
+  final String reference;
+
+  @override
+  Widget build(BuildContext context) {
+    if (prayer.trim().isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.self_improvement_rounded,
+                  color: AppColors.hqStroke, size: 16),
+              const SizedBox(width: 7),
+              Text(
+                'DAILY PRAYER',
+                style: AppTypography.ui(
+                  size: 11,
+                  weight: FontWeight.w700,
+                  letterSpacing: 11 * 0.09,
+                  color: AppColors.hqStroke,
+                ),
+              ),
+            ],
+          ),
+          if (reference.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Inspired by $reference',
+              style: AppTypography.ui(size: 12.5, color: AppColors.textMutedLight),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Text(
+            prayer,
+            style: AppTypography.serif(
+              size: 17,
+              italic: true,
+              height: 1.6,
+              color: _scriptureInk,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom actions — gold Listen (hooks into the player) + Mark-as-read.
+class _ReadingActions extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Listen (gold primary) → opens the existing full-screen player.
+        Expanded(
+          child: GestureDetector(
+            onTap: () => context.push('/player'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.secondary,
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.play_arrow_rounded,
+                      color: AppColors.onSecondary, size: 19),
+                  const SizedBox(width: 7),
+                  Text(
+                    'Listen',
+                    style: AppTypography.ui(
+                      size: 14.5,
+                      weight: FontWeight.w700,
+                      color: AppColors.onSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 11),
+        // Mark as read (outlined secondary).
+        GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Day ${_readingPlanDay()} marked as read \u2705',
+                    style: AppTypography.ui(
+                      size: 13.5,
+                      weight: FontWeight.w600,
+                      color: AppColors.onSecondary,
+                    ),
+                  ),
+                  backgroundColor: AppColors.secondary,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.cardWhite,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(color: AppColors.dividerLight, width: 1),
+              boxShadow: AppShadows.card,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_rounded,
+                    color: AppColors.primary, size: 18),
+                const SizedBox(width: 7),
+                Text(
+                  'Mark read',
+                  style: AppTypography.ui(
+                    size: 14.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -378,20 +573,19 @@ class _ErrorView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.menu_book_rounded,
-              color: AppColors.textMuted, size: 40),
-          const SizedBox(height: AppSpacing.md),
+              color: AppColors.textMutedLight, size: 40),
+          const SizedBox(height: 14),
           Text(
             message,
-            style: GoogleFonts.plusJakartaSans(
-              color: AppColors.onSurfaceVariant, fontSize: 14,
-            ),
+            style: AppTypography.bodySm.copyWith(color: AppColors.textMutedLight),
           ),
           TextButton(
             onPressed: onRetry,
             child: Text(
               'Retry',
-              style: GoogleFonts.plusJakartaSans(
-                color: AppColors.secondary, fontWeight: FontWeight.w600,
+              style: AppTypography.ui(
+                weight: FontWeight.w600,
+                color: AppColors.primary,
               ),
             ),
           ),

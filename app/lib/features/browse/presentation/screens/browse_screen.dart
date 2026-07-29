@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/app_radius.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
-import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 /// Discover / Browse: search the full library plus a grid of topic tiles.
 /// Reached from the Home search icon; the dashboard tab bar stays visible.
+///
+/// Dark "library" aesthetic — matches the Messages tab (ink bg, dark search
+/// field, and the shared [SermonListItem] row for results).
 class BrowseScreen extends ConsumerStatefulWidget {
   const BrowseScreen({super.key});
 
@@ -21,6 +27,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   final _controller = TextEditingController();
   String _query = '';
 
+  /// Brand gradients for topic tiles — purple/magenta lead, warm supporting.
   static const _tileGradients = <List<Color>>[
     [Color(0xFF6D4AFF), Color(0xFF9F7AEA)],
     [Color(0xFF8E1A57), Color(0xFFD43F8D)],
@@ -44,6 +51,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     return all.where((s) {
       return s.title.toLowerCase().contains(q) ||
           s.speaker.toLowerCase().contains(q) ||
+          (s.series ?? '').toLowerCase().contains(q) ||
           (s.category ?? '').toLowerCase().contains(q);
     }).toList();
   }
@@ -61,8 +69,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     final results = _search(allSermons);
     final searching = _query.trim().isNotEmpty;
 
+    final currentSermon = ref.watch(currentSermonProvider);
+    final playing = ref.watch(playerStateProvider).valueOrNull?.playing ?? false;
+
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: AppColors.ink,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -77,16 +88,20 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                     const SizedBox(height: 18),
                     Text(
                       'Browse',
-                      style: AppTypography.displayLg.copyWith(
-                        fontSize: 30,
-                        letterSpacing: -0.6,
+                      style: AppTypography.display(
+                        size: 30,
+                        weight: FontWeight.w700,
                         color: AppColors.heading,
-                      ),
+                      ).copyWith(letterSpacing: -0.6),
                     ),
                     const SizedBox(height: 16),
                     _SearchField(
                       controller: _controller,
                       onChanged: (v) => setState(() => _query = v),
+                      onCleared: () {
+                        _controller.clear();
+                        setState(() => _query = '');
+                      },
                     ),
                     const SizedBox(height: 22),
                   ],
@@ -95,17 +110,21 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
             ),
 
             if (searching)
-              _ResultsSliver(results: results)
+              _ResultsSliver(
+                results: results,
+                currentSermonId: currentSermon?.id,
+                playing: playing,
+              )
             else ...[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
                   child: Text(
                     'Browse all',
-                    style: AppTypography.titleMd.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.heading,
+                    style: AppTypography.ui(
+                      size: 16,
+                      weight: FontWeight.w800,
+                      color: AppColors.darkMuted3,
                     ),
                   ),
                 ),
@@ -149,16 +168,15 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Image.asset('assets/figma/dove_logo.png', height: 22,
-            color: Colors.white),
+        Image.asset(AppAssets.doveWhite, height: 22),
         const SizedBox(width: 8),
         Text(
           'DISCOVER',
-          style: AppTypography.labelMd.copyWith(
-            fontSize: 12,
+          style: AppTypography.ui(
+            size: 12,
+            weight: FontWeight.w700,
             letterSpacing: 2.4,
-            fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: AppColors.darkMuted2,
           ),
         ),
         const Spacer(),
@@ -172,7 +190,7 @@ class _TopBar extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.06),
             ),
             child: const Icon(Icons.home_outlined,
-                color: Color(0xFFCFC8D4), size: 20),
+                color: AppColors.darkMuted, size: 20),
           ),
         ),
       ],
@@ -181,49 +199,58 @@ class _TopBar extends StatelessWidget {
 }
 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller, required this.onChanged});
+  const _SearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onCleared,
+  });
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
+  final VoidCallback onCleared;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      style: AppTypography.bodySm.copyWith(
-        fontSize: 14,
-        color: AppColors.onSurface,
-      ),
-      cursorColor: AppColors.secondary,
-      decoration: InputDecoration(
-        isDense: true,
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
-        hintText: 'Artists, messages, or topics',
-        hintStyle: AppTypography.bodySm.copyWith(
-          fontSize: 14,
-          color: AppColors.textMuted,
-        ),
-        prefixIcon: const Icon(Icons.search_rounded,
-            color: AppColors.textMuted, size: 20),
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-              color: AppColors.secondary.withValues(alpha: 0.5)),
-        ),
-      ),
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        final hasText = value.text.isNotEmpty;
+        return TextField(
+          controller: controller,
+          onChanged: onChanged,
+          style: AppTypography.ui(size: 14, color: AppColors.onSurface),
+          cursorColor: AppColors.gold,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: AppColors.darkSurface,
+            hintText: 'Artists, messages, or topics',
+            hintStyle: AppTypography.ui(size: 14, color: AppColors.darkMuted),
+            prefixIcon: const Icon(Icons.search_rounded,
+                color: AppColors.darkMuted, size: 20),
+            suffixIcon: hasText
+                ? GestureDetector(
+                    onTap: onCleared,
+                    child: const Icon(Icons.close_rounded,
+                        color: AppColors.darkMuted, size: 18),
+                  )
+                : null,
+            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.input),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.input),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.input),
+              borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -246,7 +273,7 @@ class _CategoryTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -257,11 +284,11 @@ class _CategoryTile extends StatelessWidget {
           children: [
             Text(
               label,
-              style: AppTypography.titleMd.copyWith(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+              style: AppTypography.ui(
+                size: 16,
+                weight: FontWeight.w800,
                 height: 1.15,
+                color: Colors.white,
               ),
             ),
             Positioned(
@@ -296,9 +323,15 @@ class _CategoryTile extends StatelessWidget {
 }
 
 class _ResultsSliver extends ConsumerWidget {
-  const _ResultsSliver({required this.results});
+  const _ResultsSliver({
+    required this.results,
+    required this.currentSermonId,
+    required this.playing,
+  });
 
   final List<Sermon> results;
+  final String? currentSermonId;
+  final bool playing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -309,71 +342,33 @@ class _ResultsSliver extends ConsumerWidget {
           child: Center(
             child: Text(
               'No messages match your search.',
-              style: AppTypography.bodySm.copyWith(
-                color: AppColors.textMuted,
-              ),
+              style: AppTypography.ui(size: 14, color: AppColors.darkMuted),
             ),
           ),
         ),
       );
     }
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: SliverList.separated(
-        itemCount: results.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) {
-          final s = results[i];
-          return GestureDetector(
-            onTap: () => ref.read(audioPlayerServiceProvider).play(s),
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 52,
-                  height: 52,
-                  child: ArtworkImage(
-                    url: s.artworkUrl,
-                    gradientIndex: s.artworkColor ?? i,
-                    radius: 11,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        s.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodySm.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        s.category != null
-                            ? '${s.speaker}  \u00b7  ${s.category}'
-                            : s.speaker,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodySm.copyWith(
-                          fontSize: 12.5,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    return SliverList.builder(
+      itemCount: results.length,
+      itemBuilder: (context, i) {
+        final s = results[i];
+        final dateLabel = s.publishedAt != null
+            ? DateFormat('MMM yyyy').format(s.publishedAt!)
+            : '';
+        return SermonListItem(
+          key: ValueKey(s.id),
+          title: s.title,
+          speaker: s.speaker,
+          category: s.category ?? s.series,
+          durationLabel: s.formattedDuration,
+          dateLabel: dateLabel,
+          artworkColor: s.artworkColor,
+          artworkUrl: s.artworkUrl,
+          listIndex: i,
+          isPlaying: currentSermonId == s.id && playing,
+          onTap: () => ref.read(audioPlayerServiceProvider).play(s),
+        );
+      },
     );
   }
 }
