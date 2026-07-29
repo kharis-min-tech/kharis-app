@@ -55,6 +55,10 @@ jobs:
         working-directory: storybook
         run: pnpm install
 
+      - name: Install Playwright browser
+        working-directory: storybook
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Run Storybook tests
         working-directory: storybook
         run: pnpm test
