@@ -37,22 +37,31 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
 
   @override
   Future<List<Sermon>> getSermons() async {
+    // Fetch the first N pages in parallel (~one round-trip) instead of
+    // serially, so the library is ready quickly.
+    final pages = await Future.wait([
+      for (var page = 1; page <= _maxPages; page++) _fetchPage(page),
+    ]);
     final out = <Sermon>[];
-    for (var page = 1; page <= _maxPages; page++) {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        'sermons/',
-        queryParameters: {'page': page, 'page_size': _pageSize},
-      );
-      final data = resp.data;
-      if (data == null) break;
-      final results = (data['results'] as List?) ?? const [];
+    for (final results in pages) {
       for (final r in results) {
         final s = _mapSermon(r as Map<String, dynamic>);
         if (s != null) out.add(s);
       }
-      if (data['next'] == null) break;
     }
     return out;
+  }
+
+  Future<List<dynamic>> _fetchPage(int page) async {
+    try {
+      final resp = await _dio.get<Map<String, dynamic>>(
+        'sermons/',
+        queryParameters: {'page': page, 'page_size': _pageSize},
+      );
+      return (resp.data?['results'] as List?) ?? const [];
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Offline fallback: the bundled archive, never the network.
@@ -106,11 +115,11 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
     return 'https://${url.replaceFirst(RegExp(r'^/+'), '')}';
   }
 
-  /// Bumps the CDN thumbnail from `?width=256` to a hero-friendly `?width=1024`.
+  /// Bumps the CDN thumbnail from `?width=256` to a sharper-but-light `512`.
   static String? _biggerImage(String? url) {
     if (url == null || url.isEmpty) return null;
     return url.contains('width=')
-        ? url.replaceAll(RegExp(r'width=\d+'), 'width=1024')
+        ? url.replaceAll(RegExp(r'width=\d+'), 'width=512')
         : url;
   }
 

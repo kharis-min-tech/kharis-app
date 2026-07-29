@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
 
 /// Player scrubber — dark design-handoff (v3).
 ///
-/// Renders the `wave-dark` waveform image: the played portion is tinted gold
-/// while the remaining portion stays muted lavender. Tap or drag anywhere on
-/// the wave to seek. Time labels sit below — elapsed on the left, total
-/// duration on the right — both in a muted dark tone.
+/// Paints a row of uniform, evenly-spaced bars. The played portion (up to the
+/// exact `position / duration` fraction) is gold; the rest is muted, with a
+/// full-height gold cursor marking the current position. Tap or drag anywhere
+/// to seek. Time labels sit below — elapsed left, total right.
 class SeekBar extends StatefulWidget {
   const SeekBar({
     super.key,
@@ -29,7 +28,7 @@ class SeekBar extends StatefulWidget {
 class _SeekBarState extends State<SeekBar> {
   double? _dragFraction;
 
-  // Fraction (0.0–1.0) to display, accounting for a live drag.
+  /// Fraction (0.0–1.0) to display, accounting for a live drag.
   double get _fraction {
     if (_dragFraction != null) return _dragFraction!.clamp(0.0, 1.0);
     final total = widget.duration.inMilliseconds;
@@ -40,8 +39,7 @@ class _SeekBarState extends State<SeekBar> {
   Duration get _displayPosition {
     if (_dragFraction != null) {
       return Duration(
-        milliseconds:
-            (_dragFraction! * widget.duration.inMilliseconds).round(),
+        milliseconds: (_dragFraction! * widget.duration.inMilliseconds).round(),
       );
     }
     return widget.position;
@@ -70,19 +68,17 @@ class _SeekBarState extends State<SeekBar> {
       color: AppColors.darkMuted,
     );
 
-    const waveH = 46.0;
+    const waveH = 40.0;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         LayoutBuilder(builder: (_, constraints) {
           final trackWidth = constraints.maxWidth;
-          final fillWidth = (_fraction * trackWidth).clamp(0.0, trackWidth);
-
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTapDown: (d) =>
-                _seekToFraction((d.localPosition.dx / trackWidth).clamp(0.0, 1.0)),
+            onTapDown: (d) => _seekToFraction(
+                (d.localPosition.dx / trackWidth).clamp(0.0, 1.0)),
             onHorizontalDragUpdate: (d) {
               setState(() {
                 _dragFraction =
@@ -97,27 +93,12 @@ class _SeekBarState extends State<SeekBar> {
             child: SizedBox(
               height: waveH,
               width: trackWidth,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Unplayed waveform (muted).
-                  Image.asset(
-                    AppAssets.waveDark,
-                    fit: BoxFit.cover,
-                    color: AppColors.darkMuted.withValues(alpha: 0.45),
-                    colorBlendMode: BlendMode.srcIn,
-                  ),
-                  // Played waveform (gold), clipped to progress.
-                  ClipRect(
-                    clipper: _WidthClipper(fillWidth),
-                    child: Image.asset(
-                      AppAssets.waveDark,
-                      fit: BoxFit.cover,
-                      color: AppColors.gold,
-                      colorBlendMode: BlendMode.srcIn,
-                    ),
-                  ),
-                ],
+              child: CustomPaint(
+                painter: _WaveformPainter(
+                  fraction: _fraction,
+                  played: AppColors.gold,
+                  unplayed: AppColors.darkMuted.withValues(alpha: 0.35),
+                ),
               ),
             ),
           );
@@ -135,14 +116,59 @@ class _SeekBarState extends State<SeekBar> {
   }
 }
 
-class _WidthClipper extends CustomClipper<Rect> {
-  const _WidthClipper(this.width);
+/// Uniform bar scrubber: equal-height rounded bars split at [fraction], with a
+/// full-height gold cursor at the play head.
+class _WaveformPainter extends CustomPainter {
+  const _WaveformPainter({
+    required this.fraction,
+    required this.played,
+    required this.unplayed,
+  });
 
-  final double width;
+  final double fraction;
+  final Color played;
+  final Color unplayed;
 
   @override
-  Rect getClip(Size size) => Rect.fromLTWH(0, 0, width, size.height);
+  void paint(Canvas canvas, Size size) {
+    const barW = 3.0;
+    const gap = 3.0;
+    final step = barW + gap;
+    final count = (size.width / step).floor().clamp(1, 2000);
+    final splitX = (fraction * size.width).clamp(0.0, size.width);
+    final cy = size.height / 2;
+    final barH = size.height * 0.55;
+
+    final playedPaint = Paint()
+      ..color = played
+      ..strokeWidth = barW
+      ..strokeCap = StrokeCap.round;
+    final unplayedPaint = Paint()
+      ..color = unplayed
+      ..strokeWidth = barW
+      ..strokeCap = StrokeCap.round;
+
+    for (var i = 0; i < count; i++) {
+      final x = i * step + barW / 2;
+      canvas.drawLine(
+        Offset(x, cy - barH / 2),
+        Offset(x, cy + barH / 2),
+        x <= splitX ? playedPaint : unplayedPaint,
+      );
+    }
+
+    // Full-height play head.
+    final cursorX = splitX.clamp(barW / 2, size.width - barW / 2);
+    canvas.drawLine(
+      Offset(cursorX, cy - size.height / 2),
+      Offset(cursorX, cy + size.height / 2),
+      playedPaint,
+    );
+  }
 
   @override
-  bool shouldReclip(_WidthClipper oldClipper) => oldClipper.width != width;
+  bool shouldRepaint(_WaveformPainter old) =>
+      old.fraction != fraction ||
+      old.played != played ||
+      old.unplayed != unplayed;
 }
