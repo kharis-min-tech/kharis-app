@@ -7,6 +7,7 @@ import '../../features/onboarding/data/auth_repository.dart';
 import '../../features/onboarding/data/firebase_auth_repository.dart';
 import '../models/user.dart';
 import 'onboarding_provider.dart';
+import 'cache_provider.dart';
 
 // ── Repository providers ──────────────────────────────────────────────────────
 
@@ -96,7 +97,12 @@ class RouterNotifier extends ChangeNotifier {
     if (state.matchedLocation == '/') {
       final completed = _ref.read(onboardingCompletedProvider);
       final authed = _ref.read(isAuthenticatedProvider);
-      if (completed || authed) return '/home';
+      if (completed || authed) {
+        const tabs = ['/home', '/messages', '/giving', '/calendar', '/more'];
+        final i =
+            _ref.read(cacheServiceProvider).getPreference<int>('last_tab', 0);
+        return tabs[i >= 0 && i < tabs.length ? i : 0];
+      }
     }
     return null;
   }

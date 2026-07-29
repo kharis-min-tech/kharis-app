@@ -6,6 +6,8 @@ import 'package:kharis_app/core/theme/app_colors.dart';
 import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 /// Bottom-nav shell wrapping all 5 dashboard tabs.
 ///
@@ -23,11 +25,35 @@ class DashboardShell extends ConsumerStatefulWidget {
 }
 
 class _DashboardShellState extends ConsumerState<DashboardShell> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreMiniPlayer());
+  }
+
+  /// Restores the minimised player with the last-played sermon (paused at its
+  /// saved position) so the user picks up where they left off.
+  Future<void> _restoreMiniPlayer() async {
+    final svc = ref.read(audioPlayerServiceProvider);
+    if (svc.currentSermon != null) return;
+    final recent = ref.read(cacheServiceProvider).getRecentlyPlayed();
+    if (recent.isEmpty) return;
+    final lastId = recent.first;
+    try {
+      final sermons = await ref.read(sermonsProvider.future);
+      final match = sermons.where((s) => s.id == lastId);
+      if (match.isNotEmpty && mounted && svc.currentSermon == null) {
+        await svc.loadPaused(match.first);
+      }
+    } catch (_) {}
+  }
+
   void _onTap(int index) {
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == widget.navigationShell.currentIndex,
     );
+    ref.read(cacheServiceProvider).cachePreference('last_tab', index);
   }
 
   @override

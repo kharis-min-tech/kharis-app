@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/services/app_router.dart';
 import 'core/services/cache_service.dart';
@@ -18,7 +19,8 @@ Future<void> main() async {
   // Catch all errors in release mode
   runZonedGuarded(
     () async {
-      WidgetsFlutterBinding.ensureInitialized();
+      final binding = WidgetsFlutterBinding.ensureInitialized();
+      FlutterNativeSplash.preserve(widgetsBinding: binding);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       FlutterError.onError = (details) {
         if (kDebugMode) {
@@ -26,9 +28,15 @@ Future<void> main() async {
         }
       };
 
-      final prefs = await SharedPreferences.getInstance();
-      final cacheService = await CacheService.init();
-      await AppStartUp().setUp();
+      // Run independent startup work concurrently so first paint isn't blocked
+      // by prefs + Hive + Firebase in series.
+      final results = await Future.wait([
+        SharedPreferences.getInstance(),
+        CacheService.init(),
+        AppStartUp().setUp(),
+      ]);
+      final prefs = results[0] as SharedPreferences;
+      final cacheService = results[1] as CacheService;
       runApp(
         ProviderScope(
           overrides: [
@@ -38,6 +46,10 @@ Future<void> main() async {
           child: const KharisApp(),
         ),
       );
+      // Keep the branded splash up until the first themed frame paints, so
+      // there's no white gap between the native splash and the app content.
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => FlutterNativeSplash.remove());
     },
     (error, stack) {
       if (kDebugMode) {

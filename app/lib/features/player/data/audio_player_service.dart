@@ -123,6 +123,24 @@ class AudioPlayerService {
     await _player.play();
   }
 
+  /// Loads [sermon] paused at its saved resume position, without starting
+  /// playback. Used on app launch to restore the minimised player where the
+  /// listener left off.
+  Future<void> loadPaused(Sermon sermon) async {
+    _currentSermon = sermon;
+    await _player.setUrl(
+      sermon.audioUrl,
+      headers: const {'User-Agent': kBrowserUserAgent},
+    );
+    final savedMs = _cache.getPlaybackPosition(sermon.id);
+    final duration = _player.duration;
+    if (savedMs > 10000 &&
+        duration != null &&
+        savedMs < duration.inMilliseconds - 15000) {
+      await _player.seek(Duration(milliseconds: savedMs));
+    }
+  }
+
   /// Pauses playback; position is saved via the [playerStateStream] listener.
   Future<void> pause() => _player.pause();
 
