@@ -114,7 +114,7 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       'description': description,
       'category': category ?? sermonCategory(title),
       'videoId': videoId,
-      'source': source ?? 'soundcloud',
+      'source': source ?? 'audio',
       'isFeatured': isFeatured,
       'createdAt': FieldValue.serverTimestamp(),
     });

@@ -9,15 +9,15 @@ import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const _sourceOptions = ['soundcloud', 'youtube'];
+const _sourceOptions = ['audio', 'youtube'];
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 /// Admin screen: list + CRUD for Firestore-managed sermons.
 ///
 /// Only sermons stored in the `sermons` Firestore collection are editable
-/// here. The RSS/catalogue sermons are read-only (they arrive from
-/// SoundCloud automatically). Admins can add new sermon entries, edit
+/// here. The archive/API sermons are read-only (they arrive from the Kharis
+/// sermon API automatically). Admins can add new sermon entries, edit
 /// metadata, feature/unfeature, and delete.
 class AdminSermonsScreen extends ConsumerWidget {
   const AdminSermonsScreen({super.key});
@@ -565,7 +565,7 @@ class _SermonFormSheetState extends State<_SermonFormSheet> {
               TextFormField(
                 controller: _audioUrlCtrl,
                 style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(hint: 'https://...mp3 or SoundCloud stream'),
+                decoration: _inputDeco(hint: 'https://...mp3'),
                 keyboardType: TextInputType.url,
                 textInputAction: TextInputAction.next,
               ),

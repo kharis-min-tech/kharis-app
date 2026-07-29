@@ -46,7 +46,7 @@ class Sermon {
   /// YouTube video ID (for videos synced from YouTube)
   final String? videoId;
 
-  /// Content source: 'youtube', 'soundcloud', etc.
+  /// Content source: 'kharis-api', 'youtube', 'archive', etc.
   final String? source;
 
   /// Whether this sermon is featured on the Messages home.
