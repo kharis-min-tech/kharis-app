@@ -229,7 +229,7 @@ class _CollectionArt extends StatelessWidget {
           Image.asset(
             collection.asset!,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
           ),
         // Bottom scrim for legibility of the play badge.
         const DecoratedBox(

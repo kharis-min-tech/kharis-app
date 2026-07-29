@@ -108,7 +108,7 @@ class _SpeedPill extends StatelessWidget {
     final s = speed == speed.roundToDouble()
         ? speed.toStringAsFixed(0)
         : speed.toString();
-    return '${s}×';
+    return '$s×';
   }
 
   @override
