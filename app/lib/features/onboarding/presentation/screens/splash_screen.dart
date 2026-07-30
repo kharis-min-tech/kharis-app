@@ -38,21 +38,24 @@ class _SplashScreenState extends State<SplashScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Full-bleed worship photo.
-          Image.asset(AppAssets.splashWorship, fit: BoxFit.cover),
+          // Full-bleed worship photo (natural colours).
+          Image.asset(AppAssets.splashPink, fit: BoxFit.cover),
 
-          // Purple → magenta gradient wash for legibility + brand.
+          // Purple wash at the top (behind the dove + wordmark) that fades into
+          // the natural photo below; a soft dark scrim anchors the CTA text.
           DecoratedBox(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xE64A2AA8), // purple, ~90%
-                  Color(0xB35D3FD3), // purple, ~70%
-                  Color(0xE67A1F47), // magenta, ~90%
+                  Color(0xE64A2AA8), // deep purple, top
+                  Color(0x995D3FD3), // purple ~60%
+                  Color(0x1A5D3FD3), // purple ~10%
+                  Color(0x00000000), // transparent — natural photo
+                  Color(0x8C0B0A10), // soft ink ~55% for CTA/footer legibility
                 ],
-                stops: [0.0, 0.45, 1.0],
+                stops: [0.0, 0.20, 0.36, 0.55, 1.0],
               ),
             ),
           ),

@@ -618,11 +618,6 @@ class _FeaturedCard extends StatelessWidget {
         curve: Curves.easeOut,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradColors,
-          ),
           boxShadow: isActive
               ? [
                   BoxShadow(
@@ -636,6 +631,12 @@ class _FeaturedCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // Sermon artwork thumbnail as the card background.
+            ArtworkImage(
+              url: sermon.artworkUrl,
+              gradientIndex: sermon.artworkColor ?? 0,
+              radius: AppRadius.lg,
+            ),
             // Bottom scrim for text legibility
             Positioned(
               bottom: 0,
