@@ -5,6 +5,7 @@ import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
 import '../../features/home/data/daily_content_repository.dart';
 import '../../features/home/data/news_repository.dart';
+import '../../features/home/data/kharis_api_announcement_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
 import '../../features/messages/data/kharis_api_sermon_repository.dart';
@@ -234,10 +235,14 @@ final newsRepositoryProvider = Provider<NewsRepository>((ref) {
   return NewsRepository();
 });
 
-/// News & announcements, realtime.
-final newsProvider = StreamProvider<List<NewsItem>>((ref) {
-  final repo = ref.watch(newsRepositoryProvider);
-  return repo.watchNews();
+/// News & announcements — API-first (getAnnouncements) with Firestore fallback.
+final announcementApiRepositoryProvider =
+    Provider<KharisApiAnnouncementRepository>((ref) {
+  return KharisApiAnnouncementRepository();
+});
+
+final newsProvider = FutureProvider<List<NewsItem>>((ref) {
+  return ref.watch(announcementApiRepositoryProvider).getAnnouncements();
 });
 
 // ── Live status ───────────────────────────────────────────────────────────────

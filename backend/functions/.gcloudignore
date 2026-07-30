@@ -1,0 +1,11 @@
+# Uploaded to Cloud Build for gcloud gen2 deploys.
+# Cloud Build runs `npm run build` (tsc) from src/, so keep src + tsconfig.
+node_modules/
+lib/
+.env
+.env.local
+.env.*.local
+.firebase/
+firebase-debug.log
+*.log
+.git/

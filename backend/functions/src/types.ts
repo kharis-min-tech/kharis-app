@@ -48,6 +48,8 @@ export interface NewsDoc {
   id?: string;
   title: string;
   body: string;
+  type?: string;
+  branch?: string | null;
   imageUrl?: string;
   publishedAt: Timestamp;
   expiresAt?: Timestamp;
