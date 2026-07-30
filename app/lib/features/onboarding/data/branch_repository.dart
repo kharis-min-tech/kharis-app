@@ -63,7 +63,10 @@ class BranchRepository {
           .snapshots()
           .map((snap) {
         final list = snap.docs.map((d) => _map(d.id, d.data())).toList();
-        return list.isEmpty ? seedBranches : list;
+        // Show the full bundled network until the live data is migrated
+        // (detected by the presence of any KP2 branch), so every branch and
+        // KP2 location is always visible.
+        return list.any((b) => b.group == 'KP2') ? list : seedBranches;
       });
     } catch (_) {
       yield seedBranches;

@@ -76,6 +76,11 @@ async function main() {
     written++;
     console.log(`  ✓ ${id} (${rest.group})`);
   }
+  // Remove legacy placeholder docs replaced/dropped by the real network.
+  for (const id of ['london', 'medway']) {
+    await db.collection('branches').doc(id).delete();
+    console.log(`  ✗ removed legacy ${id}`);
+  }
   console.log(`Done — ${written} branches upserted.`);
 }
 
