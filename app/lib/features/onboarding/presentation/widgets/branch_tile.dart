@@ -112,12 +112,18 @@ class _Thumb extends StatelessWidget {
         height: 48,
         child: (imageUrl == null || imageUrl!.isEmpty)
             ? gradient
-            : CachedNetworkImage(
-                imageUrl: imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => gradient,
-                errorWidget: (_, _, _) => gradient,
-              ),
+            : imageUrl!.startsWith('assets/')
+                ? Image.asset(
+                    imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => gradient,
+                  )
+                : CachedNetworkImage(
+                    imageUrl: imageUrl!,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => gradient,
+                    errorWidget: (_, _, _) => gradient,
+                  ),
       ),
     );
   }

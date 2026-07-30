@@ -707,6 +707,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
           address: address,
           meetingDays: meetingDays,
           meetingTime: meetingTime,
+          group: widget.branch!.group,
         );
         widget.onSuccess('Branch updated.');
       }

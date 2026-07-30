@@ -9,6 +9,8 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/core/services/notification_service.dart';
+import 'package:kharis_app/shared/providers/notification_provider.dart';
 
 /// Branch selection (design-handoff v3) — light screen. Search across cities,
 /// then tap a branch to set it as home and enter the app.
@@ -78,32 +80,19 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
                     controller: _searchCtrl,
                     onChanged: (v) => setState(() => _query = v),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'BRANCHES',
-                    style: AppTypography.labelMd
-                        .copyWith(color: AppColors.textMutedLight),
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
             Expanded(
-              child: ListView.separated(
+              child: ListView(
                 padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
-                itemCount: filtered.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, i) {
-                  final b = filtered[i];
-                  return BranchTile(
-                    name: b.name,
-                    region: _region(b.subtitle),
-                    gradientColors: b.gradient,
-                    imageUrl: b.imageUrl,
-                    isHq: _isHq(b.subtitle),
-                    onTap: () => _confirm(context, ref, b.name),
-                  );
-                },
+                children: [
+                  ..._section(context, ref, 'BRANCHES',
+                      filtered.where((b) => b.group != 'KP2')),
+                  ..._section(context, ref, 'KHARIS PHASE TWO',
+                      filtered.where((b) => b.group == 'KP2')),
+                ],
               ),
             ),
           ],
@@ -115,21 +104,66 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
   /// Persists the chosen branch to the signed-in profile (best effort), then
   /// continues into the app.
   Future<void> _confirm(
-      BuildContext context, WidgetRef ref, String branch) async {
+      BuildContext context, WidgetRef ref, Branch branch) async {
     final user = ref.read(currentUserProvider).valueOrNull;
     final repo = ref.read(firebaseAuthRepositoryProvider);
     if (user != null && user.email.isNotEmpty) {
       try {
-        await repo.updateProfile(branch: branch);
+        await repo.updateProfile(branch: branch.name);
       } catch (_) {}
     }
     final onboardingRepo = ref.read(onboardingRepositoryProvider);
+    // Switch this device's branch FCM topic so it gets branch-scoped pushes.
+    final notifications = ref.read(notificationServiceProvider);
+    final previous = onboardingRepo.selectedBranch;
+    if (previous != null && previous.isNotEmpty && previous != branch.name) {
+      await notifications
+          .unsubscribeFromTopic(KharisTopics.branch(_slug(previous)));
+    }
+    await notifications
+        .subscribeToTopic(KharisTopics.branch(_slug(branch.name)));
     await onboardingRepo.completeOnboarding(
       role: onboardingRepo.selectedRole ?? 'member',
-      branch: branch,
+      branch: branch.name,
     );
     if (context.mounted) context.go('/home');
   }
+
+  /// Section header + branch tiles; an empty group renders nothing.
+  List<Widget> _section(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    Iterable<Branch> branches,
+  ) {
+    final list = branches.toList();
+    if (list.isEmpty) return const [];
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 10),
+        child: Text(
+          label,
+          style:
+              AppTypography.labelMd.copyWith(color: AppColors.textMutedLight),
+        ),
+      ),
+      for (final b in list)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: BranchTile(
+            name: b.name.startsWith('KP2 ') ? b.name.substring(4) : b.name,
+            region: _region(b.subtitle),
+            gradientColors: b.gradient,
+            imageUrl: b.imageUrl,
+            isHq: _isHq(b.subtitle),
+            onTap: () => _confirm(context, ref, b),
+          ),
+        ),
+    ];
+  }
+
+  static String _slug(String s) =>
+      s.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
 }
 
 class _BackRow extends StatelessWidget {

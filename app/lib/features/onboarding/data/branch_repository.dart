@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:kharis_app/core/constants/app_assets.dart';
 
 /// A church branch / campus. Gradient colours and a landmark image are stored
 /// as plain strings in Firestore so admins can edit them, and parsed here.
@@ -16,6 +17,7 @@ class Branch {
     this.address,
     this.meetingDays,
     this.meetingTime,
+    this.group = 'Kharis',
   });
 
   final String id;
@@ -28,6 +30,7 @@ class Branch {
   final String? address;
   final String? meetingDays;
   final String? meetingTime;
+  final String group;
 
   List<Color> get gradient => [gradientStart, gradientEnd];
 
@@ -77,6 +80,7 @@ class BranchRepository {
     String? address,
     String? meetingDays,
     String? meetingTime,
+    String group = 'Kharis',
   }) {
     return _firestore.collection('branches').add(_data(
           name: name,
@@ -88,6 +92,7 @@ class BranchRepository {
           address: address,
           meetingDays: meetingDays,
           meetingTime: meetingTime,
+          group: group,
         ));
   }
 
@@ -102,6 +107,7 @@ class BranchRepository {
     String? address,
     String? meetingDays,
     String? meetingTime,
+    String group = 'Kharis',
   }) {
     return _firestore.collection('branches').doc(id).update(_data(
           name: name,
@@ -113,6 +119,7 @@ class BranchRepository {
           address: address,
           meetingDays: meetingDays,
           meetingTime: meetingTime,
+          group: group,
         ));
   }
 
@@ -129,6 +136,7 @@ class BranchRepository {
     String? address,
     String? meetingDays,
     String? meetingTime,
+    String group = 'Kharis',
   }) =>
       {
         'name': name,
@@ -140,6 +148,7 @@ class BranchRepository {
         'address': address,
         'meetingDays': meetingDays,
         'meetingTime': meetingTime,
+        'group': group,
       };
 
   Branch _map(String id, Map<String, dynamic> data) => Branch(
@@ -155,111 +164,123 @@ class BranchRepository {
         address: data['address'] as String?,
         meetingDays: data['meetingDays'] as String?,
         meetingTime: data['meetingTime'] as String?,
+        group: data['group'] as String? ?? 'Kharis',
       );
 
-  /// Built-in branches, used to seed Firestore and as an offline fallback.
-  /// Landmark images are open-licensed (Wikimedia Commons).
-  static const _thumb = 'https://upload.wikimedia.org/wikipedia/commons/thumb';
+  /// Built-in branches — the real Kharis network (kharis.org), used to seed
+  /// Firestore and as an offline fallback. Landmark photos are bundled under
+  /// `assets/design` and resolved via [AppAssets.city]; admins may override
+  /// with a hosted URL from the CMS.
+  static const _gA = Color(0xFF3B2A6B);
+  static const _gB = Color(0xFF7C3AED);
 
   static final List<Branch> seedBranches = [
+    // ── Kharis main branches ────────────────────────────────────────────────
     Branch(
-      id: 'london',
-      name: 'Kharis London',
+      id: 'london-hq',
+      name: 'London',
       subtitle: 'United Kingdom · Main Campus',
-      gradientStart: const Color(0xFF3B2A6B),
-      gradientEnd: const Color(0xFF7C3AED),
-      imageUrl:
-          '$_thumb/4/43/Elizabeth_Tower%2C_June_2022.jpg/330px-Elizabeth_Tower%2C_June_2022.jpg',
+      gradientStart: _gA,
+      gradientEnd: _gB,
+      imageUrl: AppAssets.city('london-hq'),
       order: 0,
-      address: 'London, United Kingdom',
+      address: 'Kensington Town Hall, Hornton St, London W8 7NX',
       meetingDays: 'Sundays',
       meetingTime: '10:00 AM',
     ),
+    Branch(id: 'birmingham', name: 'Birmingham', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('birmingham'), order: 1),
+    Branch(id: 'brighton', name: 'Brighton', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('brighton'), order: 2),
+    Branch(id: 'bristol', name: 'Bristol', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('bristol'), order: 3),
+    Branch(id: 'chatham', name: 'Chatham', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('chatham'), order: 4),
+    Branch(id: 'chelmsford', name: 'Chelmsford', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('chelmsford'), order: 5),
+    Branch(id: 'coventry', name: 'Coventry', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('coventry'), order: 6),
+    Branch(id: 'croydon', name: 'Croydon', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('croydon'), order: 7),
+    Branch(id: 'luton', name: 'Luton', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('luton'), order: 8),
+    Branch(id: 'manchester', name: 'Manchester', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('manchester'), order: 9),
+    Branch(id: 'northampton', name: 'Northampton', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('northampton'), order: 10),
+    Branch(id: 'nottingham', name: 'Nottingham', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('nottingham'), order: 11),
+    Branch(id: 'orpington', name: 'Orpington', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('orpington'), order: 12),
+    Branch(id: 'reading', name: 'Reading', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('reading'), order: 13),
+    Branch(id: 'accra', name: 'Accra', subtitle: 'Ghana', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('accra'), order: 14),
+    Branch(id: 'freetown', name: 'Freetown', subtitle: 'Sierra Leone', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('freetown'), order: 15),
+    // ── Kharis Phase Two (KP2) — young-adults revival ────────────────────────
     Branch(
-      id: 'manchester',
-      name: 'Kharis Manchester',
-      subtitle: 'United Kingdom · North Branch',
-      gradientStart: const Color(0xFF1F2937),
-      gradientEnd: const Color(0xFF4B5563),
-      imageUrl:
-          '$_thumb/7/7f/Manchester_Town_Hall_from_Lloyd_St.jpg/330px-Manchester_Town_Hall_from_Lloyd_St.jpg',
-      order: 1,
-      address: 'Manchester, United Kingdom',
+      id: 'kp2-london',
+      name: 'KP2 London',
+      subtitle: 'United Kingdom',
+      group: 'KP2',
+      gradientStart: _gA,
+      gradientEnd: _gB,
+      imageUrl: AppAssets.city('kp2-london'),
+      order: 20,
+      address: 'Kensington Town Hall, Hornton St, London W8 7NX',
       meetingDays: 'Sundays',
-      meetingTime: '10:30 AM',
+      meetingTime: '2:00 PM',
     ),
     Branch(
-      id: 'birmingham',
-      name: 'Kharis Birmingham',
-      subtitle: 'United Kingdom · Midlands',
-      gradientStart: const Color(0xFF5B1F4F),
-      gradientEnd: const Color(0xFFC0297F),
-      imageUrl:
-          '$_thumb/e/ec/Selfridges_Building%2C_Birmingham_%282012%29.jpg/330px-Selfridges_Building%2C_Birmingham_%282012%29.jpg',
-      order: 2,
-    ),
-    Branch(
-      id: 'reading',
-      name: 'Kharis Reading',
-      subtitle: 'United Kingdom · South East',
-      gradientStart: const Color(0xFF0E7490),
-      gradientEnd: const Color(0xFF22D3EE),
-      imageUrl:
-          '$_thumb/c/c4/The_Blade%2C_Abbey_Square%2C_Reading.jpg/330px-The_Blade%2C_Abbey_Square%2C_Reading.jpg',
-      order: 3,
-    ),
-    Branch(
-      id: 'chatham',
-      name: 'Kharis Chatham',
-      subtitle: 'United Kingdom · Kent',
-      gradientStart: const Color(0xFFC2410C),
-      gradientEnd: const Color(0xFFFB923C),
-      imageUrl:
-          '$_thumb/9/9c/The_Commissioner%27s_House%2C_Chatham_Historic_Dockyard_-_geograph.org.uk_-_3473286.jpg/330px-The_Commissioner%27s_House%2C_Chatham_Historic_Dockyard_-_geograph.org.uk_-_3473286.jpg',
-      order: 4,
-    ),
-    Branch(
-      id: 'croydon',
-      name: 'Kharis Croydon',
-      subtitle: 'United Kingdom · South London',
-      gradientStart: const Color(0xFF9F1239),
-      gradientEnd: const Color(0xFFFB7185),
-      imageUrl:
-          '$_thumb/0/0f/No.1_Croydon_%28NLA_Tower%29_November_2023.jpg/330px-No.1_Croydon_%28NLA_Tower%29_November_2023.jpg',
-      order: 5,
-    ),
-    Branch(
-      id: 'medway',
-      name: 'Kharis Medway',
-      subtitle: 'United Kingdom · Kent',
-      gradientStart: const Color(0xFF1D4ED8),
-      gradientEnd: const Color(0xFF60A5FA),
-      imageUrl:
-          '$_thumb/3/3c/Rochester_Castle_from_main_approach.jpg/330px-Rochester_Castle_from_main_approach.jpg',
-      order: 6,
-    ),
-    Branch(
-      id: 'accra',
-      name: 'Kharis Accra',
-      subtitle: 'Ghana · International Campus',
-      gradientStart: const Color(0xFF8A5A10),
-      gradientEnd: const Color(0xFFE9C349),
-      imageUrl:
-          '$_thumb/4/4a/Independence_Arch_-_Accra%2C_Ghana1.jpg/330px-Independence_Arch_-_Accra%2C_Ghana1.jpg',
-      order: 7,
-      address: 'Accra, Ghana',
+      id: 'kp2-romford',
+      name: 'KP2 Romford',
+      subtitle: 'United Kingdom',
+      group: 'KP2',
+      gradientStart: _gA,
+      gradientEnd: _gB,
+      imageUrl: AppAssets.city('kp2-romford'),
+      order: 21,
+      address: 'Marshalls Park Academy, Pettits Ln, Romford RM1 4EH',
       meetingDays: 'Sundays',
-      meetingTime: '9:00 AM',
+      meetingTime: '1:00 PM',
     ),
     Branch(
-      id: 'freetown',
-      name: 'Kharis Freetown',
-      subtitle: 'Sierra Leone · West Africa',
-      gradientStart: const Color(0xFF047857),
-      gradientEnd: const Color(0xFF34D399),
-      imageUrl:
-          '$_thumb/c/c3/St._George%27s_Cathedral_Freetown.jpg/330px-St._George%27s_Cathedral_Freetown.jpg',
-      order: 8,
+      id: 'kp2-peterborough',
+      name: 'KP2 Peterborough',
+      subtitle: 'United Kingdom',
+      group: 'KP2',
+      gradientStart: _gA,
+      gradientEnd: _gB,
+      imageUrl: AppAssets.city('kp2-peterborough'),
+      order: 22,
+      address: 'Thomas Deacon Academy, Queens Gardens, Peterborough PE1 2UW',
+      meetingDays: 'Sundays',
+      meetingTime: '2:00 PM',
+    ),
+    Branch(
+      id: 'kp2-birmingham',
+      name: 'KP2 Birmingham',
+      subtitle: 'United Kingdom',
+      group: 'KP2',
+      gradientStart: _gA,
+      gradientEnd: _gB,
+      imageUrl: AppAssets.city('birmingham'),
+      order: 23,
+      address: 'Erdington Methodist Church, Erdington, Birmingham B23 6TX',
+      meetingDays: 'Sundays',
+      meetingTime: '1:00 PM',
+    ),
+    Branch(
+      id: 'kp2-southampton',
+      name: 'KP2 Southampton',
+      subtitle: 'United Kingdom',
+      group: 'KP2',
+      gradientStart: _gA,
+      gradientEnd: _gB,
+      imageUrl: AppAssets.city('kp2-southampton'),
+      order: 24,
+      address: 'River Church, 131A Northam Road, Southampton SO14 0HQ',
+      meetingDays: 'Sundays',
+      meetingTime: '2:00 PM',
+    ),
+    Branch(
+      id: 'kp2-barking',
+      name: 'KP2 Barking',
+      subtitle: 'United Kingdom',
+      group: 'KP2',
+      gradientStart: _gA,
+      gradientEnd: _gB,
+      imageUrl: AppAssets.city('kp2-barking'),
+      order: 25,
+      address: 'Greatfields School, Net St, Barking IG11 7QG',
+      meetingDays: 'Sundays',
+      meetingTime: '12:00 PM',
     ),
   ];
 }
