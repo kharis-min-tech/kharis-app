@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 @immutable
@@ -43,6 +44,16 @@ class DailyContentRepository {
 
   final FirebaseFirestore _firestore;
 
+  static const String _apiUrl =
+      'https://us-central1-kharis-church.cloudfunctions.net/getDailyReading';
+
+  static final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
+
   /// Returns today's content (or the fallback if unavailable).
   Future<DailyContent> getTodaysContent() async {
     final dateKey = _dateKey(DateTime.now());
@@ -53,6 +64,11 @@ class DailyContentRepository {
   /// is never empty, then live snapshots as the document changes.
   Stream<DailyContent> watchTodaysContent() async* {
     final dateKey = _dateKey(DateTime.now());
+    // API-first: one-shot fetch from the Cloud Functions endpoint so content
+    // appears even when Firestore is cold/unreachable, then hand over to the
+    // realtime Firestore stream below.
+    final apiContent = await _fetchFromApi();
+    if (apiContent != null) yield apiContent;
     try {
       yield* _firestore
           .collection('dailyContent')
@@ -63,6 +79,21 @@ class DailyContentRepository {
               : _hardcodedContent);
     } catch (_) {
       yield _hardcodedContent;
+    }
+  }
+
+  /// One-shot fetch of today's reading from the `getDailyReading` API.
+  /// Returns `null` on any failure so callers fall straight through to
+  /// Firestore.
+  Future<DailyContent?> _fetchFromApi() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(_apiUrl);
+      final readings = (res.data?['readings'] as List?) ?? const [];
+      final first = readings.isNotEmpty ? readings.first : null;
+      if (first is! Map<String, dynamic> || first.isEmpty) return null;
+      return _mapData(first);
+    } catch (_) {
+      return null;
     }
   }
 

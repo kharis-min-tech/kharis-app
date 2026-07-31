@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, FieldValue, FieldPath } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { getMessaging } from 'firebase-admin/messaging';
 import { SermonDoc, NewsDoc } from './types';
@@ -200,6 +200,178 @@ export const pushPendingAnnouncements = onRequest(
       pushed,
       considered: pending.length,
       timestamp: Timestamp.now().toDate().toISOString(),
+    });
+  }
+);
+
+const EVENT_PAGE_SIZE = 50;
+const API_CACHE_CONTROL = 'public, max-age=300';
+
+/**
+ * HTTP: GET /getBranches
+ * Returns all branches (venues) ordered by `order` asc, doc fields verbatim.
+ */
+export const getBranches = onRequest(
+  { memory: '256MiB', timeoutSeconds: 30, cors: true },
+  async (req, res) => {
+    if (req.method !== 'GET') {
+      res.status(405).json({ error: 'Method Not Allowed' });
+      return;
+    }
+    const db = getFirestore();
+    const snapshot = await db
+      .collection('branches')
+      .orderBy('order', 'asc')
+      .get();
+
+    const branches = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    res.set('Cache-Control', API_CACHE_CONTROL);
+    res.status(200).json({
+      branches,
+      count: branches.length,
+    });
+  }
+);
+
+/**
+ * HTTP: GET /getEvents
+ * Query params:
+ *   - branch: branch name (optional). When given, includes events for that
+ *     branch OR all-campus events (branch == null).
+ *   - limit: number (max 50, default 50)
+ * Returns upcoming events (startTime >= now) ordered by startTime asc.
+ */
+export const getEvents = onRequest(
+  { memory: '256MiB', timeoutSeconds: 30, cors: true },
+  async (req, res) => {
+    if (req.method !== 'GET') {
+      res.status(405).json({ error: 'Method Not Allowed' });
+      return;
+    }
+    const db = getFirestore();
+    const { branch, limit: limitParam } = req.query as Record<string, string>;
+    const limit = Math.min(
+      parseInt(limitParam || String(EVENT_PAGE_SIZE), 10) || EVENT_PAGE_SIZE,
+      50
+    );
+    const now = Timestamp.now();
+
+    const baseQuery = () =>
+      db
+        .collection('events')
+        .where('startTime', '>=', now)
+        .orderBy('startTime', 'asc')
+        .limit(limit);
+
+    let docs;
+    if (branch) {
+      // Branch-scoped events plus all-campus events (branch == null).
+      const [branchSnap, globalSnap] = await Promise.all([
+        baseQuery().where('branch', '==', branch).get(),
+        baseQuery().where('branch', '==', null).get(),
+      ]);
+      docs = [...branchSnap.docs, ...globalSnap.docs]
+        .sort((a, b) => {
+          const aStart = a.data().startTime as Timestamp;
+          const bStart = b.data().startTime as Timestamp;
+          return aStart.toMillis() - bStart.toMillis();
+        })
+        .slice(0, limit);
+    } else {
+      const snapshot = await baseQuery().get();
+      docs = snapshot.docs;
+    }
+
+    const events = docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        title: data.title ?? '',
+        description: data.description ?? null,
+        location: data.location ?? null,
+        branch: data.branch ?? null,
+        imageUrl: data.imageUrl ?? null,
+        isFeatured: data.isFeatured ?? false,
+        startTime:
+          data.startTime instanceof Timestamp
+            ? data.startTime.toDate().toISOString()
+            : null,
+        endTime:
+          data.endTime instanceof Timestamp
+            ? data.endTime.toDate().toISOString()
+            : null,
+      };
+    });
+
+    res.set('Cache-Control', API_CACHE_CONTROL);
+    res.status(200).json({
+      events,
+      count: events.length,
+    });
+  }
+);
+
+/** Today's date as YYYY-MM-DD in Europe/London. */
+function todayInLondon(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/**
+ * HTTP: GET /getDailyReading
+ * Query params:
+ *   - date: YYYY-MM-DD (default: today in Europe/London)
+ *   - month: YYYY-MM (returns all readings in that month, ordered by date asc)
+ * Doc IDs in `dailyContent` are YYYY-MM-DD.
+ */
+export const getDailyReading = onRequest(
+  { memory: '256MiB', timeoutSeconds: 30, cors: true },
+  async (req, res) => {
+    if (req.method !== 'GET') {
+      res.status(405).json({ error: 'Method Not Allowed' });
+      return;
+    }
+    const db = getFirestore();
+    const { date, month } = req.query as Record<string, string>;
+
+    const toReading = (id: string, data: FirebaseFirestore.DocumentData) => ({
+      date: id,
+      reading: {
+        book: data.reading?.book ?? '',
+        chapter: data.reading?.chapter ?? 0,
+        verse: data.reading?.verse ?? '',
+      },
+      prayer: data.prayer ?? '',
+      prayerReference: data.prayerReference ?? '',
+    });
+
+    let readings;
+    if (month) {
+      const snapshot = await db
+        .collection('dailyContent')
+        .where(FieldPath.documentId(), '>=', `${month}-01`)
+        .where(FieldPath.documentId(), '<=', `${month}-31`)
+        .orderBy(FieldPath.documentId(), 'asc')
+        .get();
+      readings = snapshot.docs.map((doc) => toReading(doc.id, doc.data()));
+    } else {
+      const docId = date || todayInLondon();
+      const doc = await db.collection('dailyContent').doc(docId).get();
+      readings = doc.exists ? [toReading(doc.id, doc.data() ?? {})] : [];
+    }
+
+    res.set('Cache-Control', API_CACHE_CONTROL);
+    res.status(200).json({
+      readings,
+      count: readings.length,
     });
   }
 );

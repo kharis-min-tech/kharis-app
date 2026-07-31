@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 @immutable
@@ -49,6 +50,16 @@ class EventRepository {
 
   final FirebaseFirestore _firestore;
 
+  static const String _apiUrl =
+      'https://us-central1-kharis-church.cloudfunctions.net/getEvents';
+
+  static final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
+
   /// Returns upcoming events ordered by [startTime].
   ///
   /// [branch] – when provided, returns only events for that branch plus
@@ -85,6 +96,11 @@ class EventRepository {
   /// Branch filtering happens client-side over the snapshot so a single
   /// listener covers both branch-specific and all-campus events.
   Stream<List<Event>> watchUpcomingEvents({String? branch}) async* {
+    // API-first: one-shot fetch from the Cloud Functions endpoint so content
+    // appears even when Firestore is cold/unreachable, then hand over to the
+    // realtime Firestore stream below.
+    final apiEvents = await _fetchFromApi(branch: branch);
+    if (apiEvents != null && apiEvents.isNotEmpty) yield apiEvents;
     try {
       yield* _firestore
           .collection('events')
@@ -102,6 +118,48 @@ class EventRepository {
     } catch (_) {
       yield const [];
     }
+  }
+
+  /// One-shot fetch from the `getEvents` API. Returns `null` on any failure
+  /// so callers fall straight through to Firestore.
+  Future<List<Event>?> _fetchFromApi({String? branch}) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        _apiUrl,
+        queryParameters: {
+          'branch': ?branch,
+          'limit': 50,
+        },
+      );
+      final raw = (res.data?['events'] as List?) ?? const [];
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(_mapApi)
+          .whereType<Event>()
+          .toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Event? _mapApi(Map<String, dynamic> j) {
+    final id = j['id'] as String?;
+    final title = j['title'] as String?;
+    if (id == null || title == null) return null;
+    final start = DateTime.tryParse(j['startTime'] as String? ?? '');
+    final end = DateTime.tryParse(j['endTime'] as String? ?? '');
+    if (start == null || end == null) return null;
+    return Event(
+      id: id,
+      title: title,
+      description: j['description'] as String?,
+      location: j['location'] as String?,
+      branch: j['branch'] as String?,
+      startTime: start,
+      endTime: end,
+      imageUrl: j['imageUrl'] as String?,
+      isFeatured: j['isFeatured'] as bool? ?? false,
+    );
   }
 
   /// Fetches a single event by its Firestore document ID.

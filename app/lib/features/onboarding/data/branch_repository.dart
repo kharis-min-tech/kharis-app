@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 
@@ -55,7 +56,22 @@ class BranchRepository {
 
   final FirebaseFirestore _firestore;
 
+  static const String _apiUrl =
+      'https://us-central1-kharis-church.cloudfunctions.net/getBranches';
+
+  static final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 15),
+    ),
+  );
+
   Stream<List<Branch>> watchBranches() async* {
+    // API-first: one-shot fetch from the Cloud Functions endpoint so content
+    // appears even when Firestore is cold/unreachable, then hand over to the
+    // realtime Firestore stream below.
+    final apiBranches = await _fetchFromApi();
+    if (apiBranches != null && apiBranches.isNotEmpty) yield apiBranches;
     try {
       yield* _firestore
           .collection('branches')
@@ -70,6 +86,23 @@ class BranchRepository {
       });
     } catch (_) {
       yield seedBranches;
+    }
+  }
+
+  /// One-shot fetch from the `getBranches` API. Returns `null` on any
+  /// failure so callers fall straight through to Firestore.
+  Future<List<Branch>?> _fetchFromApi() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(_apiUrl);
+      final raw = (res.data?['branches'] as List?) ?? const [];
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map((j) => _map((j['id'] as String?) ?? '', j))
+          .where((b) => b.id.isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+    } catch (_) {
+      return null;
     }
   }
 
