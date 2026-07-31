@@ -9,6 +9,7 @@ import '../../features/home/data/kharis_api_announcement_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
 import '../../features/messages/data/kharis_api_sermon_repository.dart';
+import '../../features/messages/data/sermon_collections_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/kharis_content.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
@@ -254,4 +255,20 @@ final liveRepositoryProvider = Provider<LiveRepository>((ref) {
 /// Realtime stream of whether a service is currently live on YouTube.
 final liveStatusProvider = StreamProvider<LiveStatus>((ref) {
   return ref.watch(liveRepositoryProvider).watchLiveStatus();
+});
+
+// ── Playlists & series (live collections) ────────────────────────────────────
+
+final sermonCollectionsRepositoryProvider =
+    Provider<SermonCollectionsRepository>(
+  (ref) => SermonCollectionsRepository(),
+);
+
+/// Live playlists + series from the Kharis API (playlists first, then series).
+/// Empty on failure so the Playlists screen falls back to its built-in set.
+final sermonCollectionsProvider =
+    FutureProvider<List<SermonCollection>>((ref) async {
+  final repo = ref.watch(sermonCollectionsRepositoryProvider);
+  final results = await Future.wait([repo.playlists(), repo.series()]);
+  return [...results[0], ...results[1]];
 });

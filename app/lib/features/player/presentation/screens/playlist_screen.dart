@@ -6,6 +6,7 @@ import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/features/messages/data/sermon_collections_repository.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
@@ -27,6 +28,23 @@ class PlaylistScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(sermonCollectionsProvider);
+    final live = async.valueOrNull ?? const <SermonCollection>[];
+    // Live playlists + series from the API; fall back to the built-in set
+    // while loading or if the API is unreachable.
+    final items = live.isEmpty
+        ? _kCollections
+        : live
+            .map((c) => _Collection(
+                  title: c.name,
+                  subtitle: c.description ?? '',
+                  keyword: c.name,
+                  gradientIndex: c.id % 10,
+                  kindLabel:
+                      c.kind == CollectionKind.playlist ? 'Playlist' : 'Series',
+                  imageUrl: c.imageUrl,
+                ))
+            .toList();
     return Scaffold(
       backgroundColor: AppColors.ink,
       body: SafeArea(
@@ -77,9 +95,9 @@ class PlaylistScreen extends ConsumerWidget {
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _CollectionCard(
-                    collection: _kCollections[index],
+                    collection: items[index],
                   ),
-                  childCount: _kCollections.length,
+                  childCount: items.length,
                 ),
               ),
             ),
@@ -96,9 +114,11 @@ class _Collection {
   const _Collection({
     required this.title,
     required this.subtitle,
-    required this.count,
     required this.keyword,
     required this.gradientIndex,
+    this.count = 0,
+    this.kindLabel,
+    this.imageUrl,
     this.asset,
   });
 
@@ -109,6 +129,12 @@ class _Collection {
   /// Matched (case-insensitive) against a sermon's category / series / title.
   final String keyword;
   final int gradientIndex;
+
+  /// Short card sub-line for live collections ("Playlist" / "Series").
+  final String? kindLabel;
+
+  /// Network artwork (live collections); [asset] is the bundled fallback.
+  final String? imageUrl;
   final String? asset;
 }
 
@@ -193,7 +219,7 @@ class _CollectionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${collection.count} messages',
+                    collection.kindLabel ?? '${collection.count} messages',
                     style: AppTypography.labelMd.copyWith(
                       fontSize: 11.5,
                       color: AppColors.darkMuted,
@@ -221,7 +247,7 @@ class _CollectionArt extends StatelessWidget {
       children: [
         // Gradient base (falls through if the asset is missing).
         ArtworkImage(
-          url: null,
+          url: collection.imageUrl,
           gradientIndex: collection.gradientIndex,
           radius: 0,
         ),
@@ -375,7 +401,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Playlist · ${collection.count} messages',
+                      '${sermons.length} messages',
                       style: AppTypography.labelMd.copyWith(
                         fontSize: 12,
                         color: AppColors.darkMuted,

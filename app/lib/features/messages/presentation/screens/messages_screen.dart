@@ -11,6 +11,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/features/player/presentation/screens/playlist_screen.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../widgets/sermon_list_item.dart';
 
@@ -275,6 +276,23 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         ),
                       ),
                       const Spacer(),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PlaylistScreen(),
+                          ),
+                        ),
+                        behavior: HitTestBehavior.opaque,
+                        child: Text(
+                          'Playlists',
+                          style: AppTypography.labelMd.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.gold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
                       GestureDetector(
                         onTap: () {
                           ref.read(selectedCategoryProvider.notifier).state =

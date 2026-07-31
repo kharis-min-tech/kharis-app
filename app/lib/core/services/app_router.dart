@@ -16,6 +16,7 @@ import '../../features/onboarding/presentation/screens/role_selection_screen.dar
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
+import '../../features/player/presentation/screens/playlist_screen.dart';
 import '../../features/home/presentation/screens/reading_screen.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
@@ -138,6 +139,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/reading',
         builder: (context, state) => const ReadingScreen(),
+      ),
+
+      // ── Playlists / collections (overlays shell) ──────────────────────────
+      GoRoute(
+        path: '/playlists',
+        builder: (context, state) => const PlaylistScreen(),
       ),
 
       // ── Notes (overlays shell) ────────────────────────────────────────────
