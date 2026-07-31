@@ -56,6 +56,20 @@ flutter build ipa --release \
   --build-number="$BUILD_NUMBER" || true
 [[ -d "$ARCHIVE" ]] || { echo "ERROR: archive not produced at $ARCHIVE"; exit 1; }
 
+# Guard: some Info.plist omissions pass `altool` validation and upload fine,
+# then fail App Store Connect *processing* (build lands in TestFlight as
+# "Failed" with no visible reason). Catch the known ones before uploading:
+#   CFBundleIconName            -> ITMS-90713
+#   NSCalendarsUsageDescription -> ITMS-90683 (add_2_calendar links EventKit)
+ARCHIVE_PLIST="$ARCHIVE/Products/Applications/Runner.app/Info.plist"
+for key in CFBundleIconName NSCalendarsUsageDescription; do
+  plutil -extract "$key" raw -o - "$ARCHIVE_PLIST" >/dev/null 2>&1 || {
+    echo "ERROR: $key missing from the built app's Info.plist —"
+    echo "       App Store processing would fail. Add it to ios/Runner/Info.plist."
+    exit 1
+  }
+done
+
 echo "==> Exporting signed IPA (xcodebuild cloud signing via ASC API key)"
 EXPORT_PLIST="$(mktemp -t kharis_export).plist"
 cat > "$EXPORT_PLIST" <<PLIST

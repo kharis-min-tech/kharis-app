@@ -10,6 +10,8 @@
 		<string>Kharis Church</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIconName</key>
+		<string>AppIcon</string>
 		<key>CFBundleIdentifier</key>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 		<key>CFBundleInfoDictionaryVersion</key>
@@ -68,6 +70,10 @@
 		</array>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
+		<key>NSCalendarsUsageDescription</key>
+		<string>Calendar access is needed to add church events to your calendar.</string>
+		<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+		<string>Calendar access is needed to add church events to your calendar.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>Camera access is needed to record video testimonies.</string>
 		<key>NSMicrophoneUsageDescription</key>
