@@ -7,21 +7,25 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" href="dove.png" />
+  <meta name="theme-color" content="#0A0A0C" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0D0D0D;
-      --surface:  #141414;
-      --surface2: #1E1E1E;
-      --border:   #2C2C2C;
-      --text:     #FFFFFF;
-      --muted:    #8A8A8A;
+      --bg:       #0A0A0C;
+      --surface:  #121216;
+      --surface2: #1A1A20;
+      --border:   #26262E;
+      --text:     #F8FAFC;
+      --muted:    #A1A1AA;
       --purple:   #6B34FA;
+      --purple-soft: #A47CFF;
       --orange:   #FD7F20;
-      --danger:   #FF4545;
+      --danger:   #FF5757;
       --success:  #22C55E;
       --radius:   10px;
+      --ring:     rgba(124, 92, 255, 0.55);
     }
 
     html, body {
@@ -46,6 +50,10 @@
       justify-content: center;
       min-height: 100vh;
       padding: 24px;
+      background:
+        radial-gradient(600px 320px at 50% -80px, rgba(107, 52, 250, 0.18), transparent 70%),
+        radial-gradient(420px 260px at 88% 100%, rgba(253, 127, 32, 0.07), transparent 70%),
+        var(--bg);
     }
 
     .login-card {
@@ -53,8 +61,9 @@
       max-width: 420px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 18px;
       padding: 40px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
     }
 
     .login-card .logo-row {
@@ -67,14 +76,16 @@
     .logo-icon {
       width: 44px;
       height: 44px;
-      background: var(--purple);
+      flex-shrink: 0;
+      background: linear-gradient(135deg, var(--purple) 0%, #9254FF 60%, var(--orange) 160%);
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: 0 4px 14px rgba(107, 52, 250, 0.35);
     }
 
-    .logo-icon svg { width: 26px; height: 26px; fill: #fff; }
+    .logo-icon img { width: 26px; height: auto; display: block; }
 
     .login-card h1 { font-size: 22px; margin-bottom: 4px; }
     .login-card .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
@@ -126,6 +137,7 @@
 
     input:focus, select:focus, textarea:focus {
       border-color: var(--purple);
+      box-shadow: 0 0 0 3px rgba(107, 52, 250, 0.22);
     }
 
     select {
@@ -188,7 +200,7 @@
       border-radius: var(--radius);
       border: none;
       cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
+      transition: background-color 0.18s, border-color 0.18s, color 0.18s, opacity 0.18s, transform 0.1s;
       text-decoration: none;
     }
 
@@ -199,7 +211,7 @@
       background: var(--orange);
       color: #fff;
     }
-    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:hover { background: #FF9240; }
 
     .btn-secondary {
       background: var(--surface2);
@@ -219,103 +231,115 @@
 
     .btn-full { width: 100%; }
 
-    /* ── Admin Layout ─────────────────────────────────────────────────── */
-    #admin-panel { display: none; min-height: 100vh; }
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(13, 13, 13, 0.88);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 28px;
-      height: 60px;
+    /* ── Admin Layout — sidebar shell ─────────────────────────────────── */
+    #admin-panel {
+      display: none; /* JS switches this to grid on sign-in */
+      grid-template-columns: 236px minmax(0, 1fr);
+      min-height: 100vh;
     }
 
-    .topbar-brand {
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 12px 16px;
+    }
+
+    .sidebar-brand {
       display: flex;
       align-items: center;
       gap: 10px;
+      padding: 0 8px;
     }
-
-    .topbar-brand .logo-icon { width: 34px; height: 34px; border-radius: 8px; }
-    .topbar-brand .logo-icon svg { width: 20px; height: 20px; }
-    .topbar-brand span {
+    .sidebar-brand .logo-icon { width: 36px; height: 36px; border-radius: 10px; }
+    .sidebar-brand .logo-icon img { width: 21px; }
+    .sidebar-brand .brand-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+    .sidebar-brand .brand-text span {
       font-family: 'Maven Pro', sans-serif;
-      font-weight: 700;
-      font-size: 16px;
+      font-weight: 800;
+      font-size: 14.5px;
       color: var(--text);
+      white-space: nowrap;
     }
-    .topbar-brand .badge {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 11px;
-      color: var(--muted);
-      padding: 2px 8px;
-      font-weight: 500;
-    }
+    .sidebar-brand .brand-text em { font-style: normal; font-size: 11px; color: var(--muted); }
 
-    #user-email {
-      font-size: 13px;
-      color: var(--muted);
-      margin-right: 12px;
-    }
-
-    /* ── Tab Navigation ───────────────────────────────────────────────── */
     .tab-nav {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
       display: flex;
-      padding: 0 28px;
-      gap: 4px;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      overflow-y: auto;
     }
 
     .tab-btn {
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      padding: 14px 18px;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      transition: color 0.15s, border-color 0.15s;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      width: 100%;
+      background: none;
+      border: none;
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 9px 10px;
+      cursor: pointer;
+      transition: background-color 0.18s, color 0.18s;
+      text-align: left;
       white-space: nowrap;
-      margin-bottom: -1px;
     }
 
-    .tab-btn:hover { color: var(--text); }
+    .tab-btn svg { flex-shrink: 0; }
+    .tab-btn:hover { color: var(--text); background: var(--surface2); }
 
     .tab-btn.active {
-      color: var(--orange);
-      border-bottom-color: var(--orange);
+      color: var(--text);
+      background: var(--surface2);
+      box-shadow: inset 2px 0 0 var(--purple);
     }
+    .tab-btn.active svg { color: var(--purple-soft); }
 
     .tab-btn .count-badge {
-      background: var(--surface2);
-      border-radius: 20px;
-      font-size: 11px;
+      margin-left: auto;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 10.5px;
       font-weight: 600;
+      color: var(--muted);
       padding: 1px 7px;
-      min-width: 20px;
+      min-width: 22px;
       text-align: center;
+    }
+    .tab-btn.active .count-badge { color: var(--purple-soft); border-color: rgba(107, 52, 250, 0.4); }
+
+    .sidebar-foot {
+      border-top: 1px solid var(--border);
+      padding: 12px 8px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #user-email {
+      font-size: 12px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     /* ── Content ──────────────────────────────────────────────────────── */
     .content-area {
-      padding: 28px;
-      max-width: 1100px;
-      margin: 0 auto;
+      padding: 32px 36px 64px;
+      max-width: 1160px;
+      width: 100%;
     }
 
     .tab-pane { display: none; }
@@ -323,13 +347,21 @@
 
     .pane-layout {
       display: grid;
-      grid-template-columns: 380px 1fr;
-      gap: 28px;
+      grid-template-columns: 380px minmax(0, 1fr);
+      gap: 24px;
       align-items: start;
     }
 
-    @media (max-width: 860px) {
+    @media (max-width: 900px) {
       .pane-layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      #admin-panel { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .tab-nav { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+      .tab-btn { width: auto; }
+      .sidebar-foot { flex-direction: row; align-items: center; justify-content: space-between; }
     }
 
     /* ── Cards ────────────────────────────────────────────────────────── */
@@ -370,7 +402,10 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 12px;
+      transition: border-color 0.18s;
     }
+
+    .item-card:hover { border-color: #3A3A46; }
 
     .item-card-body { flex: 1; min-width: 0; }
 
@@ -498,11 +533,27 @@
       margin: 20px 0;
     }
 
+    /* ── A11y + motion ─────────────────────────────────────────────────── */
+    .btn:focus-visible,
+    .tab-btn:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    a:focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
     /* ── Responsive tweaks ─────────────────────────────────────────────── */
     @media (max-width: 600px) {
-      .topbar { padding: 0 16px; }
-      .tab-nav { padding: 0 8px; }
-      .content-area { padding: 16px; }
+      .content-area { padding: 16px 16px 48px; }
       .card { padding: 18px; }
       .field-row { grid-template-columns: 1fr; gap: 0; }
     }
@@ -515,10 +566,7 @@
   <div class="login-card">
     <div class="logo-row">
       <div class="logo-icon">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <!-- Dove silhouette -->
-          <path d="M12 3C9.5 3 7.5 4.5 6.5 6.5C5 6.2 3.5 6.8 2.5 8C1.5 9.2 1.3 10.8 2 12C1.2 13 1 14.3 1.5 15.5C2 16.7 3 17.5 4.2 17.8L5 21H9L10 18H14L15 21H19L19.8 17.8C21 17.5 22 16.7 22.5 15.5C23 14.3 22.8 13 22 12C22.7 10.8 22.5 9.2 21.5 8C20.5 6.8 19 6.2 17.5 6.5C16.5 4.5 14.5 3 12 3Z"/>
-        </svg>
+        <img src="dove.png" alt="Kharis Church dove logo" />
       </div>
       <div>
         <h1>Kharis Church</h1>
@@ -546,23 +594,13 @@
 <!-- ── Admin Panel ────────────────────────────────────────────────────────── -->
 <div id="admin-panel">
 
-  <header class="topbar">
-    <div class="topbar-brand">
-      <div class="logo-icon">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#fff">
-          <path d="M12 3C9.5 3 7.5 4.5 6.5 6.5C5 6.2 3.5 6.8 2.5 8C1.5 9.2 1.3 10.8 2 12C1.2 13 1 14.3 1.5 15.5C2 16.7 3 17.5 4.2 17.8L5 21H9L10 18H14L15 21H19L19.8 17.8C21 17.5 22 16.7 22.5 15.5C23 14.3 22.8 13 22 12C22.7 10.8 22.5 9.2 21.5 8C20.5 6.8 19 6.2 17.5 6.5C16.5 4.5 14.5 3 12 3Z"/>
-        </svg>
-      </div>
-      <span>Kharis Church</span>
-      <span class="badge">Admin</span>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo-icon"><img src="dove.png" alt="" /></div>
+      <div class="brand-text"><span>Kharis Church</span><em>Content Studio</em></div>
     </div>
-    <div style="display:flex;align-items:center">
-      <span id="user-email"></span>
-      <button class="btn btn-secondary" id="signout-btn" style="font-size:13px;padding:7px 14px;">Sign Out</button>
-    </div>
-  </header>
 
-  <nav class="tab-nav">
+    <nav class="tab-nav">
     <button class="tab-btn" data-tab="sermons">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
       Sermons
@@ -597,7 +635,13 @@
       Branches
       <span class="count-badge" id="branches-count">—</span>
     </button>
-  </nav>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span id="user-email"></span>
+      <button class="btn btn-secondary" id="signout-btn" style="font-size:13px;padding:8px 14px;">Sign Out</button>
+    </div>
+  </aside>
 
   <div class="content-area">
 
@@ -1015,13 +1059,14 @@ const adminPanel  = document.getElementById('admin-panel');
 onAuthStateChanged(auth, (user) => {
   if (user) {
     loginScreen.style.display = 'none';
-    adminPanel.style.display  = 'block';
+    adminPanel.style.display  = 'grid';
     document.getElementById('user-email').textContent = user.email;
     loadEvents();
     loadNews();
     loadLiveStatus();
     loadSubmissions();
     setDefaultDailyDate();
+    loadBranches();
   } else {
     loginScreen.style.display = 'flex';
     adminPanel.style.display  = 'none';
@@ -1580,6 +1625,15 @@ async function loadBranches() {
   try {
     const snap = await getDocs(query(collection(db, 'branches'), orderBy('order', 'asc')));
     document.getElementById('branches-count').textContent = snap.size;
+    // Keep the event form's branch picker in sync with the live branch list.
+    const evBranch = document.getElementById('ev-branch');
+    if (evBranch && !snap.empty) {
+      const cur = evBranch.value;
+      const names = snap.docs.map(d => (d.data().name || '').trim()).filter(Boolean);
+      evBranch.innerHTML = '<option value="">All Branches</option>' +
+        names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+      evBranch.value = names.includes(cur) ? cur : '';
+    }
     if (snap.empty) {
       list.innerHTML = '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
       return;
