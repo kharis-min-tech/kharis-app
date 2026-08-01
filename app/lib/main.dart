@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -22,6 +23,14 @@ Future<void> main() async {
       final binding = WidgetsFlutterBinding.ensureInitialized();
       FlutterNativeSplash.preserve(widgetsBinding: binding);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+      // Lock-screen / notification media controls (Now Playing). Must run
+      // before any AudioPlayer is created.
+      await JustAudioBackground.init(
+        androidNotificationChannelId: 'org.kharis.kharisApp.channel.audio',
+        androidNotificationChannelName: 'Kharis audio playback',
+        androidNotificationOngoing: true,
+      );
       FlutterError.onError = (details) {
         if (kDebugMode) {
           FlutterError.dumpErrorToConsole(details);

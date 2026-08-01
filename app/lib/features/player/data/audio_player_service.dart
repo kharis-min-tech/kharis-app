@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 import 'package:kharis_app/core/services/cache_service.dart';
 import 'package:kharis_app/core/constants/http_constants.dart';
@@ -90,6 +91,26 @@ class AudioPlayerService {
 
   // ── Playback control ───────────────────────────────────────────────────────
 
+  /// Loads [sermon]'s audio with a [MediaItem] tag so the OS shows artwork,
+  /// title, and transport controls on the lock screen / notification shade.
+  Future<void> _setSource(Sermon sermon) {
+    final art = sermon.artworkUrl;
+    return _player.setAudioSource(
+      AudioSource.uri(
+        Uri.parse(sermon.audioUrl),
+        headers: const {'User-Agent': kBrowserUserAgent},
+        tag: MediaItem(
+          id: sermon.id,
+          title: sermon.title,
+          artist: sermon.speaker,
+          album: sermon.series ?? 'Kharis Church',
+          artUri: art != null ? Uri.tryParse(art) : null,
+          duration: sermon.duration,
+        ),
+      ),
+    );
+  }
+
   /// Loads the sermon's audio URL, seeks to any saved resume position, and
   /// starts playback immediately.
   Future<void> play(Sermon sermon) async {
@@ -106,10 +127,7 @@ class AudioPlayerService {
         },
       ));
     }
-    await _player.setUrl(
-      sermon.audioUrl,
-      headers: const {'User-Agent': kBrowserUserAgent},
-    );
+    await _setSource(sermon);
 
     // Restore saved position if it falls in the resumable window.
     final savedMs = _cache.getPlaybackPosition(sermon.id);
@@ -128,10 +146,7 @@ class AudioPlayerService {
   /// listener left off.
   Future<void> loadPaused(Sermon sermon) async {
     _currentSermon = sermon;
-    await _player.setUrl(
-      sermon.audioUrl,
-      headers: const {'User-Agent': kBrowserUserAgent},
-    );
+    await _setSource(sermon);
     final savedMs = _cache.getPlaybackPosition(sermon.id);
     final duration = _player.duration;
     if (savedMs > 10000 &&
