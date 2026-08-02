@@ -1,4 +1,6 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onRequest } from 'firebase-functions/v2/https';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { defineString } from 'firebase-functions/params';
 import {
@@ -24,6 +26,22 @@ function iso8601ToSeconds(duration: string): number {
   const m = parseInt(match[2] || '0', 10);
   const s = parseInt(match[3] || '0', 10);
   return h * 3600 + m * 60 + s;
+}
+
+/**
+ * YouTube API strings arrive HTML-entity-encoded (&#39; &amp; &quot; …).
+ * Decode them once at the boundary so Firestore stores clean text.
+ */
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ');
 }
 
 async function fetchLatestVideos(
@@ -121,9 +139,9 @@ export const syncYouTube = onSchedule(
         createdAt: FieldValue;
         updatedAt: Timestamp;
       } = {
-        title: snippet.title.trim(),
+        title: decodeHtmlEntities(snippet.title.trim()),
         speaker: 'David Antwi',
-        description: snippet.description.trim(),
+        description: decodeHtmlEntities(snippet.description.trim()),
         audioUrl: '',
         videoId,
         thumbnailUrl: thumbnail,
@@ -145,5 +163,107 @@ export const syncYouTube = onSchedule(
 
     await batch.commit();
     console.log(`YouTube sync complete: ${videos.length} videos upserted`);
+  }
+);
+
+/**
+ * Admin-only live search over the whole Kharis Church YouTube channel.
+ *
+ * The Content Studio calls this to browse/search ALL channel uploads (not just
+ * the synced subset) and feature any video. Gated to admins because every
+ * search spends 100 units of the YouTube API daily quota.
+ *
+ * GET ?q=<text>&pageToken=<token>&limit=<n<=50>
+ * -> { videos: [{ videoId, title, description, thumbnailUrl, publishedAt,
+ *      duration, inLibrary, isFeatured }], nextPageToken, totalResults, count }
+ */
+export const searchYouTube = onRequest(
+  { cors: true, memory: '256MiB', timeoutSeconds: 30 },
+  async (req, res) => {
+    if (req.method !== 'GET') {
+      res.status(405).json({ error: 'Method Not Allowed' });
+      return;
+    }
+
+    // Admin gate: Firebase ID token + users/{uid}.role == 'admin'.
+    try {
+      const authz = String(req.headers.authorization ?? '');
+      const idToken = authz.startsWith('Bearer ') ? authz.slice(7) : '';
+      const decoded = await getAuth().verifyIdToken(idToken);
+      const profile = await getFirestore().doc(`users/${decoded.uid}`).get();
+      if (profile.get('role') !== 'admin' && decoded.admin !== true) {
+        res.status(403).json({ error: 'Admin only' });
+        return;
+      }
+    } catch {
+      res.status(401).json({ error: 'Sign-in required' });
+      return;
+    }
+
+    const apiKey = youtubeApiKey.value();
+    if (!apiKey) {
+      res.status(500).json({ error: 'YOUTUBE_API_KEY not configured' });
+      return;
+    }
+
+    const q = String(req.query.q ?? '').trim();
+    const pageToken = String(req.query.pageToken ?? '').trim();
+    const limitParam = parseInt(String(req.query.limit ?? ''), 10);
+    const limit = Math.min(Number.isFinite(limitParam) && limitParam > 0 ? limitParam : 25, 50);
+
+    const url =
+      `${YT_API_BASE}/search?part=id,snippet` +
+      `&channelId=${CHANNEL_ID}` +
+      `&type=video` +
+      `&maxResults=${limit}` +
+      `&order=${q ? 'relevance' : 'date'}` +
+      (q ? `&q=${encodeURIComponent(q)}` : '') +
+      (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '') +
+      `&key=${apiKey}`;
+
+    const ytRes = await fetch(url);
+    if (!ytRes.ok) {
+      res.status(502).json({ error: `YouTube API error ${ytRes.status}` });
+      return;
+    }
+    const data = (await ytRes.json()) as YouTubeSearchResponse & {
+      pageInfo?: { totalResults?: number };
+    };
+    const items = (data.items ?? []).filter((v) => v.id?.videoId);
+    const ids = items.map((v) => v.id.videoId);
+
+    let durations = new Map<string, number>();
+    try {
+      if (ids.length) durations = await fetchVideoDetails(apiKey, ids);
+    } catch {
+      // Durations are cosmetic; carry on without them.
+    }
+
+    // Overlay library/featured state so the studio can show what's already in.
+    const db = getFirestore();
+    const snaps = ids.length
+      ? await db.getAll(...ids.map((id) => db.doc(`sermons/yt_${id}`)))
+      : [];
+    const lib = new Map(
+      snaps.map((s) => [s.id, s.exists ? s.get('isFeatured') === true : null])
+    );
+
+    res.set('Cache-Control', 'private, no-store');
+    res.status(200).json({
+      videos: items.map((v) => ({
+        videoId: v.id.videoId,
+        title: decodeHtmlEntities(v.snippet.title.trim()),
+        description: decodeHtmlEntities((v.snippet.description ?? '').trim()),
+        thumbnailUrl:
+          v.snippet.thumbnails.high?.url ?? v.snippet.thumbnails.default?.url ?? null,
+        publishedAt: v.snippet.publishedAt,
+        duration: durations.get(v.id.videoId) ?? 0,
+        inLibrary: lib.get(`yt_${v.id.videoId}`) !== null && lib.has(`yt_${v.id.videoId}`),
+        isFeatured: lib.get(`yt_${v.id.videoId}`) === true,
+      })),
+      nextPageToken: data.nextPageToken ?? null,
+      totalResults: data.pageInfo?.totalResults ?? null,
+      count: items.length,
+    });
   }
 );

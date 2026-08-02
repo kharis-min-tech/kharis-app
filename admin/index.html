@@ -406,6 +406,33 @@
       overflow: hidden;
     }
 
+
+    /* ── Segmented source control ─────────────────────────────────────── */
+    .seg {
+      display: inline-flex;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 2px;
+      margin-bottom: 14px;
+    }
+
+    .seg-btn {
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background-color 0.18s, color 0.18s;
+    }
+
+    .seg-btn:not(.active):hover { color: var(--text); }
+    .seg-btn.active { background: var(--purple); color: #fff; }
     .item-card:hover { border-color: #3A3A46; }
 
     .item-card-body { flex: 1; min-width: 0; }
@@ -650,13 +677,20 @@
     <div class="tab-pane" id="tab-sermons">
       <div>
         <div class="card" style="max-width:100%">
-          <div class="card-title"><span class="dot"></span> Sermon Library (Auto-synced from YouTube & SoundCloud)</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Sermons are automatically synced every hour. Toggle the star to feature a sermon on the mobile app's Messages page.</p>
+          <div class="card-title"><span class="dot"></span> Sermon Library</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Library holds synced sermons (auto-synced hourly). Switch to YouTube Channel to search everything on the Kharis Church / David Antwi channel and feature any video on the app's Messages page.</p>
+          <div class="seg" role="tablist" aria-label="Sermon source">
+            <button type="button" class="seg-btn active" id="src-library">Library</button>
+            <button type="button" class="seg-btn" id="src-youtube">YouTube Channel</button>
+          </div>
           <div style="display:flex;gap:8px;margin-bottom:16px;">
             <input type="text" id="sermon-search" placeholder="Search by title, speaker…" style="flex:1;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:14px;" />
             <button class="btn btn-secondary" id="refresh-sermons" style="font-size:12px;padding:6px 12px;">Refresh</button>
           </div>
           <div id="sermons-list"></div>
+          <div style="display:flex;justify-content:center;margin-top:14px;">
+            <button class="btn btn-secondary" id="yt-load-more" style="display:none;font-size:13px;">Load more</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1613,8 +1647,147 @@ function formatDuration(seconds) {
   return `${m}m ${s}s`;
 }
 
-// Sermon search
+// ── YouTube channel browser (Content Studio ↔ YouTube binding) ─────────────
+const YT_SEARCH_URL = 'https://us-central1-kharis-church.cloudfunctions.net/searchYouTube';
+const STAR_FILLED = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
+const STAR_OUTLINE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
+
+let sermonSource = 'library'; // 'library' | 'youtube'
+let ytVideos = [];
+let ytNextPageToken = null;
+let ytLastQuery = '';
+let ytSearchTimer = null;
+
+async function searchYouTubeChannel({ append = false } = {}) {
+  const list = document.getElementById('sermons-list');
+  const moreBtn = document.getElementById('yt-load-more');
+  if (!append) {
+    list.innerHTML = '<div class="loading-row"><span class="spinner"></span> Searching the YouTube channel…</div>';
+    ytNextPageToken = null;
+    ytVideos = [];
+  }
+  moreBtn.disabled = true;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const params = new URLSearchParams({ limit: '25' });
+    if (ytLastQuery) params.set('q', ytLastQuery);
+    if (append && ytNextPageToken) params.set('pageToken', ytNextPageToken);
+    const res = await fetch(`${YT_SEARCH_URL}?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    ytNextPageToken = data.nextPageToken;
+    ytVideos = append ? ytVideos.concat(data.videos) : data.videos;
+    if (sermonSource === 'youtube') renderYouTubeList();
+  } catch (err) {
+    list.innerHTML = `<p style="color:var(--danger);font-size:13px;">YouTube search failed: ${escHtml(err.message)}</p>`;
+  }
+  moreBtn.disabled = false;
+}
+
+function renderYouTubeList() {
+  const list = document.getElementById('sermons-list');
+  const moreBtn = document.getElementById('yt-load-more');
+  if (!ytVideos.length) {
+    list.innerHTML = '<div class="empty-state">No videos found on the channel for that search.</div>';
+    moreBtn.style.display = 'none';
+    return;
+  }
+  list.innerHTML = ytVideos.map((v, i) => {
+    const date = v.publishedAt ? formatDate(new Date(v.publishedAt)) : '';
+    const dur = v.duration ? formatDuration(v.duration) : '';
+    return `<div class="item-card">
+      <div style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;">
+        ${v.thumbnailUrl ? `<img src="${escHtml(v.thumbnailUrl)}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ''}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <strong style="font-size:14px;min-width:0;">${escHtml(v.title)}</strong>
+            <button class="yt-feature-btn" data-i="${i}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${v.isFeatured ? 'var(--orange)' : 'var(--muted)'};" title="${v.isFeatured ? 'Unfeature' : 'Feature on the app'}" aria-label="${v.isFeatured ? 'Unfeature video' : 'Feature video'}">${v.isFeatured ? STAR_FILLED : STAR_OUTLINE}</button>
+          </div>
+          <div class="item-card-meta">
+            David Antwi · YouTube · ${date} ${dur ? '· ' + dur : ''}
+            ${v.inLibrary ? '<span class="meta-chip featured">In library</span>' : '<span class="meta-chip">Not synced yet</span>'}
+          </div>
+          ${v.description ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(v.description.substring(0, 100))}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  moreBtn.style.display = ytNextPageToken ? '' : 'none';
+  list.querySelectorAll('.yt-feature-btn').forEach(btn => {
+    btn.addEventListener('click', () => featureYouTubeVideo(Number(btn.dataset.i)));
+  });
+}
+
+/** Upserts the video into `sermons` (same doc scheme as the hourly sync) and
+ *  toggles isFeatured, so the app's Messages page picks it up instantly. */
+async function featureYouTubeVideo(i) {
+  const v = ytVideos[i];
+  if (!v) return;
+  const makeFeatured = !v.isFeatured;
+  try {
+    const payload = {
+      title: v.title,
+      speaker: 'David Antwi',
+      description: v.description || '',
+      videoId: v.videoId,
+      thumbnailUrl: v.thumbnailUrl || null,
+      duration: v.duration || 0,
+      publishedAt: Timestamp.fromDate(new Date(v.publishedAt)),
+      source: 'youtube',
+      type: 'video',
+      isFeatured: makeFeatured,
+      updatedAt: serverTimestamp(),
+    };
+    if (!v.inLibrary) {
+      payload.playCount = 0;
+      payload.createdAt = serverTimestamp();
+    }
+    await setDoc(doc(db, 'sermons', `yt_${v.videoId}`), payload, { merge: true });
+    v.inLibrary = true;
+    v.isFeatured = makeFeatured;
+    toast(makeFeatured ? 'Featured on the app' : 'Unfeatured');
+    renderYouTubeList();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+}
+
+function setSermonSource(src) {
+  sermonSource = src;
+  document.getElementById('src-library').classList.toggle('active', src === 'library');
+  document.getElementById('src-youtube').classList.toggle('active', src === 'youtube');
+  const searchEl = document.getElementById('sermon-search');
+  searchEl.placeholder = src === 'youtube'
+    ? 'Search the whole YouTube channel…'
+    : 'Search by title, speaker…';
+  document.getElementById('yt-load-more').style.display = 'none';
+  if (src === 'youtube') {
+    ytLastQuery = searchEl.value.trim();
+    searchYouTubeChannel();
+  } else {
+    loadSermons();
+  }
+}
+
+document.getElementById('src-library').addEventListener('click', () => setSermonSource('library'));
+document.getElementById('src-youtube').addEventListener('click', () => setSermonSource('youtube'));
+document.getElementById('yt-load-more').addEventListener('click', () => searchYouTubeChannel({ append: true }));
+
+// Sermon search — filters the library, or (debounced) searches the channel.
 document.getElementById('sermon-search').addEventListener('input', async (e) => {
+  if (sermonSource === 'youtube') {
+    clearTimeout(ytSearchTimer);
+    ytSearchTimer = setTimeout(() => {
+      ytLastQuery = e.target.value.trim();
+      searchYouTubeChannel();
+    }, 550);
+    return;
+  }
   const term = e.target.value.toLowerCase().trim();
   const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
   const filtered = snap.docs.filter(d => {
@@ -1624,7 +1797,10 @@ document.getElementById('sermon-search').addEventListener('input', async (e) => 
   renderSermonList(filtered);
 });
 
-document.getElementById('refresh-sermons').addEventListener('click', loadSermons);
+document.getElementById('refresh-sermons').addEventListener('click', () => {
+  if (sermonSource === 'youtube') searchYouTubeChannel();
+  else loadSermons();
+});
 
 // ── Branches Tab ────────────────────────────────────────────────────────
 async function loadBranches() {

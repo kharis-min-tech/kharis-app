@@ -9,7 +9,7 @@ initializeApp();
 
 // Re-export scheduled functions
 export { syncSoundCloud } from './sync-soundcloud';
-export { syncYouTube } from './sync-youtube';
+export { syncYouTube, searchYouTube } from './sync-youtube';
 export { feedProxy } from './feed-proxy';
 
 const PAGE_SIZE = 20;
