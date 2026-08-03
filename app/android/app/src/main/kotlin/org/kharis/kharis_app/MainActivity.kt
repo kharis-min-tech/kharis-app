@@ -1,4 +1,4 @@
-package org.kharis.kharis_app
+package com.kharis.app
 
 import io.flutter.embedding.android.FlutterActivity
 

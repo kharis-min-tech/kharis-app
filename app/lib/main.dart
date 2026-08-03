@@ -27,7 +27,7 @@ Future<void> main() async {
       // Lock-screen / notification media controls (Now Playing). Must run
       // before any AudioPlayer is created.
       await JustAudioBackground.init(
-        androidNotificationChannelId: 'org.kharis.kharisApp.channel.audio',
+        androidNotificationChannelId: 'com.kharis.app.channel.audio',
         androidNotificationChannelName: 'Kharis audio playback',
         androidNotificationOngoing: true,
       );
@@ -57,8 +57,9 @@ Future<void> main() async {
       );
       // Keep the branded splash up until the first themed frame paints, so
       // there's no white gap between the native splash and the app content.
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => FlutterNativeSplash.remove());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => FlutterNativeSplash.remove(),
+      );
     },
     (error, stack) {
       if (kDebugMode) {

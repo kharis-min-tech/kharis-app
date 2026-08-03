@@ -43,9 +43,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _errorMessage = null;
     });
     try {
-      await ref.read(authRepositoryProvider).register(
+      await ref
+          .read(authRepositoryProvider)
+          .register(
             email: _emailController.text.trim(),
-            password: _passwordController.text,
+            password: _passwordController.text.trim(),
             displayName: _nameController.text.trim(),
             role: 'new_here',
           );
@@ -54,8 +56,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (mounted) setState(() => _errorMessage = e.message);
     } catch (_) {
       if (mounted) {
-        setState(() =>
-            _errorMessage = 'Something went wrong. Please try again.');
+        setState(
+          () => _errorMessage = 'Something went wrong. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -164,14 +167,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _createAccount(),
                   style: _textStyle,
-                  decoration:
-                      _fieldDecoration(hint: 'Confirm password').copyWith(
-                    suffixIcon: _eyeToggle(
-                      obscure: _obscureConfirm,
-                      onTap: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
-                  ),
+                  decoration: _fieldDecoration(hint: 'Confirm password')
+                      .copyWith(
+                        suffixIcon: _eyeToggle(
+                          obscure: _obscureConfirm,
+                          onTap: () => setState(
+                            () => _obscureConfirm = !_obscureConfirm,
+                          ),
+                        ),
+                      ),
                   validator: (v) {
                     if (v == null || v.isEmpty) {
                       return 'Please confirm your password';
@@ -204,8 +208,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.secondary,
-                      disabledBackgroundColor:
-                          AppColors.secondary.withValues(alpha: 0.4),
+                      disabledBackgroundColor: AppColors.secondary.withValues(
+                        alpha: 0.4,
+                      ),
                       foregroundColor: AppColors.onSecondary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -220,7 +225,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white),
+                                Colors.white,
+                              ),
                             ),
                           )
                         : Text(
@@ -270,10 +276,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  TextStyle get _textStyle => GoogleFonts.plusJakartaSans(
-        fontSize: 15,
-        color: AppColors.onSurface,
-      );
+  TextStyle get _textStyle =>
+      GoogleFonts.plusJakartaSans(fontSize: 15, color: AppColors.onSurface);
 
   InputDecoration _fieldDecoration({required String hint}) {
     return InputDecoration(
@@ -308,8 +312,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 
