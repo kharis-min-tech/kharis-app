@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
 import 'package:kharis_app/core/services/cache_service.dart';
@@ -21,6 +22,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 class AudioPlayerService {
   AudioPlayerService(this._cache) : _player = AudioPlayer() {
     _setupListeners();
+    unawaited(_configureSession());
   }
 
   final AudioPlayer _player;
@@ -32,6 +34,12 @@ class AudioPlayerService {
 
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<AudioInterruptionEvent>? _interruptionSub;
+  StreamSubscription<void>? _noisySub;
+
+  /// Whether playback was paused by an interruption (call, Siri, nav prompt)
+  /// and should resume when the interruption ends.
+  bool _resumeOnInterruptionEnd = false;
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
@@ -68,6 +76,45 @@ class AudioPlayerService {
           _lastPositionSave = DateTime.now();
         }
       }
+    });
+  }
+
+  /// Premium in-car / on-the-go session behavior:
+  /// - phone call, Siri, or nav prompt pauses playback and resumes after
+  ///   (when iOS says resuming is appropriate);
+  /// - unplugging headphones / disconnecting Bluetooth pauses instead of
+  ///   blasting the speaker.
+  Future<void> _configureSession() async {
+    final session = await AudioSession.instance;
+    _interruptionSub = session.interruptionEventStream.listen((event) {
+      if (event.begin) {
+        switch (event.type) {
+          case AudioInterruptionType.duck:
+            // iOS ducks system-wide automatically; nothing to do.
+            break;
+          case AudioInterruptionType.pause:
+          case AudioInterruptionType.unknown:
+            if (_player.playing) {
+              _resumeOnInterruptionEnd = true;
+              _player.pause();
+            }
+        }
+      } else {
+        switch (event.type) {
+          case AudioInterruptionType.pause:
+            if (_resumeOnInterruptionEnd) {
+              _resumeOnInterruptionEnd = false;
+              _player.play();
+            }
+          case AudioInterruptionType.duck:
+          case AudioInterruptionType.unknown:
+            _resumeOnInterruptionEnd = false;
+        }
+      }
+    });
+    _noisySub = session.becomingNoisyEventStream.listen((_) {
+      _resumeOnInterruptionEnd = false;
+      _player.pause();
     });
   }
 
@@ -183,6 +230,8 @@ class AudioPlayerService {
     if (_player.playing) _saveCurrentPosition();
     await _positionSub?.cancel();
     await _stateSub?.cancel();
+    await _interruptionSub?.cancel();
+    await _noisySub?.cancel();
     await _player.dispose();
   }
 }

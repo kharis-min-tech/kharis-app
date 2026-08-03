@@ -277,10 +277,11 @@ class _MediaToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasVideo = sermon?.videoId != null;
+    final hasVideo = (sermon?.videoId ?? '').isNotEmpty;
+    final hasAudio = (sermon?.audioUrl ?? '').isNotEmpty;
     return Row(
       children: [
-        const _ToggleChip(label: 'Audio', active: true),
+        _ToggleChip(label: 'Audio', active: hasAudio, enabled: hasAudio),
         const SizedBox(width: 9),
         _ToggleChip(
           label: 'Video',

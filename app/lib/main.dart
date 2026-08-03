@@ -24,12 +24,16 @@ Future<void> main() async {
       FlutterNativeSplash.preserve(widgetsBinding: binding);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-      // Lock-screen / notification media controls (Now Playing). Must run
-      // before any AudioPlayer is created.
+      // Lock-screen / notification / CarPlay media controls (Now Playing).
+      // Must run before any AudioPlayer is created. 15 s skip intervals give
+      // CarPlay + lock screen podcast-style ±15 s buttons (sermons have no
+      // next/previous queue, so skip buttons are the useful transport).
       await JustAudioBackground.init(
         androidNotificationChannelId: 'com.kharis.app.channel.audio',
         androidNotificationChannelName: 'Kharis audio playback',
         androidNotificationOngoing: true,
+        fastForwardInterval: const Duration(seconds: 15),
+        rewindInterval: const Duration(seconds: 15),
       );
       FlutterError.onError = (details) {
         if (kDebugMode) {
