@@ -5,7 +5,8 @@ import 'package:kharis_app/core/theme/theme.dart';
 
 /// Splash / brand entry (design-handoff v3).
 ///
-/// Full-bleed worship photo under a purple→magenta gradient wash, centred dove
+/// Full-bleed worship photo in its own colours under a neutral legibility
+/// scrim, centred dove
 /// + "Kharis" wordmark + serif tagline, then a gold **Get started** CTA and a
 /// "Log in with iKharis" row. Button-driven (no auto-advance) so returning
 /// users are routed by the auth redirect and new users choose to begin.
@@ -32,32 +33,36 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Deliberately theme-invariant: the splash is a full-bleed photo under a
-      // purple wash, so this is only the base beneath the image — a light
-      // scaffold would flash white before the asset decodes. Everything on top
-      // of the photo stays white/light in both themes for the same reason.
+      // Deliberately theme-invariant: the splash is a full-bleed photo, so this
+      // is only the base beneath the image — a light scaffold would flash white
+      // before the asset decodes. Everything on top of the photo stays
+      // white/light in both themes for the same reason.
       backgroundColor: AppColors.ink,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Full-bleed worship photo (natural colours).
-          Image.asset(AppAssets.splashPink, fit: BoxFit.cover),
+          // Full-bleed congregation photo, natural colours, no tint. Same
+          // pre-cropped asset the native splash uses, so launch hands over to
+          // this screen without a visible change.
+          Image.asset(AppAssets.splashBg, fit: BoxFit.cover),
 
-          // Purple wash at the top (behind the dove + wordmark) that fades into
-          // the natural photo below; a soft dark scrim anchors the CTA text.
+          // Neutral scrim only — no purple tint. The congregation photo is the
+          // splash, so it reads in its own colours; these stops exist purely so
+          // the dove, wordmark and CTAs stay legible over it. This also matches
+          // the native splash, which is the same photo with no wash, making the
+          // handover to Flutter invisible.
           DecoratedBox(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xE64A2AA8), // deep purple, top
-                  Color(0x995D3FD3), // purple ~60%
-                  Color(0x1A5D3FD3), // purple ~10%
-                  Color(0x00000000), // transparent — natural photo
-                  Color(0x8C0B0A10), // soft ink ~55% for CTA/footer legibility
+                  Color(0x730B0A10), // ink ~45% behind status bar + wordmark
+                  Color(0x260B0A10), // ink ~15%, fading out
+                  Color(0x00000000), // clear — the photo's own colours
+                  Color(0x9E0B0A10), // ink ~62% anchoring the CTA block
                 ],
-                stops: [0.0, 0.20, 0.36, 0.55, 1.0],
+                stops: [0.0, 0.26, 0.5, 1.0],
               ),
             ),
           ),

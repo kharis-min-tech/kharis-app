@@ -14,6 +14,12 @@ abstract final class AppAssets {
   // ── Onboarding photos ───────────────────────────────────────────────────────
   static const String splashWorship = '$_base/splash-worship.png';
   static const String splashPink = '$_base/splash-pink.jpg';
+
+  /// Full-bleed splash background: [splashPink] pre-cropped to the same
+  /// BoxFit.cover framing at 1242x2688. Generated for the native splash, and
+  /// used by SplashScreen too so both show identical pixels — the source jpg
+  /// is only 206x206 and visibly softens when the widget upscales it.
+  static const String splashBg = '$_base/splash-bg.png';
   static const String communityRole = '$_base/community-role.jpg';
 
   // ── Sermon / series art ─────────────────────────────────────────────────────
