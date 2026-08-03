@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // Internal unified notification item for display.
@@ -35,11 +35,9 @@ class NotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
     final newsAsync = ref.watch(newsProvider);
-    final eventsAsync = ref.watch(upcomingEventsProvider(null));
-
-    final userBranch = userAsync.valueOrNull?.branch;
+    final userBranch = ref.watch(currentBranchProvider).valueOrNull;
+    final eventsAsync = ref.watch(upcomingEventsProvider(userBranch));
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,

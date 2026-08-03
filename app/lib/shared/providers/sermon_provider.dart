@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/sermon_categorizer.dart';
 import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
+import '../../features/calendar/data/rsvp_repository.dart';
 import '../../features/home/data/daily_content_repository.dart';
 import '../../features/home/data/news_repository.dart';
 import '../../features/home/data/kharis_api_announcement_repository.dart';
@@ -28,16 +29,37 @@ final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
 // ── Sermons (live fetch) ──────────────────────────────────────────────────────
 /// All audio sermons, freshest source first.
 ///
-/// Firestore/RSS when reachable; otherwise the bundled 500-episode catalogue.
+/// Two sources, merged: the CMS (`sermons` collection, what the admin panel
+/// writes) layered over the public Kharis sermon API, deduped by title with
+/// the CMS winning. Without the merge an admin-added sermon would only ever be
+/// visible inside the admin panel. Falls back to the bundled 500-episode
+/// catalogue when the API is unreachable.
 final sermonsProvider = FutureProvider<List<Sermon>>((ref) async {
   final repo = ref.watch(sermonRepositoryProvider);
+  // Live stream, so a CMS edit re-emits the library without a manual refresh.
+  final cms = ref.watch(adminSermonsProvider).valueOrNull ?? const <Sermon>[];
+  final cmsAudio = cms
+      .where((s) => s.source != 'youtube' && s.videoId == null)
+      .toList();
+
+  List<Sermon> api;
   try {
-    return await repo.getSermons();
+    api = await repo.getSermons();
   } catch (_) {
     // Offline / CI fallback - never leaves the user with an empty screen.
-    return repo.loadCatalogue();
+    api = await repo.loadCatalogue();
   }
+
+  final seen = <String>{for (final s in cmsAudio) _dedupeTitle(s.title)};
+  return [
+    ...cmsAudio,
+    ...api.where((s) => seen.add(_dedupeTitle(s.title))),
+  ];
 });
+
+/// Title reduced to alphanumerics for cross-source dedupe.
+String _dedupeTitle(String title) =>
+    title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
 // ── Library sort + filter ─────────────────────────────────────────────────────
 
@@ -140,12 +162,22 @@ final videosProvider = FutureProvider<List<Sermon>>((ref) async {
 
 // ── Admin: sermon management (Firestore realtime) ────────────────────────────
 
+/// The Firestore-backed sermon repository used by the admin CMS.
+///
+/// Deliberately separate from [sermonRepositoryProvider]: the public library
+/// reads the external Kharis sermon API, while every admin write/delete must
+/// land in the Firestore `sermons` collection. Sharing one provider is what
+/// made the admin panel type-guard itself into a no-op.
+final adminSermonRepositoryProvider = Provider<FirestoreSermonRepository>(
+  (ref) => FirestoreSermonRepository(),
+);
+
 /// Admin-only realtime stream of Firestore-managed sermons for the CMS panel.
 /// Only works when [kUseFirebase] is true; otherwise emits an empty list.
 final adminSermonsProvider = StreamProvider<List<Sermon>>((ref) {
   if (!kUseFirebase) return Stream.value(const []);
   try {
-    return FirestoreSermonRepository().watchSermons();
+    return ref.watch(adminSermonRepositoryProvider).watchSermons();
   } catch (_) {
     return Stream.value(const []);
   }
@@ -218,6 +250,51 @@ final upcomingEventsProvider =
   return repo.watchUpcomingEvents(branch: branch);
 });
 
+/// Past events, optionally filtered by branch. Realtime, most recent first.
+/// An event only lands here once its end time has passed.
+final pastEventsProvider =
+    StreamProvider.family<List<Event>, String?>((ref, branch) {
+  final repo = ref.watch(eventRepositoryProvider);
+  return repo.watchPastEvents(branch: branch);
+});
+
+// ── RSVPs ─────────────────────────────────────────────────────────────────────
+
+final rsvpRepositoryProvider = Provider<RsvpRepository>((ref) {
+  return RsvpRepository();
+});
+
+/// The signed-in member's RSVPs, latest event first. Empty while signed out;
+/// re-subscribes on sign-in/sign-out without needing an outer watch.
+final myRsvpsProvider = StreamProvider<List<Rsvp>>((ref) {
+  return ref.watch(rsvpRepositoryProvider).watchMyRsvps();
+});
+
+/// Whether the signed-in member has RSVP'd to a given event id. Derived from
+/// [myRsvpsProvider] so the RSVP button reflects persisted state without a
+/// listener (or a read) per card. Auto-disposed so scrolling through a long
+/// list does not accumulate one family entry per event for the session.
+final isEventRsvpedProvider =
+    Provider.autoDispose.family<bool, String>((ref, eventId) {
+  final rsvps = ref.watch(myRsvpsProvider).valueOrNull ?? const <Rsvp>[];
+  return rsvps.any((r) => r.eventId == eventId);
+});
+
+/// The events behind [myRsvpsProvider], in RSVP order (latest event first).
+/// Resolved in `whereIn` batches, so the cost is O(n / 30) reads.
+final myRsvpEventsProvider = FutureProvider<List<Event>>((ref) async {
+  final rsvps = await ref.watch(myRsvpsProvider.future);
+  if (rsvps.isEmpty) return const [];
+  final events = await ref
+      .watch(eventRepositoryProvider)
+      .getEventsByIds(rsvps.map((r) => r.eventId).toList());
+  final byId = {for (final e in events) e.id: e};
+  return [
+    for (final r in rsvps)
+      if (byId[r.eventId] case final Event e) e,
+  ];
+});
+
 // ── Daily content ─────────────────────────────────────────────────────────────
 
 final dailyContentRepositoryProvider = Provider<DailyContentRepository>((ref) {
@@ -242,8 +319,21 @@ final announcementApiRepositoryProvider =
   return KharisApiAnnouncementRepository();
 });
 
-final newsProvider = FutureProvider<List<NewsItem>>((ref) {
-  return ref.watch(announcementApiRepositoryProvider).getAnnouncements();
+/// Live announcements, expired items removed. `expiresAt` is set by the web
+/// admin portal; anything past it must never reach the UI.
+final newsProvider = FutureProvider<List<NewsItem>>((ref) async {
+  final items =
+      await ref.watch(announcementApiRepositoryProvider).getAnnouncements();
+  return items.where((n) => !n.isExpired).toList();
+});
+
+/// Admin-only realtime announcement list — Firestore direct, expired items
+/// INCLUDED so a lapsed notice stays editable, and live so a CMS write shows
+/// up immediately (the member-facing [newsProvider] is a cached API future).
+final adminNewsProvider = StreamProvider<List<NewsItem>>((ref) {
+  return ref
+      .watch(newsRepositoryProvider)
+      .watchNews(limit: 100, includeExpired: true);
 });
 
 // ── Live status ───────────────────────────────────────────────────────────────

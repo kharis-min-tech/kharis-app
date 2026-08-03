@@ -1,26 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_webview_screen.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 
 /// The secure Kharis giving portal (opened via the web-view / payment flow).
+///
+/// Org-wide, not per-branch: the portal itself handles fund designation and the
+/// branch model carries no giving URL, so there is nothing branch-specific to
+/// substitute here.
 const String _kGivingUrl = 'https://kharis.org/giving';
 
-/// Home branch shown in the "Giving to" selector.
-const String _kBranch = 'London (HQ)';
+/// Shown in the "Giving to" row when the member has not picked a campus.
+const String _kAllCampusesLabel = 'All campuses';
 
 /// Giving tab (design-handoff v3, light).
 ///
 /// A calm, single-column giving landing: a scripture card, the branch the gift
 /// is directed to, a full-width **Give securely** call-to-action that opens the
 /// secure portal, and offline bank-transfer + campaign cards below.
-class GivingScreen extends StatelessWidget {
+class GivingScreen extends ConsumerWidget {
   const GivingScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final branch = ref.watch(currentBranchProvider).valueOrNull;
+
     return Scaffold(
       backgroundColor: AppColors.lightBg,
       body: SafeArea(
@@ -43,9 +52,11 @@ class GivingScreen extends StatelessWidget {
                     const SizedBox(height: 18),
                     const _SectionLabel('GIVING TO'),
                     const SizedBox(height: 9),
+                    // Tapping opens the profile editor — the one place a member
+                    // can actually change their campus — not the payment flow.
                     _BranchSelector(
-                      branch: _kBranch,
-                      onTap: () => openGivingFlow(context, _kGivingUrl),
+                      branch: branch ?? _kAllCampusesLabel,
+                      onTap: () => context.push('/profile/edit'),
                     ),
                     const SizedBox(height: 14),
                     _GiveSecurelyButton(

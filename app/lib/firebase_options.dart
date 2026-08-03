@@ -44,36 +44,36 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB2vE_UOW7B5klftL9SN33VqoTesIbcH7c',
-    appId: '1:656532033168:android:9ee280a45ec14c3bd21215',
-    messagingSenderId: '656532033168',
-    projectId: 'kharis-app-47c49',
-    storageBucket: 'kharis-app-47c49.firebasestorage.app',
+    apiKey: 'AIzaSyC-BfsQ5dGkmcYVX87QMDz5k0gAxDG9ETQ',
+    appId: '1:193550520841:android:04df93075ac233e9689ed8',
+    messagingSenderId: '193550520841',
+    projectId: 'kharis-church',
+    storageBucket: 'kharis-church.firebasestorage.app',
   );
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAM-SqzIh-sfKtHeth-rqTK6T2DWzgOb40',
-    appId: '1:656532033168:ios:a6e54a8e9ebef5b7d21215',
-    messagingSenderId: '656532033168',
-    projectId: 'kharis-app-47c49',
-    storageBucket: 'kharis-app-47c49.firebasestorage.app',
+    apiKey: 'AIzaSyApB73NdGgLA_cHk_DxT9gmSpijuiYuSI8',
+    appId: '1:193550520841:ios:46ad20bca7b7964a689ed8',
+    messagingSenderId: '193550520841',
+    projectId: 'kharis-church',
+    storageBucket: 'kharis-church.firebasestorage.app',
     iosBundleId: 'com.kharis.app',
   );
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDrb8yD1g5rUAZR8fjuh_SXXhhgfyzKyNA',
-    appId: '1:656532033168:web:8b84b12c3cd8d888d21215',
-    messagingSenderId: '656532033168',
-    projectId: 'kharis-app-47c49',
-    authDomain: 'kharis-app-47c49.firebaseapp.com',
-    storageBucket: 'kharis-app-47c49.firebasestorage.app',
-    measurementId: 'G-VYRG23Z14G',
+    apiKey: 'AIzaSyCSTb4h3uc2tf7-BqU9lKpZUT15OBZlXXQ',
+    appId: '1:193550520841:web:869bfc2bb60d69e4689ed8',
+    messagingSenderId: '193550520841',
+    projectId: 'kharis-church',
+    authDomain: 'kharis-church.firebaseapp.com',
+    storageBucket: 'kharis-church.firebasestorage.app',
+    measurementId: 'G-SXL76TWT0W',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAM-SqzIh-sfKtHeth-rqTK6T2DWzgOb40',
-    appId: '1:656532033168:ios:a6e54a8e9ebef5b7d21215',
-    messagingSenderId: '656532033168',
-    projectId: 'kharis-app-47c49',
-    storageBucket: 'kharis-app-47c49.firebasestorage.app',
+    apiKey: 'AIzaSyApB73NdGgLA_cHk_DxT9gmSpijuiYuSI8',
+    appId: '1:193550520841:ios:46ad20bca7b7964a689ed8',
+    messagingSenderId: '193550520841',
+    projectId: 'kharis-church',
+    storageBucket: 'kharis-church.firebasestorage.app',
     iosBundleId: 'com.kharis.app',
   );
 }

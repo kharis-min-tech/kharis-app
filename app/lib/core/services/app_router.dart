@@ -19,6 +19,7 @@ import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/player/presentation/screens/playlist_screen.dart';
 import '../../features/home/presentation/screens/reading_screen.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
+import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/admin/presentation/screens/admin_hub_screen.dart';
 import '../../features/admin/presentation/screens/admin_announcements_screen.dart';
@@ -151,6 +152,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notes',
         builder: (context, state) => const NotesScreen(),
+      ),
+
+      // ── Notifications feed (overlays shell; push deep-link target) ────────
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
 
       // ── Profile (overlays shell) ──────────────────────────────────────────

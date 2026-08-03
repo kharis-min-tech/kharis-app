@@ -121,12 +121,16 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
     return ref.id;
   }
 
-  /// Updates an existing sermon document.
+  /// Overwrites the editable field surface of an existing sermon document.
+  ///
+  /// Every optional field is written even when `null`, so clearing a field in
+  /// the admin form actually clears it in Firestore. A patch-style version
+  /// that skipped nulls made "delete the series" a silent no-op.
   Future<void> updateSermon(
     String id, {
-    String? title,
-    String? speaker,
-    String? audioUrl,
+    required String title,
+    required String speaker,
+    required String audioUrl,
     String? artworkUrl,
     int? durationSeconds,
     DateTime? publishedAt,
@@ -135,27 +139,27 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
     String? category,
     String? videoId,
     String? source,
-    bool? isFeatured,
+    required bool isFeatured,
   }) {
-    final data = <String, dynamic>{};
-    if (title != null) {
-      data['title'] = title;
-      data['category'] = category ?? sermonCategory(title);
+    final data = <String, dynamic>{
+      'title': title,
+      'speaker': speaker,
+      'audioUrl': audioUrl,
+      'thumbnailUrl': artworkUrl,
+      'artworkUrl': artworkUrl,
+      'duration': durationSeconds,
+      'series': series,
+      'description': description,
+      'category': category ?? sermonCategory(title),
+      'videoId': videoId,
+      'source': source ?? 'audio',
+      'isFeatured': isFeatured,
+    };
+    // Leave the existing publish date alone when the form has none, rather
+    // than blanking the field the library sorts on.
+    if (publishedAt != null) {
+      data['publishedAt'] = Timestamp.fromDate(publishedAt);
     }
-    if (speaker != null) data['speaker'] = speaker;
-    if (audioUrl != null) data['audioUrl'] = audioUrl;
-    if (artworkUrl != null) {
-      data['thumbnailUrl'] = artworkUrl;
-      data['artworkUrl'] = artworkUrl;
-    }
-    if (durationSeconds != null) data['duration'] = durationSeconds;
-    if (publishedAt != null) data['publishedAt'] = Timestamp.fromDate(publishedAt);
-    if (series != null) data['series'] = series;
-    if (description != null) data['description'] = description;
-    if (category != null) data['category'] = category;
-    if (videoId != null) data['videoId'] = videoId;
-    if (source != null) data['source'] = source;
-    if (isFeatured != null) data['isFeatured'] = isFeatured;
     return _firestore.collection('sermons').doc(id).update(data);
   }
 

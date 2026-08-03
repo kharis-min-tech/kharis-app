@@ -7,6 +7,7 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import '../widgets/latest_message_card.dart';
 import '../widgets/todays_reading_card.dart';
+import '../widgets/campus_card.dart';
 import '../widgets/news_section.dart';
 import 'notifications_screen.dart';
 
@@ -56,6 +57,11 @@ class HomeScreen extends ConsumerWidget {
                 child: TodaysReadingCard(),
               ),
             ),
+
+            // Your campus: venue + service times for the member's branch.
+            // Owns its own padding so it collapses to zero height when the
+            // member has no branch or the branch has no venue details.
+            const SliverToBoxAdapter(child: CampusCard()),
 
             // "Announcements" section header
             SliverToBoxAdapter(

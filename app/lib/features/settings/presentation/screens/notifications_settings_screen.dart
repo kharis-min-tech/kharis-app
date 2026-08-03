@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/notification_provider.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,9 @@ class _NotificationsSettingsScreenState
     setState(() {
       _prefs = {...?_prefs, key: value};
     });
+    // Make the toggle mean something: move this device on/off the topic.
+    // Guests get no Firestore write, so this is their only enforcement.
+    ref.read(notificationServiceProvider).applyPreference(key, value);
     final user = ref.read(currentUserProvider).valueOrNull;
     if (user != null && user.role != 'guest') {
       ref
@@ -31,9 +35,15 @@ class _NotificationsSettingsScreenState
     }
   }
 
+  Future<void> _requestPermission() async {
+    await ref.read(notificationServiceProvider).requestPermission();
+    ref.invalidate(notificationPermissionProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final prefsAsync = ref.watch(notificationPrefsProvider);
+    final permitted = ref.watch(notificationPermissionProvider).valueOrNull;
 
     // Hydrate local copy once from the first Firestore emission.
     if (_prefs == null) {
@@ -85,6 +95,12 @@ class _NotificationsSettingsScreenState
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       children: [
+                        // Toggles can't deliver anything while the OS blocks
+                        // us, so say so rather than lying with four switches.
+                        if (permitted == false) ...[
+                          _PermissionNotice(onEnable: _requestPermission),
+                          const SizedBox(height: 14),
+                        ],
                         _ToggleRow(
                           label: 'Service Reminders',
                           subtitle: 'Reminders before services start',
@@ -120,6 +136,57 @@ class _NotificationsSettingsScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── OS permission notice ──────────────────────────────────────────────────────
+
+/// Shown when the OS is blocking notifications, so the toggles below can't
+/// deliver anything regardless of their state.
+class _PermissionNotice extends StatelessWidget {
+  const _PermissionNotice({required this.onEnable});
+
+  final Future<void> Function() onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: AppRadius.cardBorder,
+        boxShadow: AppShadows.card,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Notifications are turned off',
+            style: AppTypography.ui(size: 15, weight: FontWeight.w600)
+                .copyWith(color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Your device is blocking Kharis notifications. Allow them to start '
+            'receiving the alerts you pick below.',
+            style: AppTypography.ui(size: 12)
+                .copyWith(color: AppColors.textMutedLight),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: onEnable,
+              child: Text(
+                'Allow notifications',
+                style: AppTypography.ui(size: 13, weight: FontWeight.w600)
+                    .copyWith(color: AppColors.secondary),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

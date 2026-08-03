@@ -3,7 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/core/utils/service_time.dart';
 import 'package:go_router/go_router.dart';
+
+/// Branch groupings that exist in the network. `addBranch` defaults to
+/// 'Kharis'; without an explicit selector a new KP2 campus could never be
+/// created from the app.
+const _groupOptions = ['Kharis', 'KP2'];
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -247,12 +253,14 @@ class _BranchCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    if (branch.meetingDays != null || branch.meetingTime != null)
+                    // Normalised: the web portal writes 24-hour '14:00',
+                    // the Flutter admin and seed data write '2:00 PM'.
+                    if (formatServiceSchedule(
+                            branch.meetingDays, branch.meetingTime) !=
+                        null)
                       Text(
-                        [
-                          if (branch.meetingDays != null) branch.meetingDays!,
-                          if (branch.meetingTime != null) branch.meetingTime!,
-                        ].join(', '),
+                        formatServiceSchedule(
+                            branch.meetingDays, branch.meetingTime)!,
                         style: AppTypography.labelMd.copyWith(
                           color: AppColors.textFaint,
                         ),
@@ -269,7 +277,7 @@ class _BranchCard extends StatelessWidget {
                       _ColorDot(color: branch.gradientEnd),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        'Order: ${branch.order}',
+                        '${branch.group} · Order: ${branch.order}',
                         style: AppTypography.labelMd.copyWith(
                           color: AppColors.textFaint,
                         ),
@@ -367,6 +375,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
 
   Color _gradientStart = const Color(0xFF3B2A6B);
   Color _gradientEnd = const Color(0xFF7C3AED);
+  late String _group;
   bool _saving = false;
 
   static final _hexRegex = RegExp(r'^#[0-9A-Fa-f]{6}$');
@@ -392,6 +401,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
     _addressCtrl = TextEditingController(text: b?.address ?? '');
     _meetingDaysCtrl = TextEditingController(text: b?.meetingDays ?? '');
     _meetingTimeCtrl = TextEditingController(text: b?.meetingTime ?? '');
+    _group = b?.group ?? _groupOptions.first;
   }
 
   @override
@@ -478,6 +488,24 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
                 style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
                 decoration: _deco(hint: 'Short description'),
                 textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Group (Kharis / KP2)
+              _label('Group'),
+              const SizedBox(height: AppSpacing.xs),
+              DropdownButtonFormField<String>(
+                initialValue: _group,
+                dropdownColor: AppColors.surfaceContainer,
+                style:
+                    AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                decoration: _deco(),
+                items: _groupOptions
+                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _group = v);
+                },
               ),
               const SizedBox(height: AppSpacing.sm),
 
@@ -693,6 +721,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
           address: address,
           meetingDays: meetingDays,
           meetingTime: meetingTime,
+          group: _group,
         );
         widget.onSuccess('Branch added.');
       } else {
@@ -707,7 +736,7 @@ class _BranchFormSheetState extends State<_BranchFormSheet> {
           address: address,
           meetingDays: meetingDays,
           meetingTime: meetingTime,
-          group: widget.branch!.group,
+          group: _group,
         );
         widget.onSuccess('Branch updated.');
       }

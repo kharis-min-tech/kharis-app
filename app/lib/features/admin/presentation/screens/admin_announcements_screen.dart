@@ -23,7 +23,7 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final newsAsync = ref.watch(newsProvider);
+    final newsAsync = ref.watch(adminNewsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -212,6 +212,16 @@ class _NewsCard extends StatelessWidget {
                   Row(
                     children: [
                       _TypeChip(type: item.type),
+                      if (item.isExpired) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Text(
+                          'EXPIRED',
+                          style: AppTypography.labelMd.copyWith(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                       const Spacer(),
                       Text(
                         _formatDate(item.publishedAt),

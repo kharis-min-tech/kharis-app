@@ -19,6 +19,18 @@ service cloud.firestore {
       );
     }
 
+    // Helper: does `rsvpId` belong to the caller? RSVP document IDs are
+    // `{uid}_{eventId}`, so the uid prefix is the ownership proof. Checking
+    // the ID (rather than only `resource.data.userId`) means an existence
+    // check on a document that does not exist still evaluates — there is no
+    // `resource` to read for a missing doc.
+    function ownsRsvpId(rsvpId) {
+      let prefix = request.auth.uid + '_';
+      return isAuthenticated()
+             && rsvpId.size() > prefix.size()
+             && rsvpId[0:prefix.size()] == prefix;
+    }
+
     // users — each user manages their own profile; admins manage all profiles
     // and are the only ones who may change a role (no self-promotion).
     match /users/{uid} {
@@ -83,6 +95,25 @@ service cloud.firestore {
                     && request.resource.data.text.size() > 0
                     && request.resource.data.text.size() <= 2000;
       allow read, update, delete: if isAdmin();
+    }
+
+    // rsvps — one doc per user+event, ID `{uid}_{eventId}`. Ownership is bound
+    // to the document ID as well as the payload, so a member can never create,
+    // read or delete another member's RSVP.
+    match /rsvps/{rsvpId} {
+      allow get: if ownsRsvpId(rsvpId) || isAdmin();
+      // Listing is only ever allowed for a query already narrowed to the
+      // caller's own RSVPs; admins may list everything.
+      allow list: if isAdmin()
+                  || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.eventId is string
+                    && request.resource.data.eventId.size() > 0
+                    && rsvpId == request.auth.uid + '_' + request.resource.data.eventId;
+      // RSVPs are create-or-delete only; there is nothing to mutate in place.
+      allow update: if false;
+      allow delete: if ownsRsvpId(rsvpId) || isAdmin();
     }
 
     // Deny everything else

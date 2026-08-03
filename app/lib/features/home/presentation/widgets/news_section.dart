@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 
 // Brand gradient pairs cycled across announcement cards.
 const _kCardGradients = [
@@ -22,8 +22,7 @@ class AnnouncementsCarousel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final newsAsync = ref.watch(newsProvider);
-    final user = ref.watch(currentUserProvider).valueOrNull;
-    final userBranch = user?.branch;
+    final userBranch = ref.watch(currentBranchProvider).valueOrNull;
     final allItems = newsAsync.valueOrNull ?? const <NewsItem>[];
     final items = allItems
         .where((n) => n.branch == null || n.branch == userBranch)

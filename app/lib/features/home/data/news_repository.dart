@@ -11,6 +11,7 @@ class NewsItem {
     this.body,
     this.imageUrl,
     this.branch,
+    this.expiresAt,
   });
 
   final String id;
@@ -20,6 +21,16 @@ class NewsItem {
   final String? body;
   final String? imageUrl;
   final String? branch;
+
+  /// When the announcement stops being relevant. Set by the web admin portal
+  /// (`admin/index.html`); `null` means it never expires.
+  final DateTime? expiresAt;
+
+  /// True once [expiresAt] has passed. Expired items must not be shown.
+  bool get isExpired {
+    final until = expiresAt;
+    return until != null && until.isBefore(DateTime.now());
+  }
 }
 
 /// Streams news/announcements from the Firestore `news` collection.
@@ -32,13 +43,27 @@ class NewsRepository {
 
   final FirebaseFirestore _firestore;
 
-  Stream<List<NewsItem>> watchNews({int limit = 10}) {
+  /// Live announcements, newest first.
+  ///
+  /// Expired items (`expiresAt` in the past) are dropped so the offline /
+  /// fallback path honours expiry exactly like the API path; over-fetches so
+  /// the post-filter still fills a page. Admin surfaces pass
+  /// [includeExpired] so an expired item stays editable instead of vanishing
+  /// from the CMS the moment it stops being shown to members.
+  Stream<List<NewsItem>> watchNews({
+    int limit = 10,
+    bool includeExpired = false,
+  }) {
     return _firestore
         .collection('news')
         .orderBy('publishedAt', descending: true)
-        .limit(limit)
+        .limit(includeExpired ? limit : limit * 2)
         .snapshots()
-        .map((snap) => snap.docs.map(_docToNews).toList())
+        .map((snap) => snap.docs
+            .map(_docToNews)
+            .where((n) => includeExpired || !n.isExpired)
+            .take(limit)
+            .toList())
         .handleError((Object _) {})
         .defaultIfEmpty(const []);
   }
@@ -93,6 +118,7 @@ class NewsRepository {
       body: data['body'] as String?,
       imageUrl: data['imageUrl'] as String?,
       branch: data['branch'] as String?,
+      expiresAt: (data['expiresAt'] as Timestamp?)?.toDate(),
     );
   }
 

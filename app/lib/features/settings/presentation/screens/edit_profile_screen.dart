@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/notification_provider.dart';
 
 /// Lets a signed-in user edit their display name, home branch and avatar.
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -34,10 +36,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _saving = true);
     try {
       final photo = _photoController.text.trim();
+      // Capture before the write so the FCM topic move knows what to leave.
+      final previousBranch = ref.read(currentBranchProvider).valueOrNull;
       await ref.read(firebaseAuthRepositoryProvider).updateProfile(
             displayName: _nameController.text.trim(),
             branch: _branch,
             photoUrl: photo.isEmpty ? null : photo,
+          );
+      // Same shared code path as Switch Branch; a no-change save is a no-op.
+      await ref.read(notificationServiceProvider).switchBranchTopic(
+            from: previousBranch,
+            to: _branch,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

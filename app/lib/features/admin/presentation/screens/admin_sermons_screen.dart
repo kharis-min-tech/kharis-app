@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kharis_app/core/services/firebase_service.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/sermon_categorizer.dart';
 import 'package:kharis_app/features/messages/data/firestore_sermon_repository.dart';
@@ -37,12 +38,16 @@ class AdminSermonsScreen extends ConsumerWidget {
         ),
         iconTheme: const IconThemeData(color: AppColors.heading),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.secondary,
-        foregroundColor: AppColors.onSecondary,
-        onPressed: () => _openForm(context, ref),
-        child: const Icon(Icons.add),
-      ),
+      // Firebase off ⇒ no writable backing store, so no create control at all
+      // rather than a button that opens a form nothing can save.
+      floatingActionButton: kUseFirebase
+          ? FloatingActionButton(
+              backgroundColor: AppColors.secondary,
+              foregroundColor: AppColors.onSecondary,
+              onPressed: () => _openForm(context, ref),
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: sermonsAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppColors.secondary),
@@ -55,10 +60,15 @@ class AdminSermonsScreen extends ConsumerWidget {
         data: (sermons) {
           if (sermons.isEmpty) {
             return _EmptyState(
-              icon: Icons.mic_none_rounded,
-              title: 'No CMS sermons yet',
-              subtitle:
-                  'Tap + to add a sermon. RSS episodes appear automatically in the app.',
+              icon: kUseFirebase
+                  ? Icons.mic_none_rounded
+                  : Icons.cloud_off_rounded,
+              title: kUseFirebase
+                  ? 'No CMS sermons yet'
+                  : 'Sermon CMS unavailable',
+              subtitle: kUseFirebase
+                  ? 'Tap + to add a sermon. RSS episodes appear automatically in the app.'
+                  : 'Firebase is disabled in this build, so sermons cannot be managed here.',
             );
           }
           return ListView.separated(
@@ -86,7 +96,7 @@ class AdminSermonsScreen extends ConsumerWidget {
 
   void _openForm(BuildContext context, WidgetRef ref, {Sermon? sermon}) {
     final messenger = ScaffoldMessenger.of(context);
-    final repo = ref.read(sermonRepositoryProvider);
+    final repo = ref.read(adminSermonRepositoryProvider);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -139,10 +149,9 @@ class AdminSermonsScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                final repo = ref.read(sermonRepositoryProvider);
-                if (repo is FirestoreSermonRepository) {
-                  await repo.deleteSermon(sermon.id);
-                }
+                await ref
+                    .read(adminSermonRepositoryProvider)
+                    .deleteSermon(sermon.id);
                 messenger.showSnackBar(const SnackBar(
                   content: Text('Sermon deleted.'),
                 ));
@@ -165,18 +174,16 @@ class AdminSermonsScreen extends ConsumerWidget {
 
   void _toggleFeature(BuildContext context, WidgetRef ref, Sermon sermon) {
     final messenger = ScaffoldMessenger.of(context);
-    final repo = ref.read(sermonRepositoryProvider);
+    final repo = ref.read(adminSermonRepositoryProvider);
     () async {
       try {
-        if (repo is FirestoreSermonRepository) {
-          await repo.setFeatured(sermon.id, !sermon.isFeatured);
-          messenger.showSnackBar(SnackBar(
-            content: Text(sermon.isFeatured
-                ? 'Removed from featured.'
-                : 'Added to featured.'),
-            backgroundColor: AppColors.surfaceElevated,
-          ));
-        }
+        await repo.setFeatured(sermon.id, !sermon.isFeatured);
+        messenger.showSnackBar(SnackBar(
+          content: Text(sermon.isFeatured
+              ? 'Removed from featured.'
+              : 'Added to featured.'),
+          backgroundColor: AppColors.surfaceElevated,
+        ));
       } catch (e) {
         messenger.showSnackBar(SnackBar(
           content: Text('Failed: $e'),
@@ -407,7 +414,7 @@ class _SermonFormSheet extends StatefulWidget {
   });
 
   final Sermon? sermon;
-  final dynamic repo;
+  final FirestoreSermonRepository repo;
   final void Function(String) onSuccess;
   final void Function(String) onError;
 
@@ -722,11 +729,6 @@ class _SermonFormSheetState extends State<_SermonFormSheet> {
     setState(() => _saving = true);
     try {
       final repo = widget.repo;
-      if (repo is! FirestoreSermonRepository) {
-        widget.onError('Firestore is not configured.');
-        if (mounted) setState(() => _saving = false);
-        return;
-      }
 
       final title = _titleCtrl.text.trim();
       final speaker = _speakerCtrl.text.trim();

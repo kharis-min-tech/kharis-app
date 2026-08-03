@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:kharis_app/core/constants/api_config.dart';
 
 import 'news_repository.dart';
 
@@ -20,8 +21,7 @@ class KharisApiAnnouncementRepository {
             ),
         _fallback = fallback ?? NewsRepository();
 
-  static const String _url =
-      'https://us-central1-kharis-church.cloudfunctions.net/getAnnouncements';
+  static const String _url = ApiConfig.getAnnouncements;
 
   final Dio _dio;
   final NewsRepository _fallback;
@@ -49,6 +49,7 @@ class KharisApiAnnouncementRepository {
     final title = j['title'] as String?;
     if (id == null || title == null) return null;
     final ts = j['publishedAt'] as String?;
+    final expiry = j['expiresAt'] as String?;
     return NewsItem(
       id: id,
       title: title,
@@ -58,6 +59,7 @@ class KharisApiAnnouncementRepository {
       body: j['body'] as String?,
       imageUrl: j['imageUrl'] as String?,
       branch: j['branch'] as String?,
+      expiresAt: expiry != null ? DateTime.tryParse(expiry) : null,
     );
   }
 }

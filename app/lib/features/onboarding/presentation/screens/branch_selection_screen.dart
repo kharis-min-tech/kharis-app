@@ -7,9 +7,9 @@ import 'package:kharis_app/core/theme/app_typography.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 
 /// Branch selection (design-handoff v3) — light screen. Search across cities,
@@ -114,18 +114,19 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
     }
     final onboardingRepo = ref.read(onboardingRepositoryProvider);
     // Switch this device's branch FCM topic so it gets branch-scoped pushes.
-    final notifications = ref.read(notificationServiceProvider);
-    final previous = onboardingRepo.selectedBranch;
-    if (previous != null && previous.isNotEmpty && previous != branch.name) {
-      await notifications
-          .unsubscribeFromTopic(KharisTopics.branch(_slug(previous)));
-    }
-    await notifications
-        .subscribeToTopic(KharisTopics.branch(_slug(branch.name)));
+    // Same code path as Edit Profile.
+    await ref.read(notificationServiceProvider).switchBranchTopic(
+          from: onboardingRepo.selectedBranch,
+          to: branch.name,
+        );
     await onboardingRepo.completeOnboarding(
       role: onboardingRepo.selectedRole ?? 'member',
       branch: branch.name,
     );
+    // Guests have no Firestore profile doc for [currentBranchProvider] to
+    // stream, so the locally persisted choice is their only source — force a
+    // re-read here or their switch never reaches any content provider.
+    ref.invalidate(currentBranchProvider);
     if (context.mounted) context.go('/home');
   }
 
@@ -161,9 +162,6 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
         ),
     ];
   }
-
-  static String _slug(String s) =>
-      s.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
 }
 
 class _BackRow extends StatelessWidget {

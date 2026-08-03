@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp, FieldValue, FieldPath } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getMessaging } from 'firebase-admin/messaging';
 import { SermonDoc, NewsDoc } from './types';
 
@@ -104,28 +105,41 @@ export const getAnnouncements = onRequest(
         ANNOUNCEMENT_PAGE_SIZE,
       50
     );
+    // Over-fetch so the post-filter for expired items still fills the page.
     const snapshot = await db
       .collection('news')
       .orderBy('publishedAt', 'desc')
-      .limit(limit)
+      .limit(Math.min(limit * 2, 100))
       .get();
 
-    const announcements = snapshot.docs.map((doc) => {
-      const data = doc.data() as NewsDoc;
-      const publishedAt =
-        data.publishedAt instanceof Timestamp
-          ? data.publishedAt.toDate().toISOString()
-          : null;
-      return {
-        id: doc.id,
-        title: data.title ?? '',
-        body: data.body ?? '',
-        type: data.type ?? 'Announcement',
-        branch: data.branch ?? null,
-        imageUrl: data.imageUrl ?? null,
-        publishedAt,
-      };
-    });
+    const nowMs = Date.now();
+    const announcements = snapshot.docs
+      .map((doc) => {
+        const data = doc.data() as NewsDoc;
+        const publishedAt =
+          data.publishedAt instanceof Timestamp
+            ? data.publishedAt.toDate().toISOString()
+            : null;
+        // `expiresAt` is written by the web admin portal; null means "never
+        // expires". Surfaced so clients reading the Firestore fallback path
+        // can apply the same rule.
+        const expiresAt =
+          data.expiresAt instanceof Timestamp
+            ? data.expiresAt.toDate().toISOString()
+            : null;
+        return {
+          id: doc.id,
+          title: data.title ?? '',
+          body: data.body ?? '',
+          type: data.type ?? 'Announcement',
+          branch: data.branch ?? null,
+          imageUrl: data.imageUrl ?? null,
+          publishedAt,
+          expiresAt,
+        };
+      })
+      .filter((a) => a.expiresAt === null || Date.parse(a.expiresAt) > nowMs)
+      .slice(0, limit);
 
     res.status(200).json({
       announcements,
@@ -141,11 +155,19 @@ export const getAnnouncements = onRequest(
  * or `all` (global) — topic names mirror the app's subscriptions
  * (`branch_<slug(branchName)>` / `all`). Idempotent via the `pushedAt` marker;
  * only the last 15 minutes are considered, so it never blasts the backlog.
- * Invoked every minute by Cloud Scheduler.
+ *
+ * Scheduled every minute, which is what keeps the 15-minute window meaningful:
+ * an announcement is picked up within a minute of publishing, and one bad run
+ * still leaves 14 minutes of retries before a doc ages out.
  */
-export const pushPendingAnnouncements = onRequest(
-  { memory: '256MiB', timeoutSeconds: 60, cors: true },
-  async (_req, res) => {
+export const pushPendingAnnouncements = onSchedule(
+  {
+    schedule: 'every 1 minutes',
+    timeZone: 'Europe/London',
+    memory: '256MiB',
+    timeoutSeconds: 60,
+  },
+  async () => {
     const db = getFirestore();
     const cutoff = Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
     const snap = await db
@@ -196,16 +218,19 @@ export const pushPendingAnnouncements = onRequest(
       }
     }
 
-    res.status(200).json({
-      pushed,
-      considered: pending.length,
-      timestamp: Timestamp.now().toDate().toISOString(),
-    });
-  }
+    console.log(
+      `[push] pushed ${pushed}/${pending.length} pending announcement(s)`,
+    );
+  },
 );
 
 const EVENT_PAGE_SIZE = 50;
 const API_CACHE_CONTROL = 'public, max-age=300';
+// Past events are a "moving window" — an event crosses from upcoming to past
+// the moment it starts, so the past variant is cached far more briefly than
+// the rest of the read API. The `when` query param is part of the CDN cache
+// key, so the two variants can never be served from each other's entry.
+const EVENT_PAST_CACHE_CONTROL = 'public, max-age=60';
 
 /**
  * HTTP: GET /getBranches
@@ -242,8 +267,10 @@ export const getBranches = onRequest(
  * Query params:
  *   - branch: branch name (optional). When given, includes events for that
  *     branch OR all-campus events (branch == null).
+ *   - when: 'upcoming' (default) | 'past'
  *   - limit: number (max 50, default 50)
- * Returns upcoming events (startTime >= now) ordered by startTime asc.
+ * Returns upcoming events (startTime >= now) ordered by startTime asc, or
+ * past events (startTime < now) ordered by startTime desc.
  */
 export const getEvents = onRequest(
   { memory: '256MiB', timeoutSeconds: 30, cors: true },
@@ -253,19 +280,30 @@ export const getEvents = onRequest(
       return;
     }
     const db = getFirestore();
-    const { branch, limit: limitParam } = req.query as Record<string, string>;
+    const {
+      branch,
+      limit: limitParam,
+      when,
+    } = req.query as Record<string, string>;
     const limit = Math.min(
       parseInt(limitParam || String(EVENT_PAGE_SIZE), 10) || EVENT_PAGE_SIZE,
       50
     );
+    const past = when === 'past';
     const now = Timestamp.now();
 
     const baseQuery = () =>
-      db
-        .collection('events')
-        .where('startTime', '>=', now)
-        .orderBy('startTime', 'asc')
-        .limit(limit);
+      past
+        ? db
+            .collection('events')
+            .where('startTime', '<', now)
+            .orderBy('startTime', 'desc')
+            .limit(limit)
+        : db
+            .collection('events')
+            .where('startTime', '>=', now)
+            .orderBy('startTime', 'asc')
+            .limit(limit);
 
     let docs;
     if (branch) {
@@ -278,7 +316,8 @@ export const getEvents = onRequest(
         .sort((a, b) => {
           const aStart = a.data().startTime as Timestamp;
           const bStart = b.data().startTime as Timestamp;
-          return aStart.toMillis() - bStart.toMillis();
+          const delta = aStart.toMillis() - bStart.toMillis();
+          return past ? -delta : delta;
         })
         .slice(0, limit);
     } else {
@@ -307,7 +346,7 @@ export const getEvents = onRequest(
       };
     });
 
-    res.set('Cache-Control', API_CACHE_CONTROL);
+    res.set('Cache-Control', past ? EVENT_PAST_CACHE_CONTROL : API_CACHE_CONTROL);
     res.status(200).json({
       events,
       count: events.length,

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:kharis_app/core/constants/api_config.dart';
 
 @immutable
 class DailyContent {
@@ -44,8 +45,7 @@ class DailyContentRepository {
 
   final FirebaseFirestore _firestore;
 
-  static const String _apiUrl =
-      'https://us-central1-kharis-church.cloudfunctions.net/getDailyReading';
+  static const String _apiUrl = ApiConfig.getDailyReading;
 
   static final Dio _dio = Dio(
     BaseOptions(

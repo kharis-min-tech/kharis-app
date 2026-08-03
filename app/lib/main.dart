@@ -11,9 +11,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/services/app_router.dart';
+import 'core/constants/api_config.dart';
 import 'core/services/cache_service.dart';
+import 'core/services/notification_service.dart';
 import 'core/theme/theme.dart';
 import 'shared/providers/cache_provider.dart';
+import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
 
 Future<void> main() async {
@@ -40,6 +43,10 @@ Future<void> main() async {
           FlutterError.dumpErrorToConsole(details);
         }
       };
+
+      // Loudly surface a Firebase SDK vs Cloud Functions project mismatch —
+      // that silently splits Firestore/Auth/FCM away from the API's content.
+      ApiConfig.warnIfProjectSplit();
 
       // Run independent startup work concurrently so first paint isn't blocked
       // by prefs + Hive + Firebase in series.
@@ -79,6 +86,11 @@ class KharisApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // FCM setup (permission prompt, token, handlers) runs off the first frame:
+    // this only kicks off the future, the widget tree never awaits it.
+    ref.watch(notificationInitProvider);
+    // Keeps preference-gated topic subscriptions in step with saved prefs.
+    ref.watch(notificationTopicSyncProvider);
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       builder: (BuildContext context, child) => MaterialApp.router(
@@ -86,6 +98,7 @@ class KharisApp extends ConsumerWidget {
         title: 'Kharis Church',
         themeMode: ThemeMode.light,
         theme: kharisTheme(),
+        scaffoldMessengerKey: kharisMessengerKey,
         routerConfig: ref.watch(appRouterProvider),
       ),
     );

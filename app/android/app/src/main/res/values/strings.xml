@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FCM default notification channel. Referenced from AndroidManifest.xml
+         and created in MainActivity.onCreate() — the Firebase SDK never creates
+         it for us, and on API 26+ a notification on a missing channel is
+         dropped by the system. -->
+    <string name="default_notification_channel_id">kharis_announcements</string>
+    <string name="default_notification_channel_name">Church announcements</string>
+    <string name="default_notification_channel_description">Announcements, event reminders, daily readings and new sermons.</string>
+</resources>
