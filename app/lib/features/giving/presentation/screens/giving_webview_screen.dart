@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 class GivingWebViewScreen extends StatefulWidget {
   const GivingWebViewScreen({
@@ -29,7 +29,6 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(AppColors.surfaceDark)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) => setState(() => _isLoading = true),
@@ -38,6 +37,14 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
         ),
       )
       ..loadRequest(Uri.parse(widget.url));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The web view paints its own background before the page renders; keep it
+    // on the active theme so there is no flash of the wrong brightness.
+    _controller.setBackgroundColor(context.kc.bg);
   }
 
   Future<void> _goBack() async {
@@ -51,27 +58,26 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceElevated,
+        backgroundColor: context.kc.surfaceAlt,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.onSurface, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: context.kc.onBg, size: 20),
           onPressed: _goBack,
         ),
         title: Text(
           widget.title,
           style: GoogleFonts.plusJakartaSans(
-            color: AppColors.onSurface,
+            color: context.kc.onBg,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.close_rounded,
-                color: AppColors.onSurface, size: 22),
+            icon: Icon(Icons.close_rounded,
+                color: context.kc.onBg, size: 22),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -81,10 +87,10 @@ class _GivingWebViewScreenState extends State<GivingWebViewScreen> {
           WebViewWidget(controller: _controller),
           if (_isLoading)
             Container(
-              color: AppColors.surfaceDark,
+              color: context.kc.bg,
               alignment: Alignment.center,
-              child: const CircularProgressIndicator(
-                color: AppColors.secondary,
+              child: CircularProgressIndicator(
+                color: context.kc.accentInk,
                 strokeWidth: 2.5,
               ),
             ),

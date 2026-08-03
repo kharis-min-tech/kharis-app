@@ -29,13 +29,13 @@ class AnnouncementsCarousel extends ConsumerWidget {
         .toList();
 
     if (items.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 148,
         child: Center(
           child: Text(
             'No announcements',
             style: TextStyle(
-              color: AppColors.textMutedLight,
+              color: context.kc.muted,
               fontSize: 13,
             ),
           ),

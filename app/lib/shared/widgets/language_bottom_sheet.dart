@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/theme.dart';
 import '../providers/cache_provider.dart';
 
 const _kAppLanguageKey = 'app_language';
@@ -13,7 +13,7 @@ Future<String?> showLanguageBottomSheet(
 }) {
   return showModalBottomSheet<String>(
     context: context,
-    backgroundColor: AppColors.surfaceElevated,
+    backgroundColor: context.kc.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -67,7 +67,7 @@ class _LanguageBottomSheetState extends ConsumerState<_LanguageBottomSheet> {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.onSurface,
+                color: context.kc.onBg,
               ),
             ),
             const SizedBox(height: 16),
@@ -115,16 +115,16 @@ class _LanguageRow extends StatelessWidget {
                 name,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
-                  color: AppColors.onSurface,
+                  color: context.kc.onBg,
                   fontWeight:
                       isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ),
             if (isSelected)
-              const Icon(
+              Icon(
                 Icons.check,
-                color: AppColors.secondary,
+                color: context.kc.accentInk,
                 size: 20,
               ),
           ],

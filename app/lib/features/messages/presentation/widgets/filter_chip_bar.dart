@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 /// Horizontal row of sort/filter pills.
 ///
-/// Active pill: gold bg + dark text. Inactive: glass bg + white border.
+/// Active pill: gold bg + gold ink. Inactive: muted surface + muted text.
 class SortPillBar extends StatelessWidget {
   const SortPillBar({
     super.key,
@@ -61,7 +59,7 @@ class _SortPill extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? AppColors.secondary : AppColors.darkSurface2,
+          color: active ? context.kc.accent : context.kc.surfaceMuted,
           borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(
@@ -69,7 +67,7 @@ class _SortPill extends StatelessWidget {
           style: AppTypography.ui(
             size: 13,
             weight: FontWeight.w600,
-            color: active ? AppColors.onSecondary : AppColors.darkMuted,
+            color: active ? context.kc.onAccent : context.kc.muted,
           ),
         ),
       ),

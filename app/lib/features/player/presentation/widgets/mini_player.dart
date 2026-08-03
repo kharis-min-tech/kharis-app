@@ -2,17 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_shadows.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
-/// Persistent mini player shown above the tab bar when a sermon is loaded —
-/// dark design-handoff (v3).
+/// Persistent mini player shown above the tab bar when a sermon is loaded.
 ///
-/// A 58-px [AppColors.darkSurface] bar (radius [AppRadius.tile], lifted by
+/// A 58-px `context.kc.surface` bar (radius [AppRadius.tile], lifted by
 /// [AppShadows.miniPlayer]) with the artwork thumbnail, title/speaker, and a
 /// play/pause button, plus a gold progress line pinned to the bottom edge.
 /// Tapping the body pushes `/player`; the play/pause button is isolated.
@@ -44,7 +40,7 @@ class MiniPlayer extends ConsumerWidget {
         height: 58,
         margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
         decoration: BoxDecoration(
-          color: AppColors.darkSurface,
+          color: context.kc.surface,
           borderRadius: BorderRadius.circular(AppRadius.tile),
           boxShadow: AppShadows.miniPlayer,
         ),
@@ -84,7 +80,7 @@ class MiniPlayer extends ConsumerWidget {
                                 size: 12.5,
                                 weight: FontWeight.w600,
                                 height: 1.25,
-                                color: Colors.white,
+                                color: context.kc.onBg,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -95,7 +91,7 @@ class MiniPlayer extends ConsumerWidget {
                               style: AppTypography.ui(
                                 size: 11,
                                 height: 1.25,
-                                color: AppColors.darkMuted,
+                                color: context.kc.muted,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -118,7 +114,7 @@ class MiniPlayer extends ConsumerWidget {
                               isPlaying
                                   ? Icons.pause_rounded
                                   : Icons.play_arrow_rounded,
-                              color: Colors.white,
+                              color: context.kc.onBg,
                               size: 26,
                             ),
                           ),
@@ -160,14 +156,14 @@ class _ProgressLine extends StatelessWidget {
           Container(
             width: double.infinity,
             height: 3,
-            color: Colors.white.withValues(alpha: 0.08),
+            color: context.kc.divider,
           ),
           FractionallySizedBox(
             widthFactor: progress.clamp(0.0, 1.0),
             alignment: Alignment.centerLeft,
             child: Container(
               height: 3,
-              color: AppColors.gold,
+              color: context.kc.accent,
             ),
           ),
         ],

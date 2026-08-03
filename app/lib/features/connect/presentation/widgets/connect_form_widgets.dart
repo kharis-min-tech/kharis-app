@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 const List<String> kConnectBranches = [
   'London',
@@ -47,20 +47,20 @@ class ConnectFormField extends StatelessWidget {
       maxLength: maxLength,
       style: GoogleFonts.plusJakartaSans(
         fontSize: 15,
-        color: Colors.white,
+        color: context.kc.onBg,
       ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.plusJakartaSans(
           fontSize: 14,
-          color: AppColors.textMuted,
+          color: context.kc.muted,
         ),
         filled: true,
-        fillColor: AppColors.surfaceSubtle,
+        fillColor: context.kc.surfaceAlt,
         suffixIcon: suffixIcon,
         counterStyle: GoogleFonts.plusJakartaSans(
           fontSize: 12,
-          color: AppColors.textMuted,
+          color: context.kc.muted,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -72,7 +72,7 @@ class ConnectFormField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.secondary, width: 2),
+          borderSide: BorderSide(color: context.kc.accentInk, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -91,7 +91,7 @@ class ConnectFormField extends StatelessWidget {
   }
 }
 
-/// Styled branch dropdown matching the dark connect form aesthetic.
+/// Styled branch dropdown matching the connect form aesthetic.
 class ConnectBranchDropdown extends StatelessWidget {
   const ConnectBranchDropdown({
     super.key,
@@ -106,7 +106,7 @@ class ConnectBranchDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceSubtle,
+        color: context.kc.surfaceAlt,
         borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -117,15 +117,15 @@ class ConnectBranchDropdown extends StatelessWidget {
             'Branch',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
-              color: AppColors.textMuted,
+              color: context.kc.muted,
             ),
           ),
-          dropdownColor: AppColors.surfaceElevated,
+          dropdownColor: context.kc.surface,
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted),
+          icon: Icon(Icons.keyboard_arrow_down, color: context.kc.muted),
           style: GoogleFonts.plusJakartaSans(
             fontSize: 15,
-            color: Colors.white,
+            color: context.kc.onBg,
           ),
           items: kConnectBranches
               .map(

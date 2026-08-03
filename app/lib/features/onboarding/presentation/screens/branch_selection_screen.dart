@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
@@ -51,7 +49,6 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
             .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,13 +64,13 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
                     'Find your branch',
                     style:
                         AppTypography.display(size: 30, weight: FontWeight.w700)
-                            .copyWith(color: AppColors.textPrimary),
+                            .copyWith(color: context.kc.onBg),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Kharis is one family across many cities.',
                     style: AppTypography.serif(size: 17, italic: true)
-                        .copyWith(color: AppColors.textMutedLight),
+                        .copyWith(color: context.kc.muted),
                   ),
                   const SizedBox(height: 18),
                   _SearchField(
@@ -145,7 +142,7 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
         child: Text(
           label,
           style:
-              AppTypography.labelMd.copyWith(color: AppColors.textMutedLight),
+              AppTypography.labelMd.copyWith(color: context.kc.muted),
         ),
       ),
       for (final b in list)
@@ -179,12 +176,12 @@ class _BackRow extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.chevron_left_rounded,
-                size: 24, color: AppColors.textPrimary),
+            Icon(Icons.chevron_left_rounded,
+                size: 24, color: context.kc.onBg),
             Text(
               'Back',
               style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                  .copyWith(color: AppColors.textPrimary),
+                  .copyWith(color: context.kc.onBg),
             ),
           ],
         ),
@@ -204,16 +201,16 @@ class _SearchField extends StatelessWidget {
     return TextField(
       controller: controller,
       onChanged: onChanged,
-      style: AppTypography.ui(size: 15).copyWith(color: AppColors.textPrimary),
+      style: AppTypography.ui(size: 15).copyWith(color: context.kc.onBg),
       cursorColor: AppColors.primary,
       decoration: InputDecoration(
         hintText: 'Search cities, KP2, Ghana, Sierra Leone',
         hintStyle:
-            AppTypography.ui(size: 15).copyWith(color: AppColors.textMutedLight),
-        prefixIcon: const Icon(Icons.search_rounded,
-            size: 20, color: AppColors.textMutedLight),
+            AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
+        prefixIcon: Icon(Icons.search_rounded,
+            size: 20, color: context.kc.muted),
         filled: true,
-        fillColor: AppColors.cardWhite,
+        fillColor: context.kc.surfaceAlt,
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
       ),
     );

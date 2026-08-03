@@ -3,9 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/role_card.dart';
 import 'package:kharis_app/shared/widgets/language_bottom_sheet.dart';
 
@@ -39,7 +37,6 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(22, 20, 22, 28),
@@ -51,13 +48,13 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
               Text(
                 'Welcome home',
                 style: AppTypography.display(size: 30, weight: FontWeight.w700)
-                    .copyWith(color: AppColors.textPrimary),
+                    .copyWith(color: context.kc.onBg),
               ),
               const SizedBox(height: 6),
               Text(
                 'How do you journey with Kharis?',
                 style: AppTypography.serif(size: 17, italic: true)
-                    .copyWith(color: AppColors.textMutedLight),
+                    .copyWith(color: context.kc.muted),
               ),
               const SizedBox(height: 22),
 
@@ -77,7 +74,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 icon: Icons.auto_awesome_outlined,
                 title: 'New here',
                 description: 'First time — help me settle in',
-                accent: AppColors.secondary,
+                accent: context.kc.accentInk,
                 onTap: () => _select('new_here'),
               ),
               const SizedBox(height: 12),
@@ -93,7 +90,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 icon: Icons.volunteer_activism_outlined,
                 title: 'Partner',
                 description: 'I support Kharis in ministry',
-                accent: AppColors.secondary,
+                accent: context.kc.accentInk,
                 onTap: () => _select('partner'),
               ),
 
@@ -148,6 +145,8 @@ class _CommunityBanner extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               child: Align(
                 alignment: Alignment.bottomLeft,
+                // Sits on the photo's dark gradient, not on a themed surface —
+                // stays white in both brightnesses.
                 child: Text(
                   'One family, many stories',
                   style: AppTypography.ui(size: 14, weight: FontWeight.w700)
@@ -176,24 +175,24 @@ class _LanguagePill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: AppColors.cardWhite,
+          color: context.kc.surface,
           borderRadius: AppRadius.pillBorder,
-          border: Border.all(color: AppColors.dividerLight),
+          border: Border.all(color: context.kc.outline),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.language_rounded,
-                size: 16, color: AppColors.textMutedLight),
+            Icon(Icons.language_rounded,
+                size: 16, color: context.kc.muted),
             const SizedBox(width: 8),
             Text(
               label,
               style: AppTypography.ui(size: 13, weight: FontWeight.w600)
-                  .copyWith(color: AppColors.textPrimary),
+                  .copyWith(color: context.kc.onBg),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                size: 18, color: AppColors.textMutedLight),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 18, color: context.kc.muted),
           ],
         ),
       ),
@@ -214,7 +213,7 @@ class _FooterLink extends StatelessWidget {
       child: Text(
         label,
         style: AppTypography.ui(size: 12, weight: FontWeight.w500)
-            .copyWith(color: AppColors.textMutedLight),
+            .copyWith(color: context.kc.muted),
       ),
     );
   }

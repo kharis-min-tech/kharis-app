@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 /// Player scrubber — dark design-handoff (v3).
 ///
@@ -65,7 +64,7 @@ class _SeekBarState extends State<SeekBar> {
     final timeStyle = AppTypography.ui(
       size: 11.5,
       weight: FontWeight.w600,
-      color: AppColors.darkMuted,
+      color: context.kc.muted,
     );
 
     const waveH = 40.0;
@@ -96,8 +95,8 @@ class _SeekBarState extends State<SeekBar> {
               child: CustomPaint(
                 painter: _WaveformPainter(
                   fraction: _fraction,
-                  played: AppColors.gold,
-                  unplayed: AppColors.darkMuted.withValues(alpha: 0.35),
+                  played: context.kc.accent,
+                  unplayed: context.kc.muted.withValues(alpha: 0.35),
                 ),
               ),
             ),

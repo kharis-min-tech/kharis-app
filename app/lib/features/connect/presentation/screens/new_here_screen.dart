@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/widgets/connect_form_widgets.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
@@ -45,10 +45,10 @@ class _NewHereScreenState extends State<NewHereScreen> {
       lastDate: DateTime.now(),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.primary,
-            surface: AppColors.surfaceElevated,
-          ),
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: AppColors.primary,
+                surface: context.kc.surfaceAlt,
+              ),
         ),
         child: child!,
       ),
@@ -74,12 +74,9 @@ class _NewHereScreenState extends State<NewHereScreen> {
       if (mounted) {
         setState(() => _state = _FormState.form);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Something went wrong. Please try again.',
-              style: GoogleFonts.plusJakartaSans(color: Colors.white),
-            ),
-            backgroundColor: AppColors.error,
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: AppColors.errorContainer,
           ),
         );
       }
@@ -89,14 +86,12 @@ class _NewHereScreenState extends State<NewHereScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios,
-            color: AppColors.onSurface,
+            color: context.kc.onBg,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -124,7 +119,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: context.kc.onBg,
               ),
             ),
             const SizedBox(height: 12),
@@ -133,7 +128,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 15,
-                color: AppColors.onSurfaceVariant,
+                color: context.kc.muted,
               ),
             ),
             const SizedBox(height: 36),
@@ -141,8 +136,8 @@ class _NewHereScreenState extends State<NewHereScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  foregroundColor: AppColors.onSecondary,
+                  backgroundColor: context.kc.accent,
+                  foregroundColor: context.kc.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -180,7 +175,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: context.kc.onBg,
               ),
             ),
             const SizedBox(height: 6),
@@ -188,7 +183,7 @@ class _NewHereScreenState extends State<NewHereScreen> {
               'We would love to get to know you',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 15,
-                color: AppColors.onSurfaceVariant,
+                color: context.kc.muted,
               ),
             ),
             const SizedBox(height: 28),
@@ -245,9 +240,9 @@ class _NewHereScreenState extends State<NewHereScreen> {
                     text: DateFormat('dd MMM yyyy').format(_firstVisitDate),
                   ),
                   label: 'First Visit Date',
-                  suffixIcon: const Icon(
+                  suffixIcon: Icon(
                     Icons.calendar_today_outlined,
-                    color: AppColors.textMuted,
+                    color: context.kc.muted,
                     size: 18,
                   ),
                 ),
@@ -261,8 +256,8 @@ class _NewHereScreenState extends State<NewHereScreen> {
                 height: 52,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: AppColors.onSecondary,
+                    backgroundColor: context.kc.accent,
+                    foregroundColor: context.kc.onAccent,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

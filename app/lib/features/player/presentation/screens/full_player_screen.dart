@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
@@ -13,13 +11,14 @@ import '../widgets/player_actions.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/seek_bar.dart';
 
-/// Full-screen Now Playing — dark design-handoff (v3).
+/// Full-screen Now Playing.
 ///
-/// Rises over the current tab. Purple→ink ambient gradient. Top row is a
-/// collapse chevron, the centred series label, and an overflow menu. A large
-/// square artwork dominates, followed by the title + speaker·scripture line
-/// with a like heart, an Audio/Video segmented toggle, the waveform scrubber,
-/// transport controls, and the secondary action row (Notes / Playlist / Share).
+/// Rises over the current tab on a theme-aware ambient wash (see
+/// [playerAmbientColors]). Top row is a collapse chevron, the centred series
+/// label, and an overflow menu. A large square artwork dominates, followed by
+/// the title + speaker·scripture line with a like heart, an Audio/Video
+/// segmented toggle, the waveform scrubber, transport controls, and the
+/// secondary action row (Notes / Playlist / Share).
 class FullPlayerScreen extends ConsumerWidget {
   const FullPlayerScreen({super.key});
 
@@ -35,18 +34,13 @@ class FullPlayerScreen extends ConsumerWidget {
     final subtitle = _subtitle(sermon);
 
     return Scaffold(
-      backgroundColor: AppColors.ink,
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF3A1D6E),
-              Color(0xFF1A0F33),
-              AppColors.ink,
-            ],
-            stops: [0.0, 0.44, 1.0],
+            colors: playerAmbientColors(context),
+            stops: const [0.0, 0.44, 1.0],
           ),
         ),
         child: SafeArea(
@@ -72,7 +66,7 @@ class FullPlayerScreen extends ConsumerWidget {
                           size: 10,
                           weight: FontWeight.w600,
                           letterSpacing: 1.0,
-                          color: AppColors.darkMuted2,
+                          color: context.kc.muted,
                         ),
                       ),
                     ),
@@ -137,7 +131,7 @@ class FullPlayerScreen extends ConsumerWidget {
                                     size: 22,
                                     weight: FontWeight.w700,
                                     height: 1.08,
-                                    color: Colors.white,
+                                    color: context.kc.onBg,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -148,7 +142,7 @@ class FullPlayerScreen extends ConsumerWidget {
                                     subtitle,
                                     style: AppTypography.ui(
                                       size: 13.5,
-                                      color: AppColors.darkMuted2,
+                                      color: context.kc.muted,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -186,9 +180,9 @@ class FullPlayerScreen extends ConsumerWidget {
                       // Secondary actions.
                       Container(
                         padding: const EdgeInsets.only(top: 18),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           border: Border(
-                            top: BorderSide(color: Color(0x17FFFFFF)),
+                            top: BorderSide(color: context.kc.divider),
                           ),
                         ),
                         child: const PlayerActions(),
@@ -217,7 +211,7 @@ class FullPlayerScreen extends ConsumerWidget {
   void _showActionsSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.darkSurface,
+      backgroundColor: context.kc.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -259,7 +253,7 @@ class _LikeButtonState extends State<_LikeButton> {
           padding: const EdgeInsets.only(top: 2, left: 6),
           child: Icon(
             _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            color: AppColors.gold,
+            color: context.kc.accentInk,
             size: 24,
           ),
         ),
@@ -315,10 +309,12 @@ class _ToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bg = active ? AppColors.gold : AppColors.darkSurface2;
+    final Color bg = active ? context.kc.accent : context.kc.surfaceMuted;
     final Color fg = active
-        ? AppColors.goldInk
-        : (enabled ? AppColors.darkMuted : AppColors.darkMuted.withValues(alpha: 0.4));
+        ? context.kc.onAccent
+        : (enabled
+            ? context.kc.muted
+            : context.kc.muted.withValues(alpha: 0.4));
 
     return GestureDetector(
       onTap: onTap,
@@ -362,7 +358,7 @@ class _IconTapTarget extends StatelessWidget {
       child: SizedBox(
         width: 40,
         height: 40,
-        child: Icon(icon, color: Colors.white, size: size),
+        child: Icon(icon, color: context.kc.onBg, size: size),
       ),
     );
   }

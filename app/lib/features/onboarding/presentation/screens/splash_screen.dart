@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 /// Splash / brand entry (design-handoff v3).
 ///
@@ -34,6 +32,10 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Deliberately theme-invariant: the splash is a full-bleed photo under a
+      // purple wash, so this is only the base beneath the image — a light
+      // scaffold would flash white before the asset decodes. Everything on top
+      // of the photo stays white/light in both themes for the same reason.
       backgroundColor: AppColors.ink,
       body: Stack(
         fit: StackFit.expand,

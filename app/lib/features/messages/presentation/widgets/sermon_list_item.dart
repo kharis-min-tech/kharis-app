@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 /// Spec-matching 56px sermon list row for the Messages tab.
@@ -138,7 +136,7 @@ class _SermonListItemState extends State<SermonListItem>
                     style: AppTypography.ui(
                       size: 15,
                       weight: FontWeight.w600,
-                      color: AppColors.darkMuted3,
+                      color: context.kc.onBg,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -148,7 +146,7 @@ class _SermonListItemState extends State<SermonListItem>
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.ui(
                       size: 12.5,
-                      color: AppColors.darkMuted,
+                      color: context.kc.muted,
                     ),
                   ),
                   if (metaLine.isNotEmpty) ...[
@@ -159,7 +157,7 @@ class _SermonListItemState extends State<SermonListItem>
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.ui(
                         size: 11,
-                        color: AppColors.darkMuted,
+                        color: context.kc.muted,
                       ),
                     ),
                   ],
@@ -170,9 +168,9 @@ class _SermonListItemState extends State<SermonListItem>
                       child: LinearProgressIndicator(
                         value: widget.progress.clamp(0.0, 1.0),
                         minHeight: 3,
-                        backgroundColor: AppColors.darkSurface,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppColors.secondary,
+                        backgroundColor: context.kc.surfaceAlt,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          context.kc.accent,
                         ),
                       ),
                     ),
@@ -181,7 +179,7 @@ class _SermonListItemState extends State<SermonListItem>
               ),
             ),
             const SizedBox(width: 8),
-            // ── 3-dot button (34px circle, white.06) ──────────────────────────
+            // ── 3-dot button (34px circle, inset fill) ────────────────────────
             GestureDetector(
               onTap: widget.onMoreTap,
               behavior: HitTestBehavior.opaque,
@@ -189,12 +187,12 @@ class _SermonListItemState extends State<SermonListItem>
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: context.kc.surfaceAlt,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.more_vert_rounded,
-                  color: AppColors.darkMuted,
+                  color: context.kc.muted,
                   size: 18,
                 ),
               ),

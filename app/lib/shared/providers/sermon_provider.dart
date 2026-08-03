@@ -27,6 +27,25 @@ final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
 });
 
 // ── Sermons (live fetch) ──────────────────────────────────────────────────────
+/// The public API library on its own.
+///
+/// Deliberately has no CMS dependency: [sermonsProvider] watches a Firestore
+/// *stream*, and if the network fetch lived there too, every CMS emission —
+/// including the one that lands moments after first build — would re-run four
+/// more API round-trips behind an already-populated list. Keeping the fetch
+/// here means a CMS change re-runs only the cheap merge below.
+///
+/// Invalidate this (not [sermonsProvider]) to force a real library refresh.
+final apiSermonsProvider = FutureProvider<List<Sermon>>((ref) async {
+  final repo = ref.watch(sermonRepositoryProvider);
+  try {
+    return await repo.getSermons();
+  } catch (_) {
+    // Offline / CI fallback - never leaves the user with an empty screen.
+    return repo.loadCatalogue();
+  }
+});
+
 /// All audio sermons, freshest source first.
 ///
 /// Two sources, merged: the CMS (`sermons` collection, what the admin panel
@@ -35,20 +54,13 @@ final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
 /// visible inside the admin panel. Falls back to the bundled 500-episode
 /// catalogue when the API is unreachable.
 final sermonsProvider = FutureProvider<List<Sermon>>((ref) async {
-  final repo = ref.watch(sermonRepositoryProvider);
   // Live stream, so a CMS edit re-emits the library without a manual refresh.
   final cms = ref.watch(adminSermonsProvider).valueOrNull ?? const <Sermon>[];
   final cmsAudio = cms
       .where((s) => s.source != 'youtube' && s.videoId == null)
       .toList();
 
-  List<Sermon> api;
-  try {
-    api = await repo.getSermons();
-  } catch (_) {
-    // Offline / CI fallback - never leaves the user with an empty screen.
-    api = await repo.loadCatalogue();
-  }
+  final api = await ref.watch(apiSermonsProvider.future);
 
   final seen = <String>{for (final s in cmsAudio) _dedupeTitle(s.title)};
   return [

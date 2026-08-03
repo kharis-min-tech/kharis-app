@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 
@@ -17,9 +16,8 @@ class NotesScreen extends ConsumerWidget {
     final notes = ref.watch(notesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: context.kc.bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(
@@ -27,36 +25,38 @@ class NotesScreen extends ConsumerWidget {
           style: GoogleFonts.plusJakartaSans(
             fontSize: 28,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: context.kc.onBg,
           ),
         ),
       ),
-      body: notes.isEmpty ? _buildEmpty() : _buildList(context, ref, notes),
+      body: notes.isEmpty
+          ? _buildEmpty(context)
+          : _buildList(context, ref, notes),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.secondary,
-        foregroundColor: AppColors.onSecondary,
+        backgroundColor: context.kc.accent,
+        foregroundColor: context.kc.onAccent,
         onPressed: () => _openEditor(context, ref),
         child: const Icon(Icons.edit_outlined),
       ),
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.notes_outlined,
             size: 64,
-            color: AppColors.textMuted,
+            color: context.kc.muted,
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
             'Take notes during any sermon',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
-              color: AppColors.textMuted,
+              color: context.kc.muted,
             ),
           ),
         ],
@@ -138,7 +138,7 @@ class _NoteCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
-            color: AppColors.surfaceElevated,
+            color: context.kc.surface,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -149,7 +149,7 @@ class _NoteCard extends StatelessWidget {
                 note.text,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 15,
-                  color: AppColors.onSurface,
+                  color: context.kc.onBg,
                   height: 1.4,
                 ),
                 maxLines: 2,
@@ -171,7 +171,7 @@ class _NoteCard extends StatelessWidget {
                     _relativeDate(note.updatedAt),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
-                      color: AppColors.textMuted,
+                      color: context.kc.muted,
                     ),
                   ),
                 ],

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/widgets/connect_form_widgets.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
@@ -52,12 +52,9 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
       if (mounted) {
         setState(() => _state = _FormState.form);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Something went wrong. Please try again.',
-              style: GoogleFonts.plusJakartaSans(color: Colors.white),
-            ),
-            backgroundColor: AppColors.error,
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: AppColors.errorContainer,
           ),
         );
       }
@@ -67,14 +64,12 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios,
-            color: AppColors.onSurface,
+            color: context.kc.onBg,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -102,7 +97,7 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: context.kc.onBg,
               ),
             ),
             const SizedBox(height: 12),
@@ -111,7 +106,7 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 15,
-                color: AppColors.onSurfaceVariant,
+                color: context.kc.muted,
               ),
             ),
             const SizedBox(height: 36),
@@ -119,8 +114,8 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  foregroundColor: AppColors.onSecondary,
+                  backgroundColor: context.kc.accent,
+                  foregroundColor: context.kc.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -158,7 +153,7 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: context.kc.onBg,
               ),
             ),
             const SizedBox(height: 6),
@@ -166,7 +161,7 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
               'Tell us what God has done',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 15,
-                color: AppColors.onSurfaceVariant,
+                color: context.kc.muted,
               ),
             ),
             const SizedBox(height: 28),
@@ -227,8 +222,8 @@ class _TestimonyScreenState extends State<TestimonyScreen> {
                 height: 52,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: AppColors.onSecondary,
+                    backgroundColor: context.kc.accent,
+                    foregroundColor: context.kc.onAccent,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

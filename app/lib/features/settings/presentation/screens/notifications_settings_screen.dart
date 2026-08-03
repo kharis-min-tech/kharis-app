@@ -53,7 +53,6 @@ class _NotificationsSettingsScreenState
     }
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,9 +62,9 @@ class _NotificationsSettingsScreenState
               padding: const EdgeInsets.only(left: 4, top: 8),
               child: IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back_ios_new,
-                  color: AppColors.textPrimary,
+                  color: context.kc.onBg,
                   size: 20,
                 ),
               ),
@@ -76,15 +75,15 @@ class _NotificationsSettingsScreenState
               child: Text(
                 'Notifications',
                 style: AppTypography.display(size: 26, weight: FontWeight.w700)
-                    .copyWith(color: AppColors.textPrimary),
+                    .copyWith(color: context.kc.onBg),
               ),
             ),
             // Content area
             Expanded(
               child: prefsAsync.when(
-                loading: () => const Center(
+                loading: () => Center(
                   child: CircularProgressIndicator(
-                    color: AppColors.secondary,
+                    color: context.kc.accentInk,
                     strokeWidth: 2,
                   ),
                 ),
@@ -154,7 +153,7 @@ class _PermissionNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: context.kc.surface,
         borderRadius: AppRadius.cardBorder,
         boxShadow: AppShadows.card,
       ),
@@ -165,14 +164,14 @@ class _PermissionNotice extends StatelessWidget {
           Text(
             'Notifications are turned off',
             style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                .copyWith(color: AppColors.textPrimary),
+                .copyWith(color: context.kc.onBg),
           ),
           const SizedBox(height: 2),
           Text(
             'Your device is blocking Kharis notifications. Allow them to start '
             'receiving the alerts you pick below.',
             style: AppTypography.ui(size: 12)
-                .copyWith(color: AppColors.textMutedLight),
+                .copyWith(color: context.kc.muted),
           ),
           const SizedBox(height: 10),
           Align(
@@ -182,7 +181,7 @@ class _PermissionNotice extends StatelessWidget {
               child: Text(
                 'Allow notifications',
                 style: AppTypography.ui(size: 13, weight: FontWeight.w600)
-                    .copyWith(color: AppColors.secondary),
+                    .copyWith(color: context.kc.accentInk),
               ),
             ),
           ),
@@ -211,7 +210,7 @@ class _ToggleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: context.kc.surface,
         borderRadius: AppRadius.cardBorder,
         boxShadow: AppShadows.card,
       ),
@@ -225,13 +224,13 @@ class _ToggleRow extends StatelessWidget {
                 Text(
                   label,
                   style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                      .copyWith(color: AppColors.textPrimary),
+                      .copyWith(color: context.kc.onBg),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: AppTypography.ui(size: 12)
-                      .copyWith(color: AppColors.textMutedLight),
+                      .copyWith(color: context.kc.muted),
                 ),
               ],
             ),
@@ -240,9 +239,9 @@ class _ToggleRow extends StatelessWidget {
             value: value,
             onChanged: onChanged,
             activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.secondary,
-            inactiveThumbColor: AppColors.cardWhite,
-            inactiveTrackColor: AppColors.dividerLight,
+            activeTrackColor: context.kc.accent,
+            inactiveThumbColor: context.kc.surface,
+            inactiveTrackColor: context.kc.surfaceMuted,
           ),
         ],
       ),

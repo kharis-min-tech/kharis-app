@@ -40,15 +40,14 @@ class NotificationsScreen extends ConsumerWidget {
     final eventsAsync = ref.watch(upcomingEventsProvider(userBranch));
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
           'Notifications',
-          style: AppTypography.titleMd.copyWith(color: AppColors.heading),
+          style: AppTypography.titleMd.copyWith(color: context.kc.onBg),
         ),
-        iconTheme: const IconThemeData(color: AppColors.heading),
+        iconTheme: IconThemeData(color: context.kc.onBg),
       ),
       body: Builder(
         builder: (context) {
@@ -95,7 +94,7 @@ class NotificationsScreen extends ConsumerWidget {
               child: Text(
                 'No notifications yet',
                 style: AppTypography.bodyLg.copyWith(
-                  color: AppColors.onSurfaceVariant,
+                  color: context.kc.muted,
                 ),
               ),
             );
@@ -105,7 +104,7 @@ class NotificationsScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: items.length,
             separatorBuilder: (_, _) => Divider(
-              color: Colors.white.withValues(alpha: .06),
+              color: context.kc.divider,
               height: 1,
             ),
             itemBuilder: (context, index) {
@@ -120,18 +119,18 @@ class NotificationsScreen extends ConsumerWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: .08),
+                    color: context.kc.chipBg,
                   ),
                   child: Icon(
                     item.icon,
-                    color: AppColors.secondary,
+                    color: context.kc.accentInk,
                     size: 20,
                   ),
                 ),
                 title: Text(
                   item.title,
                   style: AppTypography.bodyLg.copyWith(
-                    color: AppColors.heading,
+                    color: context.kc.onBg,
                     fontWeight: FontWeight.w600,
                   ),
                   maxLines: 1,
@@ -141,7 +140,7 @@ class NotificationsScreen extends ConsumerWidget {
                     ? Text(
                         item.body!,
                         style: AppTypography.bodySm.copyWith(
-                          color: AppColors.onSurfaceVariant,
+                          color: context.kc.muted,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -150,7 +149,7 @@ class NotificationsScreen extends ConsumerWidget {
                 trailing: Text(
                   _timeAgo(item.date),
                   style: AppTypography.labelMd.copyWith(
-                    color: AppColors.textMuted,
+                    color: context.kc.muted,
                   ),
                 ),
               );

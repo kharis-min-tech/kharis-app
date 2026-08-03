@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
@@ -13,8 +12,8 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 ///
 /// Uses [StatefulNavigationShell] from [StatefulShellRoute.indexedStack] so
 /// every branch gets its own navigator and state is preserved between tab
-/// switches. Light tab bar (design-handoff v3): a white surface with a top
-/// hairline; the active tab is gold, inactive tabs are muted grey.
+/// switches. The tab bar follows the active theme: a `surface` bar with a
+/// `divider` top hairline; the active tab is gold, inactive tabs are muted.
 class DashboardShell extends ConsumerStatefulWidget {
   const DashboardShell({super.key, required this.navigationShell});
 
@@ -63,17 +62,16 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
     return Scaffold(
       extendBody: true,
-      backgroundColor: AppColors.lightBg,
       body: widget.navigationShell,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (currentSermon != null) const MiniPlayer(),
           Container(
-            decoration: const BoxDecoration(
-              color: AppColors.cardWhite,
+            decoration: BoxDecoration(
+              color: context.kc.surface,
               border: Border(
-                top: BorderSide(color: AppColors.dividerLight, width: 1),
+                top: BorderSide(color: context.kc.divider, width: 1),
               ),
             ),
             padding: EdgeInsets.fromLTRB(6, 10, 6, 12 + safeBottom),
@@ -130,8 +128,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 }
 
 /// Single tab item: icon 24 + label 10.5px w600.
-/// Active color: [AppColors.secondary] (gold).
-/// Inactive color: [AppColors.textMutedLight].
+/// Active color: `context.kc.accentInk` (gold).
+/// Inactive color: `context.kc.muted`.
 class _TabItem extends StatelessWidget {
   const _TabItem({
     required this.icon,
@@ -152,7 +150,7 @@ class _TabItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = index == currentIndex;
-    final color = isActive ? AppColors.secondary : AppColors.textMutedLight;
+    final color = isActive ? context.kc.accentInk : context.kc.muted;
 
     return GestureDetector(
       onTap: () => onTap(index),

@@ -18,7 +18,7 @@ const String _kGivingUrl = 'https://kharis.org/giving';
 /// Shown in the "Giving to" row when the member has not picked a campus.
 const String _kAllCampusesLabel = 'All campuses';
 
-/// Giving tab (design-handoff v3, light).
+/// Giving tab (design-handoff v3).
 ///
 /// A calm, single-column giving landing: a scripture card, the branch the gift
 /// is directed to, a full-width **Give securely** call-to-action that opens the
@@ -31,7 +31,6 @@ class GivingScreen extends ConsumerWidget {
     final branch = ref.watch(currentBranchProvider).valueOrNull;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -172,7 +171,7 @@ class _BranchSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.cardWhite,
+          color: context.kc.surface,
           borderRadius: AppRadius.cardBorder,
           boxShadow: AppShadows.card,
         ),
@@ -182,7 +181,7 @@ class _BranchSelector extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.chipLight,
+                color: context.kc.chipBg,
                 borderRadius: AppRadius.tileBorder,
               ),
               child: const Icon(
@@ -198,14 +197,14 @@ class _BranchSelector extends StatelessWidget {
                 style: AppTypography.ui(
                   size: 15,
                   weight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: context.kc.onBg,
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 20,
-              color: AppColors.textMutedLight,
+              color: context.kc.muted,
             ),
           ],
         ),
@@ -269,17 +268,17 @@ class _SecureNote extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(
+        Icon(
           Icons.lock_outline_rounded,
           size: 13,
-          color: AppColors.textMutedLight,
+          color: context.kc.muted,
         ),
         const SizedBox(width: 6),
         Text(
           'Opens the secure Kharis giving page',
           style: AppTypography.ui(
             size: 11.5,
-            color: AppColors.textMutedLight,
+            color: context.kc.muted,
           ),
         ),
       ],
@@ -483,7 +482,7 @@ class _SectionLabel extends StatelessWidget {
         size: 11,
         weight: FontWeight.w700,
         letterSpacing: 1.1,
-        color: AppColors.textMutedLight,
+        color: context.kc.muted,
       ),
     );
   }

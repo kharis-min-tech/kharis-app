@@ -57,7 +57,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save. Please try again.')),
+          const SnackBar(
+            content: Text('Could not save. Please try again.'),
+            backgroundColor: AppColors.errorContainer,
+          ),
         );
       }
     } finally {
@@ -81,15 +84,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: context.kc.onBg),
         title: Text(
           'Edit Profile',
           style: AppTypography.display(size: 18, weight: FontWeight.w700)
-              .copyWith(color: AppColors.textPrimary),
+              .copyWith(color: context.kc.onBg),
         ),
       ),
       body: SafeArea(
@@ -129,21 +131,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   child: ElevatedButton(
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: AppColors.onSecondary,
+                      backgroundColor: context.kc.accent,
+                      foregroundColor: context.kc.onAccent,
                       disabledBackgroundColor:
-                          AppColors.secondary.withValues(alpha: 0.5),
+                          context.kc.accent.withValues(alpha: 0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                     ),
                     child: _saving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.4,
-                              color: AppColors.onSecondary,
+                              color: context.kc.onAccent,
                             ),
                           )
                         : Text(
@@ -151,7 +153,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             style: AppTypography.labelMd.copyWith(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.onSecondary,
+                              color: context.kc.onAccent,
                             ),
                           ),
                   ),
@@ -169,7 +171,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         child: Text(
           text,
           style: AppTypography.ui(size: 13, weight: FontWeight.w600)
-              .copyWith(color: AppColors.textPrimary),
+              .copyWith(color: context.kc.onBg),
         ),
       );
 
@@ -183,18 +185,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       controller: controller,
       validator: validator,
       keyboardType: keyboardType,
-      style: AppTypography.ui(size: 15).copyWith(color: AppColors.textPrimary),
+      style: AppTypography.ui(size: 15).copyWith(color: context.kc.onBg),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle:
-            AppTypography.ui(size: 15).copyWith(color: AppColors.textMutedLight),
+            AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
         filled: true,
-        fillColor: AppColors.cardWhite,
+        fillColor: context.kc.surface,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         enabledBorder: OutlineInputBorder(
           borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.dividerLight),
+          borderSide: BorderSide(color: context.kc.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppRadius.inputBorder,
@@ -229,21 +231,21 @@ class _BranchDropdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: context.kc.surface,
         borderRadius: AppRadius.inputBorder,
-        border: Border.all(color: AppColors.dividerLight),
+        border: Border.all(color: context.kc.outline),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String?>(
           value: value,
           isExpanded: true,
-          dropdownColor: AppColors.cardWhite,
+          dropdownColor: context.kc.surface,
           hint: Text(
             'Select your branch',
-            style: AppTypography.ui(size: 15).copyWith(color: AppColors.textMutedLight),
+            style: AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
           ),
-          icon: const Icon(Icons.expand_more, color: AppColors.textMutedLight),
-          style: AppTypography.ui(size: 15).copyWith(color: AppColors.textPrimary),
+          icon: Icon(Icons.expand_more, color: context.kc.muted),
+          style: AppTypography.ui(size: 15).copyWith(color: context.kc.onBg),
           items: [
             for (final name in names)
               DropdownMenuItem<String?>(value: name, child: Text(name)),

@@ -37,7 +37,7 @@ class _CompletedStepsNotifier extends StateNotifier<Set<int>> {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 /// "Your Journey" — scripture-forward growth path (design-handoff v3).
-/// Calm light warm surface, Newsreader serif scripture, gold progress accents.
+/// Calm warm surface, Newsreader serif scripture, gold progress accents.
 class JourneyScreen extends ConsumerWidget {
   const JourneyScreen({super.key});
 
@@ -47,7 +47,6 @@ class JourneyScreen extends ConsumerWidget {
     final allDone = completed.length == kJourneySteps.length;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -59,9 +58,9 @@ class JourneyScreen extends ConsumerWidget {
               // Back chevron
               GestureDetector(
                 onTap: () => Navigator.of(context).maybePop(),
-                child: const Icon(
+                child: Icon(
                   Icons.chevron_left,
-                  color: AppColors.textMutedLight,
+                  color: context.kc.muted,
                   size: 28,
                 ),
               ),
@@ -72,7 +71,7 @@ class JourneyScreen extends ConsumerWidget {
               Text(
                 'Your Journey',
                 style: AppTypography.display(size: 28, weight: FontWeight.w700)
-                    .copyWith(color: AppColors.textPrimary),
+                    .copyWith(color: context.kc.onBg),
               ),
 
               const SizedBox(height: 6),
@@ -80,7 +79,7 @@ class JourneyScreen extends ConsumerWidget {
               Text(
                 'Salvation \u00B7 Baptism \u00B7 Holy Spirit \u00B7 Next Steps',
                 style: AppTypography.serif(size: 15, italic: true)
-                    .copyWith(color: AppColors.textMutedLight),
+                    .copyWith(color: context.kc.muted),
               ),
 
               const SizedBox(height: 32),
@@ -156,7 +155,7 @@ class _StepCard extends StatelessWidget {
                     child: Center(
                       child: Container(
                         width: 2,
-                        color: AppColors.dividerLight,
+                        color: context.kc.divider,
                       ),
                     ),
                   ),
@@ -172,7 +171,7 @@ class _StepCard extends StatelessWidget {
               padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.cardWhite,
+                  color: context.kc.surface,
                   borderRadius: BorderRadius.circular(AppRadius.card),
                   boxShadow: AppShadows.card,
                 ),
@@ -186,7 +185,7 @@ class _StepCard extends StatelessWidget {
                       style: AppTypography.ui(
                         size: 17,
                         weight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: context.kc.onBg,
                       ),
                     ),
 
@@ -223,7 +222,7 @@ class _StepCard extends StatelessWidget {
                       style: AppTypography.ui(
                         size: 14,
                         height: 1.6,
-                        color: AppColors.textMutedLight,
+                        color: context.kc.muted,
                       ),
                     ),
 
@@ -260,11 +259,11 @@ class _RailCircle extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: done ? AppColors.secondary : AppColors.chipLight,
+        color: done ? context.kc.accent : context.kc.chipBg,
       ),
       child: Center(
         child: done
-            ? const Icon(Icons.check, color: AppColors.onSecondary, size: 16)
+            ? Icon(Icons.check, color: context.kc.onAccent, size: 16)
             : Text(
                 '$number',
                 style: AppTypography.ui(
@@ -295,9 +294,11 @@ class _CompletePill extends StatelessWidget {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: done ? AppColors.secondary : Colors.transparent,
+          color: done ? context.kc.accent : Colors.transparent,
+          // Matches the fill once complete so the rim stays invisible; the
+          // darkened gold while it is still an outline on the page.
           border: Border.all(
-            color: AppColors.secondary,
+            color: done ? context.kc.accent : context.kc.accentInk,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -306,7 +307,7 @@ class _CompletePill extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (done) ...[
-              const Icon(Icons.check, color: AppColors.onSecondary, size: 14),
+              Icon(Icons.check, color: context.kc.onAccent, size: 14),
               const SizedBox(width: 6),
             ],
             Text(
@@ -314,7 +315,7 @@ class _CompletePill extends StatelessWidget {
               style: AppTypography.ui(
                 size: 13,
                 weight: FontWeight.w600,
-                color: done ? AppColors.onSecondary : AppColors.hqStroke,
+                color: done ? context.kc.onAccent : AppColors.hqStroke,
               ),
             ),
           ],

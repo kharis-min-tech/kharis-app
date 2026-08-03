@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_spacing.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 
-/// Row of secondary player actions shown below the transport controls —
-/// dark design-handoff (v3): Notes · Playlist · Share, each an icon over a
-/// small muted-lavender label. Notes opens the note editor for the current
-/// sermon at the current playback position; Playlist and Share confirm with a
-/// lightweight toast.
+/// Row of secondary player actions shown below the transport controls:
+/// Notes · Playlist · Share, each an icon over a small muted label. Notes opens
+/// the note editor for the current sermon at the current playback position;
+/// Playlist and Share confirm with a lightweight toast.
 class PlayerActions extends ConsumerWidget {
   const PlayerActions({super.key});
 
@@ -44,7 +41,6 @@ class PlayerActions extends ConsumerWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.darkSurface,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(milliseconds: 1700),
       ),
@@ -93,14 +89,14 @@ class _ActionButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.darkMuted2, size: 22),
+          Icon(icon, color: context.kc.muted, size: 22),
           const SizedBox(height: AppSpacing.xs),
           Text(
             label,
             style: AppTypography.ui(
               size: 10,
               weight: FontWeight.w600,
-              color: AppColors.darkMuted2,
+              color: context.kc.muted,
             ),
           ),
         ],

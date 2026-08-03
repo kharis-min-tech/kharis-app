@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_spacing.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
@@ -82,13 +81,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final tagSermon = showTag ? _buildSermonTag() : null;
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark,
+        backgroundColor: context.kc.bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.onSurface),
+          icon: Icon(Icons.close, color: context.kc.onBg),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -129,7 +127,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 textAlignVertical: TextAlignVertical.top,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
-                  color: AppColors.onSurface,
+                  color: context.kc.onBg,
                   height: 1.6,
                 ),
                 cursorColor: AppColors.primary,
@@ -138,7 +136,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   hintText: 'Start typing...',
                   hintStyle: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
-                    color: AppColors.textMuted,
+                    color: context.kc.muted,
                   ),
                 ),
               ),

@@ -44,7 +44,7 @@ class CampusCard extends ConsumerWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: AppColors.cardWhite,
+          color: context.kc.surface,
           borderRadius: BorderRadius.circular(AppRadius.card),
           boxShadow: AppShadows.card,
         ),
@@ -59,7 +59,7 @@ class CampusCard extends ConsumerWidget {
                     size: 10.5,
                     weight: FontWeight.w800,
                     letterSpacing: 1.1,
-                  ).copyWith(color: AppColors.textMutedLight, height: 1),
+                  ).copyWith(color: context.kc.muted, height: 1),
                 ),
                 const Spacer(),
                 GestureDetector(
@@ -78,7 +78,7 @@ class CampusCard extends ConsumerWidget {
             Text(
               branch.name,
               style: AppTypography.display(size: 20, weight: FontWeight.w700)
-                  .copyWith(color: AppColors.textPrimary, height: 1.1),
+                  .copyWith(color: context.kc.onBg, height: 1.1),
             ),
             if (schedule != null) ...[
               const SizedBox(height: 10),
@@ -128,7 +128,7 @@ class _VenueRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = emphasised ? AppColors.primary : AppColors.textMutedLight;
+    final color = emphasised ? AppColors.primary : context.kc.muted;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

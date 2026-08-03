@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
-/// Transport controls — dark design-handoff (v3).
+/// Transport controls.
 ///
 /// Row layout: speed pill | skip-back 15 | play/pause | skip-forward 30 |
 /// repeat. The play/pause button is a 70-px gold circle with a dark icon and a
@@ -120,7 +118,7 @@ class _SpeedPill extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.5),
+            color: context.kc.accentInk.withValues(alpha: 0.5),
             width: 1.5,
           ),
         ),
@@ -129,7 +127,7 @@ class _SpeedPill extends StatelessWidget {
           style: AppTypography.ui(
             size: 12.5,
             weight: FontWeight.w700,
-            color: AppColors.gold,
+            color: context.kc.accentInk,
           ),
         ),
       ),
@@ -159,10 +157,10 @@ class _PlayPauseButton extends StatelessWidget {
         height: 70,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.gold,
+          color: context.kc.accent,
           boxShadow: [
             BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.5),
+              color: context.kc.accent.withValues(alpha: 0.5),
               blurRadius: 22,
               offset: const Offset(0, 12),
               spreadRadius: -6,
@@ -171,18 +169,18 @@ class _PlayPauseButton extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: isBuffering
-            ? const SizedBox(
+            ? SizedBox(
                 width: 26,
                 height: 26,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
                   valueColor:
-                      AlwaysStoppedAnimation<Color>(AppColors.goldInk),
+                      AlwaysStoppedAnimation<Color>(context.kc.onAccent),
                 ),
               )
             : Icon(
                 isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: AppColors.goldInk,
+                color: context.kc.onAccent,
                 size: 34,
               ),
       ),
@@ -215,7 +213,7 @@ class _SkipButton extends StatelessWidget {
           children: [
             Icon(
               isForward ? Icons.forward_rounded : Icons.replay_rounded,
-              color: Colors.white,
+              color: context.kc.onBg,
               size: 32,
             ),
             Positioned(
@@ -225,7 +223,7 @@ class _SkipButton extends StatelessWidget {
                 style: AppTypography.ui(
                   size: 8,
                   weight: FontWeight.w800,
-                  color: Colors.white,
+                  color: context.kc.onBg,
                 ).copyWith(height: 1),
               ),
             ),
@@ -256,7 +254,7 @@ class _RepeatButton extends StatelessWidget {
           children: [
             Icon(
               Icons.repeat_rounded,
-              color: active ? AppColors.gold : AppColors.darkMuted,
+              color: active ? context.kc.accentInk : context.kc.muted,
               size: 22,
             ),
             if (active)
@@ -265,9 +263,9 @@ class _RepeatButton extends StatelessWidget {
                 child: Container(
                   width: 4,
                   height: 4,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.gold,
+                    color: context.kc.accentInk,
                   ),
                 ),
               ),

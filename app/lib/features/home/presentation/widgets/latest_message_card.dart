@@ -5,6 +5,11 @@ import 'package:kharis_app/features/player/presentation/screens/media_player_scr
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
+/// Pale lavender series eyebrow drawn over the hero artwork. Invariant, like
+/// the white title beside it: the artwork and its scrim do not follow the theme,
+/// so the text on top of them must not either.
+const Color _heroEyebrow = Color(0xFFE6DDFF);
+
 /// Featured hero sermon card. Shows the latest message artwork with a
 /// LIVE/Latest state pill, gold EQ mark, and a gold "Watch full" CTA.
 class LatestMessageCard extends ConsumerWidget {
@@ -204,7 +209,7 @@ class _VideoHeroCard extends StatelessWidget {
                         style: AppTypography.labelMd.copyWith(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.darkMuted3,
+                          color: _heroEyebrow,
                           letterSpacing: 1.1,
                           height: 1,
                         ),
@@ -232,16 +237,16 @@ class _VideoHeroCard extends StatelessWidget {
                             vertical: 9,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.secondary,
+                            color: context.kc.accent,
                             borderRadius:
                                 BorderRadius.circular(AppRadius.pill),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.play_arrow_rounded,
-                                color: AppColors.onSecondary,
+                                color: context.kc.onAccent,
                                 size: 17,
                               ),
                               const SizedBox(width: 5),
@@ -251,7 +256,7 @@ class _VideoHeroCard extends StatelessWidget {
                                   size: 13,
                                   weight: FontWeight.w800,
                                 ).copyWith(
-                                  color: AppColors.onSecondary,
+                                  color: context.kc.onAccent,
                                   height: 1,
                                 ),
                               ),

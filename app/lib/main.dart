@@ -14,6 +14,7 @@ import 'core/services/app_router.dart';
 import 'core/constants/api_config.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
+import 'shared/providers/theme_provider.dart';
 import 'core/theme/theme.dart';
 import 'shared/providers/cache_provider.dart';
 import 'shared/providers/notification_provider.dart';
@@ -96,8 +97,9 @@ class KharisApp extends ConsumerWidget {
       builder: (BuildContext context, child) => MaterialApp.router(
         debugShowCheckedModeBanner: false,
         title: 'Kharis Church',
-        themeMode: ThemeMode.light,
-        theme: kharisTheme(),
+        themeMode: ref.watch(themeModeProvider),
+        theme: kharisTheme(brightness: Brightness.light),
+        darkTheme: kharisTheme(brightness: Brightness.dark),
         scaffoldMessengerKey: kharisMessengerKey,
         routerConfig: ref.watch(appRouterProvider),
       ),

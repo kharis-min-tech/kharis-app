@@ -11,7 +11,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
-/// Playlists library (dark) — series & collections shown as artwork cards.
+/// Playlists library — series & collections shown as artwork cards.
 ///
 /// Tapping a card opens [_PlaylistDetailScreen], an ordered sermon list that
 /// reuses the Messages [SermonListItem] visual spec. Playback + navigation to
@@ -46,7 +46,6 @@ class PlaylistScreen extends ConsumerWidget {
                 ))
             .toList();
     return Scaffold(
-      backgroundColor: AppColors.ink,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -63,7 +62,7 @@ class PlaylistScreen extends ConsumerWidget {
                       style: AppTypography.headlineLg.copyWith(
                         fontSize: 30,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.heading,
+                        color: context.kc.onBg,
                         letterSpacing: -0.18,
                       ),
                     ),
@@ -72,7 +71,7 @@ class PlaylistScreen extends ConsumerWidget {
                       'Series & collections · curated from Kharis',
                       style: AppTypography.bodySm.copyWith(
                         fontSize: 13,
-                        color: AppColors.onSurfaceVariant,
+                        color: context.kc.muted,
                       ),
                     ),
                   ],
@@ -189,7 +188,7 @@ class _CollectionCard extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.darkSurface,
+          color: context.kc.surface,
           borderRadius: BorderRadius.circular(AppRadius.card),
         ),
         clipBehavior: Clip.antiAlias,
@@ -214,7 +213,7 @@ class _CollectionCard extends StatelessWidget {
                     style: AppTypography.display(
                       size: 15,
                       weight: FontWeight.w700,
-                      color: AppColors.heading,
+                      color: context.kc.onBg,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -222,7 +221,7 @@ class _CollectionCard extends StatelessWidget {
                     collection.kindLabel ?? '${collection.count} messages',
                     style: AppTypography.labelMd.copyWith(
                       fontSize: 11.5,
-                      color: AppColors.darkMuted,
+                      color: context.kc.muted,
                     ),
                   ),
                 ],
@@ -274,13 +273,13 @@ class _CollectionArt extends StatelessWidget {
           child: Container(
             width: 34,
             height: 34,
-            decoration: const BoxDecoration(
-              color: AppColors.gold,
+            decoration: BoxDecoration(
+              color: context.kc.accent,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.play_arrow_rounded,
-              color: AppColors.goldInk,
+              color: context.kc.onAccent,
               size: 22,
             ),
           ),
@@ -326,7 +325,6 @@ class _PlaylistDetailScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      backgroundColor: AppColors.ink,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -339,9 +337,9 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.chevron_left_rounded,
-                        color: AppColors.heading,
+                        color: context.kc.onBg,
                         size: 30,
                       ),
                     ),
@@ -350,7 +348,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                       style: AppTypography.ui(
                         size: 14,
                         weight: FontWeight.w600,
-                        color: AppColors.darkMuted,
+                        color: context.kc.muted,
                       ),
                     ),
                   ],
@@ -386,7 +384,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                       style: AppTypography.display(
                         size: 26,
                         weight: FontWeight.w700,
-                        color: AppColors.heading,
+                        color: context.kc.onBg,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -396,7 +394,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                         size: 14,
                         italic: true,
                         height: 1.5,
-                        color: AppColors.darkMuted2,
+                        color: context.kc.muted,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -404,7 +402,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                       '${sermons.length} messages',
                       style: AppTypography.labelMd.copyWith(
                         fontSize: 12,
-                        color: AppColors.darkMuted,
+                        color: context.kc.muted,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -416,10 +414,10 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                             ? null
                             : () => audioService.play(sermons.first),
                         style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.gold,
-                          foregroundColor: AppColors.goldInk,
+                          backgroundColor: context.kc.accent,
+                          foregroundColor: context.kc.onAccent,
                           disabledBackgroundColor:
-                              AppColors.gold.withValues(alpha: 0.4),
+                              context.kc.accent.withValues(alpha: 0.4),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius:
@@ -432,13 +430,13 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                           style: AppTypography.ui(
                             size: 15,
                             weight: FontWeight.w700,
-                            color: AppColors.goldInk,
+                            color: context.kc.onAccent,
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Divider(color: AppColors.darkSurface, height: 1),
+                    Divider(color: context.kc.divider, height: 1),
                   ],
                 ),
               ),
@@ -446,12 +444,12 @@ class _PlaylistDetailScreen extends ConsumerWidget {
 
             // ── Loading ───────────────────────────────────────────────────
             if (sermonsAsync.isLoading)
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(32),
                   child: Center(
                     child: CircularProgressIndicator(
-                      color: AppColors.gold,
+                      color: context.kc.accentInk,
                       strokeWidth: 2,
                     ),
                   ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 
@@ -70,7 +70,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -88,7 +87,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.onSurface,
+                    color: context.kc.onBg,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -97,7 +96,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
-                    color: AppColors.onSurfaceVariant,
+                    color: context.kc.muted,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -207,11 +206,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _createAccount,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      disabledBackgroundColor: AppColors.secondary.withValues(
+                      backgroundColor: context.kc.accent,
+                      disabledBackgroundColor: context.kc.accent.withValues(
                         alpha: 0.4,
                       ),
-                      foregroundColor: AppColors.onSecondary,
+                      foregroundColor: context.kc.onAccent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -249,7 +248,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       'Already have an account? ',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
+                        color: context.kc.muted,
                       ),
                     ),
                     GestureDetector(
@@ -258,7 +257,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         'Sign In',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
-                          color: AppColors.secondary,
+                          color: context.kc.accentInk,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -277,16 +276,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   TextStyle get _textStyle =>
-      GoogleFonts.plusJakartaSans(fontSize: 15, color: AppColors.onSurface);
+      GoogleFonts.plusJakartaSans(fontSize: 15, color: context.kc.onBg);
 
   InputDecoration _fieldDecoration({required String hint}) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.surfaceSubtle,
+      fillColor: context.kc.surfaceAlt,
       hintText: hint,
       hintStyle: GoogleFonts.plusJakartaSans(
         fontSize: 15,
-        color: AppColors.onSurfaceVariant,
+        color: context.kc.muted,
       ),
       errorStyle: GoogleFonts.plusJakartaSans(
         fontSize: 12,
@@ -302,7 +301,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.secondary, width: 2),
+        borderSide: BorderSide(color: context.kc.accentInk, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -320,7 +319,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return IconButton(
       icon: Icon(
         obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-        color: AppColors.onSurfaceVariant,
+        color: context.kc.muted,
         size: 20,
       ),
       onPressed: onTap,

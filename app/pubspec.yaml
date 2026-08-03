@@ -126,9 +126,20 @@ flutter_launcher_icons:
   min_sdk_android: 21
   remove_alpha_ios: true
 
+# Native splash. This is what shows BEFORE the first Flutter frame, so it must
+# match SplashScreen or the member sees a purple logo card that then jumps to
+# the worship photo. Full-bleeding the same photo makes the handover seamless —
+# "we want people to log in and feel like they're seeing life".
+#
+# `color` is the photo's top gradient stop (#4A2AA8), not the brand purple
+# (#5D3FD3), so any letterboxing blends into SplashScreen's purple wash.
+#
+# Android 12+ replaces the splash with a system-drawn centred icon on a solid
+# colour and cannot full-bleed an image, so that path keeps the dove — which is
+# also centred on SplashScreen — over the same matched colour.
 flutter_native_splash:
-  color: "#5D3FD3"
-  image: assets/icon/icon_foreground.png
+  color: "#4A2AA8"
+  background_image: assets/design/splash-pink.jpg
   android_12:
-    color: "#5D3FD3"
+    color: "#4A2AA8"
     image: assets/icon/icon_foreground.png

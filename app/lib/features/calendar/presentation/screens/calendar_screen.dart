@@ -14,7 +14,7 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Events tab (design-handoff v3) — light screen. Segmented Upcoming / Past /
+/// Events tab (design-handoff v3). Segmented Upcoming / Past /
 /// My RSVPs tabs, a branch selector, and event cards with a photo banner, an
 /// overlaid date chip, title/time/location, and RSVP + Add-to-calendar actions.
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -56,7 +56,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         BranchRepository.seedBranches;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -140,6 +139,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         ),
       ),
       error: (_, _) => _messageSliver(
+        context,
         icon: Icons.error_outline_rounded,
         title: 'Unable to load events',
         subtitle: 'Please check your connection and try again.',
@@ -147,6 +147,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       data: (events) {
         if (events.isEmpty) {
           return _messageSliver(
+            context,
             icon: emptyIcon,
             title: emptyTitle,
             subtitle: emptySubtitle,
@@ -178,20 +179,20 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_outline_rounded,
-                color: AppColors.textMutedLight, size: 44),
+            Icon(Icons.lock_outline_rounded,
+                color: context.kc.muted, size: 44),
             const SizedBox(height: 14),
             Text(
               title,
               style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                  .copyWith(color: AppColors.textPrimary),
+                  .copyWith(color: context.kc.onBg),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
               subtitle,
               style: AppTypography.ui(size: 13)
-                  .copyWith(color: AppColors.textMutedLight),
+                  .copyWith(color: context.kc.muted),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 18),
@@ -219,7 +220,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Future<void> _pickBranch(List<Branch> branches, String? current) async {
     final choice = await showModalBottomSheet<_BranchChoice>(
       context: context,
-      backgroundColor: AppColors.cardWhite,
+      backgroundColor: context.kc.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -245,7 +246,8 @@ class _BranchChoice {
   final String? name;
 }
 
-Widget _messageSliver({
+Widget _messageSliver(
+  BuildContext context, {
   required IconData icon,
   required String title,
   required String subtitle,
@@ -256,18 +258,18 @@ Widget _messageSliver({
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: AppColors.textMutedLight, size: 44),
+          Icon(icon, color: context.kc.muted, size: 44),
           const SizedBox(height: 14),
           Text(
             title,
             style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                .copyWith(color: AppColors.textPrimary),
+                .copyWith(color: context.kc.onBg),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
             style: AppTypography.ui(size: 13)
-                .copyWith(color: AppColors.textMutedLight),
+                .copyWith(color: context.kc.muted),
             textAlign: TextAlign.center,
           ),
         ],
@@ -293,7 +295,7 @@ class _Header extends StatelessWidget {
           child: Text(
             'Events',
             style: AppTypography.display(size: 27, weight: FontWeight.w700)
-                .copyWith(color: AppColors.textPrimary),
+                .copyWith(color: context.kc.onBg),
           ),
         ),
         const SizedBox(width: 12),
@@ -304,7 +306,7 @@ class _Header extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.cardWhite,
+                color: context.kc.surface,
                 borderRadius: AppRadius.pillBorder,
                 boxShadow: AppShadows.card,
               ),
@@ -355,7 +357,7 @@ class _BranchSheet extends StatelessWidget {
               width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.dividerLight,
+                color: context.kc.divider,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -366,7 +368,7 @@ class _BranchSheet extends StatelessWidget {
                 child: Text(
                   'Show events for',
                   style: AppTypography.ui(size: 15, weight: FontWeight.w700)
-                      .copyWith(color: AppColors.textPrimary),
+                      .copyWith(color: context.kc.onBg),
                 ),
               ),
             ),
@@ -398,7 +400,7 @@ class _BranchSheet extends StatelessWidget {
           size: 14,
           weight: selected ? FontWeight.w700 : FontWeight.w500,
         ).copyWith(
-          color: selected ? AppColors.primary : AppColors.textPrimary,
+          color: selected ? AppColors.primary : context.kc.onBg,
         ),
       ),
       trailing: selected
@@ -461,7 +463,7 @@ class _TabChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: active ? AppColors.primary : const Color(0xFFF0ECEA),
+          color: active ? AppColors.primary : context.kc.surfaceMuted,
           borderRadius: AppRadius.pillBorder,
         ),
         child: Text(
@@ -470,7 +472,7 @@ class _TabChip extends StatelessWidget {
             size: 13,
             weight: active ? FontWeight.w700 : FontWeight.w600,
           ).copyWith(
-            color: active ? AppColors.onPrimary : AppColors.textMutedLight,
+            color: active ? AppColors.onPrimary : context.kc.muted,
           ),
         ),
       ),
@@ -500,7 +502,7 @@ class _EventCard extends ConsumerWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: context.kc.surface,
         borderRadius: AppRadius.cardBorder,
         boxShadow: AppShadows.card,
       ),
@@ -537,7 +539,7 @@ class _EventCard extends ConsumerWidget {
                     size: 15.5,
                     weight: FontWeight.w700,
                     height: 1.15,
-                  ).copyWith(color: AppColors.textPrimary),
+                  ).copyWith(color: context.kc.onBg),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -553,36 +555,36 @@ class _EventCard extends ConsumerWidget {
 
           // Split footer: RSVP | Add to calendar.
           DecoratedBox(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.dividerLight)),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: context.kc.divider)),
             ),
             child: IntrinsicHeight(
               child: Row(
                 children: [
                   Expanded(
                     child: isPast
-                        ? const _FooterAction(
+                        ? _FooterAction(
                             label: 'Ended',
-                            color: AppColors.textMutedLight,
+                            color: context.kc.muted,
                             onTap: null,
                           )
                         : _FooterAction(
                             label: isRsvped ? 'Going \u2713' : 'RSVP',
                             color: isRsvped
-                                ? AppColors.textMutedLight
+                                ? context.kc.muted
                                 : AppColors.primary,
                             onTap: () => _toggleRsvp(context, ref),
                           ),
                   ),
-                  const VerticalDivider(
+                  VerticalDivider(
                     width: 1,
                     thickness: 1,
-                    color: AppColors.dividerLight,
+                    color: context.kc.divider,
                   ),
                   Expanded(
                     child: _FooterAction(
                       label: 'Add to calendar',
-                      color: AppColors.textMutedLight,
+                      color: context.kc.muted,
                       onTap: () => _addToCalendar(context),
                     ),
                   ),
@@ -654,7 +656,6 @@ class _EventCard extends ConsumerWidget {
         'Sign in to RSVP to events.',
         action: SnackBarAction(
           label: 'Sign in',
-          textColor: AppColors.gold,
           onPressed: () => router.push('/login'),
         ),
       ));
@@ -724,6 +725,10 @@ class _DateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Fixed light plate in both themes. The chip sits on the photo banner, and
+    // the _accentPalette it carries is calibrated for a light plate over
+    // photography — tinting it with the active surface drops those accents to
+    // roughly 2:1 in dark mode.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -769,13 +774,13 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 13, color: AppColors.textMutedLight),
+        Icon(icon, size: 13, color: context.kc.muted),
         const SizedBox(width: 5),
         Expanded(
           child: Text(
             text,
             style: AppTypography.ui(size: 12.5)
-                .copyWith(color: AppColors.textMutedLight),
+                .copyWith(color: context.kc.muted),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -818,17 +823,11 @@ class _FooterAction extends StatelessWidget {
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
+/// Toast. Plate colour, content type, floating behaviour and shape all come
+/// from `snackBarTheme`; only the bottom margin that clears the tab bar is
+/// screen-specific.
 SnackBar _toast(String message, {SnackBarAction? action}) => SnackBar(
-      content: Text(
-        message,
-        style: AppTypography.ui(size: 14, weight: FontWeight.w600)
-            .copyWith(color: Colors.white),
-      ),
-      backgroundColor: AppColors.darkSurface,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      content: Text(message),
       action: action,
       duration: const Duration(milliseconds: 1900),
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 90),

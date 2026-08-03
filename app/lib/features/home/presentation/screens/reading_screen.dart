@@ -42,11 +42,20 @@ int _readingPlanDay() {
   return now.difference(DateTime(now.year, 1, 1)).inDays + 1;
 }
 
-/// Warm superscript verse-number accent used on the light reading surface.
-const Color _verseAccent = Color(0xFFB8875F);
+/// Warm superscript verse-number accent for the reading surface. Light mode
+/// uses a warm brown against the paper background; dark mode lifts it to a
+/// warm tan so it still separates from the serif body.
+Color _verseAccent(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFFD1A57C)
+        : const Color(0xFFB8875F);
 
-/// Warm ink for long-form serif scripture (softer than pure text primary).
-const Color _scriptureInk = Color(0xFF2A2723);
+/// Warm ink for long-form serif scripture — deliberately softer than primary
+/// text so long passages read calmly. Dark mode uses a warm off-white.
+Color _scriptureInk(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFFE8E2D8)
+        : const Color(0xFF2A2723);
 
 /// Full-screen reader for today's Bible reading with version switching.
 /// Design-handoff v3 — calm, scripture-forward, Newsreader serif on light warm.
@@ -58,13 +67,12 @@ class ReadingScreen extends ConsumerWidget {
     final contentAsync = ref.watch(dailyContentProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: AppColors.textPrimary),
+          icon: Icon(Icons.keyboard_arrow_down_rounded,
+              color: context.kc.onBg),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -72,7 +80,7 @@ class ReadingScreen extends ConsumerWidget {
           style: AppTypography.ui(
             size: 13,
             weight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: context.kc.onBg,
           ),
         ),
         centerTitle: true,
@@ -122,7 +130,7 @@ class _PassageView extends ConsumerWidget {
   void _showVersionSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.cardWhite,
+      backgroundColor: context.kc.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
@@ -149,7 +157,7 @@ class _PassageView extends ConsumerWidget {
                   child: Text(
                     'Could not load versions',
                     style: AppTypography.bodySm
-                        .copyWith(color: AppColors.textMutedLight),
+                        .copyWith(color: context.kc.muted),
                   ),
                 ),
                 data: (bibles) => ListView(
@@ -181,7 +189,7 @@ class _PassageView extends ConsumerWidget {
                                 : FontWeight.w500,
                             color: b.id == selected.id
                                 ? AppColors.primary
-                                : AppColors.textPrimary,
+                                : context.kc.onBg,
                           ),
                         ),
                         subtitle: Text(
@@ -190,7 +198,7 @@ class _PassageView extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.ui(
                             size: 12,
-                            color: AppColors.textMutedLight,
+                            color: context.kc.muted,
                           ),
                         ),
                         trailing: b.id == selected.id
@@ -257,7 +265,7 @@ class _PassageView extends ConsumerWidget {
                         ? passage.reference
                         : fallbackReference,
                     style: AppTypography.display(size: 32, weight: FontWeight.w700)
-                        .copyWith(color: AppColors.textPrimary, height: 1.15),
+                        .copyWith(color: context.kc.onBg, height: 1.15),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -277,7 +285,7 @@ class _PassageView extends ConsumerWidget {
                 style: AppTypography.ui(
                   size: 11,
                   height: 1.5,
-                  color: AppColors.textMutedLight,
+                  color: context.kc.muted,
                 ),
               ),
             ],
@@ -347,13 +355,13 @@ class _PassageBody extends StatelessWidget {
     final bodyStyle = AppTypography.serif(
       size: 18,
       height: 1.62,
-      color: _scriptureInk,
+      color: _scriptureInk(context),
     );
     final verseStyle = AppTypography.ui(
       size: 12,
       height: 1.62,
       weight: FontWeight.w600,
-      color: _verseAccent,
+      color: _verseAccent(context),
     );
 
     final children = <Widget>[];
@@ -364,7 +372,7 @@ class _PassageBody extends StatelessWidget {
           child: Text(
             block.segments.map((s) => s.text).join(' '),
             style: AppTypography.display(size: 17, weight: FontWeight.w700)
-                .copyWith(color: AppColors.textPrimary),
+                .copyWith(color: context.kc.onBg),
           ),
         ));
         continue;
@@ -375,7 +383,7 @@ class _PassageBody extends StatelessWidget {
           child: Text(
             block.segments.map((s) => s.text).join(' '),
             style: AppTypography.serif(size: 15, italic: true)
-                .copyWith(color: AppColors.textMutedLight),
+                .copyWith(color: context.kc.muted),
           ),
         ));
         continue;
@@ -427,7 +435,7 @@ class _DailyPrayer extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
       decoration: BoxDecoration(
-        color: AppColors.cardWhite,
+        color: context.kc.surface,
         borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: AppShadows.card,
       ),
@@ -454,7 +462,7 @@ class _DailyPrayer extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'Inspired by $reference',
-              style: AppTypography.ui(size: 12.5, color: AppColors.textMutedLight),
+              style: AppTypography.ui(size: 12.5, color: context.kc.muted),
             ),
           ],
           const SizedBox(height: 14),
@@ -464,7 +472,7 @@ class _DailyPrayer extends StatelessWidget {
               size: 17,
               italic: true,
               height: 1.6,
-              color: _scriptureInk,
+              color: _scriptureInk(context),
             ),
           ),
         ],
@@ -486,21 +494,21 @@ class _ReadingActions extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.secondary,
+                color: context.kc.accent,
                 borderRadius: BorderRadius.circular(AppRadius.button),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.play_arrow_rounded,
-                      color: AppColors.onSecondary, size: 19),
+                  Icon(Icons.play_arrow_rounded,
+                      color: context.kc.onAccent, size: 19),
                   const SizedBox(width: 7),
                   Text(
                     'Listen',
                     style: AppTypography.ui(
                       size: 14.5,
                       weight: FontWeight.w700,
-                      color: AppColors.onSecondary,
+                      color: context.kc.onAccent,
                     ),
                   ),
                 ],
@@ -521,10 +529,8 @@ class _ReadingActions extends StatelessWidget {
                     style: AppTypography.ui(
                       size: 13.5,
                       weight: FontWeight.w600,
-                      color: AppColors.onSecondary,
                     ),
                   ),
-                  backgroundColor: AppColors.secondary,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -532,15 +538,15 @@ class _ReadingActions extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.cardWhite,
+              color: context.kc.surface,
               borderRadius: BorderRadius.circular(AppRadius.button),
-              border: Border.all(color: AppColors.dividerLight, width: 1),
+              border: Border.all(color: context.kc.divider, width: 1),
               boxShadow: AppShadows.card,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.check_rounded,
+                Icon(Icons.check_rounded,
                     color: AppColors.primary, size: 18),
                 const SizedBox(width: 7),
                 Text(
@@ -548,7 +554,7 @@ class _ReadingActions extends StatelessWidget {
                   style: AppTypography.ui(
                     size: 14.5,
                     weight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: context.kc.onBg,
                   ),
                 ),
               ],
@@ -572,12 +578,12 @@ class _ErrorView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.menu_book_rounded,
-              color: AppColors.textMutedLight, size: 40),
+          Icon(Icons.menu_book_rounded,
+              color: context.kc.muted, size: 40),
           const SizedBox(height: 14),
           Text(
             message,
-            style: AppTypography.bodySm.copyWith(color: AppColors.textMutedLight),
+            style: AppTypography.bodySm.copyWith(color: context.kc.muted),
           ),
           TextButton(
             onPressed: onRetry,

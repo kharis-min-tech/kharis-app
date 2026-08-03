@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
@@ -14,10 +12,18 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
-/// Unified media player for audio and YouTube video content — dark
-/// design-handoff (v3). Audio playback mirrors the full Now Playing screen
-/// (purple→ink wash, gold transport, waveform scrubber); video hosts the
-/// YouTube player under the same dark chrome.
+/// Ambient wash shared by the player screens, settling into the page background
+/// at the bottom so they belong to whichever theme is active. Dark mode keeps
+/// the deep purple→ink gradient from the design handoff; light mode uses a soft
+/// lavender that fades into the warm page background.
+List<Color> playerAmbientColors(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+        ? [const Color(0xFF3A1D6E), const Color(0xFF1A0F33), context.kc.bg]
+        : [const Color(0xFFE6DEF8), const Color(0xFFF2ECF9), context.kc.bg];
+
+/// Unified media player for audio and YouTube video content. Audio playback
+/// mirrors the full Now Playing screen (ambient wash, gold transport, waveform
+/// scrubber); video hosts the YouTube player under the same chrome.
 class MediaPlayerScreen extends ConsumerStatefulWidget {
   const MediaPlayerScreen({super.key, required this.sermon});
 
@@ -69,17 +75,16 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.ink,
       body: _isVideo ? _buildVideoPlayer() : _buildAudioPlayer(),
     );
   }
 
-  BoxDecoration get _gradient => const BoxDecoration(
+  BoxDecoration get _gradient => BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF3A1D6E), Color(0xFF1A0F33), AppColors.ink],
-          stops: [0.0, 0.44, 1.0],
+          colors: playerAmbientColors(context),
+          stops: const [0.0, 0.44, 1.0],
         ),
       );
 
@@ -139,8 +144,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                     const SizedBox(height: 26),
                     Container(
                       padding: const EdgeInsets.only(top: 18),
-                      decoration: const BoxDecoration(
-                        border: Border(top: BorderSide(color: Color(0x17FFFFFF))),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: context.kc.divider),
+                        ),
                       ),
                       child: const PlayerActions(),
                     ),
@@ -177,7 +184,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                 size: 10,
                 weight: FontWeight.w600,
                 letterSpacing: 1.0,
-                color: AppColors.darkMuted2,
+                color: context.kc.muted,
               ),
             ),
           ),
@@ -187,7 +194,6 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Share link copied'),
-                backgroundColor: AppColors.darkSurface,
                 behavior: SnackBarBehavior.floating,
                 duration: Duration(milliseconds: 1700),
               ),
@@ -205,7 +211,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       child: SizedBox(
         width: 40,
         height: 40,
-        child: Icon(icon, color: Colors.white, size: size),
+        child: Icon(icon, color: context.kc.onBg, size: size),
       ),
     );
   }
@@ -260,7 +266,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                     size: 22,
                     weight: FontWeight.w700,
                     height: 1.08,
-                    color: Colors.white,
+                    color: context.kc.onBg,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -271,7 +277,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                     subtitle,
                     style: AppTypography.ui(
                       size: 13.5,
-                      color: AppColors.darkMuted2,
+                      color: context.kc.muted,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -293,7 +299,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                   _liked
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
-                  color: AppColors.gold,
+                  color: context.kc.accentInk,
                   size: 24,
                 ),
               ),

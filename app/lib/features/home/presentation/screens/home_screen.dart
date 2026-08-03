@@ -17,10 +17,9 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: RefreshIndicator(
-        color: AppColors.secondary,
-        backgroundColor: AppColors.cardWhite,
+        color: context.kc.accentInk,
+        backgroundColor: context.kc.surface,
         edgeOffset: MediaQuery.of(context).padding.top,
         onRefresh: () async {
           ref.invalidate(videosProvider);
@@ -74,7 +73,7 @@ class HomeScreen extends ConsumerWidget {
                       style: AppTypography.display(
                         size: 19,
                         weight: FontWeight.w700,
-                      ).copyWith(color: AppColors.textPrimary, height: 1),
+                      ).copyWith(color: context.kc.onBg, height: 1),
                     ),
                     const Spacer(),
                     GestureDetector(
@@ -84,7 +83,7 @@ class HomeScreen extends ConsumerWidget {
                         style: AppTypography.ui(
                           size: 12,
                           weight: FontWeight.w600,
-                        ).copyWith(color: AppColors.textMutedLight, height: 1),
+                        ).copyWith(color: context.kc.muted, height: 1),
                       ),
                     ),
                   ],
@@ -155,7 +154,7 @@ class _HomeHeader extends ConsumerWidget {
                 style: AppTypography.ui(
                   size: 12.5,
                   weight: FontWeight.w500,
-                ).copyWith(color: AppColors.textMutedLight, height: 1.1),
+                ).copyWith(color: context.kc.muted, height: 1.1),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -165,7 +164,7 @@ class _HomeHeader extends ConsumerWidget {
                 style: AppTypography.display(
                   size: 22,
                   weight: FontWeight.w700,
-                ).copyWith(color: AppColors.textPrimary, height: 1.15),
+                ).copyWith(color: context.kc.onBg, height: 1.15),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -188,12 +187,12 @@ class _HomeHeader extends ConsumerWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.cardWhite,
+                  color: context.kc.surface,
                   boxShadow: AppShadows.card,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.notifications_none_rounded,
-                  color: AppColors.textPrimary,
+                  color: context.kc.onBg,
                   size: 21,
                 ),
               ),
@@ -207,7 +206,7 @@ class _HomeHeader extends ConsumerWidget {
                     color: AppColors.accentPink,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppColors.cardWhite,
+                      color: context.kc.surface,
                       width: 1.5,
                     ),
                   ),
