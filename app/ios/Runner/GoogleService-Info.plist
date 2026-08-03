@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.kharis.app</string>
+	<string>org.kharis.kharisApp</string>
 	<key>PROJECT_ID</key>
 	<string>kharis-church</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:193550520841:ios:46ad20bca7b7964a689ed8</string>
+	<string>1:193550520841:ios:9ec20dbafea0225e689ed8</string>
 </dict>
 </plist>

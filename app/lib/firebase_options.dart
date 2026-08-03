@@ -52,11 +52,11 @@ class DefaultFirebaseOptions {
   );
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyApB73NdGgLA_cHk_DxT9gmSpijuiYuSI8',
-    appId: '1:193550520841:ios:46ad20bca7b7964a689ed8',
+    appId: '1:193550520841:ios:9ec20dbafea0225e689ed8',
     messagingSenderId: '193550520841',
     projectId: 'kharis-church',
     storageBucket: 'kharis-church.firebasestorage.app',
-    iosBundleId: 'com.kharis.app',
+    iosBundleId: 'org.kharis.kharisApp',
   );
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyCSTb4h3uc2tf7-BqU9lKpZUT15OBZlXXQ',
@@ -70,10 +70,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyApB73NdGgLA_cHk_DxT9gmSpijuiYuSI8',
-    appId: '1:193550520841:ios:46ad20bca7b7964a689ed8',
+    appId: '1:193550520841:ios:9ec20dbafea0225e689ed8',
     messagingSenderId: '193550520841',
     projectId: 'kharis-church',
     storageBucket: 'kharis-church.firebasestorage.app',
-    iosBundleId: 'com.kharis.app',
+    iosBundleId: 'org.kharis.kharisApp',
   );
 }
