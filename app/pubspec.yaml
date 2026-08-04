@@ -146,6 +146,13 @@ flutter_launcher_icons:
 # and cannot full-bleed, so it keeps its own colour — a dark tone sampled from
 # the photo, chosen so the white dove stays legible and nothing reads as brand
 # purple.
+#
+# AFTER running `dart run flutter_native_splash:create`, re-add the 2x/3x
+# launch background slots. The package writes the image into the imageset's 1x
+# slot only and leaves 2x/3x empty, so on an @3x device the photo is a 1x asset
+# claiming to be 1242pt wide. scaleToFill hides it visually, but the correct
+# assets are 414x896 / 828x1792 / 1242x2688 in
+# ios/Runner/Assets.xcassets/LaunchBackground.imageset.
 flutter_native_splash:
   background_image: assets/design/splash-bg.png
   image: assets/icon/icon_foreground.png
