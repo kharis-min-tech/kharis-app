@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart';
 
 import 'package:kharis_app/shared/models/user.dart';
 import 'auth_repository.dart';
@@ -80,14 +81,26 @@ class FirebaseAuthRepository implements AuthRepository {
         role: safeRole,
         createdAt: DateTime.now(),
       );
-      await _firestore.collection('users').doc(fbUser.uid).set({
-        'email': user.email,
-        'displayName': user.displayName,
-        'role': user.role,
-        'branch': user.branch,
-        'photoUrl': user.photoUrl,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // The Auth account already exists at this point, so a failed profile
+      // write must not fail the whole signup — that surfaces as a raw
+      // "database" error on an account the member can actually sign into, and
+      // retrying just hits email-already-in-use. [_hydrate] recreates the
+      // profile on the next auth emission, so log and continue.
+      try {
+        await _firestore.collection('users').doc(fbUser.uid).set({
+          'email': user.email,
+          'displayName': user.displayName,
+          'role': user.role,
+          'branch': user.branch,
+          'photoUrl': user.photoUrl,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint(
+          '[auth] profile write failed for ${fbUser.uid}: $e — '
+          '_hydrate will backfill it on the next auth emission.',
+        );
+      }
       _cached = user;
       return user;
     } on fb.FirebaseAuthException catch (e) {

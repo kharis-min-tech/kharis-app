@@ -292,19 +292,17 @@ final isEventRsvpedProvider =
   return rsvps.any((r) => r.eventId == eventId);
 });
 
-/// The events behind [myRsvpsProvider], in RSVP order (latest event first).
-/// Resolved in `whereIn` batches, so the cost is O(n / 30) reads.
-final myRsvpEventsProvider = FutureProvider<List<Event>>((ref) async {
+/// The events behind [myRsvpsProvider], split into upcoming and past on the
+/// same cutoff the Events tabs use, so an RSVP'd event whose date has passed
+/// is never shown as upcoming. Resolved in `whereIn` batches, so the cost is
+/// O(n / 30) reads. RSVPs whose event has since been deleted drop out.
+final myRsvpEventsProvider = FutureProvider<RsvpEvents>((ref) async {
   final rsvps = await ref.watch(myRsvpsProvider.future);
-  if (rsvps.isEmpty) return const [];
+  if (rsvps.isEmpty) return RsvpEvents.empty;
   final events = await ref
       .watch(eventRepositoryProvider)
       .getEventsByIds(rsvps.map((r) => r.eventId).toList());
-  final byId = {for (final e in events) e.id: e};
-  return [
-    for (final r in rsvps)
-      if (byId[r.eventId] case final Event e) e,
-  ];
+  return RsvpEvents.split(events, DateTime.now());
 });
 
 // ── Daily content ─────────────────────────────────────────────────────────────
@@ -331,11 +329,19 @@ final announcementApiRepositoryProvider =
   return KharisApiAnnouncementRepository();
 });
 
-/// Live announcements, expired items removed. `expiresAt` is set by the web
-/// admin portal; anything past it must never reach the UI.
-final newsProvider = FutureProvider<List<NewsItem>>((ref) async {
-  final items =
-      await ref.watch(announcementApiRepositoryProvider).getAnnouncements();
+/// Live announcements for a campus, expired items removed. Pass the member's
+/// active branch (`currentBranchProvider`) and the API returns that branch's
+/// announcements plus all-campus ones; pass null for the unscoped feed. The
+/// scoping is server-side, so a branch notice is never lost behind a global
+/// page limit and callers must not re-filter by branch.
+///
+/// `expiresAt` is set by the web admin portal; anything past it must never
+/// reach the UI.
+final newsProvider =
+    FutureProvider.family<List<NewsItem>, String?>((ref, branch) async {
+  final items = await ref
+      .watch(announcementApiRepositoryProvider)
+      .getAnnouncements(branch: branch);
   return items.where((n) => !n.isExpired).toList();
 });
 

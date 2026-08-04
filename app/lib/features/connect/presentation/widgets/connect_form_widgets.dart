@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 
-const List<String> kConnectBranches = [
+/// Offline fallback for [ConnectBranchDropdown].
+///
+/// Only used when the live branch list has not loaded. The real list comes
+/// from `branchesProvider` — this used to be a hardcoded const the dropdown
+/// read directly, which meant a branch added or renamed in Content Studio
+/// never reached these forms, and it still listed "Medway", which is not a
+/// branch in the network.
+const List<String> _kFallbackBranches = [
   'London',
   'Birmingham',
   'Reading',
   'Chatham',
   'Croydon',
-  'Medway',
   'Accra',
   'Freetown',
 ];
@@ -92,7 +100,7 @@ class ConnectFormField extends StatelessWidget {
 }
 
 /// Styled branch dropdown matching the connect form aesthetic.
-class ConnectBranchDropdown extends StatelessWidget {
+class ConnectBranchDropdown extends ConsumerWidget {
   const ConnectBranchDropdown({
     super.key,
     required this.value,
@@ -103,7 +111,11 @@ class ConnectBranchDropdown extends StatelessWidget {
   final ValueChanged<String?> onChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final live = ref.watch(branchesProvider).valueOrNull;
+    final names = (live != null && live.isNotEmpty)
+        ? (live.map((b) => b.name).toList()..sort())
+        : _kFallbackBranches;
     return Container(
       decoration: BoxDecoration(
         color: context.kc.surfaceAlt,
@@ -127,7 +139,7 @@ class ConnectBranchDropdown extends StatelessWidget {
             fontSize: 15,
             color: context.kc.onBg,
           ),
-          items: kConnectBranches
+          items: names
               .map(
                 (b) => DropdownMenuItem(
                   value: b,

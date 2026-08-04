@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kharis_app/core/constants/api_config.dart';
+import 'package:kharis_app/features/home/data/reading_plan_repository.dart';
 
 @immutable
 class DailyContent {
@@ -30,20 +31,58 @@ class BibleReading {
   final int chapter;
   final String verse;
 
-  /// Human-readable reference, e.g. "John 3:16-17".
-  String get reference => '$book $chapter:$verse';
+  /// Human-readable reference, e.g. "John 3:16-17". A `1-end` verse range means
+  /// the whole chapter, so it collapses to "Proverbs 2".
+  String get reference => formatReadingReference(book, chapter, verse);
 }
 
-/// Reads today's devotional content from the Firestore `dailyContent`
-/// collection, keyed by date string `"YYYY-MM-DD"`.
+/// Where a resolved reading came from.
+enum DailyContentSource {
+  /// A hand-written `dailyContent/{date}` document.
+  day,
+
+  /// A reading plan that covers the date.
+  plan,
+
+  /// The last day of an expired plan, because nothing covers the date yet.
+  planLastDay,
+
+  /// Nothing is configured at all — the built-in fallback.
+  fallback,
+}
+
+/// A reading plus why it resolved that way — what the Content Studio previews.
+@immutable
+class ResolvedDailyContent {
+  const ResolvedDailyContent({
+    required this.content,
+    required this.source,
+    this.planTitle,
+  });
+
+  final DailyContent content;
+  final DailyContentSource source;
+
+  /// Title of the plan behind [content], when it came from one.
+  final String? planTitle;
+}
+
+/// Reads the devotional content for a date.
 ///
-/// Falls back to [_hardcodedContent] when Firestore is unavailable or the
-/// document for today does not yet exist.
+/// Resolution order matches `getDailyReading` on the backend:
+///   1. a hand-written `dailyContent/{YYYY-MM-DD}` document;
+///   2. the reading plan covering that date (see [resolvePlanReading]);
+///   3. the last day of the most recently expired plan;
+///   4. [_hardcodedContent], so the UI is never empty.
 class DailyContentRepository {
-  DailyContentRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  DailyContentRepository({
+    FirebaseFirestore? firestore,
+    ReadingPlanRepository? plans,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _plans = plans ?? ReadingPlanRepository(firestore: firestore);
 
   final FirebaseFirestore _firestore;
+  final ReadingPlanRepository _plans;
 
   static const String _apiUrl = ApiConfig.getDailyReading;
 
@@ -55,28 +94,36 @@ class DailyContentRepository {
   );
 
   /// Returns today's content (or the fallback if unavailable).
-  Future<DailyContent> getTodaysContent() async {
-    final dateKey = _dateKey(DateTime.now());
-    return getContentForDate(dateKey);
-  }
+  Future<DailyContent> getTodaysContent() =>
+      getContentForDate(readingDateKey(DateTime.now()));
 
   /// Realtime stream of today's content; emits the fallback first so the UI
   /// is never empty, then live snapshots as the document changes.
   Stream<DailyContent> watchTodaysContent() async* {
-    final dateKey = _dateKey(DateTime.now());
+    final today = dateOnly(DateTime.now());
     // API-first: one-shot fetch from the Cloud Functions endpoint so content
     // appears even when Firestore is cold/unreachable, then hand over to the
     // realtime Firestore stream below.
     final apiContent = await _fetchFromApi();
     if (apiContent != null) yield apiContent;
+
+    // Plans change rarely, so one fetch is enough to keep this fallback in step
+    // with the plan resolution the API performs.
+    final plans = await _plansOrEmpty(today);
     try {
       yield* _firestore
           .collection('dailyContent')
-          .doc(dateKey)
+          .doc(readingDateKey(today))
           .snapshots()
-          .map((doc) => doc.exists && doc.data() != null
-              ? _mapData(doc.data()!)
-              : _hardcodedContent);
+          .map((doc) {
+        final data = doc.data();
+        // A hand-written day always wins over the plan.
+        if (_hasReading(data)) return _mapData(data!);
+        final resolved = resolvePlanReading(plans, today);
+        return resolved == null
+            ? _hardcodedContent
+            : _fromPlan(resolved.reading);
+      });
     } catch (_) {
       yield _hardcodedContent;
     }
@@ -98,21 +145,68 @@ class DailyContentRepository {
   }
 
   /// Returns content for [dateKey] formatted as `"YYYY-MM-DD"`.
-  Future<DailyContent> getContentForDate(String dateKey) async {
+  Future<DailyContent> getContentForDate(String dateKey) async =>
+      (await resolveForDate(dateKey)).content;
+
+  /// Resolves [dateKey] and reports which rule produced the reading.
+  Future<ResolvedDailyContent> resolveForDate(String dateKey) async {
+    final date = parseReadingDate(dateKey) ?? dateOnly(DateTime.now());
     try {
       final doc =
           await _firestore.collection('dailyContent').doc(dateKey).get();
-      if (!doc.exists || doc.data() == null) return _hardcodedContent;
-      return _mapData(doc.data()!);
+      final data = doc.data();
+      // A hand-written day BEATS the plan for that date — that is what lets an
+      // admin special-case Christmas without disturbing the plan around it.
+      if (_hasReading(data)) {
+        return ResolvedDailyContent(
+          content: _mapData(data!),
+          source: DailyContentSource.day,
+        );
+      }
     } catch (_) {
-      return _hardcodedContent;
+      // Fall through to plan resolution.
     }
+
+    final resolved = resolvePlanReading(await _plansOrEmpty(date), date);
+    if (resolved == null) {
+      return const ResolvedDailyContent(
+        content: _hardcodedContent,
+        source: DailyContentSource.fallback,
+      );
+    }
+    return ResolvedDailyContent(
+      content: _fromPlan(resolved.reading),
+      source: resolved.pinnedToLastDay
+          ? DailyContentSource.planLastDay
+          : DailyContentSource.plan,
+      planTitle: resolved.plan.title,
+    );
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  String _dateKey(DateTime date) =>
-      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  Future<List<ReadingPlan>> _plansOrEmpty(DateTime date) async {
+    try {
+      return await _plans.plansThrough(date);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  bool _hasReading(Map<String, dynamic>? data) {
+    final reading = data?['reading'];
+    return reading is Map && (reading['book'] as String?)?.isNotEmpty == true;
+  }
+
+  DailyContent _fromPlan(PlanDayReading reading) => DailyContent(
+        reading: BibleReading(
+          book: reading.book,
+          chapter: reading.chapter,
+          verse: reading.verse,
+        ),
+        prayer: reading.prayer,
+        prayerReference: reading.prayerReference,
+      );
 
   DailyContent _mapData(Map<String, dynamic> data) {
     final readingData = data['reading'] as Map<String, dynamic>?;
@@ -143,37 +237,6 @@ class DailyContentRepository {
       'prayer': content.prayer,
       'prayerReference': content.prayerReference,
     });
-  }
-
-  /// Batch-creates a sequential reading series: one chapter per day starting
-  /// from [startDate] for [days] days, beginning at [book] chapter [startChapter].
-  Future<int> batchSetContent({
-    required String book,
-    required int startChapter,
-    required DateTime startDate,
-    required int days,
-    String prayer = '',
-  }) async {
-    final batch = _firestore.batch();
-    for (var i = 0; i < days; i++) {
-      final date = startDate.add(Duration(days: i));
-      final chapter = startChapter + i;
-      final key = _dateKey(date);
-      final ref = _firestore.collection('dailyContent').doc(key);
-      batch.set(ref, {
-        'reading': {
-          'book': book,
-          'chapter': chapter,
-          'verse': '1-end',
-        },
-        'prayer': prayer.isNotEmpty
-            ? prayer
-            : 'Lord, speak to us through $book $chapter today.',
-        'prayerReference': '$book $chapter:1',
-      });
-    }
-    await batch.commit();
-    return days;
   }
 
   /// Deletes the dailyContent document for [dateKey].

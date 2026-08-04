@@ -104,27 +104,54 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
       BuildContext context, WidgetRef ref, Branch branch) async {
     final user = ref.read(currentUserProvider).valueOrNull;
     final repo = ref.read(firebaseAuthRepositoryProvider);
-    if (user != null && user.email.isNotEmpty) {
-      try {
-        await repo.updateProfile(branch: branch.name);
-      } catch (_) {}
-    }
     final onboardingRepo = ref.read(onboardingRepositoryProvider);
-    // Switch this device's branch FCM topic so it gets branch-scoped pushes.
-    // Same code path as Edit Profile.
-    await ref.read(notificationServiceProvider).switchBranchTopic(
-          from: onboardingRepo.selectedBranch,
-          to: branch.name,
-        );
+    // Captured before completeOnboarding overwrites it, or the FCM unsubscribe
+    // below would be handed the new branch as its `from` and leave the device
+    // subscribed to the old topic.
+    final previousBranch = onboardingRepo.selectedBranch;
+
+    // Persist locally first: this always succeeds, so the member's choice is
+    // never lost to a failed network write.
     await onboardingRepo.completeOnboarding(
       role: onboardingRepo.selectedRole ?? 'member',
       branch: branch.name,
     );
-    // Guests have no Firestore profile doc for [currentBranchProvider] to
-    // stream, so the locally persisted choice is their only source — force a
-    // re-read here or their switch never reaches any content provider.
+
+    // Switch this device's branch FCM topic so it gets branch-scoped pushes.
+    // Same code path as Edit Profile.
+    await ref.read(notificationServiceProvider).switchBranchTopic(
+          from: previousBranch,
+          to: branch.name,
+        );
+
+    // Mirror into the Firestore profile so the branch follows the member to
+    // other devices. If it fails, flag it rather than swallowing: the profile
+    // is normally authoritative, so a silent failure would let the stale
+    // remote branch overwrite this choice on the next launch.
+    var syncFailed = false;
+    if (user != null && user.id.isNotEmpty && user.role != 'guest') {
+      try {
+        await repo.updateProfile(branch: branch.name);
+        await onboardingRepo.setBranchSyncPending(false);
+      } catch (_) {
+        syncFailed = true;
+        await onboardingRepo.setBranchSyncPending(true);
+      }
+    }
+
     ref.invalidate(currentBranchProvider);
-    if (context.mounted) context.go('/home');
+    if (!context.mounted) return;
+    if (syncFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Switched to ${branch.name} on this device. We could not reach '
+            'your profile — it will sync automatically.',
+          ),
+        ),
+      );
+    }
+    context.go('/home');
   }
 
   /// Section header + branch tiles; an empty group renders nothing.

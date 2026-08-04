@@ -177,6 +177,13 @@ class NotificationService {
     );
   }
 
+  /// Routes a tapped push to the screen that shows what it is about.
+  ///
+  /// `message.data['type']` is the contract with the backend: every push sent
+  /// from `backend/functions/src/content-notifications.ts` and
+  /// `pushPendingAnnouncements` carries one of the types cased below. Adding a
+  /// type server-side without a case here drops the member on `/home` with no
+  /// sign of what they tapped, so the two move together.
   void _handleNotificationTap(RemoteMessage message) {
     debugPrint('[FCM] Tapped: ${message.notification?.title}');
     final type = message.data['type'] as String?;
@@ -192,6 +199,10 @@ class NotificationService {
       case KharisTopics.events:
       case KharisTopics.serviceReminders:
         router?.go('/calendar');
+      case 'venue':
+        // Branch address and service times are read off the home screen's
+        // campus card — the only member-facing surface for them.
+        router?.go('/home');
       case 'reading':
       case KharisTopics.dailyReading:
         router?.go('/reading');

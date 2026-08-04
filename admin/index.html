@@ -640,8 +640,8 @@
       <span class="count-badge" id="events-count">—</span>
     </button>
     <button class="tab-btn" data-tab="news">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-      News
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8a4 4 0 0 1 0 8"/><path d="M17.5 5a8 8 0 0 1 0 14"/></svg>
+      Announcements
       <span class="count-badge" id="news-count">—</span>
     </button>
     <button class="tab-btn" data-tab="daily">
@@ -771,7 +771,11 @@
 
         <!-- Form -->
         <div class="card">
-          <div class="card-title"><span class="dot"></span> Publish News</div>
+          <div class="card-title"><span class="dot"></span> Publish Announcement</div>
+          <p style="font-size:12px;color:var(--muted);margin:-4px 0 14px;">
+            An announcement is a message to the church — headline, body, optional image, optional expiry.
+            Anything with a date and a venue that people RSVP to belongs in the <strong>Events</strong> tab.
+          </p>
           <form id="news-form">
             <div class="field">
               <label for="nw-title">Title *</label>
@@ -784,6 +788,32 @@
             <div class="field">
               <label for="nw-image">Image URL</label>
               <input type="url" id="nw-image" placeholder="https://…" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="nw-type">Type</label>
+                <select id="nw-type">
+                  <option value="Announcement">Announcement</option>
+                  <option value="Ministry">Ministry</option>
+                  <option value="Notice">Notice</option>
+                  <option value="Update">Update</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="nw-branch">Branch</label>
+                <select id="nw-branch">
+                  <option value="">All Branches</option>
+                  <option value="London">London</option>
+                  <option value="Manchester">Manchester</option>
+                  <option value="Birmingham">Birmingham</option>
+                  <option value="Reading">Reading</option>
+                  <option value="Chatham">Chatham</option>
+                  <option value="Croydon">Croydon</option>
+                  <option value="Medway">Medway</option>
+                  <option value="Accra">Accra</option>
+                  <option value="Freetown">Freetown</option>
+                </select>
+              </div>
             </div>
             <div class="field-row">
               <div class="field">
@@ -804,14 +834,14 @@
         <!-- List -->
         <div>
           <div class="list-header">
-            <span class="list-section-title">Published News</span>
+            <span class="list-section-title">Published Announcements</span>
             <button class="btn btn-secondary" id="refresh-news" style="font-size:12px;padding:6px 12px;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               Refresh
             </button>
           </div>
           <div id="news-list">
-            <div class="loading-row"><span class="spinner"></span> Loading news…</div>
+            <div class="loading-row"><span class="spinner"></span> Loading announcements…</div>
           </div>
         </div>
       </div>
@@ -878,8 +908,16 @@
           </form>
         </div>
 
-        <!-- Preview of existing content -->
+        <!-- What the app actually serves for the selected date -->
         <div>
+          <div class="list-header">
+            <span class="list-section-title">What Members See</span>
+          </div>
+          <div id="daily-resolved" style="margin-bottom:22px;">
+            <div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
+              Select a date to see what resolves for it.
+            </div>
+          </div>
           <div class="list-header">
             <span class="list-section-title">Saved Entry</span>
           </div>
@@ -887,6 +925,88 @@
             <div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
               Select a date to preview existing content.
             </div>
+          </div>
+        </div>
+
+        <!-- Reading plan: authored once, resolves every date in its range -->
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Reading Plan</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:18px;line-height:1.5;">
+            A plan covers a range of dates and advances on its own — Proverbs 1
+            on day 1, Proverbs 2 on day 2. A saved day above always overrides
+            the plan for that one date, and when a plan ends with no successor
+            members keep seeing its last day.
+          </p>
+
+          <form id="plan-form">
+            <div class="field">
+              <label for="pl-title">Plan Name *</label>
+              <input type="text" id="pl-title" placeholder="January – Proverbs" required />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="pl-book">Book *</label>
+                <input type="text" id="pl-book" placeholder="Proverbs" required />
+              </div>
+              <div class="field">
+                <label for="pl-start">Start Date *</label>
+                <input type="date" id="pl-start" required />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="pl-mode">Advances By</label>
+                <select id="pl-mode">
+                  <option value="chapter">A chapter a day</option>
+                  <option value="verse">Verses a day</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="pl-days">Length In Days *</label>
+                <input type="number" id="pl-days" min="1" max="400" placeholder="31" required />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="pl-chapter">Starting Chapter *</label>
+                <input type="number" id="pl-chapter" min="1" value="1" required />
+              </div>
+              <div class="field" id="pl-verses-field">
+                <label for="pl-verses">Verse Range Each Day</label>
+                <input type="text" id="pl-verses" placeholder="Whole chapter" />
+              </div>
+            </div>
+            <div class="field-row" id="pl-verse-fields" style="display:none;">
+              <div class="field">
+                <label for="pl-start-verse">First Verse</label>
+                <input type="number" id="pl-start-verse" min="1" value="1" />
+              </div>
+              <div class="field">
+                <label for="pl-verses-per-day">Verses Per Day</label>
+                <input type="number" id="pl-verses-per-day" min="1" value="1" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="pl-prayer">Prayer Shown Each Day</label>
+              <textarea id="pl-prayer" placeholder="Generated from the reading if left blank"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="plan-submit-btn">
+              Save Reading Plan
+            </button>
+          </form>
+        </div>
+
+        <!-- Plan list -->
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Reading Plans</span>
+            <button class="btn btn-secondary" id="refresh-plans" style="font-size:12px;padding:6px 12px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div id="plans-list">
+            <div class="loading-row"><span class="spinner"></span> Loading plans…</div>
           </div>
         </div>
       </div>
@@ -1155,6 +1275,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     // Lazy-load data for the tab
     if (btn.dataset.tab === 'sermons') loadSermons();
     if (btn.dataset.tab === 'branches') loadBranches();
+    if (btn.dataset.tab === 'daily') loadPlans();
   });
 });
 
@@ -1347,7 +1468,7 @@ async function loadSubmissions() {
 // ════════════════════════════════════════════════════════════════════════════
 async function loadNews() {
   const listEl = document.getElementById('news-list');
-  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading news…</div>';
+  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading announcements…</div>';
   try {
     const q    = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
     const snap = await getDocs(q);
@@ -1364,7 +1485,7 @@ function renderNewsList(items) {
   if (!items.length) {
     listEl.innerHTML = `<div class="empty-state">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <p>No news items yet. Publish one!</p>
+      <p>No announcements yet. Publish one!</p>
     </div>`;
     return;
   }
@@ -1381,6 +1502,8 @@ function renderNewsList(items) {
         <div class="item-card-title">${escHtml(nw.title)}</div>
         <div class="item-card-meta">
           <span>Published ${formatDate(published)}</span>
+          <span class="meta-chip">${escHtml(nw.branch || 'All Branches')}</span>
+          ${nw.type ? `<span class="meta-chip">${escHtml(nw.type)}</span>` : ''}
           ${nw.expiresAt ? `<span class="meta-chip">Expires ${formatDate(nw.expiresAt.toDate ? nw.expiresAt.toDate() : new Date(nw.expiresAt))}</span>` : ''}
         </div>
         ${preview ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">${escHtml(preview)}</div>` : ''}
@@ -1405,6 +1528,10 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
       title:       document.getElementById('nw-title').value.trim(),
       body:        document.getElementById('nw-body').value.trim(),
       imageUrl:    document.getElementById('nw-image').value.trim() || null,
+      type:        document.getElementById('nw-type').value,
+      // Empty select = church-wide. Written as an explicit null (never left
+      // absent) so getAnnouncements' branch-scoped query can see it.
+      branch:      document.getElementById('nw-branch').value || null,
       publishedAt: Timestamp.fromDate(new Date(publishVal)),
       expiresAt:   expiryVal ? Timestamp.fromDate(new Date(expiryVal)) : null,
       createdAt:   Timestamp.now(),
@@ -1412,7 +1539,7 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
     await addDoc(collection(db, 'news'), payload);
     document.getElementById('news-form').reset();
     setDefaultNewsDate();
-    toast('News item published');
+    toast('Announcement published');
     loadNews();
   } catch (err) {
     toast(err.message, 'error');
@@ -1446,6 +1573,7 @@ async function loadDailyPreview(dateKey) {
   const previewEl = document.getElementById('daily-preview');
   const bannerEl  = document.getElementById('daily-existing-banner');
   if (!dateKey) return;
+  loadResolvedReading(dateKey);
   previewEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Checking…</div>';
   try {
     const snap = await getDoc(doc(db, 'dailyContent', dateKey));
@@ -1481,6 +1609,184 @@ async function loadDailyPreview(dateKey) {
     previewEl.innerHTML = `<div style="color:var(--danger);font-size:13px;">Error: ${err.message}</div>`;
   }
 }
+
+// Resolution (saved day → covering plan → last day of the most recent expired
+// plan) is done by the getDailyReading function, so the portal, the app and the
+// daily notification can never disagree about what a date means.
+const DAILY_READING_URL =
+  'https://us-central1-kharis-church.cloudfunctions.net/getDailyReading';
+
+const READING_SOURCE_LABEL = {
+  'day': 'Written by hand for this date — overrides any plan.',
+  'plan': 'From a reading plan.',
+  'plan-last-day':
+    'That plan has finished — held on its last day until a new plan starts.',
+};
+
+async function loadResolvedReading(dateKey) {
+  const el = document.getElementById('daily-resolved');
+  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Resolving…</div>';
+  try {
+    const res = await fetch(`${DAILY_READING_URL}?date=${encodeURIComponent(dateKey)}`);
+    const data = await res.json();
+    const entry = (data.readings || [])[0];
+    if (!entry) {
+      el.innerHTML = `<div class="empty-state" style="padding:24px 0;text-align:left;font-size:13px;color:var(--danger);">
+        Nothing covers <strong>${escHtml(dateKey)}</strong>. Members see the built-in
+        default reading until a plan covers it or a day is saved.</div>`;
+      return;
+    }
+    const r = entry.reading || {};
+    const ref = (!r.verse || r.verse === '1-end')
+      ? `${r.book} ${r.chapter}`
+      : `${r.book} ${r.chapter}:${r.verse}`;
+    const plan = entry.planTitle ? ` — ${escHtml(entry.planTitle)}` : '';
+    el.innerHTML = `
+      <div class="card" style="background:var(--surface2);">
+        <div style="font-size:18px;font-weight:700;">${escHtml(ref)}</div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);">${READING_SOURCE_LABEL[entry.source] || ''}${plan}</div>
+        <div style="margin-top:10px;font-size:13px;line-height:1.6;color:var(--text);">${escHtml(entry.prayer || '')}</div>
+      </div>`;
+  } catch (err) {
+    el.innerHTML = `<div style="color:var(--danger);font-size:13px;">Could not resolve: ${escHtml(err.message)}</div>`;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  READING PLANS
+// ════════════════════════════════════════════════════════════════════════════
+function syncPlanModeFields() {
+  const byVerse = document.getElementById('pl-mode').value === 'verse';
+  document.getElementById('pl-verse-fields').style.display = byVerse ? '' : 'none';
+  document.getElementById('pl-verses-field').style.display = byVerse ? 'none' : '';
+}
+
+document.getElementById('pl-mode').addEventListener('change', syncPlanModeFields);
+
+// Inclusive last date of a plan. Pure calendar arithmetic in UTC so a BST
+// switch cannot shift it; the readings themselves are resolved server-side.
+function planEndDateKey(startKey, days) {
+  const [y, m, d] = startKey.split('-').map(Number);
+  return toDateKey(new Date(Date.UTC(y, m - 1, d + days - 1)));
+}
+
+async function loadPlans() {
+  const listEl = document.getElementById('plans-list');
+  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading plans…</div>';
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'readingPlans'),
+      orderBy('startDate', 'desc'),
+      limit(50),
+    ));
+    if (snap.empty) {
+      listEl.innerHTML = '<div class="empty-state" style="padding:24px 0;text-align:left;color:var(--muted);font-size:13px;">No plans yet. Create one to schedule a whole month at once.</div>';
+      return;
+    }
+    listEl.innerHTML = snap.docs.map(d => {
+      const p = d.data();
+      const days = Number(p.days) || 1;
+      const rule = p.mode === 'verse'
+        ? `${escHtml(p.book || '')} ${p.startChapter || 1}, ${Number(p.versesPerDay) || 1} verse(s) a day`
+        : `one chapter a day from ${escHtml(p.book || '')} ${p.startChapter || 1}`;
+      return `<div class="item-card" data-id="${d.id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <strong>${escHtml(p.title || p.book || 'Untitled plan')}</strong>
+            <div class="item-card-meta">${escHtml(p.startDate || '')} → ${escHtml(planEndDateKey(p.startDate || '', days))} · ${days} days</div>
+            <div style="color:var(--muted);font-size:12px;margin-top:4px;">${rule}</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary plan-edit-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;">Edit</button>
+            <button class="btn btn-secondary plan-delete-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;color:var(--danger);">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    listEl.querySelectorAll('.plan-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => editPlan(btn.dataset.id));
+    });
+    listEl.querySelectorAll('.plan-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this reading plan?')) return;
+        try {
+          await deleteDoc(doc(db, 'readingPlans', btn.dataset.id));
+          toast('Plan deleted');
+          loadPlans();
+          loadResolvedReading(document.getElementById('dc-date').value);
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+    });
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${escHtml(err.message)}</div>`;
+  }
+}
+
+async function editPlan(id) {
+  const snap = await getDoc(doc(db, 'readingPlans', id));
+  if (!snap.exists()) return;
+  const p = snap.data();
+  document.getElementById('pl-title').value = p.title || '';
+  document.getElementById('pl-book').value = p.book || '';
+  document.getElementById('pl-start').value = p.startDate || '';
+  document.getElementById('pl-days').value = p.days || 1;
+  document.getElementById('pl-mode').value = p.mode === 'verse' ? 'verse' : 'chapter';
+  document.getElementById('pl-chapter').value = p.startChapter || 1;
+  document.getElementById('pl-verses').value = p.verses || '';
+  document.getElementById('pl-start-verse').value = p.startVerse || 1;
+  document.getElementById('pl-verses-per-day').value = p.versesPerDay || 1;
+  document.getElementById('pl-prayer').value = p.prayer || '';
+  document.getElementById('plan-form').dataset.editId = id;
+  document.getElementById('plan-submit-btn').textContent = 'Update Reading Plan';
+  syncPlanModeFields();
+}
+
+document.getElementById('plan-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const btn = document.getElementById('plan-submit-btn');
+  const editId = form.dataset.editId;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const byVerse = document.getElementById('pl-mode').value === 'verse';
+    const verses = document.getElementById('pl-verses').value.trim();
+    const payload = {
+      title: document.getElementById('pl-title').value.trim(),
+      book: document.getElementById('pl-book').value.trim(),
+      startDate: document.getElementById('pl-start').value,
+      days: parseInt(document.getElementById('pl-days').value, 10),
+      mode: byVerse ? 'verse' : 'chapter',
+      startChapter: parseInt(document.getElementById('pl-chapter').value, 10) || 1,
+      verses: byVerse || !verses ? null : verses,
+      startVerse: parseInt(document.getElementById('pl-start-verse').value, 10) || 1,
+      versesPerDay: parseInt(document.getElementById('pl-verses-per-day').value, 10) || 1,
+      prayer: document.getElementById('pl-prayer').value.trim(),
+      prayerReference: '',
+    };
+    if (editId) {
+      await setDoc(doc(db, 'readingPlans', editId), payload);
+    } else {
+      await addDoc(collection(db, 'readingPlans'), payload);
+    }
+    form.reset();
+    delete form.dataset.editId;
+    syncPlanModeFields();
+    toast(editId ? 'Reading plan updated' : 'Reading plan created');
+    loadPlans();
+    loadResolvedReading(document.getElementById('dc-date').value);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Reading Plan';
+  }
+});
+
+document.getElementById('refresh-plans').addEventListener('click', loadPlans);
 
 document.getElementById('daily-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1809,14 +2115,20 @@ async function loadBranches() {
   try {
     const snap = await getDocs(query(collection(db, 'branches'), orderBy('order', 'asc')));
     document.getElementById('branches-count').textContent = snap.size;
-    // Keep the event form's branch picker in sync with the live branch list.
-    const evBranch = document.getElementById('ev-branch');
-    if (evBranch && !snap.empty) {
-      const cur = evBranch.value;
+    // Keep the event and announcement branch pickers in sync with the live
+    // branch list. Both keep "All Branches" (empty value) as the first option:
+    // unset means church-wide.
+    if (!snap.empty) {
       const names = snap.docs.map(d => (d.data().name || '').trim()).filter(Boolean);
-      evBranch.innerHTML = '<option value="">All Branches</option>' +
+      const options = '<option value="">All Branches</option>' +
         names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
-      evBranch.value = names.includes(cur) ? cur : '';
+      ['ev-branch', 'nw-branch'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const cur = sel.value;
+        sel.innerHTML = options;
+        sel.value = names.includes(cur) ? cur : '';
+      });
     }
     if (snap.empty) {
       list.innerHTML = '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';

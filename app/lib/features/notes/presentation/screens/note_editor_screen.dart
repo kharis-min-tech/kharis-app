@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
+import 'package:kharis_app/features/notes/presentation/note_anchor.dart';
+import 'package:kharis_app/features/notes/presentation/widgets/note_anchor_chip.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 
@@ -34,7 +36,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.existingNote?.text ?? '');
+    _controller = TextEditingController(text: widget.existingNote?.body ?? '');
   }
 
   @override
@@ -54,24 +56,40 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final now = DateTime.now();
 
     final note = widget.existingNote != null
-        ? widget.existingNote!.copyWith(
-            text: text,
-            updatedAt: now,
-          )
+        ? widget.existingNote!.copyWith(body: text, updatedAt: now)
         : Note(
-            id: NoteRepository.generateId(),
+            id: repo.newId(),
             sermonId: widget.sermon?.id,
             sermonTitle: widget.sermon?.title,
             positionMs: widget.positionMs,
-            text: text,
+            body: text,
             createdAt: now,
             updatedAt: now,
           );
 
     await repo.upsert(note);
-    ref.read(notesRevisionProvider.notifier).state++;
 
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Plays the anchored sermon from the note's timestamp and closes the
+  /// editor so the player is visible underneath.
+  Future<void> _playFromAnchor() async {
+    final note = widget.existingNote;
+    if (note == null) return;
+    final result = await NoteAnchor.play(ref, note);
+    if (!mounted) return;
+    if (result == NoteAnchorResult.sermonUnavailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('That message is no longer available'),
+          backgroundColor: AppColors.errorContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pop();
   }
 
   @override
@@ -150,52 +168,22 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Widget? _buildSermonTag() {
     // Prefer live sermon (opened from player); fall back to existing note tag.
     final title = widget.sermon?.title ?? widget.existingNote?.sermonTitle;
-    final posMs = widget.positionMs ?? widget.existingNote?.positionMs;
-
     if (title == null) return null;
 
-    final label = posMs != null ? '$title @ ${_formatMs(posMs)}' : title;
+    final posMs = widget.positionMs ?? widget.existingNote?.positionMs;
+    // Only offer "jump back to this moment" when re-reading a saved note; a
+    // note being written from the player is already at that moment.
+    final canSeek =
+        widget.sermon == null && (widget.existingNote?.isAnchored ?? false);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.headphones_outlined,
-            size: 14,
-            color: AppColors.primary,
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Flexible(
-            child: Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: NoteAnchorChip(
+        title: title,
+        positionMs: posMs,
+        maxWidth: 320,
+        onTap: canSeek ? _playFromAnchor : null,
       ),
     );
-  }
-
-  String _formatMs(int ms) {
-    final d = Duration(milliseconds: ms);
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
   }
 }

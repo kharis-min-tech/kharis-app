@@ -7,6 +7,7 @@ class OnboardingRepository {
   static const _completedKey = 'onboarding_completed';
   static const _roleKey = 'onboarding_role';
   static const _branchKey = 'onboarding_branch';
+  static const _branchPendingKey = 'onboarding_branch_sync_pending';
 
   final SharedPreferences _prefs;
 
@@ -17,6 +18,19 @@ class OnboardingRepository {
   String? get selectedRole => _prefs.getString(_roleKey);
 
   String? get selectedBranch => _prefs.getString(_branchKey);
+
+  /// True when [selectedBranch] has not yet been written to the signed-in
+  /// user's Firestore profile.
+  ///
+  /// The profile is normally authoritative, so a failed write would let the
+  /// stale remote branch overwrite the member's choice on the next launch —
+  /// they pick a branch, reopen the app, and silently land back on the old
+  /// one. While this flag is set the local choice wins and the push is
+  /// retried.
+  bool get branchSyncPending => _prefs.getBool(_branchPendingKey) ?? false;
+
+  Future<void> setBranchSyncPending(bool pending) =>
+      _prefs.setBool(_branchPendingKey, pending);
 
   Future<void> completeOnboarding({
     required String role,

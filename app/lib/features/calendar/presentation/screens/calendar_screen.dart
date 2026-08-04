@@ -111,12 +111,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 'you between devices.',
           );
         }
-        return _eventsSliver(
-          ref.watch(myRsvpEventsProvider),
-          emptyIcon: Icons.check_circle_outline_rounded,
-          emptyTitle: 'No RSVPs yet',
-          emptySubtitle: 'Events you RSVP to will show up here.',
-        );
+        return _rsvpSliver(ref.watch(myRsvpEventsProvider));
     }
   }
 
@@ -127,17 +122,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     required String emptySubtitle,
   }) {
     return async.when(
-      loading: () => const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 60),
-          child: Center(
-            child: CircularProgressIndicator(
-              color: AppColors.primary,
-              strokeWidth: 2,
-            ),
-          ),
-        ),
-      ),
+      loading: () => _kLoadingSliver,
       error: (_, _) => _messageSliver(
         context,
         icon: Icons.error_outline_rounded,
@@ -165,6 +150,47 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
               ),
               childCount: events.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// "My RSVPs" is sectioned rather than flat: an RSVP'd event whose date has
+  /// passed belongs under Past, never Upcoming. A group with no events
+  /// contributes no header.
+  Widget _rsvpSliver(AsyncValue<RsvpEvents> async) {
+    return async.when(
+      loading: () => _kLoadingSliver,
+      error: (_, _) => _messageSliver(
+        context,
+        icon: Icons.error_outline_rounded,
+        title: 'Unable to load your RSVPs',
+        subtitle: 'Please check your connection and try again.',
+      ),
+      data: (grouped) {
+        if (grouped.isEmpty) {
+          return _messageSliver(
+            context,
+            icon: Icons.check_circle_outline_rounded,
+            title: 'No RSVPs yet',
+            subtitle: 'Events you RSVP to will show up here.',
+          );
+        }
+        final rows = _rsvpRows(grouped);
+        return SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 150),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => switch (rows[index]) {
+                _RsvpHeaderRow(:final label) => _GroupHeader(label: label),
+                _RsvpCardRow(:final event, :final accent) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _EventCard(event: event, accent: accent),
+                  ),
+              },
+              childCount: rows.length,
             ),
           ),
         );
@@ -276,6 +302,80 @@ Widget _messageSliver(
       ),
     ),
   );
+}
+
+const Widget _kLoadingSliver = SliverToBoxAdapter(
+  child: Padding(
+    padding: EdgeInsets.symmetric(vertical: 60),
+    child: Center(
+      child: CircularProgressIndicator(
+        color: AppColors.primary,
+        strokeWidth: 2,
+      ),
+    ),
+  ),
+);
+
+// ── My RSVPs sections ─────────────────────────────────────────────────────────
+
+/// One row of the sectioned "My RSVPs" list.
+sealed class _RsvpRow {
+  const _RsvpRow();
+}
+
+class _RsvpHeaderRow extends _RsvpRow {
+  const _RsvpHeaderRow(this.label);
+
+  final String label;
+}
+
+class _RsvpCardRow extends _RsvpRow {
+  const _RsvpCardRow(this.event, this.accent);
+
+  final Event event;
+  final Color accent;
+}
+
+/// Flattens [grouped] into header + card rows. The accent palette continues
+/// across both groups so no two adjacent cards share a colour.
+List<_RsvpRow> _rsvpRows(RsvpEvents grouped) {
+  final rows = <_RsvpRow>[];
+  var accent = 0;
+
+  void addGroup(String label, List<Event> events) {
+    if (events.isEmpty) return;
+    rows.add(_RsvpHeaderRow(label));
+    for (final event in events) {
+      rows.add(
+        _RsvpCardRow(event, _accentPalette[accent++ % _accentPalette.length]),
+      );
+    }
+  }
+
+  addGroup('Upcoming', grouped.upcoming);
+  addGroup('Past', grouped.past);
+  return rows;
+}
+
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        label.toUpperCase(),
+        style: AppTypography.ui(
+          size: 11,
+          weight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ).copyWith(color: context.kc.muted),
+      ),
+    );
+  }
 }
 
 // ── Header ───────────────────────────────────────────────────────────────────

@@ -10,7 +10,9 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-const _newsTypes = ['Announcement', 'Event', 'Ministry', 'Notice'];
+// Announcement categories live on the model — see [NewsItem.types]. There is
+// deliberately no 'Event' category: events are dated, located, RSVP-able and
+// live in the `events` collection.
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -1075,7 +1077,9 @@ class _BranchNewsFormSheetState extends State<_BranchNewsFormSheet> {
     _titleCtrl = TextEditingController(text: widget.item?.title ?? '');
     _bodyCtrl = TextEditingController(text: widget.item?.body ?? '');
     _imageUrlCtrl = TextEditingController(text: widget.item?.imageUrl ?? '');
-    _type = widget.item?.type ?? _newsTypes.first;
+    // normaliseType keeps a legacy 'Event' doc off an item the dropdown does
+    // not carry — DropdownButton asserts on a value outside `items`.
+    _type = NewsItem.normaliseType(widget.item?.type);
   }
 
   @override
@@ -1161,7 +1165,7 @@ class _BranchNewsFormSheetState extends State<_BranchNewsFormSheet> {
                 dropdownColor: AppColors.surfaceContainer,
                 style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
                 decoration: _inputDeco(),
-                items: _newsTypes
+                items: NewsItem.types
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (v) {

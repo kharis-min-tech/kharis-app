@@ -34,9 +34,11 @@ void main() {
     required FakeFirebaseFirestore db,
     required User? user,
     String? localBranch,
+    bool branchSyncPending = false,
   }) async {
     SharedPreferences.setMockInitialValues({
       'onboarding_branch': ?localBranch,
+      if (branchSyncPending) 'onboarding_branch_sync_pending': true,
     });
     final prefs = await SharedPreferences.getInstance();
     final container = ProviderContainer(
@@ -50,6 +52,37 @@ void main() {
     await container.read(currentUserProvider.future);
     return container;
   }
+
+  test('a branch switch survives a failed profile write', () async {
+    // The reported bug: pick a branch, reopen the app, and it silently reverts.
+    // The profile write had failed, so the stale remote value won on relaunch.
+    final db = FakeFirebaseFirestore();
+    await db.collection('users').doc(uid).set({'branch': 'Bristol'});
+
+    final container = await settled(
+      db: db,
+      user: signedIn(branch: 'Bristol'),
+      localBranch: 'Manchester',
+      branchSyncPending: true,
+    );
+
+    expect(
+      await container.read(currentBranchProvider.future),
+      'Manchester',
+      reason: 'the unsynced local choice must beat the stale remote branch',
+    );
+  });
+
+  test('the remote branch wins once the profile write has landed', () async {
+    final db = FakeFirebaseFirestore();
+    await db.collection('users').doc(uid).set({'branch': 'Bristol'});
+    final container = await settled(
+      db: db,
+      user: signedIn(branch: 'Bristol'),
+      localBranch: 'Manchester',
+    );
+    expect(await container.read(currentBranchProvider.future), 'Bristol');
+  });
 
   test('re-emits when the profile branch changes, without a restart', () async {
     final db = FakeFirebaseFirestore();

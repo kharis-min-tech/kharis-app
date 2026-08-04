@@ -44,6 +44,38 @@ class Rsvp {
   String toString() => 'Rsvp(user: $userId, event: $eventId)';
 }
 
+/// RSVP'd events split by the same cutoff the Events tabs use, so an event
+/// whose date has passed is never presented as upcoming.
+///
+/// Grouping happens once, at the provider, because both the split and the
+/// per-group ordering are product rules rather than layout concerns.
+@immutable
+class RsvpEvents {
+  const RsvpEvents({required this.upcoming, required this.past});
+
+  static const RsvpEvents empty = RsvpEvents(upcoming: [], past: []);
+
+  /// Not yet finished, soonest first.
+  final List<Event> upcoming;
+
+  /// Finished, most recent first.
+  final List<Event> past;
+
+  bool get isEmpty => upcoming.isEmpty && past.isEmpty;
+
+  /// Splits [events] on [Event.isPastAt] and orders each group.
+  factory RsvpEvents.split(List<Event> events, DateTime now) {
+    final upcoming = <Event>[];
+    final past = <Event>[];
+    for (final e in events) {
+      (e.isPastAt(now) ? past : upcoming).add(e);
+    }
+    upcoming.sort((a, b) => a.startTime.compareTo(b.startTime));
+    past.sort((a, b) => b.startTime.compareTo(a.startTime));
+    return RsvpEvents(upcoming: upcoming, past: past);
+  }
+}
+
 /// Thrown when an RSVP action is attempted without a signed-in user.
 ///
 /// Callers must gate on auth and prompt sign-in; this exists so a missing

@@ -94,6 +94,14 @@ class AdminHubScreen extends ConsumerWidget {
               ),
               SizedBox(height: AppSpacing.sm),
               _HubCard(
+                icon: Icons.auto_stories_rounded,
+                title: 'Reading Plans',
+                subtitle:
+                    'Schedule a month of readings that advance on their own',
+                route: '/admin/reading-plans',
+              ),
+              SizedBox(height: AppSpacing.sm),
+              _HubCard(
                 icon: Icons.mic_rounded,
                 title: 'Sermons',
                 subtitle: 'Add, edit, feature, and manage preached messages',

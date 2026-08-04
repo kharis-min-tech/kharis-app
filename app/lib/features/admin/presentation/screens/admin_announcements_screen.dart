@@ -5,9 +5,12 @@ import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 
-// ── News type options ──────────────────────────────────────────────────────────
-
-const _newsTypes = ['Announcement', 'Event', 'Ministry', 'Notice'];
+// ── News type options ─────────────────────────────────────────────────────────
+//
+// The vocabulary lives on the model — see [NewsItem.types]. There is
+// deliberately no 'Event' category: an announcement is a message, while an
+// event is a dated, located, RSVP-able occurrence managed on the Events
+// screen and stored in the `events` collection.
 
 // Fallback branch list if branchesProvider has not loaded yet.
 const _kFallbackBranches = [
@@ -290,6 +293,9 @@ class _NewsCard extends StatelessWidget {
 
 // ── Type chip ─────────────────────────────────────────────────────────────────
 
+/// Category pill for an announcement. The megaphone is the announcement mark
+/// throughout the app — events carry a calendar mark instead — so an admin can
+/// tell the two content kinds apart at a glance.
 class _TypeChip extends StatelessWidget {
   const _TypeChip({required this.type});
 
@@ -303,9 +309,20 @@ class _TypeChip extends StatelessWidget {
         color: AppColors.secondary.withValues(alpha: 0.15),
         borderRadius: AppRadius.pillBorder,
       ),
-      child: Text(
-        type,
-        style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.campaign_rounded,
+            size: 12,
+            color: AppColors.secondary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            type,
+            style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+          ),
+        ],
       ),
     );
   }
@@ -374,7 +391,9 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
     _titleCtrl = TextEditingController(text: widget.item?.title ?? '');
     _bodyCtrl = TextEditingController(text: widget.item?.body ?? '');
     _imageUrlCtrl = TextEditingController(text: widget.item?.imageUrl ?? '');
-    _type = widget.item?.type ?? _newsTypes.first;
+    // normaliseType guards the dropdown: a legacy doc saved as type 'Event'
+    // would otherwise assert on a value outside `items`.
+    _type = NewsItem.normaliseType(widget.item?.type);
     _branch = widget.item?.branch;
   }
 
@@ -418,9 +437,29 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.campaign_rounded,
+                    size: 20,
+                    color: AppColors.secondary,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    isEdit ? 'Edit Announcement' : 'New Announcement',
+                    style:
+                        AppTypography.titleMd.copyWith(color: AppColors.heading),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
               Text(
-                isEdit ? 'Edit Announcement' : 'New Announcement',
-                style: AppTypography.titleMd.copyWith(color: AppColors.heading),
+                'A message to the church — headline, optional body and image. '
+                'For anything with a date and a venue people RSVP to, use '
+                'Events instead.',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
 
@@ -445,7 +484,7 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
                 dropdownColor: AppColors.surfaceContainer,
                 style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
                 decoration: _inputDeco(),
-                items: _newsTypes
+                items: NewsItem.types
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (v) {

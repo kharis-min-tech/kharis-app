@@ -41,6 +41,21 @@ service cloud.firestore {
                     || (isAuthenticated() && request.auth.uid == uid
                         && request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
+
+      // notes — the member's private notebook. Owner-only: nobody else, not
+      // even an admin, may read what a member wrote. Anchored notes also
+      // carry sermonId / positionMs, both optional.
+      match /notes/{noteId} {
+        function isOwner() {
+          return isAuthenticated() && request.auth.uid == uid;
+        }
+        allow read, delete: if isOwner();
+        allow create, update: if isOwner()
+                              && request.resource.data.body is string
+                              && request.resource.data.body.size() > 0
+                              && request.resource.data.body.size() <= 20000
+                              && request.resource.data.updatedAt is timestamp;
+      }
     }
 
     // branches — publicly readable, writable only by admin
@@ -67,10 +82,44 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // news — publicly readable, writable only by admin
+    // readingPlans — a plan authored once that spans a date range and resolves a
+    // reading for every date inside it (see functions/src/reading-plans.ts).
+    // Publicly readable because the app resolves the day's reading from the plan
+    // itself whenever the API is unreachable. Writes are admin-only AND shape-
+    // checked: a plan missing `startDate`/`book`/`days` silently drops out of
+    // resolution, so it is rejected at write time rather than lost at read time.
+    match /readingPlans/{planId} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+                    && request.resource.data.startDate is string
+                    && request.resource.data.startDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+                    && request.resource.data.book is string
+                    && request.resource.data.book.size() > 0
+                    && request.resource.data.days is number
+                    && request.resource.data.days >= 1
+                    && request.resource.data.days <= 400;
+      allow delete: if isAdmin();
+    }
+
+    // dailyReadingPushes — one document per date the daily reading notification
+    // has been claimed for. Written only by the Admin SDK (which bypasses these
+    // rules) and it is the ONLY guard against double-sending, so a client able
+    // to write it could duplicate or suppress a push to the whole church.
+    match /dailyReadingPushes/{dateId} {
+      allow read, write: if false;
+    }
+
+    // news (announcements) — publicly readable, writable only by admin.
+    // `branch` scopes an announcement to one campus; absent or null means
+    // all-campus. Anything else would silently drop out of the branch-scoped
+    // getAnnouncements query, so writes are rejected rather than lost.
     match /news/{newsId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin()
+                    && (!('branch' in request.resource.data)
+                        || request.resource.data.branch == null
+                        || request.resource.data.branch is string);
+      allow delete: if isAdmin();
     }
 
     // config (e.g. live status, featured video) — publicly readable, admin writable
@@ -114,6 +163,16 @@ service cloud.firestore {
       // RSVPs are create-or-delete only; there is nothing to mutate in place.
       allow update: if false;
       allow delete: if ownsRsvpId(rsvpId) || isAdmin();
+    }
+
+    // pushLog — one document per FCM notification the Firestore triggers in
+    // `content-notifications.ts` have sent, keyed on the CloudEvent id. It is
+    // written only by the Admin SDK (which bypasses these rules) and exists
+    // purely so a redelivered trigger cannot double-send. Nothing client-side
+    // reads it, and a client that could write it could suppress real pushes,
+    // so it is closed to everyone — admins included.
+    match /pushLog/{pushKey} {
+      allow read, write: if false;
     }
 
     // Deny everything else

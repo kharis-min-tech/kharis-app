@@ -149,7 +149,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                           top: BorderSide(color: context.kc.divider),
                         ),
                       ),
-                      child: const PlayerActions(),
+                      child: PlayerActions(sermon: widget.sermon),
                     ),
                   ],
                 ),

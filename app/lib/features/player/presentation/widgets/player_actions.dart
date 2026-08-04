@@ -2,27 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
+import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
-import 'package:kharis_app/shared/providers/notes_provider.dart';
 
 /// Row of secondary player actions shown below the transport controls:
-/// Notes · Playlist · Share, each an icon over a small muted label. Notes opens
-/// the note editor for the current sermon at the current playback position;
-/// Playlist and Share confirm with a lightweight toast.
+/// Notes · Playlist · Share, each an icon over a small muted label.
+///
+/// Notes opens [SermonNotesSheet] for the message on screen — everything
+/// already written against it, in timeline order, plus a "add a note at
+/// MM:SS" action stamped with the live playback position. It is only rendered
+/// when a message is actually resolvable; Playlist and Share confirm with a
+/// lightweight toast.
 class PlayerActions extends ConsumerWidget {
-  const PlayerActions({super.key});
+  const PlayerActions({super.key, this.sermon});
+
+  /// The message on screen. Supplied by the video player, whose sermon is not
+  /// the one loaded into the audio service. Falls back to whatever the audio
+  /// service is playing.
+  final Sermon? sermon;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final target = sermon ?? ref.watch(currentSermonProvider);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _ActionButton(
-          icon: Icons.notes_rounded,
-          label: 'Notes',
-          onTap: () => _openNoteEditor(context, ref),
-        ),
+        if (target != null)
+          _ActionButton(
+            icon: Icons.notes_rounded,
+            label: 'Notes',
+            onTap: () => SermonNotesSheet.show(context, target),
+          ),
         _ActionButton(
           icon: Icons.add_rounded,
           label: 'Playlist',
@@ -45,26 +57,6 @@ class PlayerActions extends ConsumerWidget {
         duration: const Duration(milliseconds: 1700),
       ),
     );
-  }
-
-  void _openNoteEditor(BuildContext context, WidgetRef ref) {
-    final sermon = ref.read(currentSermonProvider);
-    final position = ref.read(positionProvider).valueOrNull ?? Duration.zero;
-
-    Navigator.of(context)
-        .push<void>(
-          MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (_) => NoteEditorScreen(
-              sermon: sermon,
-              positionMs: position.inMilliseconds,
-            ),
-          ),
-        )
-        .then((_) {
-      // Bump revision so any open NotesScreen list stays fresh.
-      ref.read(notesRevisionProvider.notifier).state++;
-    });
   }
 }
 
