@@ -184,6 +184,9 @@ class AudioPlayerService {
 
   Sermon? get currentSermon => _currentSermon;
 
+  /// Current playback position, for handing the timeline to another engine.
+  Duration get position => _player.position;
+
   /// The load failure the member still needs to see, or null when the last
   /// load succeeded. Read this to seed a widget that mounts after the failure.
   PlaybackFailure? get failure => _failure;
@@ -304,8 +307,10 @@ class AudioPlayerService {
       // failing, so refuse it up front.
       _setFailure(PlaybackFailure(
         sermonId: sermon.id,
+        // Video-only sermons are routed to the video engine before they can
+        // reach this service (see startPlayback), so this is a backstop only.
         message: sermon.hasVideo
-            ? 'This message is video only \u2014 open it in the video player.'
+            ? 'This message has no audio recording.'
             : 'This message has no recording yet.',
       ));
       return false;

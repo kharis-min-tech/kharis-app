@@ -464,6 +464,8 @@
 
     .meta-chip.featured { background: rgba(107, 52, 250, 0.25); color: #a47cff; }
 
+    .meta-chip.motd { background: rgba(255, 209, 102, 0.18); color: #FFD166; }
+
     /* Home-screen verdict for an announcement: is it actually showing, and
        to whom. Loud on purpose — it is the first thing to read on the row. */
     .home-chip {
@@ -713,6 +715,11 @@
         <div class="card" style="max-width:100%">
           <div class="card-title"><span class="dot"></span> Sermon Library</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Library holds synced sermons (auto-synced hourly). Switch to YouTube Channel to search everything on the Kharis Church / David Antwi channel and feature any video on the app's Messages page.</p>
+          <div id="motd-banner" style="display:none;align-items:center;gap:10px;background:rgba(255,209,102,0.08);border:1px solid rgba(255,209,102,0.3);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;">
+            <span style="color:#FFD166;display:inline-flex;flex-shrink:0;" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5" fill="currentColor"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
+            <span id="motd-banner-text" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            <button class="btn btn-secondary" id="motd-clear-btn" style="font-size:12px;padding:5px 12px;flex-shrink:0;">Clear</button>
+          </div>
           <div class="seg" role="tablist" aria-label="Sermon source">
             <button type="button" class="seg-btn active" id="src-library">Library</button>
             <button type="button" class="seg-btn" id="src-youtube">YouTube Channel</button>
@@ -1031,6 +1038,7 @@
               <label for="pl-prayer">Prayer Shown Each Day</label>
               <textarea id="pl-prayer" placeholder="Generated from the reading if left blank"></textarea>
             </div>
+            <div class="where-panel" id="pl-preview"></div>
             <button type="submit" class="btn btn-primary btn-full" id="plan-submit-btn">
               Save Reading Plan
             </button>
@@ -1799,6 +1807,55 @@ function syncPlanModeFields() {
 
 document.getElementById('pl-mode').addEventListener('change', syncPlanModeFields);
 
+// Live day-by-day preview of the plan being authored. The chapter/verse
+// arithmetic mirrors planReading() in backend/functions/src/reading-plans.ts
+// exactly, so what the admin sees here is what getDailyReading serves.
+function updatePlanPreview() {
+  const el = document.getElementById('pl-preview');
+  const startKey = document.getElementById('pl-start').value;
+  const days = parseInt(document.getElementById('pl-days').value, 10);
+  const book = document.getElementById('pl-book').value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startKey) || !book || !(days >= 1)) {
+    el.innerHTML = '<span class="where-title">Day-by-day preview</span>' +
+      'Fill in book, start date and length to see what each date resolves to.';
+    return;
+  }
+  const byVerse = document.getElementById('pl-mode').value === 'verse';
+  const startChapter = Math.max(1, parseInt(document.getElementById('pl-chapter').value, 10) || 1);
+  const constantVerses = document.getElementById('pl-verses').value.trim();
+  const startVerse = Math.max(1, parseInt(document.getElementById('pl-start-verse').value, 10) || 1);
+  const perDay = Math.max(1, parseInt(document.getElementById('pl-verses-per-day').value, 10) || 1);
+  const refAt = (offset) => {
+    let chapter, verse;
+    if (byVerse) {
+      const first = startVerse + offset * perDay;
+      chapter = startChapter;
+      verse = perDay === 1 ? `${first}` : `${first}-${first + perDay - 1}`;
+    } else {
+      chapter = startChapter + offset;
+      verse = constantVerses || '1-end';
+    }
+    return verse === '1-end' ? `${book} ${chapter}` : `${book} ${chapter}:${verse}`;
+  };
+  const [y, m, d] = startKey.split('-').map(Number);
+  const spansYears = new Date(Date.UTC(y, m - 1, d + days - 1)).getUTCFullYear() !== y;
+  const fmtAt = (offset) => new Date(Date.UTC(y, m - 1, d + offset)).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', ...(spansYears ? { year: 'numeric' } : {}), timeZone: 'UTC',
+  });
+  const row = (offset) => `<li><strong>${escHtml(fmtAt(offset))}</strong> → ${escHtml(refAt(offset))}</li>`;
+  const rows = days <= 4
+    ? Array.from({ length: days }, (_, i) => row(i)).join('')
+    : row(0) + row(1) + '<li style="list-style:none;color:var(--muted);">⋯</li>' + row(days - 1);
+  el.innerHTML = `<span class="where-title">Day-by-day preview</span><ul>${rows}</ul>`;
+}
+
+['pl-book', 'pl-start', 'pl-days', 'pl-chapter', 'pl-verses',
+ 'pl-start-verse', 'pl-verses-per-day'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', updatePlanPreview);
+});
+document.getElementById('pl-mode').addEventListener('change', updatePlanPreview);
+updatePlanPreview();
+
 // Inclusive last date of a plan. Pure calendar arithmetic in UTC so a BST
 // switch cannot shift it; the readings themselves are resolved server-side.
 function planEndDateKey(startKey, days) {
@@ -1878,6 +1935,7 @@ async function editPlan(id) {
   document.getElementById('plan-form').dataset.editId = id;
   document.getElementById('plan-submit-btn').textContent = 'Update Reading Plan';
   syncPlanModeFields();
+  updatePlanPreview();
 }
 
 document.getElementById('plan-form').addEventListener('submit', async (e) => {
@@ -1911,6 +1969,7 @@ document.getElementById('plan-form').addEventListener('submit', async (e) => {
     form.reset();
     delete form.dataset.editId;
     syncPlanModeFields();
+    updatePlanPreview();
     toast(editId ? 'Reading plan updated' : 'Reading plan created');
     loadPlans();
     loadResolvedReading(document.getElementById('dc-date').value);
@@ -2020,7 +2079,10 @@ async function loadSermons() {
   const list = document.getElementById('sermons-list');
   list.innerHTML = '<p style="color:var(--muted);">Loading sermons…</p>';
   try {
-    const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
+    const [snap] = await Promise.all([
+      getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50))),
+      loadMotd(),
+    ]);
     document.getElementById('sermons-count').textContent = snap.size;
     if (snap.empty) {
       list.innerHTML = '<p style="color:var(--muted);">No sermons yet. They will appear here automatically once the YouTube/SoundCloud sync runs.</p>';
@@ -2037,6 +2099,47 @@ async function loadSermons() {
 const _entityScratch = document.createElement('textarea');
 function decodeEntities(s) { _entityScratch.innerHTML = s || ''; return _entityScratch.value; }
 
+// ── Message of the Day ──────────────────────────────────────────────────────
+// One pointer doc, config/messageOfTheDay { sermonId, title, setAt }, always
+// written with a plain setDoc overwrite — so exactly one sermon holds MOTD.
+const SUN_FILLED = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="currentColor"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+const SUN_OUTLINE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+
+let motdSermonId = null;
+
+async function loadMotd() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'messageOfTheDay'));
+    const data = snap.exists() ? snap.data() : null;
+    motdSermonId = data?.sermonId || null;
+    updateMotdBanner(data);
+  } catch (err) {
+    motdSermonId = null;
+    updateMotdBanner(null);
+    toast('Could not load Message of the Day: ' + err.message, 'error');
+  }
+}
+
+function updateMotdBanner(data) {
+  const banner = document.getElementById('motd-banner');
+  if (!data || !data.sermonId) { banner.style.display = 'none'; return; }
+  document.getElementById('motd-banner-text').textContent =
+    `Message of the Day: ${decodeEntities(data.title || 'Untitled')}`;
+  banner.style.display = 'flex';
+}
+
+document.getElementById('motd-clear-btn').addEventListener('click', async () => {
+  try {
+    await deleteDoc(doc(db, 'config', 'messageOfTheDay'));
+    motdSermonId = null;
+    updateMotdBanner(null);
+    toast('Message of the Day cleared');
+    if (sermonSource === 'library') loadSermons();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
 function renderSermonList(docs) {
   const list = document.getElementById('sermons-list');
   list.innerHTML = docs.map(d => {
@@ -2048,6 +2151,7 @@ function renderSermonList(docs) {
       : '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3z"/></svg>';
     const sourceLabel = s.source === 'youtube' ? 'YouTube' : 'SoundCloud';
     const dur = s.duration ? formatDuration(s.duration) : '';
+    const isMotd = d.id === motdSermonId;
     return `<div class="item-card" data-id="${d.id}">
       <div style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;">
         ${s.thumbnailUrl ? `<img src="${escHtml(s.thumbnailUrl)}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : `<div style="width:64px;height:64px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0;">${sourceIcon}</div>`}
@@ -2055,8 +2159,9 @@ function renderSermonList(docs) {
           <div style="display:flex;align-items:flex-start;gap:8px;">
             <strong style="font-size:14px;min-width:0;">${escHtml(decodeEntities(s.title || 'Untitled'))}</strong>
             <button class="feature-btn" data-id="${d.id}" data-featured="${featured}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${featured ? 'var(--orange)' : 'var(--muted)'};" title="${featured ? 'Unfeature' : 'Feature'}" aria-label="${featured ? 'Unfeature sermon' : 'Feature sermon'}">${featured ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>'}</button>
+            <button class="motd-btn" data-id="${d.id}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${isMotd ? '#FFD166' : 'var(--muted)'};" title="${isMotd ? 'Clear Message of the Day' : 'Set as Message of the Day'}" aria-label="${isMotd ? 'Clear Message of the Day' : 'Set as Message of the Day'}">${isMotd ? SUN_FILLED : SUN_OUTLINE}</button>
           </div>
-          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''}</div>
+          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''} ${isMotd ? '<span class="meta-chip motd">Message of the Day</span>' : ''}</div>
           ${s.description ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(decodeEntities(s.description).substring(0, 100))}</div>` : ''}
         </div>
       </div>
@@ -2072,6 +2177,36 @@ function renderSermonList(docs) {
         await updateDoc(doc(db, 'sermons', id), { isFeatured: !isFeatured, updatedAt: serverTimestamp() });
         toast(`${!isFeatured ? 'Featured' : 'Unfeatured'} sermon`);
         loadSermons();
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
+    });
+  });
+
+  // Message of the Day: set on click, clear when the current holder is clicked
+  // again. Re-renders in place so a search-filtered list keeps its filter.
+  list.querySelectorAll('.motd-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      try {
+        if (id === motdSermonId) {
+          await deleteDoc(doc(db, 'config', 'messageOfTheDay'));
+          motdSermonId = null;
+          updateMotdBanner(null);
+          toast('Message of the Day cleared');
+        } else {
+          const docSnap = docs.find(x => x.id === id);
+          const payload = {
+            sermonId: id,
+            title: decodeEntities(docSnap?.data().title || 'Untitled'),
+            setAt: Timestamp.now(),
+          };
+          await setDoc(doc(db, 'config', 'messageOfTheDay'), payload);
+          motdSermonId = id;
+          updateMotdBanner(payload);
+          toast('Message of the Day set');
+        }
+        renderSermonList(docs);
       } catch (err) {
         toast('Error: ' + err.message, 'error');
       }

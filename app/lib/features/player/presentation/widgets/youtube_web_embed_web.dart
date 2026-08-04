@@ -10,22 +10,29 @@ import 'package:web/web.dart' as web;
 /// registered and the player screen renders blank. A plain HtmlElementView
 /// with a youtube-nocookie embed is bulletproof and loads instantly.
 class YoutubeWebEmbed extends StatelessWidget {
-  const YoutubeWebEmbed({super.key, required this.videoId});
+  const YoutubeWebEmbed({super.key, required this.videoId, this.startSeconds});
 
   final String videoId;
 
+  /// Playback position handed over from the audio engine, if any.
+  final int? startSeconds;
+
   static final Set<String> _registered = <String>{};
 
-  String get _viewType => 'youtube-embed-$videoId';
+  // Start time participates in the key: the registry caches factories, and a
+  // handed-over position must not reuse an embed registered to start at 0.
+  String get _viewType => 'youtube-embed-$videoId-${startSeconds ?? 0}';
 
   void _ensureRegistered() {
     if (_registered.contains(_viewType)) return;
     _registered.add(_viewType);
 
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
+      final start =
+          startSeconds != null && startSeconds! > 0 ? '&start=$startSeconds' : '';
       final iframe = web.HTMLIFrameElement()
         ..src =
-            'https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&playsinline=1&rel=0'
+            'https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&playsinline=1&rel=0$start'
         ..style.border = 'none'
         ..style.width = '100%'
         ..style.height = '100%'

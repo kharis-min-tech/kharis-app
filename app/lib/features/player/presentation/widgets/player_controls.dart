@@ -5,15 +5,47 @@ import 'package:just_audio/just_audio.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
+/// A snapshot of whichever engine currently owns playback, so [PlayerControls]
+/// can drive audio (just_audio) and video (YouTube) with one control row.
+///
+/// Null on [PlayerControls.transport] means the audio service, read reactively
+/// from the Riverpod providers as before. A video host supplies a binding
+/// rebuilt from its own streams instead.
+@immutable
+class TransportBinding {
+  const TransportBinding({
+    required this.isPlaying,
+    required this.isBuffering,
+    required this.position,
+    required this.duration,
+    required this.onPlay,
+    required this.onPause,
+    required this.onSeek,
+    required this.onSetSpeed,
+  });
+
+  final bool isPlaying;
+  final bool isBuffering;
+  final Duration position;
+  final Duration duration;
+  final VoidCallback onPlay;
+  final VoidCallback onPause;
+  final ValueChanged<Duration> onSeek;
+  final ValueChanged<double> onSetSpeed;
+}
+
 /// Transport controls.
 ///
 /// Row layout: speed pill | skip-back 15 | play/pause | skip-forward 30 |
 /// repeat. The play/pause button is a 70-px gold circle with a dark icon and a
 /// soft gold glow; a spinner replaces the icon while buffering. Tapping the
 /// speed pill cycles 1× → 1.25× → 1.5× → 2× → 0.75× and applies the rate to the
-/// audio service. Repeat is a local visual toggle only.
+/// active engine. Repeat is a local visual toggle only.
 class PlayerControls extends ConsumerStatefulWidget {
-  const PlayerControls({super.key});
+  const PlayerControls({super.key, this.transport});
+
+  /// The engine these controls operate. Null drives the audio service.
+  final TransportBinding? transport;
 
   @override
   ConsumerState<PlayerControls> createState() => _PlayerControlsState();
@@ -29,28 +61,54 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
 
   void _cycleSpeed() {
     setState(() => _speedIndex = (_speedIndex + 1) % _speeds.length);
-    ref.read(audioPlayerServiceProvider).setSpeed(_speed);
+    final transport = widget.transport;
+    if (transport != null) {
+      transport.onSetSpeed(_speed);
+    } else {
+      ref.read(audioPlayerServiceProvider).setSpeed(_speed);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final playerState = ref.watch(playerStateProvider).valueOrNull;
-    final isPlaying = playerState?.playing ?? false;
-    final processingState = playerState?.processingState;
-    final isBuffering = processingState == ProcessingState.loading ||
-        processingState == ProcessingState.buffering;
+    final transport = widget.transport;
 
-    final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-    final duration =
-        ref.watch(durationProvider).valueOrNull ?? Duration.zero;
-    final service = ref.read(audioPlayerServiceProvider);
+    final bool isPlaying;
+    final bool isBuffering;
+    final Duration position;
+    final Duration duration;
+    final VoidCallback onPlay;
+    final VoidCallback onPause;
+    final ValueChanged<Duration> onSeek;
+
+    if (transport != null) {
+      isPlaying = transport.isPlaying;
+      isBuffering = transport.isBuffering;
+      position = transport.position;
+      duration = transport.duration;
+      onPlay = transport.onPlay;
+      onPause = transport.onPause;
+      onSeek = transport.onSeek;
+    } else {
+      final playerState = ref.watch(playerStateProvider).valueOrNull;
+      isPlaying = playerState?.playing ?? false;
+      final processingState = playerState?.processingState;
+      isBuffering = processingState == ProcessingState.loading ||
+          processingState == ProcessingState.buffering;
+      position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
+      duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
+      final service = ref.read(audioPlayerServiceProvider);
+      onPlay = service.resume;
+      onPause = service.pause;
+      onSeek = service.seek;
+    }
 
     void seekRelative(int seconds) {
       final newPos = position + Duration(seconds: seconds);
       final clamped = Duration(
         milliseconds: newPos.inMilliseconds.clamp(0, duration.inMilliseconds),
       );
-      service.seek(clamped);
+      onSeek(clamped);
     }
 
     return Padding(
@@ -73,7 +131,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
           _PlayPauseButton(
             isPlaying: isPlaying,
             isBuffering: isBuffering,
-            onTap: () => isPlaying ? service.pause() : service.resume(),
+            onTap: () => isPlaying ? onPause() : onPlay(),
           ),
 
           // Skip forward 30 seconds.

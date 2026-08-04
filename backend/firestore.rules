@@ -122,7 +122,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // config (e.g. live status, featured video) — publicly readable, admin writable
+    // config (e.g. live status, featured video, messageOfTheDay) — publicly
+    // readable, admin writable
     match /config/{docId} {
       allow read: if true;
       allow write: if isAdmin();

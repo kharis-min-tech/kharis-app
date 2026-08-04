@@ -13,6 +13,7 @@ import '../../features/messages/data/kharis_api_sermon_repository.dart';
 import '../../features/messages/data/sermon_collections_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/kharis_content.dart';
+import '../../features/messages/data/motd_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
 import '../models/sermon.dart';
 import 'audio_provider.dart';
@@ -197,13 +198,47 @@ final adminSermonsProvider = StreamProvider<List<Sermon>>((ref) {
 });
 
 /// Featured sermons for the Messages page hero.
+///
+/// Studio-controlled ONLY: the Content Studio writes `isFeatured` on
+/// Firestore `sermons` docs, and this is the sole source. No newest-N
+/// heuristic — zero featured docs means the hero carousel is absent.
 final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
-  final sermons = ref.watch(librarySermonsProvider);
-  final firestoreFeatured = ref.watch(adminSermonsProvider).valueOrNull ?? [];
-  // Prefer explicitly featured docs from Firestore, fall back to the 3 newest.
-  final featured = firestoreFeatured.where((s) => s.isFeatured).toList();
-  if (featured.isNotEmpty) return featured.take(5).toList();
-  return sermons.take(3).toList();
+  final firestoreSermons =
+      ref.watch(adminSermonsProvider).valueOrNull ?? const <Sermon>[];
+  return firestoreSermons.where((s) => s.isFeatured).take(5).toList();
+});
+
+// ── Message of the Day (Studio-controlled) ───────────────────────────────────
+
+final motdRepositoryProvider = Provider<MotdRepository>(
+  (ref) => MotdRepository(),
+);
+
+/// Realtime `config/messageOfTheDay` sermonId. Null when unset.
+final motdSermonIdProvider = StreamProvider<String?>((ref) {
+  if (!kUseFirebase) return Stream.value(null);
+  try {
+    return ref.watch(motdRepositoryProvider).watchSermonId();
+  } catch (_) {
+    return Stream.value(null);
+  }
+});
+
+/// The Message of the Day sermon, resolved against loaded sermons.
+///
+/// The Studio picks a Firestore `sermons` doc, so its id is matched against
+/// the live CMS stream first, then the merged library (which carries API
+/// ids). Null when no doc is set or the id no longer resolves — the Messages
+/// tab shows no MOTD card in that case.
+final motdSermonProvider = Provider<Sermon?>((ref) {
+  final id = ref.watch(motdSermonIdProvider).valueOrNull;
+  if (id == null) return null;
+  final cms = ref.watch(adminSermonsProvider).valueOrNull ?? const <Sermon>[];
+  final library = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+  for (final sermon in cms.followedBy(library)) {
+    if (sermon.id == id) return sermon;
+  }
+  return null;
 });
 
 // ── Recently played ───────────────────────────────────────────────────────────

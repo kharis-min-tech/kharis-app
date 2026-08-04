@@ -68,8 +68,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final isFiltered = selectedCategory != 'All';
 
-    // Featured + recently played.
+    // Featured + Message of the Day + recently played.
     final featured = ref.watch(featuredSermonsProvider);
+    final motd = ref.watch(motdSermonProvider);
     final recentlyPlayed = ref.watch(recentlyPlayedProvider);
 
     // Search.
@@ -190,7 +191,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             else ...[
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-              // ── 2. Featured hero carousel ────────────────────────────────
+              // ── 2. Featured hero carousel + Message of the Day ───────────
               if (featured.isNotEmpty)
                 SliverToBoxAdapter(
                   child: _FeaturedCarousel(
@@ -200,6 +201,18 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                     onPlay: (sermon) => startPlayback(ref, sermon),
                   ),
                 ),
+              if (motd != null) ...[
+                if (featured.isNotEmpty)
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                SliverToBoxAdapter(
+                  child: _MessageOfTheDayCard(
+                    sermon: motd,
+                    isPlaying: currentSermon?.id == motd.id &&
+                        (playerState?.playing ?? false),
+                    onPlay: () => startPlayback(ref, motd),
+                  ),
+                ),
+              ],
 
               // ── 3. Recently played ───────────────────────────────────────
               if (recentlyPlayed.isNotEmpty) ...[
@@ -764,6 +777,117 @@ class _FeaturedCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Message of the Day card ────────────────────────────────────────────────────
+
+class _MessageOfTheDayCard extends StatelessWidget {
+  const _MessageOfTheDayCard({
+    required this.sermon,
+    required this.isPlaying,
+    required this.onPlay,
+  });
+
+  final Sermon sermon;
+  final bool isPlaying;
+  final VoidCallback onPlay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: PressEffect(
+        onTap: onPlay,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: context.kc.surfaceAlt,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: context.kc.accent.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 56,
+                height: 56,
+                child: ArtworkImage(
+                  url: sermon.artworkUrl,
+                  gradientIndex: sermon.artworkColor ?? 0,
+                  radius: AppRadius.md,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.wb_sunny_rounded,
+                          size: 12,
+                          color: context.kc.accentInk,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'MESSAGE OF THE DAY',
+                          style: AppTypography.labelMd.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: context.kc.accentInk,
+                            letterSpacing: 0.08,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      sermon.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyLg.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: context.kc.onBg,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sermon.speaker,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 12,
+                        color: context.kc.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: context.kc.accent,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Icon(
+                  isPlaying ? Icons.equalizer_rounded : Icons.play_arrow_rounded,
+                  color: context.kc.onAccent,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
