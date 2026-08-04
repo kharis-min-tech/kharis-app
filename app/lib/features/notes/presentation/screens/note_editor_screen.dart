@@ -79,10 +79,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     if (note == null) return;
     final result = await NoteAnchor.play(ref, note);
     if (!mounted) return;
-    if (result == NoteAnchorResult.sermonUnavailable) {
+    if (result == NoteAnchorResult.sermonUnavailable ||
+        result == NoteAnchorResult.playbackFailed) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('That message is no longer available'),
+          content: Text(
+            result == NoteAnchorResult.playbackFailed
+                ? 'Couldn\u2019t play that message. Please try again.'
+                : 'That message is no longer available',
+          ),
           backgroundColor: AppColors.errorContainer,
           behavior: SnackBarBehavior.floating,
         ),

@@ -5,6 +5,8 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
+import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
+import 'package:kharis_app/features/player/presentation/widgets/playback_error_banner.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
@@ -21,13 +23,22 @@ List<Color> playerAmbientColors(BuildContext context) =>
         ? [const Color(0xFF3A1D6E), const Color(0xFF1A0F33), context.kc.bg]
         : [const Color(0xFFE6DEF8), const Color(0xFFF2ECF9), context.kc.bg];
 
+/// Which medium [MediaPlayerScreen] presents.
+enum MediaMode { audio, video }
+
 /// Unified media player for audio and YouTube video content. Audio playback
 /// mirrors the full Now Playing screen (ambient wash, gold transport, waveform
 /// scrubber); video hosts the YouTube player under the same chrome.
 class MediaPlayerScreen extends ConsumerStatefulWidget {
-  const MediaPlayerScreen({super.key, required this.sermon});
+  const MediaPlayerScreen({super.key, required this.sermon, this.mode});
 
   final Sermon sermon;
+
+  /// The medium to open. Null derives it from the sermon, and audio always
+  /// wins: most sermons carry both an mp3 and a YouTube link, and a member who
+  /// asked for a message must never be handed a video instead. Pass
+  /// [MediaMode.video] to open the video deliberately.
+  final MediaMode? mode;
 
   @override
   ConsumerState<MediaPlayerScreen> createState() => _MediaPlayerScreenState();
@@ -37,12 +48,26 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   YoutubePlayerController? _youtubeController;
   bool _liked = false;
 
-  bool get _isVideo => widget.sermon.isYouTubeVideo;
+  /// Resolved once, in [initState], so the screen can never flip medium under
+  /// the member mid-session.
+  late final bool _isVideo = _resolveMode() == MediaMode.video;
+
+  MediaMode _resolveMode() {
+    final requested = widget.mode;
+    if (requested == MediaMode.video && widget.sermon.hasVideo) {
+      return MediaMode.video;
+    }
+    if (requested == MediaMode.audio && widget.sermon.hasAudio) {
+      return MediaMode.audio;
+    }
+    // No usable request: play what the sermon actually has, audio first.
+    return widget.sermon.hasAudio ? MediaMode.audio : MediaMode.video;
+  }
 
   @override
   void initState() {
     super.initState();
-    if (_isVideo && widget.sermon.videoId != null) {
+    if (_isVideo) {
       // Only one audio source at a time: pause any playing sermon audio so it
       // does not clash with the YouTube player.
       ref.read(audioPlayerServiceProvider).pause();
@@ -61,8 +86,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         );
       }
     } else {
-      // Start audio playback
-      ref.read(audioPlayerServiceProvider).play(widget.sermon);
+      // Start audio playback; a failed load surfaces in the banner below.
+      startPlayback(ref, widget.sermon);
     }
   }
 
@@ -134,6 +159,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                     const SizedBox(height: 24),
                     _buildInfoRow(),
                     const SizedBox(height: 22),
+                    PlaybackErrorBanner(sermonId: widget.sermon.id),
                     SeekBar(
                       position: position,
                       duration: duration,

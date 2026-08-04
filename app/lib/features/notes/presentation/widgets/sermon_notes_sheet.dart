@@ -221,7 +221,11 @@ class SermonNotesSheet extends ConsumerWidget {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('That message is no longer available'),
+        content: Text(
+          result == NoteAnchorResult.playbackFailed
+              ? 'Couldn\u2019t play that message. Please try again.'
+              : 'That message is no longer available',
+        ),
         backgroundColor: AppColors.errorContainer,
         behavior: SnackBarBehavior.floating,
       ),

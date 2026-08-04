@@ -8,6 +8,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/features/player/presentation/screens/playlist_screen.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../widgets/sermon_list_item.dart';
@@ -179,9 +180,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       artworkUrl: sermon.artworkUrl,
                       listIndex: index,
                       isPlaying: isPlaying,
-                      onTap: () {
-                        ref.read(audioPlayerServiceProvider).play(sermon);
-                      },
+                      onTap: () => startPlayback(ref, sermon),
                     );
                   },
                 ),
@@ -198,9 +197,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                     sermons: featured,
                     currentSermonId: currentSermon?.id,
                     isPlaying: playerState?.playing ?? false,
-                    onPlay: (sermon) {
-                      ref.read(audioPlayerServiceProvider).play(sermon);
-                    },
+                    onPlay: (sermon) => startPlayback(ref, sermon),
                   ),
                 ),
 
@@ -241,11 +238,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                             sermon: sermon,
                             isPlaying: currentSermon?.id == sermon.id &&
                                 (playerState?.playing ?? false),
-                            onTap: () {
-                              ref
-                                  .read(audioPlayerServiceProvider)
-                                  .play(sermon);
-                            },
+                            onTap: () => startPlayback(ref, sermon),
                           ),
                         );
                       },
@@ -434,9 +427,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       artworkUrl: sermon.artworkUrl,
                       listIndex: index,
                       isPlaying: isPlaying,
-                      onTap: () {
-                        ref.read(audioPlayerServiceProvider).play(sermon);
-                      },
+                      onTap: () => startPlayback(ref, sermon),
                     );
                   },
                 ),

@@ -29,6 +29,11 @@ class MiniPlayer extends ConsumerWidget {
         ref.watch(durationProvider).valueOrNull ?? Duration.zero;
     final service = ref.read(audioPlayerServiceProvider);
 
+    // A failed load keeps the sermon loaded here, so the bar doubles as the
+    // error state: it says what happened and retries in place.
+    final failure = ref.watch(playbackFailureProvider).valueOrNull;
+    final failed = failure != null && failure.sermonId == sermon.id;
+
     final progress = rawDuration.inMilliseconds > 0
         ? (position.inMilliseconds / rawDuration.inMilliseconds)
             .clamp(0.0, 1.0)
@@ -87,11 +92,17 @@ class MiniPlayer extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              sermon.speaker,
+                              failed
+                                  ? (sermon.hasAudio
+                                      ? 'Couldn\u2019t play \u00b7 tap to retry'
+                                      : 'Video only \u00b7 no audio recording')
+                                  : sermon.speaker,
                               style: AppTypography.ui(
                                 size: 11,
                                 height: 1.25,
-                                color: context.kc.muted,
+                                color: failed
+                                    ? AppColors.danger
+                                    : context.kc.muted,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -103,18 +114,33 @@ class MiniPlayer extends ConsumerWidget {
                       // Play / pause icon button (does not navigate).
                       Semantics(
                         button: true,
-                        label: isPlaying ? 'Pause' : 'Play',
+                        label: failed
+                            ? 'Retry'
+                            : (isPlaying ? 'Pause' : 'Play'),
                         excludeSemantics: true,
                         child: GestureDetector(
-                          onTap: () =>
-                              isPlaying ? service.pause() : service.resume(),
+                          onTap: () {
+                            if (failed) {
+                              if (sermon.hasAudio) service.retry();
+                              return;
+                            }
+                            if (isPlaying) {
+                              service.pause();
+                            } else {
+                              service.resume();
+                            }
+                          },
                           child: Padding(
                             padding: const EdgeInsets.all(8),
                             child: Icon(
-                              isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: context.kc.onBg,
+                              failed
+                                  ? Icons.refresh_rounded
+                                  : (isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded),
+                              color: failed
+                                  ? AppColors.danger
+                                  : context.kc.onBg,
                               size: 26,
                             ),
                           ),

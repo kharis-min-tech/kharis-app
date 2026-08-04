@@ -39,3 +39,15 @@ final positionProvider = StreamProvider<Duration>((ref) {
 final durationProvider = StreamProvider<Duration?>((ref) {
   return ref.watch(audioPlayerServiceProvider).durationStream;
 });
+
+/// The load failure the member still needs to see, or null when playback is
+/// healthy.
+///
+/// Seeded with the service's current failure so a widget that mounts *after*
+/// the failure — the full player opened from the mini player, say — still
+/// renders the error and its retry.
+final playbackFailureProvider = StreamProvider<PlaybackFailure?>((ref) async* {
+  final service = ref.watch(audioPlayerServiceProvider);
+  yield service.failure;
+  yield* service.failureStream;
+});

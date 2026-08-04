@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
+import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -363,7 +364,7 @@ class _ResultsSliver extends ConsumerWidget {
           artworkUrl: s.artworkUrl,
           listIndex: i,
           isPlaying: currentSermonId == s.id && playing,
-          onTap: () => ref.read(audioPlayerServiceProvider).play(s),
+          onTap: () => startPlayback(ref, s),
         );
       },
     );

@@ -334,6 +334,10 @@ const API_CACHE_CONTROL = 'public, max-age=300';
 // the rest of the read API. The `when` query param is part of the CDN cache
 // key, so the two variants can never be served from each other's entry.
 const EVENT_PAST_CACHE_CONTROL = 'public, max-age=60';
+// The Past tab is a capped archive, not a full history: only the 15 most
+// recent finished events are ever served. Older events stay in Firestore,
+// they are simply out of view — which also bounds what the past query costs.
+const PAST_EVENT_LIMIT = 15;
 
 /**
  * HTTP: GET /getBranches
@@ -371,7 +375,9 @@ export const getBranches = onRequest(
  *   - branch: branch name (optional). When given, includes events for that
  *     branch OR all-campus events (branch == null).
  *   - when: 'upcoming' (default) | 'past'
- *   - limit: number (max 50, default 50)
+ *   - limit: number. Upcoming: default and max 50. Past: PAST_EVENT_LIMIT is
+ *     both the default and the ceiling — a larger `limit` is clamped, so no
+ *     caller can widen the past archive beyond the 15 most recent.
  * Returns upcoming events (startTime >= now) ordered by startTime asc, or
  * past events (startTime < now) ordered by startTime desc.
  */
@@ -388,11 +394,9 @@ export const getEvents = onRequest(
       limit: limitParam,
       when,
     } = req.query as Record<string, string>;
-    const limit = Math.min(
-      parseInt(limitParam || String(EVENT_PAGE_SIZE), 10) || EVENT_PAGE_SIZE,
-      50
-    );
     const past = when === 'past';
+    const maxLimit = past ? PAST_EVENT_LIMIT : EVENT_PAGE_SIZE;
+    const limit = Math.min(parseInt(limitParam, 10) || maxLimit, maxLimit);
     const now = Timestamp.now();
 
     const baseQuery = () =>

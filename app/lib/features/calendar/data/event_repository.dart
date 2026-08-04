@@ -76,6 +76,12 @@ class EventRepository {
   /// this is treated as past once the window slides past it.
   static const Duration _inProgressLookback = Duration(days: 2);
 
+  /// The Past view is a capped archive, not a full history: only the 15 most
+  /// recent finished events are ever fetched or shown. Older events stay in
+  /// Firestore — this is a view cap, and it also bounds the query cost.
+  /// Mirrors `PAST_EVENT_LIMIT` in `backend/functions/src/index.ts`.
+  static const int pastEventLimit = 15;
+
   /// `whereIn` accepts at most 30 values per query.
   static const int _whereInChunk = 30;
 
@@ -95,7 +101,8 @@ class EventRepository {
   Future<List<Event>> getUpcomingEvents({String? branch}) =>
       _getEvents(branch: branch, past: false);
 
-  /// Returns finished events, most recent first. Mirrors [getUpcomingEvents].
+  /// Returns the [pastEventLimit] most recent finished events. Mirrors
+  /// [getUpcomingEvents], but capped — see [pastEventLimit].
   Future<List<Event>> getPastEvents({String? branch}) =>
       _getEvents(branch: branch, past: true);
 
@@ -103,7 +110,7 @@ class EventRepository {
   Stream<List<Event>> watchUpcomingEvents({String? branch}) =>
       _watchEvents(branch: branch, past: false);
 
-  /// Realtime stream of past events, most recent first.
+  /// Realtime stream of the [pastEventLimit] most recent finished events.
   Stream<List<Event>> watchPastEvents({String? branch}) =>
       _watchEvents(branch: branch, past: true);
 
@@ -162,6 +169,12 @@ class EventRepository {
 
   /// The Firestore range window for a view. Client-side filtering on
   /// [Event.isPastAt] narrows this to the exact set.
+  ///
+  /// The past window is bounded at [pastEventLimit] documents so the query
+  /// itself — not just the rendered list — stays capped. An event that has
+  /// started but not finished falls inside the range yet is filtered out as
+  /// not-past, so a running event can leave the Past tab one short; that is
+  /// the deliberate cost of not paying for a wider read.
   Query<Map<String, dynamic>> _windowQuery({
     required DateTime now,
     required bool past,
@@ -170,7 +183,8 @@ class EventRepository {
     if (past) {
       return events
           .where('startTime', isLessThan: Timestamp.fromDate(now))
-          .orderBy('startTime', descending: true);
+          .orderBy('startTime', descending: true)
+          .limit(pastEventLimit);
     }
     return events
         .where(
@@ -233,7 +247,7 @@ class EventRepository {
         queryParameters: {
           'branch': ?branch,
           'when': past ? 'past' : 'upcoming',
-          'limit': 50,
+          'limit': past ? pastEventLimit : 50,
         },
       );
       final raw = (res.data?['events'] as List?) ?? const [];
@@ -335,10 +349,14 @@ class EventRepository {
           .where((e) => e.isPastAt(now) == past)
           .toList();
 
+  /// Orders a page and, for the Past view, applies [pastEventLimit]. Every
+  /// read path — Firestore one-shot, Firestore stream and the API fetch —
+  /// returns through here, so the cap cannot be bypassed by adding a caller.
   List<Event> _sorted(List<Event> events, {required bool past}) {
     final sorted = [...events]
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
-    return past ? sorted.reversed.toList() : sorted;
+    if (!past) return sorted;
+    return sorted.reversed.take(pastEventLimit).toList();
   }
 
   Event? _docToEvent(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>

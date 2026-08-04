@@ -74,8 +74,10 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
     final audio = j['audio_link'] as Map<String, dynamic>?;
     final audioUrl = _absolutise(audio?['download_url'] as String?);
     final videoId = _youTubeId(j['video_link'] as String?);
-    // Skip records with no playable media.
-    if (audioUrl.isEmpty && (videoId == null || videoId.isEmpty)) return null;
+    // The library is the audio catalogue: a record with only a `video_link`
+    // has nothing to stream (and an empty URL wedges the player), so it is
+    // dropped here. Video content reaches the app through the YouTube feed.
+    if (audioUrl.isEmpty) return null;
 
     final preachers = (j['preachers'] as List?) ?? const [];
     final speaker = preachers

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"ls -la ~/.omp 2>/dev/null && ls -la ~/.omp/sessions 2>/dev/null\",\"description\":\"Inspect ~/.omp sessions directory\"}",
+  "error": "Exit code 2\ndrwx------@   - ajayifam  4 Aug 07:38 agent\ndrwx------@   - ajayifam 19 May 23:54 cache\ndrwxr-xr-x@   - ajayifam  4 Aug 00:00 logs\ndrwxr-xr-x@   - ajayifam  3 Aug 14:59 natives\ndrwx------@   - ajayifam  5 Jul 21:52 profiles\ndrwxr-xr-x@   - ajayifam 21 Apr 11:07 puppeteer\ndrwx------@   - ajayifam 16 Jul 09:03 run\n.rw-r--r--@ 16k ajayifam 29 Jul 08:15 autoqa.db\n.rw-r--r--@  16 ajayifam 30 Jun 19:10 gpu_cache.json\n.rw-------@  37 ajayifam  2 Jun 17:08 install-id",
+  "timestamp": "2026-08-04T14:07:30.621Z",
+  "retry_count": 1
+}

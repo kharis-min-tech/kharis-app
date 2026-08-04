@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
+import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/features/messages/data/sermon_collections_repository.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -299,9 +300,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
   /// Audio-only sermons matching the collection keyword; falls back to the
   /// first few audio sermons so the list is never empty.
   List<Sermon> _resolve(List<Sermon> all) {
-    final audio = all
-        .where((s) => !s.isYouTubeVideo && s.audioUrl.isNotEmpty)
-        .toList();
+    final audio = all.where((s) => s.hasAudio).toList();
     final key = collection.keyword.toLowerCase();
     final matched = audio.where((s) {
       final cat = (s.category ?? '').toLowerCase();
@@ -314,7 +313,6 @@ class _PlaylistDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final audioService = ref.read(audioPlayerServiceProvider);
     final sermonsAsync = ref.watch(sermonsProvider);
     final currentSermon = ref.watch(currentSermonProvider);
     final playerState = ref.watch(playerStateProvider).valueOrNull;
@@ -412,7 +410,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                       child: FilledButton.icon(
                         onPressed: sermons.isEmpty
                             ? null
-                            : () => audioService.play(sermons.first),
+                            : () => startPlayback(ref, sermons.first),
                         style: FilledButton.styleFrom(
                           backgroundColor: context.kc.accent,
                           foregroundColor: context.kc.onAccent,
@@ -478,7 +476,7 @@ class _PlaylistDetailScreen extends ConsumerWidget {
                     artworkUrl: sermon.artworkUrl,
                     listIndex: index,
                     isPlaying: isPlaying,
-                    onTap: () => audioService.play(sermon),
+                    onTap: () => startPlayback(ref, sermon),
                   );
                 },
                 childCount: sermons.length,

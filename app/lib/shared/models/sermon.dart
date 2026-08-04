@@ -19,11 +19,21 @@ class Sermon {
     this.isFeatured = false,
   });
 
-  /// Returns true if this is a YouTube video (has videoId, no audioUrl)
-  bool get isYouTubeVideo => videoId != null && videoId!.isNotEmpty;
+  /// Whether this sermon has a streamable audio recording.
+  ///
+  /// Media checks are deliberately split into [hasAudio] and [hasVideo]: most
+  /// Kharis sermons carry BOTH an mp3 and a `video_link`, so a single
+  /// "is a video" flag keyed off `videoId` is what sent members who tapped an
+  /// audio message into the YouTube player. Callers must state which medium
+  /// they mean.
+  bool get hasAudio => audioUrl.trim().isNotEmpty;
 
-  /// YouTube video URL for opening in browser/player
-  String? get youtubeUrl => isYouTubeVideo ? 'https://www.youtube.com/watch?v=$videoId' : null;
+  /// Whether this sermon has a YouTube recording.
+  bool get hasVideo => (videoId ?? '').trim().isNotEmpty;
+
+  /// YouTube video URL for opening in browser/player; null without a video.
+  String? get youtubeUrl =>
+      hasVideo ? 'https://www.youtube.com/watch?v=$videoId' : null;
 
   final String id;
   final String title;

@@ -1,13 +1,11 @@
-import 'package:add_2_calendar_new/add_2_calendar_new.dart' as add2cal;
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/data/rsvp_repository.dart';
+import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
@@ -40,17 +38,14 @@ const List<Color> _accentPalette = [
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   _EventTab _tab = _EventTab.upcoming;
 
-  /// True once the member has picked a branch on this screen. Kept separate
-  /// from [_branchOverride] so "all campuses" (a `null` branch) is a real
-  /// choice rather than indistinguishable from "not chosen yet".
-  bool _branchOverridden = false;
-  String? _branchOverride;
-
   @override
   Widget build(BuildContext context) {
-    final branch = _branchOverridden
-        ? _branchOverride
-        : ref.watch(currentBranchProvider).valueOrNull;
+    // The member's campus is persisted state, never screen state: this screen
+    // reads it from [currentBranchProvider] and writes it back through
+    // [setActiveBranch]. A local override field here would be a second source
+    // of truth that dies with the screen — which is exactly how the chip used
+    // to appear to "revert" on relaunch.
+    final branch = ref.watch(currentBranchProvider).valueOrNull;
     final branchLabel = branch ?? _kAllCampuses;
     final branches = ref.watch(branchesProvider).valueOrNull ??
         BranchRepository.seedBranches;
@@ -102,6 +97,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           emptyTitle: 'No past events',
           emptySubtitle: 'Events at $branchLabel that have finished '
               'will appear here.',
+          capNote: 'Showing the ${EventRepository.pastEventLimit} most recent '
+              'events. Anything older is no longer listed.',
         );
       case _EventTab.rsvps:
         if (ref.watch(currentUserProvider).valueOrNull == null) {
@@ -115,11 +112,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }
   }
 
+  /// [capNote] is shown under the list once it is full to the view cap, so a
+  /// truncated archive never reads as the whole history.
   Widget _eventsSliver(
     AsyncValue<List<Event>> async, {
     required IconData emptyIcon,
     required String emptyTitle,
     required String emptySubtitle,
+    String? capNote,
   }) {
     return async.when(
       loading: () => _kLoadingSliver,
@@ -138,18 +138,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             subtitle: emptySubtitle,
           );
         }
+        final note = events.length >= EventRepository.pastEventLimit
+            ? capNote
+            : null;
         return SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 150),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _EventCard(
-                  event: events[index],
-                  accent: _accentPalette[index % _accentPalette.length],
-                ),
-              ),
-              childCount: events.length,
+              (context, index) {
+                if (index == events.length) return _CapNote(text: note!);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: EventCard(
+                    event: events[index],
+                    accent: _accentPalette[index % _accentPalette.length],
+                  ),
+                );
+              },
+              childCount: events.length + (note == null ? 0 : 1),
             ),
           ),
         );
@@ -187,8 +193,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 _RsvpHeaderRow(:final label) => _GroupHeader(label: label),
                 _RsvpCardRow(:final event, :final accent) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: _EventCard(event: event, accent: accent),
+                    child: EventCard(event: event, accent: accent),
                   ),
+                _RsvpNoteRow(:final text) => _CapNote(text: text),
               },
               childCount: rows.length,
             ),
@@ -243,6 +250,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
+  /// Switches the member's campus for the whole app.
+  ///
+  /// [setActiveBranch] owns every store the campus lives in — the local
+  /// preference, this device's FCM branch topic and `users/{uid}.branch` —
+  /// and invalidates [currentBranchProvider] on the way out. None of that is
+  /// repeated here, and nothing is kept on this screen.
   Future<void> _pickBranch(List<Branch> branches, String? current) async {
     final choice = await showModalBottomSheet<_BranchChoice>(
       context: context,
@@ -257,10 +270,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       ),
     );
     if (choice == null || !mounted) return;
-    setState(() {
-      _branchOverridden = true;
-      _branchOverride = choice.name;
-    });
+    if (choice.name == current) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final label = choice.name ?? _kAllCampuses;
+    final result = await setActiveBranch(ref, choice.name);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      eventToast(
+        result.syncFailed
+            ? 'Your campus is now $label on this device. We could not reach '
+                'your profile — it will sync automatically.'
+            : 'Your campus is now $label.',
+      ),
+    );
   }
 }
 
@@ -336,8 +358,18 @@ class _RsvpCardRow extends _RsvpRow {
   final Color accent;
 }
 
+class _RsvpNoteRow extends _RsvpRow {
+  const _RsvpNoteRow(this.text);
+
+  final String text;
+}
+
 /// Flattens [grouped] into header + card rows. The accent palette continues
 /// across both groups so no two adjacent cards share a colour.
+///
+/// The Past group is capped at [EventRepository.pastEventLimit] by
+/// [myRsvpEventsProvider]; when it is full, a closing note says so rather
+/// than letting a truncated list pass for the member's whole RSVP history.
 List<_RsvpRow> _rsvpRows(RsvpEvents grouped) {
   final rows = <_RsvpRow>[];
   var accent = 0;
@@ -354,7 +386,35 @@ List<_RsvpRow> _rsvpRows(RsvpEvents grouped) {
 
   addGroup('Upcoming', grouped.upcoming);
   addGroup('Past', grouped.past);
+  if (grouped.past.length >= EventRepository.pastEventLimit) {
+    rows.add(
+      _RsvpNoteRow(
+        'Showing your ${EventRepository.pastEventLimit} most recent past '
+        'RSVPs.',
+      ),
+    );
+  }
   return rows;
+}
+
+/// Closing line under a list that has been trimmed to a view cap. Quiet by
+/// design: it explains an absence, it is not content.
+class _CapNote extends StatelessWidget {
+  const _CapNote({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 14),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: AppTypography.ui(size: 12).copyWith(color: context.kc.faint),
+      ),
+    );
+  }
 }
 
 class _GroupHeader extends StatelessWidget {
@@ -380,6 +440,9 @@ class _GroupHeader extends StatelessWidget {
 
 // ── Header ───────────────────────────────────────────────────────────────────
 
+/// Screen title plus the campus chip. The chip is captioned "YOUR CAMPUS"
+/// because tapping it changes the member's campus everywhere — it is not a
+/// throwaway filter over this list.
 class _Header extends StatelessWidget {
   const _Header({required this.branchLabel, required this.onTapBranch});
 
@@ -410,21 +473,38 @@ class _Header extends StatelessWidget {
                 borderRadius: AppRadius.pillBorder,
                 boxShadow: AppShadows.card,
               ),
-              child: Row(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Flexible(
-                    child: Text(
-                      branchLabel,
-                      style: AppTypography.ui(size: 13, weight: FontWeight.w600)
-                          .copyWith(color: AppColors.primary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  Text(
+                    'YOUR CAMPUS',
+                    style: AppTypography.ui(
+                      size: 9,
+                      weight: FontWeight.w700,
+                      letterSpacing: 0.7,
+                    ).copyWith(color: context.kc.muted),
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.keyboard_arrow_down_rounded,
-                      size: 16, color: AppColors.primary),
+                  const SizedBox(height: 1),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          branchLabel,
+                          style: AppTypography.ui(
+                            size: 13,
+                            weight: FontWeight.w600,
+                          ).copyWith(color: AppColors.primary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 16, color: AppColors.primary),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -463,13 +543,22 @@ class _BranchSheet extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Show events for',
-                  style: AppTypography.ui(size: 15, weight: FontWeight.w700)
-                      .copyWith(color: context.kc.onBg),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your campus',
+                    style: AppTypography.ui(size: 15, weight: FontWeight.w700)
+                        .copyWith(color: context.kc.onBg),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Saved to your profile and used across the app — events, '
+                    'announcements and giving. You can change it any time.',
+                    style: AppTypography.ui(size: 12)
+                        .copyWith(color: context.kc.muted),
+                  ),
+                ],
               ),
             ),
             Flexible(
@@ -580,355 +669,3 @@ class _TabChip extends StatelessWidget {
   }
 }
 
-// ── Event card ─────────────────────────────────────────────────────────────────
-
-class _EventCard extends ConsumerWidget {
-  const _EventCard({required this.event, required this.accent});
-
-  final Event event;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final day = DateFormat('d').format(event.startTime);
-    final month = DateFormat('MMM').format(event.startTime).toUpperCase();
-    final weekday = DateFormat('EEE').format(event.startTime);
-    final time = DateFormat('h:mm a').format(event.startTime);
-    final whenText = '$weekday \u00b7 $time';
-    final place = event.location ?? event.branch ?? '';
-    final isPast = event.isPastAt(DateTime.now());
-    final isRsvped = ref.watch(isEventRsvpedProvider(event.id));
-
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: context.kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Photo banner with overlaid date chip.
-          Stack(
-            children: [
-              SizedBox(
-                height: 104,
-                width: double.infinity,
-                child: _banner(),
-              ),
-              Positioned(
-                top: 11,
-                left: 11,
-                child: _DateChip(day: day, month: month, color: accent),
-              ),
-              if (event.isFeatured)
-                const Positioned(top: 11, right: 11, child: _FeaturedPill()),
-            ],
-          ),
-
-          // Title + time + location.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.title,
-                  style: AppTypography.ui(
-                    size: 15.5,
-                    weight: FontWeight.w700,
-                    height: 1.15,
-                  ).copyWith(color: context.kc.onBg),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                _InfoRow(icon: Icons.schedule_rounded, text: whenText),
-                if (place.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  _InfoRow(icon: Icons.place_outlined, text: place),
-                ],
-              ],
-            ),
-          ),
-
-          // Split footer: RSVP | Add to calendar.
-          DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: context.kc.divider)),
-            ),
-            child: IntrinsicHeight(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: isPast
-                        ? _FooterAction(
-                            label: 'Ended',
-                            color: context.kc.muted,
-                            onTap: null,
-                          )
-                        : _FooterAction(
-                            label: isRsvped ? 'Going \u2713' : 'RSVP',
-                            color: isRsvped
-                                ? context.kc.muted
-                                : AppColors.primary,
-                            onTap: () => _toggleRsvp(context, ref),
-                          ),
-                  ),
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: context.kc.divider,
-                  ),
-                  Expanded(
-                    child: _FooterAction(
-                      label: 'Add to calendar',
-                      color: context.kc.muted,
-                      onTap: () => _addToCalendar(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _banner() {
-    final fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: 0.85),
-            AppColors.primaryDeep,
-          ],
-        ),
-      ),
-    );
-    final url = event.imageUrl;
-    if (url == null || url.isEmpty) return fallback;
-    return CachedNetworkImage(
-      imageUrl: url,
-      fit: BoxFit.cover,
-      placeholder: (_, _) => fallback,
-      errorWidget: (_, _, _) => fallback,
-    );
-  }
-
-  /// Toggles the persisted RSVP. The button state comes from
-  /// [isEventRsvpedProvider], which is driven by the Firestore stream, so the
-  /// UI settles on the value that was actually written.
-  Future<void> _toggleRsvp(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
-    if (ref.read(currentUserProvider).valueOrNull == null) {
-      _promptSignIn(messenger, router);
-      return;
-    }
-    final activeBranch = ref.read(currentBranchProvider).valueOrNull;
-    try {
-      final going = await ref
-          .read(rsvpRepositoryProvider)
-          .toggleRsvp(event, branch: event.branch ?? activeBranch);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(_toast(going
-            ? 'You\u2019re going to ${event.title} \ud83c\udf89'
-            : 'RSVP cancelled for ${event.title}.'));
-    } on RsvpAuthRequiredException {
-      _promptSignIn(messenger, router);
-    } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(_toast('Couldn\u2019t save your RSVP. Please try again.'));
-    }
-  }
-
-  void _promptSignIn(ScaffoldMessengerState messenger, GoRouter router) {
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(_toast(
-        'Sign in to RSVP to events.',
-        action: SnackBarAction(
-          label: 'Sign in',
-          onPressed: () => router.push('/login'),
-        ),
-      ));
-  }
-
-  Future<void> _addToCalendar(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    // Events may legitimately have no end time; a one-hour block is the
-    // sensible default for a calendar entry.
-    final calEvent = add2cal.Event(
-      title: event.title,
-      description: event.description,
-      location: event.location,
-      startDate: event.startTime,
-      endDate: event.endTime ?? event.startTime.add(const Duration(hours: 1)),
-    );
-    try {
-      await add2cal.Add2Calendar.addEvent2Cal(calEvent);
-    } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(_toast('Couldn\u2019t open your calendar.'));
-    }
-  }
-}
-
-class _FeaturedPill extends StatelessWidget {
-  const _FeaturedPill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: AppRadius.pillBorder,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.star_rounded, size: 12, color: AppColors.gold),
-          const SizedBox(width: 4),
-          Text(
-            'Featured',
-            style: AppTypography.ui(
-              size: 10,
-              weight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ).copyWith(color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DateChip extends StatelessWidget {
-  const _DateChip({
-    required this.day,
-    required this.month,
-    required this.color,
-  });
-
-  final String day;
-  final String month;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    // Fixed light plate in both themes. The chip sits on the photo banner, and
-    // the _accentPalette it carries is calibrated for a light plate over
-    // photography — tinting it with the active surface drops those accents to
-    // roughly 2:1 in dark mode.
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x26000000),
-            offset: Offset(0, 2),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            day,
-            style: AppTypography.ui(size: 18, weight: FontWeight.w700, height: 1)
-                .copyWith(color: color),
-          ),
-          Text(
-            month,
-            style: AppTypography.ui(
-              size: 9,
-              weight: FontWeight.w600,
-              letterSpacing: 0.4,
-            ).copyWith(color: color),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 13, color: context.kc.muted),
-        const SizedBox(width: 5),
-        Expanded(
-          child: Text(
-            text,
-            style: AppTypography.ui(size: 12.5)
-                .copyWith(color: context.kc.muted),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FooterAction extends StatelessWidget {
-  const _FooterAction({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-
-  /// `null` renders the action as inert — used for events that have ended.
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Center(
-          child: Text(
-            label,
-            style: AppTypography.ui(size: 13, weight: FontWeight.w700)
-                .copyWith(color: color),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
-
-/// Toast. Plate colour, content type, floating behaviour and shape all come
-/// from `snackBarTheme`; only the bottom margin that clears the tab bar is
-/// screen-specific.
-SnackBar _toast(String message, {SnackBarAction? action}) => SnackBar(
-      content: Text(message),
-      action: action,
-      duration: const Duration(milliseconds: 1900),
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-    );

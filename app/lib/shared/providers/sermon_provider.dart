@@ -56,9 +56,10 @@ final apiSermonsProvider = FutureProvider<List<Sermon>>((ref) async {
 final sermonsProvider = FutureProvider<List<Sermon>>((ref) async {
   // Live stream, so a CMS edit re-emits the library without a manual refresh.
   final cms = ref.watch(adminSermonsProvider).valueOrNull ?? const <Sermon>[];
-  final cmsAudio = cms
-      .where((s) => s.source != 'youtube' && s.videoId == null)
-      .toList();
+  // Audio-bearing docs only. A `videoId` does NOT make a sermon a video: most
+  // carry both an mp3 and a YouTube link, and excluding those hid them from
+  // the library entirely.
+  final cmsAudio = cms.where((s) => s.hasAudio).toList();
 
   final api = await ref.watch(apiSermonsProvider.future);
 
@@ -262,7 +263,8 @@ final upcomingEventsProvider =
   return repo.watchUpcomingEvents(branch: branch);
 });
 
-/// Past events, optionally filtered by branch. Realtime, most recent first.
+/// The [EventRepository.pastEventLimit] most recent past events, optionally
+/// filtered by branch. Realtime, most recent first.
 /// An event only lands here once its end time has passed.
 final pastEventsProvider =
     StreamProvider.family<List<Event>, String?>((ref, branch) {
@@ -296,13 +298,21 @@ final isEventRsvpedProvider =
 /// same cutoff the Events tabs use, so an RSVP'd event whose date has passed
 /// is never shown as upcoming. Resolved in `whereIn` batches, so the cost is
 /// O(n / 30) reads. RSVPs whose event has since been deleted drop out.
+///
+/// The past group carries the same [EventRepository.pastEventLimit] cap as
+/// the Past tab — a member with years of RSVPs sees the recent ones, not an
+/// unbounded archive. Upcoming is never capped.
 final myRsvpEventsProvider = FutureProvider<RsvpEvents>((ref) async {
   final rsvps = await ref.watch(myRsvpsProvider.future);
   if (rsvps.isEmpty) return RsvpEvents.empty;
   final events = await ref
       .watch(eventRepositoryProvider)
       .getEventsByIds(rsvps.map((r) => r.eventId).toList());
-  return RsvpEvents.split(events, DateTime.now());
+  final grouped = RsvpEvents.split(events, DateTime.now());
+  return RsvpEvents(
+    upcoming: grouped.upcoming,
+    past: grouped.past.take(EventRepository.pastEventLimit).toList(),
+  );
 });
 
 // ── Daily content ─────────────────────────────────────────────────────────────

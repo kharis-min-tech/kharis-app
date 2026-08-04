@@ -67,7 +67,11 @@ class _VideoHeroCard extends StatelessWidget {
 
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
-        builder: (_) => MediaPlayerScreen(sermon: targetSermon),
+        // The Home hero is the YouTube feed: always the video player.
+        builder: (_) => MediaPlayerScreen(
+          sermon: targetSermon,
+          mode: MediaMode.video,
+        ),
       ),
     );
   }

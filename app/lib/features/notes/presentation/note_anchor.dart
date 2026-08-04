@@ -14,6 +14,9 @@ enum NoteAnchorResult {
 
   /// The sermon the note was written against is no longer in the library.
   sermonUnavailable,
+
+  /// The sermon exists but its audio would not load.
+  playbackFailed,
 }
 
 /// Jumps playback back to the moment a note was written.
@@ -42,8 +45,8 @@ abstract final class NoteAnchor {
     if (sermon == null) return NoteAnchorResult.sermonUnavailable;
 
     // play() restores the saved resume point; seek afterwards so the note's
-    // own timestamp wins.
-    await audio.play(sermon);
+    // own timestamp wins. A failed load must not read as started.
+    if (!await audio.play(sermon)) return NoteAnchorResult.playbackFailed;
     await audio.seek(target);
     return NoteAnchorResult.started;
   }
@@ -52,7 +55,7 @@ abstract final class NoteAnchor {
     try {
       final sermons = await ref.read(sermonsProvider.future);
       for (final sermon in sermons) {
-        if (sermon.id == sermonId && sermon.audioUrl.isNotEmpty) return sermon;
+        if (sermon.id == sermonId && sermon.hasAudio) return sermon;
       }
     } catch (_) {
       // Library unreachable — treated the same as a missing sermon.

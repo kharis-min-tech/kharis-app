@@ -6,9 +6,7 @@ import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:kharis_app/shared/providers/notification_provider.dart';
 
 /// Branch selection (design-handoff v3) — light screen. Search across cities,
 /// then tap a branch to set it as home and enter the app.
@@ -98,50 +96,20 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
     );
   }
 
-  /// Persists the chosen branch to the signed-in profile (best effort), then
-  /// continues into the app.
+  /// Marks onboarding complete and persists the chosen campus through the one
+  /// shared path, so prefs, the FCM topic and the profile cannot disagree.
   Future<void> _confirm(
       BuildContext context, WidgetRef ref, Branch branch) async {
-    final user = ref.read(currentUserProvider).valueOrNull;
-    final repo = ref.read(firebaseAuthRepositoryProvider);
     final onboardingRepo = ref.read(onboardingRepositoryProvider);
-    // Captured before completeOnboarding overwrites it, or the FCM unsubscribe
-    // below would be handed the new branch as its `from` and leave the device
-    // subscribed to the old topic.
-    final previousBranch = onboardingRepo.selectedBranch;
-
-    // Persist locally first: this always succeeds, so the member's choice is
-    // never lost to a failed network write.
     await onboardingRepo.completeOnboarding(
       role: onboardingRepo.selectedRole ?? 'member',
       branch: branch.name,
     );
 
-    // Switch this device's branch FCM topic so it gets branch-scoped pushes.
-    // Same code path as Edit Profile.
-    await ref.read(notificationServiceProvider).switchBranchTopic(
-          from: previousBranch,
-          to: branch.name,
-        );
+    final result = await setActiveBranch(ref, branch.name);
 
-    // Mirror into the Firestore profile so the branch follows the member to
-    // other devices. If it fails, flag it rather than swallowing: the profile
-    // is normally authoritative, so a silent failure would let the stale
-    // remote branch overwrite this choice on the next launch.
-    var syncFailed = false;
-    if (user != null && user.id.isNotEmpty && user.role != 'guest') {
-      try {
-        await repo.updateProfile(branch: branch.name);
-        await onboardingRepo.setBranchSyncPending(false);
-      } catch (_) {
-        syncFailed = true;
-        await onboardingRepo.setBranchSyncPending(true);
-      }
-    }
-
-    ref.invalidate(currentBranchProvider);
     if (!context.mounted) return;
-    if (syncFailed) {
+    if (result.syncFailed) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

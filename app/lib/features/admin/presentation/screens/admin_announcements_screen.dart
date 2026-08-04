@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/announcement_home_status.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 
@@ -68,20 +69,28 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.gutter,
-              AppSpacing.sm,
-              AppSpacing.gutter,
-              AppSpacing.lg + AppSpacing.lg,
-            ),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (_, index) => _NewsCard(
-              item: items[index],
-              onEdit: () => _openForm(context, ref, item: items[index]),
-              onDelete: () => _confirmDelete(context, ref, items[index]),
-            ),
+          return Column(
+            children: [
+              const AnnouncementHomeRulesBanner(),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.gutter,
+                    AppSpacing.sm,
+                    AppSpacing.gutter,
+                    AppSpacing.lg + AppSpacing.lg,
+                  ),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (_, index) => _NewsCard(
+                    item: items[index],
+                    onEdit: () => _openForm(context, ref, item: items[index]),
+                    onDelete: () => _confirmDelete(context, ref, items[index]),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -215,19 +224,12 @@ class _NewsCard extends StatelessWidget {
                   Row(
                     children: [
                       _TypeChip(type: item.type),
-                      if (item.isExpired) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          'EXPIRED',
-                          style: AppTypography.labelMd.copyWith(
-                            color: AppColors.error,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
                       const Spacer(),
                       Text(
-                        _formatDate(item.publishedAt),
+                        item.expiresAt == null
+                            ? _formatDate(item.publishedAt)
+                            : '${_formatDate(item.publishedAt)} → '
+                                '${_formatDate(item.expiresAt!)}',
                         style: AppTypography.labelMd.copyWith(
                           color: AppColors.textFaint,
                         ),
@@ -235,7 +237,9 @@ class _NewsCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  _BranchChip(branch: item.branch),
+                  AnnouncementHomeStatusChip(
+                    visibility: AnnouncementHomeVisibility.of(item),
+                  ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     item.title,
@@ -323,33 +327,6 @@ class _TypeChip extends StatelessWidget {
             style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
           ),
         ],
-      ),
-    );
-  }
-}
-
-
-// ── Branch chip ───────────────────────────────────────────────────────────────
-
-class _BranchChip extends StatelessWidget {
-  const _BranchChip({required this.branch});
-
-  final String? branch;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = branch ?? 'All Branches';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.onSurfaceVariant.withValues(alpha: 0.12),
-        borderRadius: AppRadius.pillBorder,
-      ),
-      child: Text(
-        label,
-        style: AppTypography.labelMd.copyWith(
-          color: AppColors.onSurfaceVariant,
-        ),
       ),
     );
   }
@@ -512,6 +489,13 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
                 ],
                 onChanged: (v) => setState(() => _branch = v),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              AnnouncementWillAppearPanel(
+                audience: AnnouncementHomeVisibility.audienceFor(_branch),
+                expiresAt: widget.item?.expiresAt,
+                isNew: !isEdit,
+              ),
+              const SizedBox(height: AppSpacing.sm),
 
               // Body
               _inputLabel('Body (optional)'),

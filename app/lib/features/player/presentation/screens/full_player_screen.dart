@@ -7,6 +7,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 import 'media_player_screen.dart';
+import '../widgets/playback_error_banner.dart';
 import '../widgets/player_actions.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/seek_bar.dart';
@@ -163,6 +164,8 @@ class FullPlayerScreen extends ConsumerWidget {
 
                       const SizedBox(height: 22),
 
+                      PlaybackErrorBanner(sermonId: sermon?.id),
+
                       // Waveform scrubber.
                       SeekBar(
                         position: position,
@@ -264,18 +267,32 @@ class _LikeButtonState extends State<_LikeButton> {
 
 // ── Audio / Video segmented toggle ────────────────────────────────────────────
 
-class _MediaToggle extends StatelessWidget {
+class _MediaToggle extends ConsumerWidget {
   const _MediaToggle({required this.sermon});
 
   final Sermon? sermon;
 
   @override
-  Widget build(BuildContext context) {
-    final hasVideo = (sermon?.videoId ?? '').isNotEmpty;
-    final hasAudio = (sermon?.audioUrl ?? '').isNotEmpty;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final target = sermon;
+    final hasVideo = target?.hasVideo ?? false;
+    final hasAudio = target?.hasAudio ?? false;
+    // Audio is the medium this screen is playing, so it reads as active only
+    // while the audio load is actually healthy.
+    final failed = ref.watch(playbackFailureProvider).valueOrNull != null;
+
     return Row(
       children: [
-        _ToggleChip(label: 'Audio', active: hasAudio, enabled: hasAudio),
+        _ToggleChip(
+          label: 'Audio',
+          active: hasAudio && !failed,
+          enabled: hasAudio,
+          // Tapping Audio after a failed load retries it, rather than being a
+          // dead chip that leaves Video as the only thing that responds.
+          onTap: hasAudio && failed
+              ? () => ref.read(audioPlayerServiceProvider).retry()
+              : null,
+        ),
         const SizedBox(width: 9),
         _ToggleChip(
           label: 'Video',
@@ -284,7 +301,11 @@ class _MediaToggle extends StatelessWidget {
           onTap: hasVideo
               ? () => Navigator.of(context).push<void>(
                     MaterialPageRoute(
-                      builder: (_) => MediaPlayerScreen(sermon: sermon!),
+                      // Explicit: the member asked for the video.
+                      builder: (_) => MediaPlayerScreen(
+                        sermon: target!,
+                        mode: MediaMode.video,
+                      ),
                     ),
                   )
               : null,

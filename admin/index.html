@@ -464,6 +464,40 @@
 
     .meta-chip.featured { background: rgba(107, 52, 250, 0.25); color: #a47cff; }
 
+    /* Home-screen verdict for an announcement: is it actually showing, and
+       to whom. Loud on purpose — it is the first thing to read on the row. */
+    .home-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .home-chip.live   { background: rgba(34, 197, 94, 0.16);  color: var(--success); }
+    .home-chip.hidden { background: rgba(255, 87, 87, 0.16);  color: var(--danger); }
+
+    /* "Where this shows" panel under the compose form's branch/expiry fields. */
+    .where-panel {
+      background: var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+    .where-panel strong { color: var(--text); font-weight: 600; }
+    .where-panel .where-title {
+      display: block;
+      color: var(--text);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .where-panel ul { margin: 0; padding-left: 16px; }
+    .where-panel .warn { color: var(--danger); }
+
     .empty-state {
       text-align: center;
       padding: 40px 20px;
@@ -774,6 +808,7 @@
           <div class="card-title"><span class="dot"></span> Publish Announcement</div>
           <p style="font-size:12px;color:var(--muted);margin:-4px 0 14px;">
             An announcement is a message to the church — headline, body, optional image, optional expiry.
+            It shows in the announcements carousel on the <strong>app home screen</strong>.
             Anything with a date and a venue that people RSVP to belongs in the <strong>Events</strong> tab.
           </p>
           <form id="news-form">
@@ -825,6 +860,7 @@
                 <input type="date" id="nw-expiry" />
               </div>
             </div>
+            <div class="where-panel" id="nw-where"></div>
             <button type="submit" class="btn btn-primary btn-full" id="news-submit-btn">
               Publish
             </button>
@@ -840,6 +876,11 @@
               Refresh
             </button>
           </div>
+          <p style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">
+            A member sees an announcement on the app home screen when it is set to
+            their branch or to All Branches, and it has not expired. Each row says
+            exactly where it stands.
+          </p>
           <div id="news-list">
             <div class="loading-row"><span class="spinner"></span> Loading announcements…</div>
           </div>
@@ -1480,6 +1521,49 @@ async function loadNews() {
   }
 }
 
+// ── Home-screen visibility ──────────────────────────────────────────────────
+// The app home screen renders announcements through AnnouncementsCarousel ->
+// newsProvider(activeBranch) -> getAnnouncements (selectAnnouncements in
+// backend/functions/src/index.ts). Exactly two rules decide what a member
+// sees, and these are them — do not add a third here:
+//   1. hidden once expiresAt has passed;
+//   2. reaches a member when its branch is theirs, or it is all-campus.
+// A blank or absent branch is all-campus, which is how the API reads it.
+// Both the published rows and the compose preview below read from here, so
+// they can never disagree with each other or with the app.
+function toJsDate(value) {
+  if (!value) return null;
+  const date = value.toDate ? value.toDate() : new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+function homeAudience(branch) {
+  return (branch || '').trim() || 'All Branches';
+}
+
+function homeVisibility(branch, expiresAt) {
+  const expiry = toJsDate(expiresAt);
+  const expired = !!expiry && expiry.getTime() <= Date.now();
+  const audience = homeAudience(branch);
+  return {
+    live: !expired,
+    audience,
+    expiry,
+    label: expired
+      ? 'Expired — hidden from home'
+      : `Live on home — ${audience}`,
+  };
+}
+
+const HOME_ICON_LIVE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>';
+const HOME_ICON_HIDDEN = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+function homeChip(visibility) {
+  const cls = visibility.live ? 'live' : 'hidden';
+  const icon = visibility.live ? HOME_ICON_LIVE : HOME_ICON_HIDDEN;
+  return `<span class="home-chip ${cls}">${icon}${escHtml(visibility.label)}</span>`;
+}
+
 function renderNewsList(items) {
   const listEl = document.getElementById('news-list');
   if (!items.length) {
@@ -1493,18 +1577,21 @@ function renderNewsList(items) {
   const ul = document.createElement('div');
   ul.className = 'item-list';
   items.forEach(nw => {
-    const published = nw.publishedAt?.toDate ? nw.publishedAt.toDate() : new Date(nw.publishedAt);
+    const published = toJsDate(nw.publishedAt) || new Date();
+    const visibility = homeVisibility(nw.branch, nw.expiresAt);
     const item = document.createElement('div');
     item.className = 'item-card';
     const preview = nw.body ? nw.body.slice(0, 80) + (nw.body.length > 80 ? '…' : '') : '';
     item.innerHTML = `
       <div class="item-card-body">
+        <div style="margin-bottom:6px;">${homeChip(visibility)}</div>
         <div class="item-card-title">${escHtml(nw.title)}</div>
         <div class="item-card-meta">
           <span>Published ${formatDate(published)}</span>
-          <span class="meta-chip">${escHtml(nw.branch || 'All Branches')}</span>
           ${nw.type ? `<span class="meta-chip">${escHtml(nw.type)}</span>` : ''}
-          ${nw.expiresAt ? `<span class="meta-chip">Expires ${formatDate(nw.expiresAt.toDate ? nw.expiresAt.toDate() : new Date(nw.expiresAt))}</span>` : ''}
+          <span class="meta-chip">${visibility.expiry
+            ? `${visibility.live ? 'Expires' : 'Expired'} ${formatDate(visibility.expiry)}`
+            : 'No expiry'}</span>
         </div>
         ${preview ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">${escHtml(preview)}</div>` : ''}
       </div>
@@ -1515,6 +1602,37 @@ function renderNewsList(items) {
   listEl.appendChild(ul);
   attachDeleteListeners();
 }
+
+// Restates, before publishing, where the announcement lands and who sees it.
+// Driven by the same homeVisibility rules as the rows above.
+function updateNewsWherePreview() {
+  const el = document.getElementById('nw-where');
+  if (!el) return;
+  const branch = document.getElementById('nw-branch').value;
+  const expiryVal = document.getElementById('nw-expiry').value;
+  const visibility = homeVisibility(branch, expiryVal ? new Date(expiryVal) : null);
+  const audienceLine = visibility.audience === 'All Branches'
+    ? 'Seen by <strong>everyone, at every branch</strong>.'
+    : `Seen <strong>only by members whose campus is ${escHtml(visibility.audience)}</strong>.`;
+  const expiryLine = !visibility.expiry
+    ? 'No expiry, so it stays on the home screen until you delete it.'
+    : visibility.live
+      ? `Drops off the home screen at the start of <strong>${formatDate(visibility.expiry)}</strong>.`
+      : `<span class="warn">That expiry has already passed — it would be hidden from the home screen immediately.</span>`;
+  el.innerHTML = `
+    <span class="where-title">Where this shows</span>
+    <ul>
+      <li>In the announcements carousel on the <strong>app home screen</strong> — not in Events.</li>
+      <li>${audienceLine}</li>
+      <li>${expiryLine}</li>
+      <li>Members see it when they next open the app, or pull to refresh the home screen.</li>
+    </ul>
+  `;
+}
+
+document.getElementById('nw-branch').addEventListener('change', updateNewsWherePreview);
+document.getElementById('nw-expiry').addEventListener('change', updateNewsWherePreview);
+document.getElementById('nw-expiry').addEventListener('input', updateNewsWherePreview);
 
 document.getElementById('news-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1532,7 +1650,14 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
       // Empty select = church-wide. Written as an explicit null (never left
       // absent) so getAnnouncements' branch-scoped query can see it.
       branch:      document.getElementById('nw-branch').value || null,
-      publishedAt: Timestamp.fromDate(new Date(publishVal)),
+      // A date input yields UTC midnight of the chosen day. Publishing "today"
+      // that way is already hours in the past, so pushPendingAnnouncements —
+      // which only considers the last 15 minutes — never picked it up and a
+      // portal announcement silently never notified anyone. Publish-today now
+      // means now; a future date still schedules for that date.
+      publishedAt: isPublishToday(publishVal)
+        ? Timestamp.now()
+        : Timestamp.fromDate(new Date(publishVal)),
       expiresAt:   expiryVal ? Timestamp.fromDate(new Date(expiryVal)) : null,
       createdAt:   Timestamp.now(),
     };
@@ -1560,9 +1685,20 @@ function setDefaultDailyDate() {
   loadDailyPreview(dateInput.value);
 }
 
+// Also refreshes the "Where this shows" panel: this runs on load and after
+// every reset, which are exactly the moments the branch/expiry fields change
+// without firing an input event.
 function setDefaultNewsDate() {
   const el = document.getElementById('nw-publish');
   if (!el.value) el.value = toDateKey(new Date());
+  updateNewsWherePreview();
+}
+
+// True when the chosen publish date is today, compared on the same local
+// YYYY-MM-DD key the picker produces so a timezone offset cannot make "today"
+// read as yesterday.
+function isPublishToday(publishVal) {
+  return !publishVal || publishVal === toDateKey(new Date());
 }
 
 document.getElementById('dc-date').addEventListener('change', (e) => {
@@ -2129,6 +2265,8 @@ async function loadBranches() {
         sel.innerHTML = options;
         sel.value = names.includes(cur) ? cur : '';
       });
+      // The announcement picker may have just been reset to All Branches.
+      updateNewsWherePreview();
     }
     if (snap.empty) {
       list.innerHTML = '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
