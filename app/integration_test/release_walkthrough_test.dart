@@ -28,6 +28,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/configs/app_startup.dart';
+import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.dart';
 import 'package:kharis_app/core/constants/api_config.dart';
 import 'package:kharis_app/core/services/cache_service.dart';
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
@@ -221,15 +222,39 @@ void main() {
         );
         await hostShot(tester, 'step1c-branch-selection-london');
 
-        // First match is the BRANCHES-section London (KP2 London renders
-        // later in the list).
-        await tester.tap(find.text('London').first, warnIfMissed: false);
-        await pumpUntilFound(
-          tester,
-          navHomeLabel,
-          timeout: const Duration(seconds: 90),
-          reason: 'main shell after completing onboarding',
-        );
+        // Tap the branch TILE, not the search field: after typing, the
+        // TextField's own 'London' text is first in the tree, and KP2 London
+        // also renders as 'London' after its prefix strip — so scope the
+        // finder to a BranchTile descendant and take the first (BRANCHES
+        // section precedes KP2). Tile tap IS the confirm (routes onward).
+        final londonTile = find
+            .descendant(of: find.byType(BranchTile), matching: find.text('London'))
+            .first;
+        await tester.ensureVisible(londonTile);
+        await tester.pumpAndSettle();
+        await tester.tap(londonTile, warnIfMissed: false);
+
+        // After the tile confirm the route depends on auth timing: the
+        // app-level silent anonymous sign-in usually authenticates before
+        // this point (branch → /home directly), but a slow first launch can
+        // still land on /login, whose no-account path is "Continue as
+        // Guest". Accept either: pump until the shell appears, tapping the
+        // guest button if the login screen shows up on the way.
+        final guestButton = find.text('Continue as Guest');
+        final shellDeadline =
+            DateTime.now().add(const Duration(seconds: 90));
+        while (tester.widgetList(navHomeLabel).isEmpty) {
+          if (DateTime.now().isAfter(shellDeadline)) {
+            fail('Timed out waiting for the main shell after branch '
+                'confirm (login screen shown: '
+                '${tester.widgetList(guestButton).isNotEmpty})');
+          }
+          if (tester.widgetList(guestButton).isNotEmpty) {
+            await hostShot(tester, 'step1d-login');
+            await tester.tap(guestButton);
+          }
+          await tester.pump(const Duration(milliseconds: 500));
+        }
       } else {
         // Re-run on a device that already finished onboarding: the redirect
         // sends '/' straight to the shell. Continue from the Home tab.

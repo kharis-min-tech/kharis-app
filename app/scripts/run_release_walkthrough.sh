@@ -13,6 +13,14 @@ APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$SHOTS_DIR"
 cd "$APP_DIR"
 
+# Pre-grant the notification permission: the native iOS permission alert is
+# invisible to the Flutter test harness and would otherwise block the run the
+# moment guest sign-in subscribes to FCM topics. Needs wix/brew applesimutils.
+if command -v applesimutils >/dev/null 2>&1; then
+  applesimutils --byId "$UDID" --bundle org.kharis.kharisApp \
+    --setPermissions notifications=YES >/dev/null 2>&1 || true
+fi
+
 flutter test integration_test/release_walkthrough_test.dart \
   -d "$UDID" \
   --dart-define-from-file=env.json \
