@@ -56,6 +56,28 @@ service cloud.firestore {
                               && request.resource.data.body.size() <= 20000
                               && request.resource.data.updatedAt is timestamp;
       }
+
+      // playlists — member-created named lists of sermon ids. Owner-only,
+      // like notes: nobody else, not even an admin, may read or change them.
+      // Shape mirrors PlaylistRepository: `name` (trimmed client-side,
+      // 1..80 chars), `sermonIds` (list of catalogue ids — entries may
+      // dangle when a message leaves the library, resolution tolerates
+      // that), and `createdAt`/`updatedAt` timestamps. `request.resource.data`
+      // is the full post-write document, so updates (rename, arrayUnion /
+      // arrayRemove of sermon ids) are held to the same shape as creates.
+      match /playlists/{playlistId} {
+        function isOwner() {
+          return isAuthenticated() && request.auth.uid == uid;
+        }
+        allow read, delete: if isOwner();
+        allow create, update: if isOwner()
+                              && request.resource.data.name is string
+                              && request.resource.data.name.size() > 0
+                              && request.resource.data.name.size() <= 80
+                              && request.resource.data.sermonIds is list
+                              && request.resource.data.createdAt is timestamp
+                              && request.resource.data.updatedAt is timestamp;
+      }
     }
 
     // branches — publicly readable, writable only by admin

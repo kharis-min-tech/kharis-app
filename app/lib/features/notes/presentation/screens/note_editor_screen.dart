@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
+import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/features/notes/presentation/note_anchor.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/note_anchor_chip.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -55,12 +56,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final repo = ref.read(notesRepositoryProvider);
     final now = DateTime.now();
 
+    final sermon = widget.sermon;
     final note = widget.existingNote != null
         ? widget.existingNote!.copyWith(body: text, updatedAt: now)
         : Note(
             id: repo.newId(),
-            sermonId: widget.sermon?.id,
-            sermonTitle: widget.sermon?.title,
+            // Canonical key, not the raw sermon id: the audio and video
+            // variants of one message must share a single note timeline.
+            sermonId: sermon == null ? null : NoteTimelineKey.of(sermon).canonical,
+            sermonTitle: sermon?.title,
             positionMs: widget.positionMs,
             body: text,
             createdAt: now,

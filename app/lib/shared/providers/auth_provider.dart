@@ -37,6 +37,52 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
       );
 });
 
+/// Guarantees the session always has a Firebase user.
+///
+/// The primary onboarding path (role selection → branch selection → home)
+/// never visits the login screen, so most members reach the app with NO
+/// Firebase user at all — and everything keyed on `users/{uid}` (playlists,
+/// note upload, profile sync) would silently have nowhere to write. Watching
+/// this provider (done once in `KharisApp`) signs the session in anonymously
+/// whenever auth resolves to "no user"; an explicit email sign-in later
+/// replaces the anonymous account through the normal auth flow.
+///
+/// A failed attempt (offline first launch) is logged, and [AnonymousSignIn
+/// .ensure] can be re-kicked from any surface whose UI says "still signing
+/// you in — try again" so the retry actually retries.
+final anonymousSignInProvider = Provider<AnonymousSignIn>((ref) {
+  final bootstrap = AnonymousSignIn(ref);
+  ref.listen<AsyncValue<User?>>(currentUserProvider, (_, next) {
+    if (next is AsyncData<User?> && next.value == null) bootstrap.ensure();
+  }, fireImmediately: true);
+  return bootstrap;
+});
+
+/// Single-flight anonymous sign-in used by [anonymousSignInProvider].
+class AnonymousSignIn {
+  AnonymousSignIn(this._ref);
+
+  final Ref _ref;
+  Future<void>? _inFlight;
+
+  /// Signs in anonymously unless a user already exists or an attempt is
+  /// already running. Failures are logged — the next call retries.
+  void ensure() {
+    if (_ref.read(authRepositoryProvider).isAuthenticated) return;
+    _inFlight ??= _attempt();
+  }
+
+  Future<void> _attempt() async {
+    try {
+      await _ref.read(authRepositoryProvider).loginAsGuest();
+    } catch (e) {
+      debugPrint('[auth] anonymous sign-in failed: $e');
+    } finally {
+      _inFlight = null;
+    }
+  }
+}
+
 /// True when the signed-in user is an admin (profile role or `admin` claim).
 final isAdminProvider = FutureProvider<bool>((ref) async {
   final user = ref.watch(currentUserProvider).valueOrNull;

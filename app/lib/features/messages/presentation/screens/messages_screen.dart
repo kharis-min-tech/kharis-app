@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
@@ -9,7 +10,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
-import 'package:kharis_app/features/player/presentation/screens/playlist_screen.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../widgets/sermon_list_item.dart';
 
@@ -182,11 +183,15 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       listIndex: index,
                       isPlaying: isPlaying,
                       onTap: () => startPlayback(ref, sermon),
+                      onMoreTap: () => showAddToPlaylistSheet(
+                        context,
+                        sermonId: sermon.id,
+                        sermonTitle: sermon.title,
+                      ),
                     );
                   },
                 ),
             ]
-
             // ── Normal browse mode ───────────────────────────────────────────
             else ...[
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -207,7 +212,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 SliverToBoxAdapter(
                   child: _MessageOfTheDayCard(
                     sermon: motd,
-                    isPlaying: currentSermon?.id == motd.id &&
+                    isPlaying:
+                        currentSermon?.id == motd.id &&
                         (playerState?.playing ?? false),
                     onPlay: () => startPlayback(ref, motd),
                   ),
@@ -244,12 +250,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         final sermon = recentlyPlayed[index];
                         return Padding(
                           padding: EdgeInsets.only(
-                            right:
-                                index < recentlyPlayed.length - 1 ? 12 : 0,
+                            right: index < recentlyPlayed.length - 1 ? 12 : 0,
                           ),
                           child: _RecentlyPlayedCard(
                             sermon: sermon,
-                            isPlaying: currentSermon?.id == sermon.id &&
+                            isPlaying:
+                                currentSermon?.id == sermon.id &&
                                 (playerState?.playing ?? false),
                             onTap: () => startPlayback(ref, sermon),
                           ),
@@ -279,11 +285,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const PlaylistScreen(),
-                          ),
-                        ),
+                        // Root-navigator route: overlays the shell with its
+                        // own back affordance instead of replacing this tab's
+                        // content with an inescapable branch push.
+                        onTap: () => context.push('/playlists'),
                         behavior: HitTestBehavior.opaque,
                         child: Text(
                           'Playlists',
@@ -331,8 +336,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                             final count = categoryCounts[cat] ?? 0;
                             return Padding(
                               padding: EdgeInsets.only(
-                                right:
-                                    index < categories.length - 1 ? 12 : 0,
+                                right: index < categories.length - 1 ? 12 : 0,
                               ),
                               child: _TopicCard(
                                 category: cat,
@@ -341,10 +345,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                 active: selectedCategory == cat,
                                 onTap: () {
                                   ref
-                                          .read(
-                                              selectedCategoryProvider.notifier)
-                                          .state =
-                                      selectedCategory == cat ? 'All' : cat;
+                                      .read(selectedCategoryProvider.notifier)
+                                      .state = selectedCategory == cat
+                                      ? 'All'
+                                      : cat;
                                   _scrollToList();
                                 },
                               ),
@@ -383,17 +387,17 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           _SortPill(
                             label: 'Newest',
                             active: sort == SermonSort.newest,
-                            onTap: () => ref
-                                .read(sermonSortProvider.notifier)
-                                .state = SermonSort.newest,
+                            onTap: () =>
+                                ref.read(sermonSortProvider.notifier).state =
+                                    SermonSort.newest,
                           ),
                           const SizedBox(width: 8),
                           _SortPill(
                             label: 'Oldest',
                             active: sort == SermonSort.oldest,
-                            onTap: () => ref
-                                .read(sermonSortProvider.notifier)
-                                .state = SermonSort.oldest,
+                            onTap: () =>
+                                ref.read(sermonSortProvider.notifier).state =
+                                    SermonSort.oldest,
                           ),
                         ],
                       ),
@@ -402,9 +406,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         _FilterChip(
                           label: selectedCategory,
                           count: sermons.length,
-                          onClear: () => ref
-                              .read(selectedCategoryProvider.notifier)
-                              .state = 'All',
+                          onClear: () =>
+                              ref
+                                      .read(selectedCategoryProvider.notifier)
+                                      .state =
+                                  'All',
                         ),
                       ],
                     ],
@@ -441,6 +447,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       listIndex: index,
                       isPlaying: isPlaying,
                       onTap: () => startPlayback(ref, sermon),
+                      onMoreTap: () => showAddToPlaylistSheet(
+                        context,
+                        sermonId: sermon.id,
+                        sermonTitle: sermon.title,
+                      ),
                     );
                   },
                 ),
@@ -486,8 +497,7 @@ class _SearchBar extends StatelessWidget {
             cursorColor: context.kc.accentInk,
             decoration: InputDecoration(
               hintText: 'Search sermons, speakers, topics...',
-              hintStyle:
-                  AppTypography.bodySm.copyWith(color: context.kc.muted),
+              hintStyle: AppTypography.bodySm.copyWith(color: context.kc.muted),
               prefixIcon: Icon(
                 Icons.search_rounded,
                 size: 20,
@@ -507,8 +517,7 @@ class _SearchBar extends StatelessWidget {
               enabledBorder: InputBorder.none,
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppRadius.pill),
-                borderSide:
-                    BorderSide(color: context.kc.accentInk, width: 1.5),
+                borderSide: BorderSide(color: context.kc.accentInk, width: 1.5),
               ),
               focusedErrorBorder: InputBorder.none,
               errorBorder: InputBorder.none,
@@ -680,8 +689,10 @@ class _FeaturedCard extends StatelessWidget {
               top: 14,
               left: 14,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: context.kc.accent.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -720,9 +731,7 @@ class _FeaturedCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Icon(
-                  isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
+                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                   color: Colors.white,
                   size: 24,
                 ),
@@ -807,9 +816,7 @@ class _MessageOfTheDayCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: context.kc.surfaceAlt,
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(
-              color: context.kc.accent.withValues(alpha: 0.4),
-            ),
+            border: Border.all(color: context.kc.accent.withValues(alpha: 0.4)),
           ),
           child: Row(
             children: [
@@ -881,7 +888,9 @@ class _MessageOfTheDayCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Icon(
-                  isPlaying ? Icons.equalizer_rounded : Icons.play_arrow_rounded,
+                  isPlaying
+                      ? Icons.equalizer_rounded
+                      : Icons.play_arrow_rounded,
                   color: context.kc.onAccent,
                   size: 20,
                 ),
@@ -930,8 +939,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
                         ? Container(
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.4),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: const Center(
                               child: Icon(
@@ -1095,8 +1103,7 @@ class _TopicCard extends StatelessWidget {
                     ),
                     child: Icon(
                       active ? Icons.check_rounded : Icons.play_arrow_rounded,
-                      color:
-                          active ? context.kc.onAccent : _onArtworkChipInk,
+                      color: active ? context.kc.onAccent : _onArtworkChipInk,
                       size: 20,
                     ),
                   ),
@@ -1142,9 +1149,7 @@ class _FilterChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: context.kc.accent.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: context.kc.accent.withValues(alpha: 0.5),
-          ),
+          border: Border.all(color: context.kc.accent.withValues(alpha: 0.5)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1158,11 +1163,7 @@ class _FilterChip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            Icon(
-              Icons.close_rounded,
-              size: 16,
-              color: context.kc.accentInk,
-            ),
+            Icon(Icons.close_rounded, size: 16, color: context.kc.accentInk),
           ],
         ),
       ),

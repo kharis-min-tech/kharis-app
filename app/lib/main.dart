@@ -16,6 +16,7 @@ import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
 import 'shared/providers/theme_provider.dart';
 import 'core/theme/theme.dart';
+import 'shared/providers/auth_provider.dart';
 import 'shared/providers/cache_provider.dart';
 import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
@@ -92,6 +93,10 @@ class KharisApp extends ConsumerWidget {
     ref.watch(notificationInitProvider);
     // Keeps preference-gated topic subscriptions in step with saved prefs.
     ref.watch(notificationTopicSyncProvider);
+    // Guarantees a Firebase uid for every session (anonymous when the member
+    // never signs in) so per-user data — playlists, notes — has somewhere to
+    // live even on the login-free onboarding path.
+    ref.watch(anonymousSignInProvider);
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       builder: (BuildContext context, child) => MaterialApp.router(

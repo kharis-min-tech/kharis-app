@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,6 +54,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           const SnackBar(content: Text('Profile updated')),
         );
         context.pop();
+      }
+    } on FirebaseException catch (e) {
+      // Surface the real reason instead of a blind generic — a permission or
+      // network failure reads very differently to the member.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not save: ${e.message ?? e.code}'),
+            backgroundColor: AppColors.errorContainer,
+          ),
+        );
       }
     } catch (_) {
       if (mounted) {

@@ -7,6 +7,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart'
+    show NoteTimelineBinding;
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/features/player/presentation/widgets/media_mode_toggle.dart';
@@ -55,6 +57,12 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
   /// can pump the video layout without platform views.
   @visibleForTesting
   static bool debugDisableVideoEngine = false;
+
+  /// Stands in for the video engine's note binding while
+  /// [debugDisableVideoEngine] is on, so tests can prove note capture and
+  /// anchor seeks route to the video engine.
+  @visibleForTesting
+  static NoteTimelineBinding? debugVideoNoteBinding;
 
   @override
   ConsumerState<MediaPlayerScreen> createState() => _MediaPlayerScreenState();
@@ -202,6 +210,61 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     await service.seek(handoff);
   }
 
+  /// How the notes sheet binds to the video engine, or null in audio mode —
+  /// the sheet's own audio-service default is already the audio engine.
+  ///
+  /// Video mode must pass a binding: the audio source is fully stopped here,
+  /// so without one a note would be written unstamped and an anchor tap would
+  /// wake audio playback underneath the video.
+  NoteTimelineBinding? _videoNoteBinding() {
+    if (_mode != MediaMode.video) return null;
+    if (MediaPlayerScreen.debugDisableVideoEngine) {
+      return MediaPlayerScreen.debugVideoNoteBinding;
+    }
+    if (kIsWeb) {
+      // The iframe embed has no JS bridge: no live position (notes are
+      // written unstamped), and a seek recreates the embed at the anchor via
+      // the keyed start parameter.
+      return NoteTimelineBinding(
+        seek: (target) async {
+          if (!mounted) return;
+          setState(() => _webStartSeconds = target.inSeconds);
+        },
+      );
+    }
+    final controller = _youtubeController;
+    if (controller == null) return null;
+    return NoteTimelineBinding(
+      position: _videoNotePositions(controller),
+      seek: (target) => controller.seekTo(
+        seconds: target.inMilliseconds / 1000,
+        allowSeekAhead: true,
+      ),
+    );
+  }
+
+  /// The note sheet's position source for the video engine.
+  ///
+  /// [YoutubePlayerController.videoStateStream] only ticks while the video is
+  /// PLAYING — the iframe clears its update interval on every other state —
+  /// and, as a broadcast stream, never replays to a new subscriber. A sheet
+  /// opened over a PAUSED video (the natural note-taking moment) would
+  /// therefore never see a position and the note would be saved unstamped.
+  /// Seed the stream with a one-shot `currentTime` query so the paused case
+  /// is covered, then follow the live ticks.
+  Stream<Duration> _videoNotePositions(
+    YoutubePlayerController controller,
+  ) async* {
+    try {
+      final seconds = await controller.currentTime;
+      yield Duration(milliseconds: (seconds * 1000).round());
+    } catch (_) {
+      // Bridge gone / not ready: fall through to the live stream so the
+      // button degrades to the unstamped "Add a note", as before.
+    }
+    yield* controller.videoStateStream.map((state) => state.position);
+  }
+
   // ── Layout ─────────────────────────────────────────────────────────────────
 
   @override
@@ -242,7 +305,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                             top: BorderSide(color: context.kc.divider),
                           ),
                         ),
-                        child: PlayerActions(sermon: widget.sermon),
+                        child: PlayerActions(
+                          sermon: widget.sermon,
+                          timeline: _videoNoteBinding(),
+                        ),
                       ),
                     ],
                   ),
@@ -267,7 +333,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   Widget _buildVideoSurface() {
     final Widget player;
     if (kIsWeb) {
+      // Keyed on the start position: a note-anchor seek bumps
+      // _webStartSeconds, and the fresh key rebuilds the iframe at that
+      // moment — the embed has no JS bridge to seek in place.
       player = YoutubeWebEmbed(
+        key: ValueKey('yt-web-$_webStartSeconds'),
         videoId: widget.sermon.videoId!,
         startSeconds: _webStartSeconds,
       );

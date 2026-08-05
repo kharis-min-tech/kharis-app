@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
@@ -11,16 +12,22 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 ///
 /// Notes opens [SermonNotesSheet] for the message on screen — everything
 /// already written against it, in timeline order, plus a "add a note at
-/// MM:SS" action stamped with the live playback position. It is only rendered
-/// when a message is actually resolvable; Playlist and Share confirm with a
-/// lightweight toast.
+/// MM:SS" action stamped with the live playback position. Playlist opens
+/// [AddToPlaylistSheet], filing the message into the member's persisted
+/// playlists. Both are only rendered when a message is actually resolvable;
+/// Share confirms with a lightweight toast.
 class PlayerActions extends ConsumerWidget {
-  const PlayerActions({super.key, this.sermon});
+  const PlayerActions({super.key, this.sermon, this.timeline});
 
   /// The message on screen. Supplied by the video player, whose sermon is not
   /// the one loaded into the audio service. Falls back to whatever the audio
   /// service is playing.
   final Sermon? sermon;
+
+  /// The engine that owns playback on the hosting screen, handed through to
+  /// [SermonNotesSheet] so note capture and anchor seeks drive the ACTIVE
+  /// engine. Null means the audio service (the sheet's default).
+  final NoteTimelineBinding? timeline;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,13 +40,19 @@ class PlayerActions extends ConsumerWidget {
           _ActionButton(
             icon: Icons.notes_rounded,
             label: 'Notes',
-            onTap: () => SermonNotesSheet.show(context, target),
+            onTap: () =>
+                SermonNotesSheet.show(context, target, timeline: timeline),
           ),
-        _ActionButton(
-          icon: Icons.add_rounded,
-          label: 'Playlist',
-          onTap: () => _toast(context, 'Added to playlist'),
-        ),
+        if (target != null)
+          _ActionButton(
+            icon: Icons.add_rounded,
+            label: 'Playlist',
+            onTap: () => showAddToPlaylistSheet(
+              context,
+              sermonId: target.id,
+              sermonTitle: target.title,
+            ),
+          ),
         _ActionButton(
           icon: Icons.ios_share_rounded,
           label: 'Share',

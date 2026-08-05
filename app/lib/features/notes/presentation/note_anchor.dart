@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/features/notes/data/note_repository.dart';
+import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -34,8 +35,11 @@ abstract final class NoteAnchor {
     final audio = ref.read(audioPlayerServiceProvider);
     final target = Duration(milliseconds: positionMs);
 
-    // Already loaded: seek in place rather than reloading the source.
-    if (audio.currentSermon?.id == sermonId) {
+    // Already loaded: seek in place rather than reloading the source. Matched
+    // through NoteTimelineKey, because the note may be stored under the
+    // canonical `yt_` key while the loaded variant carries its raw id.
+    final playing = audio.currentSermon;
+    if (playing != null && NoteTimelineKey.of(playing).matches(sermonId)) {
       await audio.seek(target);
       await audio.resume();
       return NoteAnchorResult.started;
@@ -55,7 +59,9 @@ abstract final class NoteAnchor {
     try {
       final sermons = await ref.read(sermonsProvider.future);
       for (final sermon in sermons) {
-        if (sermon.id == sermonId && sermon.hasAudio) return sermon;
+        if (sermon.hasAudio && NoteTimelineKey.of(sermon).matches(sermonId)) {
+          return sermon;
+        }
       }
     } catch (_) {
       // Library unreachable — treated the same as a missing sermon.

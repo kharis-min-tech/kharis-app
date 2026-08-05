@@ -7,10 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:kharis_app/features/notes/data/note_repository.dart';
+import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 /// Coverage for the note-persistence contract the product owner asked for:
 /// notes must survive a reinstall (so they cannot live only in Hive), notes
@@ -49,6 +52,9 @@ void main() {
         firestoreProvider.overrideWithValue(db),
         localNoteStoreProvider.overrideWithValue(LocalNoteStore(box)),
         currentUserProvider.overrideWith((ref) => Stream.value(user)),
+        // Hermetic: sermonNotesProvider consults the catalogue for legacy
+        // note aliases — keep it empty so no network/asset load runs here.
+        sermonsProvider.overrideWith((ref) async => const <Sermon>[]),
       ],
     );
     addTearDown(container.dispose);
@@ -197,7 +203,8 @@ void main() {
       return notes != null && notes.length == 5;
     });
 
-    final scoped = container.read(sermonNotesProvider('sermon-c'));
+    final scoped =
+        container.read(sermonNotesProvider(const NoteTimelineKey('sermon-c')));
     expect(scoped.map((n) => n.id), ['whole', 'early', 'late']);
 
     // The overall notebook still shows everything, newest edit first.

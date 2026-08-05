@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
+import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/features/notes/presentation/note_anchor.dart';
 import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/note_anchor_chip.dart';
@@ -11,28 +12,60 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 
+/// Binds [SermonNotesSheet] to the engine that owns playback on the screen
+/// that opened it.
+///
+/// Without a binding the sheet reads the audio service — the default, and the
+/// only engine reachable outside the unified player. The video mode of the
+/// unified player passes one so a new note is stamped with the VIDEO engine's
+/// clock and an anchor tap seeks the video, instead of waking the stopped
+/// audio source underneath it.
+class NoteTimelineBinding {
+  const NoteTimelineBinding({this.position, this.seek});
+
+  /// Live playback position of the active engine. Null when the engine has no
+  /// position channel (the web iframe embed) — notes are then written without
+  /// a timestamp.
+  final Stream<Duration>? position;
+
+  /// Seeks the active engine to a note's anchor.
+  final Future<void> Function(Duration target)? seek;
+}
+
 /// Everything the member has written against one message, in timeline order —
 /// the "show what they wrote on that timeline" view. Opened from the player.
+///
+/// Notes are keyed by [NoteTimelineKey], so the audio and video variants of
+/// the same message share ONE timeline: a note taken at 12:30 in audio shows
+/// at 12:30 in video.
 ///
 /// Tapping a note's timestamp seeks playback back to it; tapping the body
 /// opens the note for editing.
 class SermonNotesSheet extends ConsumerWidget {
-  const SermonNotesSheet({super.key, required this.sermon});
+  const SermonNotesSheet({super.key, required this.sermon, this.timeline});
 
   final Sermon sermon;
 
-  static Future<void> show(BuildContext context, Sermon sermon) {
+  /// The engine that owns playback where this sheet was opened; null falls
+  /// back to the audio service.
+  final NoteTimelineBinding? timeline;
+
+  static Future<void> show(
+    BuildContext context,
+    Sermon sermon, {
+    NoteTimelineBinding? timeline,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => SermonNotesSheet(sermon: sermon),
+      builder: (_) => SermonNotesSheet(sermon: sermon, timeline: timeline),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notes = ref.watch(sermonNotesProvider(sermon.id));
+    final notes = ref.watch(sermonNotesProvider(NoteTimelineKey.of(sermon)));
 
     return SafeArea(
       top: false,
@@ -144,50 +177,70 @@ class SermonNotesSheet extends ConsumerWidget {
 
   /// Rebuilt on its own so the ticking playback position does not repaint the
   /// whole sheet.
-  Widget _addButton(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          0,
-          AppSpacing.lg,
-          AppSpacing.lg,
+  ///
+  /// The position comes from the ACTIVE engine: the [timeline] binding when
+  /// the opening screen passed one (video mode), otherwise the audio service.
+  Widget _addButton(BuildContext context) {
+    final binding = timeline;
+    final Widget button;
+    if (binding != null) {
+      final position = binding.position;
+      button = position == null
+          ? _addButtonBody(context, null)
+          : StreamBuilder<Duration>(
+              stream: position,
+              builder: (context, snapshot) =>
+                  _addButtonBody(context, snapshot.data?.inMilliseconds),
+            );
+    } else {
+      button = Consumer(
+        builder: (context, ref, _) =>
+            _addButtonBody(context, _livePositionMs(ref)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      child: SizedBox(width: double.infinity, child: button),
+    );
+  }
+
+  Widget _addButtonBody(BuildContext context, int? positionMs) =>
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: context.kc.accent,
+          foregroundColor: context.kc.onAccent,
+          padding: const EdgeInsets.symmetric(vertical: 14),
         ),
-        child: SizedBox(
-          width: double.infinity,
-          child: Consumer(
-            builder: (context, ref, _) {
-              final positionMs = _livePositionMs(ref);
-              return FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.kc.accent,
-                  foregroundColor: context.kc.onAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: () =>
-                    _openEditor(context, capturePositionMs: positionMs),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: Text(
-                  positionMs == null
-                      ? 'Add a note'
-                      : 'Add a note at ${formatNotePosition(positionMs)}',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              );
-            },
+        onPressed: () => _openEditor(context, capturePositionMs: positionMs),
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        label: Text(
+          positionMs == null
+              ? 'Add a note'
+              : 'Add a note at ${formatNotePosition(positionMs)}',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
           ),
         ),
       );
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  /// The current playback position, but only when this sheet's sermon is the
-  /// one actually loaded — otherwise a new note would be stamped with an
-  /// unrelated timestamp.
+  /// The current audio playback position, but only when this sheet's message
+  /// is the one actually loaded — otherwise a new note would be stamped with
+  /// an unrelated timestamp. Variants are matched through [NoteTimelineKey]
+  /// so the audio service holding a different id of the SAME message still
+  /// counts.
   int? _livePositionMs(WidgetRef ref) {
     final playing = ref.watch(currentSermonProvider);
-    if (playing?.id != sermon.id) return null;
+    if (playing == null || !NoteTimelineKey.of(sermon).matches(playing.id)) {
+      return null;
+    }
     return ref.watch(positionProvider).valueOrNull?.inMilliseconds;
   }
 
@@ -213,6 +266,17 @@ class SermonNotesSheet extends ConsumerWidget {
   }
 
   Future<void> _seek(BuildContext context, WidgetRef ref, Note note) async {
+    // The opening screen's engine owns playback (video mode of the unified
+    // player): seek IT — waking the audio engine here would double-play
+    // underneath the video.
+    final engineSeek = timeline?.seek;
+    final positionMs = note.positionMs;
+    if (engineSeek != null && positionMs != null) {
+      await engineSeek(Duration(milliseconds: positionMs));
+      if (context.mounted) Navigator.of(context).pop();
+      return;
+    }
+
     final result = await NoteAnchor.play(ref, note);
     if (!context.mounted) return;
     if (result == NoteAnchorResult.started) {
