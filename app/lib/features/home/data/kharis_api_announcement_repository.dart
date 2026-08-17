@@ -4,7 +4,7 @@ import 'package:kharis_app/core/constants/api_config.dart';
 import 'news_repository.dart';
 
 /// Fetches announcements from the Kharis Cloud Functions API
-/// (`getAnnouncements` on kharis-church) and maps them to [NewsItem].
+/// (`getAnnouncements` on the Kharis backend) and maps them to [NewsItem].
 ///
 /// Branch scoping happens server-side: passing [branch] returns that campus's
 /// announcements plus all-campus ones, so a branch notice can never be pushed

@@ -1204,12 +1204,12 @@
 //    6. Copy the firebaseConfig object shown there
 // ════════════════════════════════════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey:            "AIzaSyCSTb4h3uc2tf7-BqU9lKpZUT15OBZlXXQ",
-  authDomain:        "kharis-church.firebaseapp.com",
-  projectId:         "kharis-church",
-  storageBucket:     "kharis-church.firebasestorage.app",
-  messagingSenderId: "193550520841",
-  appId:             "1:193550520841:web:869bfc2bb60d69e4689ed8",
+  apiKey:            "AIzaSyDrb8yD1g5rUAZR8fjuh_SXXhhgfyzKyNA",
+  authDomain:        "kharis-app-47c49.firebaseapp.com",
+  projectId:         "kharis-app-47c49",
+  storageBucket:     "kharis-app-47c49.firebasestorage.app",
+  messagingSenderId: "656532033168",
+  appId:             "1:656532033168:web:8b84b12c3cd8d888d21215",
 };
 
 // ── SDK imports ─────────────────────────────────────────────────────────────
@@ -1758,7 +1758,7 @@ async function loadDailyPreview(dateKey) {
 // plan) is done by the getDailyReading function, so the portal, the app and the
 // daily notification can never disagree about what a date means.
 const DAILY_READING_URL =
-  'https://us-central1-kharis-church.cloudfunctions.net/getDailyReading';
+  'https://us-central1-kharis-app-47c49.cloudfunctions.net/getDailyReading';
 
 const READING_SOURCE_LABEL = {
   'day': 'Written by hand for this date — overrides any plan.',
@@ -2225,7 +2225,7 @@ function formatDuration(seconds) {
 }
 
 // ── YouTube channel browser (Content Studio ↔ YouTube binding) ─────────────
-const YT_SEARCH_URL = 'https://us-central1-kharis-church.cloudfunctions.net/searchYouTube';
+const YT_SEARCH_URL = 'https://us-central1-kharis-app-47c49.cloudfunctions.net/searchYouTube';
 const STAR_FILLED = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
 const STAR_OUTLINE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
 

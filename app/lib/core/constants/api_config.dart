@@ -13,7 +13,7 @@ import '../../firebase_options.dart';
 /// stale data (Firestore), plus push notifications that could never arrive.
 abstract final class ApiConfig {
   /// Firebase project that hosts the Cloud Functions and Firestore data.
-  static const String backendProjectId = 'kharis-church';
+  static const String backendProjectId = 'kharis-app-47c49';
 
   static const String region = 'us-central1';
 
