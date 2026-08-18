@@ -26,7 +26,7 @@
 #     ./scripts/deploy-testflight.sh 42         # explicit build number
 set -euo pipefail
 
-TEAM_ID="T8242XY72S"
+TEAM_ID="Z9TTRH45X3"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
