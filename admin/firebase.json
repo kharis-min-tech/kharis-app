@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "kharis-church-admin",
+    "site": "kharis-app-admin",
     "public": ".",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "Dockerfile", "docker-compose.yml"],
     "rewrites": [

@@ -60,9 +60,15 @@ dependencies:
   flutter_screenutil: ^5.9.3
   flutter_native_splash: ^2.4.8
   just_audio_background: ^0.0.1-beta.17
+  audio_session: ^0.1.25
+  # youtube_player_iframe does not hold a wakelock; without this the screen can
+  # sleep mid-video. Enabled only while the video engine reports playing.
+  wakelock_plus: ^1.2.10
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -76,6 +82,7 @@ dev_dependencies:
   custom_lint: ^0.7.0
   riverpod_lint: ^2.6.3
   flutter_launcher_icons: ^0.14.3
+  fake_cloud_firestore: ^3.1.0
 flutter:
 
   # The following line ensures that the Material Icons font is
@@ -124,9 +131,36 @@ flutter_launcher_icons:
   min_sdk_android: 21
   remove_alpha_ios: true
 
+# Native splash — what shows BEFORE the first Flutter frame. It must match
+# SplashScreen, or launch reads as a flat card that then jumps to the worship
+# photo. No purple: the photo itself is the background, with the dove centred
+# on top, so the member opens the app straight into the congregation shot.
+#
+# `background_image` must be a PNG. Pointed at a .jpg, flutter_native_splash
+# silently emits a 1x1 placeholder and the splash falls back to a flat `color`
+# — which is exactly how the purple card got there. splash-bg.png is generated
+# from splash-pink.jpg pre-cropped to BoxFit.cover framing so the native splash
+# and SplashScreen show the same crop.
+#
+# `color` and `background_image` are MUTUALLY EXCLUSIVE: flutter_native_splash
+# takes the `color` branch first and writes a 1x1 PNG of it, silently ignoring
+# the image (see ios.dart _createBackground). A top-level `color` is therefore
+# omitted deliberately — adding one back reinstates the flat purple card.
+#
+# Android 12+ is the exception: it draws a system centred icon on a solid plate
+# and cannot full-bleed, so it keeps its own colour — a dark tone sampled from
+# the photo, chosen so the white dove stays legible and nothing reads as brand
+# purple.
+#
+# AFTER running `dart run flutter_native_splash:create`, re-add the 2x/3x
+# launch background slots. The package writes the image into the imageset's 1x
+# slot only and leaves 2x/3x empty, so on an @3x device the photo is a 1x asset
+# claiming to be 1242pt wide. scaleToFill hides it visually, but the correct
+# assets are 414x896 / 828x1792 / 1242x2688 in
+# ios/Runner/Assets.xcassets/LaunchBackground.imageset.
 flutter_native_splash:
-  color: "#5D3FD3"
+  background_image: assets/design/splash-bg.png
   image: assets/icon/icon_foreground.png
   android_12:
-    color: "#5D3FD3"
+    color: "#34161C"
     image: assets/icon/icon_foreground.png

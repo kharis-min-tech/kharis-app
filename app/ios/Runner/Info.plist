@@ -80,7 +80,10 @@
 		<string>Microphone access is needed to record video testimonies.</string>
 		<key>UIBackgroundModes</key>
 		<array>
+			<!-- Lock-screen / CarPlay sermon playback. -->
 			<string>audio</string>
+			<!-- Silent/data pushes and FCM background delivery. -->
+			<string>remote-notification</string>
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>

@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_shadows.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 /// A full-width onboarding choice row (design-handoff v3): a white card with a
 /// tinted [accent] icon tile, title, supporting line and trailing chevron.
@@ -46,7 +43,7 @@ class _RoleCardState extends State<RoleCard> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.cardWhite,
+            color: context.kc.surface,
             borderRadius: AppRadius.cardBorder,
             boxShadow: AppShadows.card,
           ),
@@ -70,21 +67,21 @@ class _RoleCardState extends State<RoleCard> {
                     Text(
                       widget.title,
                       style: AppTypography.ui(size: 16, weight: FontWeight.w700)
-                          .copyWith(color: AppColors.textPrimary),
+                          .copyWith(color: context.kc.onBg),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       widget.description,
                       style: AppTypography.ui(size: 13)
-                          .copyWith(color: AppColors.textMutedLight, height: 1.3),
+                          .copyWith(color: context.kc.muted, height: 1.3),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.textMutedLight,
+                color: context.kc.muted,
                 size: 22,
               ),
             ],

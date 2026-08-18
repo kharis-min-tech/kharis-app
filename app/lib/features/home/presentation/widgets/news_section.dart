@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 
 // Brand gradient pairs cycled across announcement cards.
 const _kCardGradients = [
@@ -21,22 +21,19 @@ class AnnouncementsCarousel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final newsAsync = ref.watch(newsProvider);
-    final user = ref.watch(currentUserProvider).valueOrNull;
-    final userBranch = user?.branch;
-    final allItems = newsAsync.valueOrNull ?? const <NewsItem>[];
-    final items = allItems
-        .where((n) => n.branch == null || n.branch == userBranch)
-        .toList();
+    final userBranch = ref.watch(currentBranchProvider).valueOrNull;
+    // Scoped server-side by getAnnouncements?branch= — no client-side filter.
+    final newsAsync = ref.watch(newsProvider(userBranch));
+    final items = newsAsync.valueOrNull ?? const <NewsItem>[];
 
     if (items.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 148,
         child: Center(
           child: Text(
             'No announcements',
             style: TextStyle(
-              color: AppColors.textMutedLight,
+              color: context.kc.muted,
               fontSize: 13,
             ),
           ),
@@ -77,7 +74,9 @@ class _AnnouncementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go('/calendar'),
+      // An announcement is a message, not a dated occurrence — it opens the
+      // announcement feed, never the events calendar.
+      onTap: () => context.go('/notifications'),
       child: Container(
         width: 210,
         decoration: BoxDecoration(
@@ -144,15 +143,26 @@ class _AnnouncementCard extends StatelessWidget {
                         color: Colors.black.withValues(alpha: .25),
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
-                      child: Text(
-                        item.type.toUpperCase(),
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: 0.9,
-                          height: 1,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.campaign_rounded,
+                            size: 11,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            item.type.toUpperCase(),
+                            style: AppTypography.labelMd.copyWith(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.9,
+                              height: 1,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 6),

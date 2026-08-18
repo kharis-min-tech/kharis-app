@@ -2,20 +2,50 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
-/// Transport controls — dark design-handoff (v3).
+/// A snapshot of whichever engine currently owns playback, so [PlayerControls]
+/// can drive audio (just_audio) and video (YouTube) with one control row.
+///
+/// Null on [PlayerControls.transport] means the audio service, read reactively
+/// from the Riverpod providers as before. A video host supplies a binding
+/// rebuilt from its own streams instead.
+@immutable
+class TransportBinding {
+  const TransportBinding({
+    required this.isPlaying,
+    required this.isBuffering,
+    required this.position,
+    required this.duration,
+    required this.onPlay,
+    required this.onPause,
+    required this.onSeek,
+    required this.onSetSpeed,
+  });
+
+  final bool isPlaying;
+  final bool isBuffering;
+  final Duration position;
+  final Duration duration;
+  final VoidCallback onPlay;
+  final VoidCallback onPause;
+  final ValueChanged<Duration> onSeek;
+  final ValueChanged<double> onSetSpeed;
+}
+
+/// Transport controls.
 ///
 /// Row layout: speed pill | skip-back 15 | play/pause | skip-forward 30 |
 /// repeat. The play/pause button is a 70-px gold circle with a dark icon and a
 /// soft gold glow; a spinner replaces the icon while buffering. Tapping the
 /// speed pill cycles 1× → 1.25× → 1.5× → 2× → 0.75× and applies the rate to the
-/// audio service. Repeat is a local visual toggle only.
+/// active engine. Repeat is a local visual toggle only.
 class PlayerControls extends ConsumerStatefulWidget {
-  const PlayerControls({super.key});
+  const PlayerControls({super.key, this.transport});
+
+  /// The engine these controls operate. Null drives the audio service.
+  final TransportBinding? transport;
 
   @override
   ConsumerState<PlayerControls> createState() => _PlayerControlsState();
@@ -31,28 +61,54 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
 
   void _cycleSpeed() {
     setState(() => _speedIndex = (_speedIndex + 1) % _speeds.length);
-    ref.read(audioPlayerServiceProvider).setSpeed(_speed);
+    final transport = widget.transport;
+    if (transport != null) {
+      transport.onSetSpeed(_speed);
+    } else {
+      ref.read(audioPlayerServiceProvider).setSpeed(_speed);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final playerState = ref.watch(playerStateProvider).valueOrNull;
-    final isPlaying = playerState?.playing ?? false;
-    final processingState = playerState?.processingState;
-    final isBuffering = processingState == ProcessingState.loading ||
-        processingState == ProcessingState.buffering;
+    final transport = widget.transport;
 
-    final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-    final duration =
-        ref.watch(durationProvider).valueOrNull ?? Duration.zero;
-    final service = ref.read(audioPlayerServiceProvider);
+    final bool isPlaying;
+    final bool isBuffering;
+    final Duration position;
+    final Duration duration;
+    final VoidCallback onPlay;
+    final VoidCallback onPause;
+    final ValueChanged<Duration> onSeek;
+
+    if (transport != null) {
+      isPlaying = transport.isPlaying;
+      isBuffering = transport.isBuffering;
+      position = transport.position;
+      duration = transport.duration;
+      onPlay = transport.onPlay;
+      onPause = transport.onPause;
+      onSeek = transport.onSeek;
+    } else {
+      final playerState = ref.watch(playerStateProvider).valueOrNull;
+      isPlaying = playerState?.playing ?? false;
+      final processingState = playerState?.processingState;
+      isBuffering = processingState == ProcessingState.loading ||
+          processingState == ProcessingState.buffering;
+      position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
+      duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
+      final service = ref.read(audioPlayerServiceProvider);
+      onPlay = service.resume;
+      onPause = service.pause;
+      onSeek = service.seek;
+    }
 
     void seekRelative(int seconds) {
       final newPos = position + Duration(seconds: seconds);
       final clamped = Duration(
         milliseconds: newPos.inMilliseconds.clamp(0, duration.inMilliseconds),
       );
-      service.seek(clamped);
+      onSeek(clamped);
     }
 
     return Padding(
@@ -75,7 +131,7 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
           _PlayPauseButton(
             isPlaying: isPlaying,
             isBuffering: isBuffering,
-            onTap: () => isPlaying ? service.pause() : service.resume(),
+            onTap: () => isPlaying ? onPause() : onPlay(),
           ),
 
           // Skip forward 30 seconds.
@@ -120,7 +176,7 @@ class _SpeedPill extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.5),
+            color: context.kc.accentInk.withValues(alpha: 0.5),
             width: 1.5,
           ),
         ),
@@ -129,7 +185,7 @@ class _SpeedPill extends StatelessWidget {
           style: AppTypography.ui(
             size: 12.5,
             weight: FontWeight.w700,
-            color: AppColors.gold,
+            color: context.kc.accentInk,
           ),
         ),
       ),
@@ -159,10 +215,10 @@ class _PlayPauseButton extends StatelessWidget {
         height: 70,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.gold,
+          color: context.kc.accent,
           boxShadow: [
             BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.5),
+              color: context.kc.accent.withValues(alpha: 0.5),
               blurRadius: 22,
               offset: const Offset(0, 12),
               spreadRadius: -6,
@@ -171,18 +227,18 @@ class _PlayPauseButton extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: isBuffering
-            ? const SizedBox(
+            ? SizedBox(
                 width: 26,
                 height: 26,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
                   valueColor:
-                      AlwaysStoppedAnimation<Color>(AppColors.goldInk),
+                      AlwaysStoppedAnimation<Color>(context.kc.onAccent),
                 ),
               )
             : Icon(
                 isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: AppColors.goldInk,
+                color: context.kc.onAccent,
                 size: 34,
               ),
       ),
@@ -215,7 +271,7 @@ class _SkipButton extends StatelessWidget {
           children: [
             Icon(
               isForward ? Icons.forward_rounded : Icons.replay_rounded,
-              color: Colors.white,
+              color: context.kc.onBg,
               size: 32,
             ),
             Positioned(
@@ -225,7 +281,7 @@ class _SkipButton extends StatelessWidget {
                 style: AppTypography.ui(
                   size: 8,
                   weight: FontWeight.w800,
-                  color: Colors.white,
+                  color: context.kc.onBg,
                 ).copyWith(height: 1),
               ),
             ),
@@ -256,7 +312,7 @@ class _RepeatButton extends StatelessWidget {
           children: [
             Icon(
               Icons.repeat_rounded,
-              color: active ? AppColors.gold : AppColors.darkMuted,
+              color: active ? context.kc.accentInk : context.kc.muted,
               size: 22,
             ),
             if (active)
@@ -265,9 +321,9 @@ class _RepeatButton extends StatelessWidget {
                 child: Container(
                   width: 4,
                   height: 4,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.gold,
+                    color: context.kc.accentInk,
                   ),
                 ),
               ),

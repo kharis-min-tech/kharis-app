@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
+import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -14,8 +13,8 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 /// Discover / Browse: search the full library plus a grid of topic tiles.
 /// Reached from the Home search icon; the dashboard tab bar stays visible.
 ///
-/// Dark "library" aesthetic — matches the Messages tab (ink bg, dark search
-/// field, and the shared [SermonListItem] row for results).
+/// "Library" aesthetic — matches the Messages tab: screen background, an inset
+/// search field, and the shared [SermonListItem] row for results.
 class BrowseScreen extends ConsumerStatefulWidget {
   const BrowseScreen({super.key});
 
@@ -73,7 +72,6 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     final playing = ref.watch(playerStateProvider).valueOrNull?.playing ?? false;
 
     return Scaffold(
-      backgroundColor: AppColors.ink,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -91,7 +89,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                       style: AppTypography.display(
                         size: 30,
                         weight: FontWeight.w700,
-                        color: AppColors.heading,
+                        color: context.kc.onBg,
                       ).copyWith(letterSpacing: -0.6),
                     ),
                     const SizedBox(height: 16),
@@ -124,7 +122,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                     style: AppTypography.ui(
                       size: 16,
                       weight: FontWeight.w800,
-                      color: AppColors.darkMuted3,
+                      color: context.kc.onBg,
                     ),
                   ),
                 ),
@@ -176,7 +174,7 @@ class _TopBar extends StatelessWidget {
             size: 12,
             weight: FontWeight.w700,
             letterSpacing: 2.4,
-            color: AppColors.darkMuted2,
+            color: context.kc.muted,
           ),
         ),
         const Spacer(),
@@ -187,10 +185,10 @@ class _TopBar extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.06),
+              color: context.kc.surfaceMuted,
             ),
-            child: const Icon(Icons.home_outlined,
-                color: AppColors.darkMuted, size: 20),
+            child: Icon(Icons.home_outlined,
+                color: context.kc.muted, size: 20),
           ),
         ),
       ],
@@ -218,21 +216,21 @@ class _SearchField extends StatelessWidget {
         return TextField(
           controller: controller,
           onChanged: onChanged,
-          style: AppTypography.ui(size: 14, color: AppColors.onSurface),
-          cursorColor: AppColors.gold,
+          style: AppTypography.ui(size: 14, color: context.kc.onBg),
+          cursorColor: context.kc.accentInk,
           decoration: InputDecoration(
             isDense: true,
             filled: true,
-            fillColor: AppColors.darkSurface,
+            fillColor: context.kc.surfaceAlt,
             hintText: 'Artists, messages, or topics',
-            hintStyle: AppTypography.ui(size: 14, color: AppColors.darkMuted),
-            prefixIcon: const Icon(Icons.search_rounded,
-                color: AppColors.darkMuted, size: 20),
+            hintStyle: AppTypography.ui(size: 14, color: context.kc.muted),
+            prefixIcon: Icon(Icons.search_rounded,
+                color: context.kc.muted, size: 20),
             suffixIcon: hasText
                 ? GestureDetector(
                     onTap: onCleared,
-                    child: const Icon(Icons.close_rounded,
-                        color: AppColors.darkMuted, size: 18),
+                    child: Icon(Icons.close_rounded,
+                        color: context.kc.muted, size: 18),
                   )
                 : null,
             contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -246,7 +244,7 @@ class _SearchField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.input),
-              borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+              borderSide: BorderSide(color: context.kc.accentInk, width: 1.5),
             ),
           ),
         );
@@ -342,7 +340,7 @@ class _ResultsSliver extends ConsumerWidget {
           child: Center(
             child: Text(
               'No messages match your search.',
-              style: AppTypography.ui(size: 14, color: AppColors.darkMuted),
+              style: AppTypography.ui(size: 14, color: context.kc.muted),
             ),
           ),
         ),
@@ -366,7 +364,7 @@ class _ResultsSliver extends ConsumerWidget {
           artworkUrl: s.artworkUrl,
           listIndex: i,
           isPlaying: currentSermonId == s.id && playing,
-          onTap: () => ref.read(audioPlayerServiceProvider).play(s),
+          onTap: () => startPlayback(ref, s),
         );
       },
     );

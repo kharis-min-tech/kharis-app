@@ -77,8 +77,10 @@ Workaround: verified functions via observable Firestore write-backs
 deployed `ACTIVE` and the Eventarc trigger existed, but the function was **never
 invoked** (an unconditional entry-marker write never appeared after 5 tests,
 all IAM + service agents granted). This is wiring that `firebase deploy`
-normally handles. Replaced with a **Cloud Scheduler + HTTP poll**
-(`pushPendingAnnouncements`, every minute) which is reliable and verified.
+normally handles. Replaced with a scheduled poll — `pushPendingAnnouncements`
+is now an `onSchedule` function (`every 1 minutes`), matching the `syncYouTube`
+/ `syncSoundCloud` pattern, so Cloud Scheduler wiring comes from the function
+definition rather than a hand-created HTTP job.
 
 ### 🟡 Kharis App (org) project not usable by the automation account
 Goal was to migrate the backend to the org-owned `kharis-app-47c49`. Blocked:

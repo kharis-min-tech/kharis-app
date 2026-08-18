@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/core/utils/service_time.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/branch_venue_form_sheet.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-const _newsTypes = ['Announcement', 'Event', 'Ministry', 'Notice'];
+// Announcement categories live on the model — see [NewsItem.types]. There is
+// deliberately no 'Event' category: events are dated, located, RSVP-able and
+// live in the `events` collection.
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -29,7 +32,7 @@ class AdminBranchDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final branchesAsync = ref.watch(branchesProvider);
     final eventsAsync = ref.watch(upcomingEventsProvider(branchName));
-    final newsAsync = ref.watch(newsProvider);
+    final newsAsync = ref.watch(adminNewsProvider);
 
     final branch = branchesAsync.valueOrNull
         ?.where((b) => b.id == branchId)
@@ -72,7 +75,9 @@ class AdminBranchDetailScreen extends ConsumerWidget {
         children: [
           _InfoCard(
             branch: branch,
-            onEdit: () => context.pop(),
+            onEdit: branch == null
+                ? null
+                : () => _openVenueForm(context, ref, branch),
           ),
           const SizedBox(height: AppSpacing.sm),
           _EventsCard(
@@ -93,6 +98,36 @@ class AdminBranchDetailScreen extends ConsumerWidget {
             onDelete: (n) => _confirmDeleteNews(context, ref, n),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Opens the venue editor for this branch. Writes `address`,
+  /// `meetingDays` and `meetingTime` through [BranchRepository.updateBranch],
+  /// preserving every other field so a venue edit cannot blank the branch's
+  /// name, gradient, image, order or group.
+  void _openVenueForm(BuildContext context, WidgetRef ref, Branch branch) {
+    final messenger = ScaffoldMessenger.of(context);
+    final repo = ref.read(branchRepositoryProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BranchVenueFormSheet(
+        branch: branch,
+        repo: repo,
+        onSuccess: (msg) => messenger.showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: AppColors.surfaceElevated,
+          ),
+        ),
+        onError: (msg) => messenger.showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: AppColors.errorContainer,
+          ),
+        ),
       ),
     );
   }
@@ -316,21 +351,29 @@ class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.branch, required this.onEdit});
 
   final Branch? branch;
-  final VoidCallback onEdit;
+
+  /// `null` until the branch has loaded — no edit affordance before there is
+  /// something to edit.
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
+    final b = branch;
     return _SectionCard(
       label: 'BRANCH INFO',
       trailing: TextButton.icon(
         onPressed: onEdit,
-        icon: const Icon(Icons.arrow_back, size: 14, color: AppColors.secondary),
+        icon: const Icon(
+          Icons.edit_outlined,
+          size: 14,
+          color: AppColors.secondary,
+        ),
         label: Text(
-          'Edit',
+          'Edit venue',
           style: AppTypography.bodySm.copyWith(color: AppColors.secondary),
         ),
       ),
-      child: branch == null
+      child: b == null
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Text(
@@ -341,14 +384,20 @@ class _InfoCard extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoRow(label: 'Name', value: branch!.name),
-                _InfoRow(label: 'Subtitle', value: branch!.subtitle),
-                if (branch!.address != null)
-                  _InfoRow(label: 'Address', value: branch!.address!),
-                if (branch!.meetingDays != null)
-                  _InfoRow(label: 'Meeting days', value: branch!.meetingDays!),
-                if (branch!.meetingTime != null)
-                  _InfoRow(label: 'Meeting time', value: branch!.meetingTime!),
+                _InfoRow(label: 'Name', value: b.name),
+                _InfoRow(label: 'Subtitle', value: b.subtitle),
+                _InfoRow(label: 'Group', value: b.group),
+                _InfoRow(label: 'Address', value: b.address ?? 'Not set'),
+                _InfoRow(
+                  label: 'Meeting days',
+                  value: b.meetingDays ?? 'Not set',
+                ),
+                // Normalised: the web portal writes 24-hour '14:00', the
+                // Flutter admin and seed data write '2:00 PM'.
+                _InfoRow(
+                  label: 'Meeting time',
+                  value: formatServiceTime(b.meetingTime) ?? 'Not set',
+                ),
               ],
             ),
     );
@@ -1028,7 +1077,9 @@ class _BranchNewsFormSheetState extends State<_BranchNewsFormSheet> {
     _titleCtrl = TextEditingController(text: widget.item?.title ?? '');
     _bodyCtrl = TextEditingController(text: widget.item?.body ?? '');
     _imageUrlCtrl = TextEditingController(text: widget.item?.imageUrl ?? '');
-    _type = widget.item?.type ?? _newsTypes.first;
+    // normaliseType keeps a legacy 'Event' doc off an item the dropdown does
+    // not carry — DropdownButton asserts on a value outside `items`.
+    _type = NewsItem.normaliseType(widget.item?.type);
   }
 
   @override
@@ -1114,7 +1165,7 @@ class _BranchNewsFormSheetState extends State<_BranchNewsFormSheet> {
                 dropdownColor: AppColors.surfaceContainer,
                 style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
                 decoration: _inputDeco(),
-                items: _newsTypes
+                items: NewsItem.types
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (v) {

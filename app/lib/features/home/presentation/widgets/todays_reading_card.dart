@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
@@ -51,19 +52,57 @@ class _ReadingCard extends StatelessWidget {
     final dayOfYear = now.difference(DateTime(now.year)).inDays + 1;
     final scripture = verse.isNotEmpty ? verse : theme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+    // Matches the Giving screen's scripture panel: a deep purple base with a
+    // radial brand-purple wash from the top-left and a dove watermark in the
+    // top-right corner. Brand gradient, so it is identical in both themes and
+    // its text stays light regardless of the active brightness.
+    // DecoratedBox carries the elevation because ClipRRect cannot cast a
+    // shadow through its clip.
+    return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: AppShadows.card,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDeep],
-        ),
       ),
-      child: Column(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF2A1A6B), Color(0xFF0B0A12)],
+                ),
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(-0.75, -0.85),
+                    radius: 1.1,
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.85),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.55],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: -14,
+            top: -10,
+            child: Opacity(
+              opacity: 0.12,
+              child: Image.asset(AppAssets.doveWhite, width: 96),
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+            child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Eyebrow: TODAY'S READING · DAY N
@@ -167,7 +206,11 @@ class _ReadingCard extends StatelessWidget {
             ],
           ),
         ],
+            ),
+          ),
+        ],
       ),
-    );
+        ),
+      );
   }
 }

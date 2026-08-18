@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
-/// Animated skeleton placeholder — surfaceSubtle base with a slow opacity
+/// Animated skeleton placeholder — surfaceAlt base with a slow opacity
 /// pulse (1.1 s, 0.45 → 0.95). Drop-in replacement for loading spinners.
 class Skeleton extends StatefulWidget {
   const Skeleton({
@@ -49,7 +49,7 @@ class _SkeletonState extends State<Skeleton>
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
-          color: AppColors.surfaceSubtle,
+          color: context.kc.surfaceAlt,
           borderRadius: BorderRadius.circular(widget.radius),
         ),
       ),

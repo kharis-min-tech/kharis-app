@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart';
 
 import 'package:kharis_app/shared/models/user.dart';
 import 'auth_repository.dart';
@@ -80,14 +81,26 @@ class FirebaseAuthRepository implements AuthRepository {
         role: safeRole,
         createdAt: DateTime.now(),
       );
-      await _firestore.collection('users').doc(fbUser.uid).set({
-        'email': user.email,
-        'displayName': user.displayName,
-        'role': user.role,
-        'branch': user.branch,
-        'photoUrl': user.photoUrl,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // The Auth account already exists at this point, so a failed profile
+      // write must not fail the whole signup — that surfaces as a raw
+      // "database" error on an account the member can actually sign into, and
+      // retrying just hits email-already-in-use. [_hydrate] recreates the
+      // profile on the next auth emission, so log and continue.
+      try {
+        await _firestore.collection('users').doc(fbUser.uid).set({
+          'email': user.email,
+          'displayName': user.displayName,
+          'role': user.role,
+          'branch': user.branch,
+          'photoUrl': user.photoUrl,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint(
+          '[auth] profile write failed for ${fbUser.uid}: $e — '
+          '_hydrate will backfill it on the next auth emission.',
+        );
+      }
       _cached = user;
       return user;
     } on fb.FirebaseAuthException catch (e) {
@@ -128,10 +141,7 @@ class FirebaseAuthRepository implements AuthRepository {
       'photoUrl': ?photoUrl,
     };
     if (updates.isNotEmpty) {
-      await _firestore.collection('users').doc(fbUser.uid).set(
-            updates,
-            SetOptions(merge: true),
-          );
+      await _upsertProfile(fbUser, updates);
     }
     if (displayName != null) await fbUser.updateDisplayName(displayName);
     final user = await _hydrate(fbUser);
@@ -141,12 +151,40 @@ class FirebaseAuthRepository implements AuthRepository {
 
   /// Persists notification preference toggles to the user's Firestore doc.
   Future<void> updateNotificationPrefs(Map<String, bool> prefs) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-    await _firestore.collection('users').doc(uid).set(
-      {'notificationPrefs': prefs},
-      SetOptions(merge: true),
-    );
+    final fbUser = _auth.currentUser;
+    if (fbUser == null) return;
+    await _upsertProfile(fbUser, {'notificationPrefs': prefs});
+  }
+
+  /// Merges [updates] into the caller's `users/{uid}` doc, creating the full
+  /// profile first when the doc is missing.
+  ///
+  /// Accounts created while the app pointed at the dead Firebase project have
+  /// no profile doc, and a bare merge-set on a missing doc is a rules-level
+  /// CREATE — which the rules reject because it carries no `role`. So:
+  /// existing doc → plain merge that never sends `role` (rules pin it to its
+  /// current value); missing doc → the same profile shape and safe role that
+  /// [register] writes, with [updates] layered on top.
+  Future<void> _upsertProfile(
+    fb.User fbUser,
+    Map<String, Object?> updates,
+  ) async {
+    final ref = _firestore.collection('users').doc(fbUser.uid);
+    final exists = (await ref.get()).exists;
+    if (exists) {
+      await ref.set(updates, SetOptions(merge: true));
+      return;
+    }
+    await ref.set({
+      'email': fbUser.email ?? '',
+      'displayName':
+          fbUser.displayName ?? (fbUser.isAnonymous ? 'Guest' : 'Member'),
+      'role': fbUser.isAnonymous ? 'guest' : 'member',
+      'branch': null,
+      'photoUrl': fbUser.photoURL,
+      'createdAt': FieldValue.serverTimestamp(),
+      ...updates,
+    }, SetOptions(merge: true));
   }
 
   /// True when the current user is an admin (custom claim or profile role).

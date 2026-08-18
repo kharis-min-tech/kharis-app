@@ -1,9 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_shadows.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 
 /// A branch row (design-handoff v3): a rounded city-landmark thumbnail, the
 /// branch name and region, and a gold **HQ** badge for the headquarters (warm
@@ -33,7 +30,7 @@ class BranchTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isHq ? AppColors.hqTint : AppColors.cardWhite,
+          color: isHq ? AppColors.hqTint : context.kc.surface,
           borderRadius: AppRadius.cardBorder,
           border: isHq
               ? Border.all(color: AppColors.hqStroke.withValues(alpha: 0.5))
@@ -51,7 +48,7 @@ class BranchTile extends StatelessWidget {
                   Text(
                     name,
                     style: AppTypography.ui(size: 16, weight: FontWeight.w700)
-                        .copyWith(color: AppColors.textPrimary),
+                        .copyWith(color: context.kc.onBg),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -59,7 +56,7 @@ class BranchTile extends StatelessWidget {
                   Text(
                     region,
                     style: AppTypography.ui(size: 13)
-                        .copyWith(color: AppColors.textMutedLight),
+                        .copyWith(color: context.kc.muted),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -71,13 +68,13 @@ class BranchTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppColors.secondary,
+                  color: context.kc.accent,
                   borderRadius: AppRadius.pillBorder,
                 ),
                 child: Text(
                   'HQ',
                   style: AppTypography.ui(size: 11, weight: FontWeight.w800)
-                      .copyWith(color: AppColors.onSecondary, letterSpacing: 0.5),
+                      .copyWith(color: context.kc.onAccent, letterSpacing: 0.5),
                 ),
               ),
             ],

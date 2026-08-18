@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/announcement_home_status.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 
-// ── News type options ──────────────────────────────────────────────────────────
-
-const _newsTypes = ['Announcement', 'Event', 'Ministry', 'Notice'];
+// ── News type options ─────────────────────────────────────────────────────────
+//
+// The vocabulary lives on the model — see [NewsItem.types]. There is
+// deliberately no 'Event' category: an announcement is a message, while an
+// event is a dated, located, RSVP-able occurrence managed on the Events
+// screen and stored in the `events` collection.
 
 // Fallback branch list if branchesProvider has not loaded yet.
 const _kFallbackBranches = [
@@ -23,7 +27,7 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final newsAsync = ref.watch(newsProvider);
+    final newsAsync = ref.watch(adminNewsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -65,20 +69,28 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.gutter,
-              AppSpacing.sm,
-              AppSpacing.gutter,
-              AppSpacing.lg + AppSpacing.lg,
-            ),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (_, index) => _NewsCard(
-              item: items[index],
-              onEdit: () => _openForm(context, ref, item: items[index]),
-              onDelete: () => _confirmDelete(context, ref, items[index]),
-            ),
+          return Column(
+            children: [
+              const AnnouncementHomeRulesBanner(),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.gutter,
+                    AppSpacing.sm,
+                    AppSpacing.gutter,
+                    AppSpacing.lg + AppSpacing.lg,
+                  ),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (_, index) => _NewsCard(
+                    item: items[index],
+                    onEdit: () => _openForm(context, ref, item: items[index]),
+                    onDelete: () => _confirmDelete(context, ref, items[index]),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -214,7 +226,10 @@ class _NewsCard extends StatelessWidget {
                       _TypeChip(type: item.type),
                       const Spacer(),
                       Text(
-                        _formatDate(item.publishedAt),
+                        item.expiresAt == null
+                            ? _formatDate(item.publishedAt)
+                            : '${_formatDate(item.publishedAt)} → '
+                                '${_formatDate(item.expiresAt!)}',
                         style: AppTypography.labelMd.copyWith(
                           color: AppColors.textFaint,
                         ),
@@ -222,7 +237,9 @@ class _NewsCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  _BranchChip(branch: item.branch),
+                  AnnouncementHomeStatusChip(
+                    visibility: AnnouncementHomeVisibility.of(item),
+                  ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     item.title,
@@ -280,6 +297,9 @@ class _NewsCard extends StatelessWidget {
 
 // ── Type chip ─────────────────────────────────────────────────────────────────
 
+/// Category pill for an announcement. The megaphone is the announcement mark
+/// throughout the app — events carry a calendar mark instead — so an admin can
+/// tell the two content kinds apart at a glance.
 class _TypeChip extends StatelessWidget {
   const _TypeChip({required this.type});
 
@@ -293,36 +313,20 @@ class _TypeChip extends StatelessWidget {
         color: AppColors.secondary.withValues(alpha: 0.15),
         borderRadius: AppRadius.pillBorder,
       ),
-      child: Text(
-        type,
-        style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-      ),
-    );
-  }
-}
-
-
-// ── Branch chip ───────────────────────────────────────────────────────────────
-
-class _BranchChip extends StatelessWidget {
-  const _BranchChip({required this.branch});
-
-  final String? branch;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = branch ?? 'All Branches';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.onSurfaceVariant.withValues(alpha: 0.12),
-        borderRadius: AppRadius.pillBorder,
-      ),
-      child: Text(
-        label,
-        style: AppTypography.labelMd.copyWith(
-          color: AppColors.onSurfaceVariant,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.campaign_rounded,
+            size: 12,
+            color: AppColors.secondary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            type,
+            style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+          ),
+        ],
       ),
     );
   }
@@ -364,7 +368,9 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
     _titleCtrl = TextEditingController(text: widget.item?.title ?? '');
     _bodyCtrl = TextEditingController(text: widget.item?.body ?? '');
     _imageUrlCtrl = TextEditingController(text: widget.item?.imageUrl ?? '');
-    _type = widget.item?.type ?? _newsTypes.first;
+    // normaliseType guards the dropdown: a legacy doc saved as type 'Event'
+    // would otherwise assert on a value outside `items`.
+    _type = NewsItem.normaliseType(widget.item?.type);
     _branch = widget.item?.branch;
   }
 
@@ -408,9 +414,29 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.campaign_rounded,
+                    size: 20,
+                    color: AppColors.secondary,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    isEdit ? 'Edit Announcement' : 'New Announcement',
+                    style:
+                        AppTypography.titleMd.copyWith(color: AppColors.heading),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
               Text(
-                isEdit ? 'Edit Announcement' : 'New Announcement',
-                style: AppTypography.titleMd.copyWith(color: AppColors.heading),
+                'A message to the church — headline, optional body and image. '
+                'For anything with a date and a venue people RSVP to, use '
+                'Events instead.',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
 
@@ -435,7 +461,7 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
                 dropdownColor: AppColors.surfaceContainer,
                 style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
                 decoration: _inputDeco(),
-                items: _newsTypes
+                items: NewsItem.types
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (v) {
@@ -463,6 +489,13 @@ class _NewsFormSheetState extends State<_NewsFormSheet> {
                 ],
                 onChanged: (v) => setState(() => _branch = v),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              AnnouncementWillAppearPanel(
+                audience: AnnouncementHomeVisibility.audienceFor(_branch),
+                expiresAt: widget.item?.expiresAt,
+                isNew: !isEdit,
+              ),
+              const SizedBox(height: AppSpacing.sm),
 
               // Body
               _inputLabel('Body (optional)'),

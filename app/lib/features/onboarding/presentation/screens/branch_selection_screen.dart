@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:kharis_app/core/services/notification_service.dart';
-import 'package:kharis_app/shared/providers/notification_provider.dart';
 
 /// Branch selection (design-handoff v3) — light screen. Search across cities,
 /// then tap a branch to set it as home and enter the app.
@@ -51,7 +47,6 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
             .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,13 +62,13 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
                     'Find your branch',
                     style:
                         AppTypography.display(size: 30, weight: FontWeight.w700)
-                            .copyWith(color: AppColors.textPrimary),
+                            .copyWith(color: context.kc.onBg),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Kharis is one family across many cities.',
                     style: AppTypography.serif(size: 17, italic: true)
-                        .copyWith(color: AppColors.textMutedLight),
+                        .copyWith(color: context.kc.muted),
                   ),
                   const SizedBox(height: 18),
                   _SearchField(
@@ -101,32 +96,30 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
     );
   }
 
-  /// Persists the chosen branch to the signed-in profile (best effort), then
-  /// continues into the app.
+  /// Marks onboarding complete and persists the chosen campus through the one
+  /// shared path, so prefs, the FCM topic and the profile cannot disagree.
   Future<void> _confirm(
       BuildContext context, WidgetRef ref, Branch branch) async {
-    final user = ref.read(currentUserProvider).valueOrNull;
-    final repo = ref.read(firebaseAuthRepositoryProvider);
-    if (user != null && user.email.isNotEmpty) {
-      try {
-        await repo.updateProfile(branch: branch.name);
-      } catch (_) {}
-    }
     final onboardingRepo = ref.read(onboardingRepositoryProvider);
-    // Switch this device's branch FCM topic so it gets branch-scoped pushes.
-    final notifications = ref.read(notificationServiceProvider);
-    final previous = onboardingRepo.selectedBranch;
-    if (previous != null && previous.isNotEmpty && previous != branch.name) {
-      await notifications
-          .unsubscribeFromTopic(KharisTopics.branch(_slug(previous)));
-    }
-    await notifications
-        .subscribeToTopic(KharisTopics.branch(_slug(branch.name)));
     await onboardingRepo.completeOnboarding(
       role: onboardingRepo.selectedRole ?? 'member',
       branch: branch.name,
     );
-    if (context.mounted) context.go('/home');
+
+    final result = await setActiveBranch(ref, branch.name);
+
+    if (!context.mounted) return;
+    if (result.syncFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Switched to ${branch.name} on this device. We could not reach '
+            'your profile — it will sync automatically.',
+          ),
+        ),
+      );
+    }
+    context.go('/home');
   }
 
   /// Section header + branch tiles; an empty group renders nothing.
@@ -144,7 +137,7 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
         child: Text(
           label,
           style:
-              AppTypography.labelMd.copyWith(color: AppColors.textMutedLight),
+              AppTypography.labelMd.copyWith(color: context.kc.muted),
         ),
       ),
       for (final b in list)
@@ -161,9 +154,6 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
         ),
     ];
   }
-
-  static String _slug(String s) =>
-      s.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
 }
 
 class _BackRow extends StatelessWidget {
@@ -181,12 +171,12 @@ class _BackRow extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.chevron_left_rounded,
-                size: 24, color: AppColors.textPrimary),
+            Icon(Icons.chevron_left_rounded,
+                size: 24, color: context.kc.onBg),
             Text(
               'Back',
               style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                  .copyWith(color: AppColors.textPrimary),
+                  .copyWith(color: context.kc.onBg),
             ),
           ],
         ),
@@ -206,16 +196,16 @@ class _SearchField extends StatelessWidget {
     return TextField(
       controller: controller,
       onChanged: onChanged,
-      style: AppTypography.ui(size: 15).copyWith(color: AppColors.textPrimary),
+      style: AppTypography.ui(size: 15).copyWith(color: context.kc.onBg),
       cursorColor: AppColors.primary,
       decoration: InputDecoration(
         hintText: 'Search cities, KP2, Ghana, Sierra Leone',
         hintStyle:
-            AppTypography.ui(size: 15).copyWith(color: AppColors.textMutedLight),
-        prefixIcon: const Icon(Icons.search_rounded,
-            size: 20, color: AppColors.textMutedLight),
+            AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
+        prefixIcon: Icon(Icons.search_rounded,
+            size: 20, color: context.kc.muted),
         filled: true,
-        fillColor: AppColors.cardWhite,
+        fillColor: context.kc.surfaceAlt,
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
       ),
     );

@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_radius.dart';
-import 'package:kharis_app/core/theme/app_spacing.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/artwork_gradient.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
-import 'package:kharis_app/features/player/presentation/screens/playlist_screen.dart';
+import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../widgets/sermon_list_item.dart';
 
@@ -70,8 +69,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final isFiltered = selectedCategory != 'All';
 
-    // Featured + recently played.
+    // Featured + Message of the Day + recently played.
     final featured = ref.watch(featuredSermonsProvider);
+    final motd = ref.watch(motdSermonProvider);
     final recentlyPlayed = ref.watch(recentlyPlayedProvider);
 
     // Search.
@@ -89,7 +89,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.ink,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -107,7 +106,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         size: 30,
                         weight: FontWeight.w700,
                         height: 1.0,
-                        color: Colors.white,
+                        color: context.kc.onBg,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -115,7 +114,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       'Sermons & teachings · streamed from Kharis',
                       style: AppTypography.bodySm.copyWith(
                         fontSize: 13,
-                        color: AppColors.darkMuted,
+                        color: context.kc.muted,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -143,20 +142,20 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   child: Text(
                     '${searchResults.length} result${searchResults.length == 1 ? '' : 's'} for "$searchQuery"',
                     style: AppTypography.bodySm.copyWith(
-                      color: AppColors.darkMuted,
+                      color: context.kc.muted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ),
               if (searchResults.isEmpty)
-                const SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 60),
+                    padding: const EdgeInsets.only(top: 60),
                     child: Center(
                       child: Text(
                         'No sermons found',
-                        style: TextStyle(color: AppColors.darkMuted),
+                        style: TextStyle(color: context.kc.muted),
                       ),
                     ),
                   ),
@@ -183,30 +182,43 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       artworkUrl: sermon.artworkUrl,
                       listIndex: index,
                       isPlaying: isPlaying,
-                      onTap: () {
-                        ref.read(audioPlayerServiceProvider).play(sermon);
-                      },
+                      onTap: () => startPlayback(ref, sermon),
+                      onMoreTap: () => showAddToPlaylistSheet(
+                        context,
+                        sermonId: sermon.id,
+                        sermonTitle: sermon.title,
+                      ),
                     );
                   },
                 ),
             ]
-
             // ── Normal browse mode ───────────────────────────────────────────
             else ...[
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-              // ── 2. Featured hero carousel ────────────────────────────────
+              // ── 2. Featured hero carousel + Message of the Day ───────────
               if (featured.isNotEmpty)
                 SliverToBoxAdapter(
                   child: _FeaturedCarousel(
                     sermons: featured,
                     currentSermonId: currentSermon?.id,
                     isPlaying: playerState?.playing ?? false,
-                    onPlay: (sermon) {
-                      ref.read(audioPlayerServiceProvider).play(sermon);
-                    },
+                    onPlay: (sermon) => startPlayback(ref, sermon),
                   ),
                 ),
+              if (motd != null) ...[
+                if (featured.isNotEmpty)
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                SliverToBoxAdapter(
+                  child: _MessageOfTheDayCard(
+                    sermon: motd,
+                    isPlaying:
+                        currentSermon?.id == motd.id &&
+                        (playerState?.playing ?? false),
+                    onPlay: () => startPlayback(ref, motd),
+                  ),
+                ),
+              ],
 
               // ── 3. Recently played ───────────────────────────────────────
               if (recentlyPlayed.isNotEmpty) ...[
@@ -219,7 +231,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       style: AppTypography.bodyLg.copyWith(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: context.kc.onBg,
                         letterSpacing: -0.18,
                       ),
                     ),
@@ -238,18 +250,14 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         final sermon = recentlyPlayed[index];
                         return Padding(
                           padding: EdgeInsets.only(
-                            right:
-                                index < recentlyPlayed.length - 1 ? 12 : 0,
+                            right: index < recentlyPlayed.length - 1 ? 12 : 0,
                           ),
                           child: _RecentlyPlayedCard(
                             sermon: sermon,
-                            isPlaying: currentSermon?.id == sermon.id &&
+                            isPlaying:
+                                currentSermon?.id == sermon.id &&
                                 (playerState?.playing ?? false),
-                            onTap: () {
-                              ref
-                                  .read(audioPlayerServiceProvider)
-                                  .play(sermon);
-                            },
+                            onTap: () => startPlayback(ref, sermon),
                           ),
                         );
                       },
@@ -271,24 +279,23 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         style: AppTypography.bodyLg.copyWith(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: context.kc.onBg,
                           letterSpacing: -0.18,
                         ),
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const PlaylistScreen(),
-                          ),
-                        ),
+                        // Root-navigator route: overlays the shell with its
+                        // own back affordance instead of replacing this tab's
+                        // content with an inescapable branch push.
+                        onTap: () => context.push('/playlists'),
                         behavior: HitTestBehavior.opaque,
                         child: Text(
                           'Playlists',
                           style: AppTypography.labelMd.copyWith(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.gold,
+                            color: context.kc.accentInk,
                           ),
                         ),
                       ),
@@ -305,7 +312,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           style: AppTypography.labelMd.copyWith(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.darkMuted,
+                            color: context.kc.muted,
                           ),
                         ),
                       ),
@@ -329,8 +336,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                             final count = categoryCounts[cat] ?? 0;
                             return Padding(
                               padding: EdgeInsets.only(
-                                right:
-                                    index < categories.length - 1 ? 12 : 0,
+                                right: index < categories.length - 1 ? 12 : 0,
                               ),
                               child: _TopicCard(
                                 category: cat,
@@ -339,10 +345,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                 active: selectedCategory == cat,
                                 onTap: () {
                                   ref
-                                          .read(
-                                              selectedCategoryProvider.notifier)
-                                          .state =
-                                      selectedCategory == cat ? 'All' : cat;
+                                      .read(selectedCategoryProvider.notifier)
+                                      .state = selectedCategory == cat
+                                      ? 'All'
+                                      : cat;
                                   _scrollToList();
                                 },
                               ),
@@ -372,7 +378,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                               style: AppTypography.bodyLg.copyWith(
                                 fontSize: 19,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                                color: context.kc.onBg,
                                 letterSpacing: -0.18,
                               ),
                             ),
@@ -381,17 +387,17 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           _SortPill(
                             label: 'Newest',
                             active: sort == SermonSort.newest,
-                            onTap: () => ref
-                                .read(sermonSortProvider.notifier)
-                                .state = SermonSort.newest,
+                            onTap: () =>
+                                ref.read(sermonSortProvider.notifier).state =
+                                    SermonSort.newest,
                           ),
                           const SizedBox(width: 8),
                           _SortPill(
                             label: 'Oldest',
                             active: sort == SermonSort.oldest,
-                            onTap: () => ref
-                                .read(sermonSortProvider.notifier)
-                                .state = SermonSort.oldest,
+                            onTap: () =>
+                                ref.read(sermonSortProvider.notifier).state =
+                                    SermonSort.oldest,
                           ),
                         ],
                       ),
@@ -400,9 +406,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         _FilterChip(
                           label: selectedCategory,
                           count: sermons.length,
-                          onClear: () => ref
-                              .read(selectedCategoryProvider.notifier)
-                              .state = 'All',
+                          onClear: () =>
+                              ref
+                                      .read(selectedCategoryProvider.notifier)
+                                      .state =
+                                  'All',
                         ),
                       ],
                     ],
@@ -438,9 +446,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       artworkUrl: sermon.artworkUrl,
                       listIndex: index,
                       isPlaying: isPlaying,
-                      onTap: () {
-                        ref.read(audioPlayerServiceProvider).play(sermon);
-                      },
+                      onTap: () => startPlayback(ref, sermon),
+                      onMoreTap: () => showAddToPlaylistSheet(
+                        context,
+                        sermonId: sermon.id,
+                        sermonTitle: sermon.title,
+                      ),
                     );
                   },
                 ),
@@ -476,30 +487,29 @@ class _SearchBar extends StatelessWidget {
         final hasText = value.text.isNotEmpty;
         return Container(
           decoration: BoxDecoration(
-            color: AppColors.darkSurface2,
+            color: context.kc.surfaceAlt,
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: TextField(
             controller: controller,
             onChanged: onChanged,
-            style: AppTypography.bodyLg.copyWith(color: AppColors.darkMuted3),
-            cursorColor: AppColors.secondary,
+            style: AppTypography.bodyLg.copyWith(color: context.kc.onBg),
+            cursorColor: context.kc.accentInk,
             decoration: InputDecoration(
               hintText: 'Search sermons, speakers, topics...',
-              hintStyle:
-                  AppTypography.bodySm.copyWith(color: AppColors.darkMuted),
-              prefixIcon: const Icon(
+              hintStyle: AppTypography.bodySm.copyWith(color: context.kc.muted),
+              prefixIcon: Icon(
                 Icons.search_rounded,
                 size: 20,
-                color: AppColors.darkMuted,
+                color: context.kc.muted,
               ),
               suffixIcon: hasText
                   ? GestureDetector(
                       onTap: onCleared,
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         size: 18,
-                color: AppColors.darkMuted,
+                        color: context.kc.muted,
                       ),
                     )
                   : null,
@@ -507,15 +517,14 @@ class _SearchBar extends StatelessWidget {
               enabledBorder: InputBorder.none,
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppRadius.pill),
-                borderSide:
-                    const BorderSide(color: AppColors.secondary, width: 1.5),
+                borderSide: BorderSide(color: context.kc.accentInk, width: 1.5),
               ),
               focusedErrorBorder: InputBorder.none,
               errorBorder: InputBorder.none,
               disabledBorder: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
               filled: true,
-              fillColor: AppColors.darkSurface2,
+              fillColor: context.kc.surfaceAlt,
             ),
           ),
         );
@@ -599,8 +608,8 @@ class _FeaturedCarouselState extends State<_FeaturedCarousel> {
               height: 6,
               decoration: BoxDecoration(
                 color: i == _currentPage
-                    ? AppColors.secondary
-                    : AppColors.outlineVariant,
+                    ? context.kc.accent
+                    : context.kc.outline,
                 borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
@@ -680,10 +689,12 @@ class _FeaturedCard extends StatelessWidget {
               top: 14,
               left: 14,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.9),
+                  color: context.kc.accent.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Row(
@@ -692,7 +703,7 @@ class _FeaturedCard extends StatelessWidget {
                     Icon(
                       isPlaying ? Icons.equalizer_rounded : Icons.star_rounded,
                       size: 12,
-                      color: AppColors.onSecondary,
+                      color: context.kc.onAccent,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -700,7 +711,7 @@ class _FeaturedCard extends StatelessWidget {
                       style: AppTypography.labelMd.copyWith(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.onSecondary,
+                        color: context.kc.onAccent,
                         letterSpacing: 0.08,
                       ),
                     ),
@@ -720,9 +731,7 @@ class _FeaturedCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Icon(
-                  isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
+                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                   color: Colors.white,
                   size: 24,
                 ),
@@ -783,6 +792,117 @@ class _FeaturedCard extends StatelessWidget {
   }
 }
 
+// ── Message of the Day card ────────────────────────────────────────────────────
+
+class _MessageOfTheDayCard extends StatelessWidget {
+  const _MessageOfTheDayCard({
+    required this.sermon,
+    required this.isPlaying,
+    required this.onPlay,
+  });
+
+  final Sermon sermon;
+  final bool isPlaying;
+  final VoidCallback onPlay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: PressEffect(
+        onTap: onPlay,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: context.kc.surfaceAlt,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: context.kc.accent.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 56,
+                height: 56,
+                child: ArtworkImage(
+                  url: sermon.artworkUrl,
+                  gradientIndex: sermon.artworkColor ?? 0,
+                  radius: AppRadius.md,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.wb_sunny_rounded,
+                          size: 12,
+                          color: context.kc.accentInk,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'MESSAGE OF THE DAY',
+                          style: AppTypography.labelMd.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: context.kc.accentInk,
+                            letterSpacing: 0.08,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      sermon.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyLg.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: context.kc.onBg,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sermon.speaker,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 12,
+                        color: context.kc.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: context.kc.accent,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Icon(
+                  isPlaying
+                      ? Icons.equalizer_rounded
+                      : Icons.play_arrow_rounded,
+                  color: context.kc.onAccent,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Recently played card ───────────────────────────────────────────────────────
 
 class _RecentlyPlayedCard extends StatelessWidget {
@@ -819,8 +939,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
                         ? Container(
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.4),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: const Center(
                               child: Icon(
@@ -840,7 +959,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: AppColors.secondary,
+                      color: context.kc.accent,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                       boxShadow: [
                         BoxShadow(
@@ -854,7 +973,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
                       isPlaying
                           ? Icons.pause_rounded
                           : Icons.play_arrow_rounded,
-                      color: AppColors.onSecondary,
+                      color: context.kc.onAccent,
                       size: 18,
                     ),
                   ),
@@ -869,7 +988,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
               style: AppTypography.labelMd.copyWith(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.darkMuted3,
+                color: context.kc.onBg,
                 height: 1.3,
               ),
             ),
@@ -881,6 +1000,11 @@ class _RecentlyPlayedCard extends StatelessWidget {
 }
 
 // ── Topic playlist card (150x150) ─────────────────────────────────────────────
+
+/// Ink for the circular chip that floats over a topic card's artwork gradient.
+/// Invariant on purpose: the gradient beneath it does not follow the theme, so
+/// neither does the chip.
+const Color _onArtworkChipInk = Color(0xFF0B0A10);
 
 class _TopicCard extends StatelessWidget {
   const _TopicCard({
@@ -918,12 +1042,12 @@ class _TopicCard extends StatelessWidget {
                 colors: colors,
               ),
               border: active
-                  ? Border.all(color: AppColors.secondary, width: 2.5)
+                  ? Border.all(color: context.kc.accent, width: 2.5)
                   : null,
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: AppColors.secondary.withValues(alpha: 0.35),
+                        color: context.kc.accent.withValues(alpha: 0.35),
                         blurRadius: 18,
                         spreadRadius: 1,
                       ),
@@ -974,13 +1098,12 @@ class _TopicCard extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: active ? AppColors.secondary : Colors.white,
+                      color: active ? context.kc.accent : Colors.white,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                     child: Icon(
                       active ? Icons.check_rounded : Icons.play_arrow_rounded,
-                      color:
-                          active ? AppColors.onSecondary : AppColors.ink,
+                      color: active ? context.kc.onAccent : _onArtworkChipInk,
                       size: 20,
                     ),
                   ),
@@ -995,7 +1118,7 @@ class _TopicCard extends StatelessWidget {
           style: AppTypography.bodySm.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: active ? AppColors.secondary : AppColors.darkMuted,
+            color: active ? context.kc.accentInk : context.kc.muted,
           ),
         ),
       ],
@@ -1024,11 +1147,9 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 7, 10, 7),
         decoration: BoxDecoration(
-          color: AppColors.secondary.withValues(alpha: 0.14),
+          color: context.kc.accent.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: AppColors.secondary.withValues(alpha: 0.5),
-          ),
+          border: Border.all(color: context.kc.accent.withValues(alpha: 0.5)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1038,15 +1159,11 @@ class _FilterChip extends StatelessWidget {
               style: AppTypography.labelMd.copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: AppColors.secondary,
+                color: context.kc.accentInk,
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(
-              Icons.close_rounded,
-              size: 16,
-              color: AppColors.secondary,
-            ),
+            Icon(Icons.close_rounded, size: 16, color: context.kc.accentInk),
           ],
         ),
       ),
@@ -1054,7 +1171,7 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-// ── Sort pill (gold active, glass inactive) ────────────────────────────────────
+// ── Sort pill (gold active, muted surface inactive) ───────────────────────────
 
 class _SortPill extends StatelessWidget {
   const _SortPill({
@@ -1076,7 +1193,7 @@ class _SortPill extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? AppColors.secondary : AppColors.darkSurface2,
+          color: active ? context.kc.accent : context.kc.surfaceMuted,
           borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(
@@ -1084,7 +1201,7 @@ class _SortPill extends StatelessWidget {
           style: AppTypography.labelMd.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: active ? AppColors.onSecondary : AppColors.darkMuted,
+            color: active ? context.kc.onAccent : context.kc.muted,
           ),
         ),
       ),
@@ -1107,7 +1224,7 @@ class _SermonRowSkeleton extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AppColors.darkSurface2,
+              color: context.kc.surfaceAlt,
               borderRadius: BorderRadius.circular(11),
             ),
           ),
@@ -1120,7 +1237,7 @@ class _SermonRowSkeleton extends StatelessWidget {
                   height: 14,
                   width: 180,
                   decoration: BoxDecoration(
-                    color: AppColors.darkSurface2,
+                    color: context.kc.surfaceAlt,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -1129,7 +1246,7 @@ class _SermonRowSkeleton extends StatelessWidget {
                   height: 12,
                   width: 120,
                   decoration: BoxDecoration(
-                    color: AppColors.darkSurface2,
+                    color: context.kc.surfaceAlt,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -1141,7 +1258,7 @@ class _SermonRowSkeleton extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: AppColors.darkSurface2,
+              color: context.kc.surfaceAlt,
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
           ),

@@ -16,9 +16,11 @@ import '../../features/onboarding/presentation/screens/role_selection_screen.dar
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
-import '../../features/player/presentation/screens/playlist_screen.dart';
+import '../../features/playlists/presentation/screens/playlist_detail_screen.dart';
+import '../../features/playlists/presentation/screens/playlists_screen.dart';
 import '../../features/home/presentation/screens/reading_screen.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
+import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/admin/presentation/screens/admin_hub_screen.dart';
 import '../../features/admin/presentation/screens/admin_announcements_screen.dart';
@@ -26,6 +28,7 @@ import '../../features/admin/presentation/screens/admin_events_screen.dart';
 import '../../features/admin/presentation/screens/admin_branches_screen.dart';
 import '../../features/admin/presentation/screens/admin_users_screen.dart';
 import '../../features/admin/presentation/screens/admin_bible_reading_screen.dart';
+import '../../features/admin/presentation/screens/admin_reading_plans_screen.dart';
 import '../../features/admin/presentation/screens/admin_sermons_screen.dart';
 import '../../features/admin/presentation/screens/admin_branch_detail_screen.dart';
 import '../../shared/providers/auth_provider.dart';
@@ -52,10 +55,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
     routes: [
       // ── Onboarding ────────────────────────────────────────────────────────
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const SplashScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: '/role-selection',
         builder: (context, state) => const RoleSelectionScreen(),
@@ -66,10 +66,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Auth ──────────────────────────────────────────────────────────────
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -141,16 +138,29 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ReadingScreen(),
       ),
 
-      // ── Playlists / collections (overlays shell) ──────────────────────────
+      // ── Playlists (overlays shell) ────────────────────────────────────────
+      // The member's own playlists. Home and detail are both pushed routes on
+      // the root navigator, so the shell tab underneath stays intact and the
+      // AppBar back button always exits — never replacing tab content.
       GoRoute(
         path: '/playlists',
-        builder: (context, state) => const PlaylistScreen(),
+        builder: (context, state) => const PlaylistsScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (context, state) =>
+                PlaylistDetailScreen(playlistId: state.pathParameters['id']!),
+          ),
+        ],
       ),
 
       // ── Notes (overlays shell) ────────────────────────────────────────────
+      GoRoute(path: '/notes', builder: (context, state) => const NotesScreen()),
+
+      // ── Notifications feed (overlays shell; push deep-link target) ────────
       GoRoute(
-        path: '/notes',
-        builder: (context, state) => const NotesScreen(),
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
 
       // ── Profile (overlays shell) ──────────────────────────────────────────
@@ -183,6 +193,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/bible-reading',
         builder: (context, state) => const AdminBibleReadingScreen(),
+      ),
+      GoRoute(
+        path: '/admin/reading-plans',
+        builder: (context, state) => const AdminReadingPlansScreen(),
       ),
       GoRoute(
         path: '/admin/sermons',

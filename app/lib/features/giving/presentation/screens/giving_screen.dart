@@ -1,28 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_webview_screen.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 
 /// The secure Kharis giving portal (opened via the web-view / payment flow).
+///
+/// Org-wide, not per-branch: the portal itself handles fund designation and the
+/// branch model carries no giving URL, so there is nothing branch-specific to
+/// substitute here.
 const String _kGivingUrl = 'https://kharis.org/giving';
 
-/// Home branch shown in the "Giving to" selector.
-const String _kBranch = 'London (HQ)';
+/// Shown in the "Giving to" row when the member has not picked a campus.
+const String _kAllCampusesLabel = 'All campuses';
 
-/// Giving tab (design-handoff v3, light).
+/// Giving tab (design-handoff v3).
 ///
 /// A calm, single-column giving landing: a scripture card, the branch the gift
 /// is directed to, a full-width **Give securely** call-to-action that opens the
 /// secure portal, and offline bank-transfer + campaign cards below.
-class GivingScreen extends StatelessWidget {
+class GivingScreen extends ConsumerWidget {
   const GivingScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final branch = ref.watch(currentBranchProvider).valueOrNull;
+
     return Scaffold(
-      backgroundColor: AppColors.lightBg,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -43,9 +51,11 @@ class GivingScreen extends StatelessWidget {
                     const SizedBox(height: 18),
                     const _SectionLabel('GIVING TO'),
                     const SizedBox(height: 9),
+                    // Tapping opens the profile editor — the one place a member
+                    // can actually change their campus — not the payment flow.
                     _BranchSelector(
-                      branch: _kBranch,
-                      onTap: () => openGivingFlow(context, _kGivingUrl),
+                      branch: branch ?? _kAllCampusesLabel,
+                      onTap: () => context.push('/profile/edit'),
                     ),
                     const SizedBox(height: 14),
                     _GiveSecurelyButton(
@@ -161,7 +171,7 @@ class _BranchSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.cardWhite,
+          color: context.kc.surface,
           borderRadius: AppRadius.cardBorder,
           boxShadow: AppShadows.card,
         ),
@@ -171,7 +181,7 @@ class _BranchSelector extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.chipLight,
+                color: context.kc.chipBg,
                 borderRadius: AppRadius.tileBorder,
               ),
               child: const Icon(
@@ -187,14 +197,14 @@ class _BranchSelector extends StatelessWidget {
                 style: AppTypography.ui(
                   size: 15,
                   weight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: context.kc.onBg,
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 20,
-              color: AppColors.textMutedLight,
+              color: context.kc.muted,
             ),
           ],
         ),
@@ -258,17 +268,17 @@ class _SecureNote extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(
+        Icon(
           Icons.lock_outline_rounded,
           size: 13,
-          color: AppColors.textMutedLight,
+          color: context.kc.muted,
         ),
         const SizedBox(width: 6),
         Text(
           'Opens the secure Kharis giving page',
           style: AppTypography.ui(
             size: 11.5,
-            color: AppColors.textMutedLight,
+            color: context.kc.muted,
           ),
         ),
       ],
@@ -472,7 +482,7 @@ class _SectionLabel extends StatelessWidget {
         size: 11,
         weight: FontWeight.w700,
         letterSpacing: 1.1,
-        color: AppColors.textMutedLight,
+        color: context.kc.muted,
       ),
     );
   }

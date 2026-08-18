@@ -1,36 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/app_colors.dart';
-import 'package:kharis_app/core/theme/app_spacing.dart';
-import 'package:kharis_app/core/theme/app_typography.dart';
-import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
+import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
-import 'package:kharis_app/shared/providers/notes_provider.dart';
 
-/// Row of secondary player actions shown below the transport controls —
-/// dark design-handoff (v3): Notes · Playlist · Share, each an icon over a
-/// small muted-lavender label. Notes opens the note editor for the current
-/// sermon at the current playback position; Playlist and Share confirm with a
-/// lightweight toast.
+/// Row of secondary player actions shown below the transport controls:
+/// Notes · Playlist · Share, each an icon over a small muted label.
+///
+/// Notes opens [SermonNotesSheet] for the message on screen — everything
+/// already written against it, in timeline order, plus a "add a note at
+/// MM:SS" action stamped with the live playback position. Playlist opens
+/// [AddToPlaylistSheet], filing the message into the member's persisted
+/// playlists. Both are only rendered when a message is actually resolvable;
+/// Share confirms with a lightweight toast.
 class PlayerActions extends ConsumerWidget {
-  const PlayerActions({super.key});
+  const PlayerActions({super.key, this.sermon, this.timeline});
+
+  /// The message on screen. Supplied by the video player, whose sermon is not
+  /// the one loaded into the audio service. Falls back to whatever the audio
+  /// service is playing.
+  final Sermon? sermon;
+
+  /// The engine that owns playback on the hosting screen, handed through to
+  /// [SermonNotesSheet] so note capture and anchor seeks drive the ACTIVE
+  /// engine. Null means the audio service (the sheet's default).
+  final NoteTimelineBinding? timeline;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final target = sermon ?? ref.watch(currentSermonProvider);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _ActionButton(
-          icon: Icons.notes_rounded,
-          label: 'Notes',
-          onTap: () => _openNoteEditor(context, ref),
-        ),
-        _ActionButton(
-          icon: Icons.add_rounded,
-          label: 'Playlist',
-          onTap: () => _toast(context, 'Added to playlist'),
-        ),
+        if (target != null)
+          _ActionButton(
+            icon: Icons.notes_rounded,
+            label: 'Notes',
+            onTap: () =>
+                SermonNotesSheet.show(context, target, timeline: timeline),
+          ),
+        if (target != null)
+          _ActionButton(
+            icon: Icons.add_rounded,
+            label: 'Playlist',
+            onTap: () => showAddToPlaylistSheet(
+              context,
+              sermonId: target.id,
+              sermonTitle: target.title,
+            ),
+          ),
         _ActionButton(
           icon: Icons.ios_share_rounded,
           label: 'Share',
@@ -44,31 +66,10 @@ class PlayerActions extends ConsumerWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.darkSurface,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(milliseconds: 1700),
       ),
     );
-  }
-
-  void _openNoteEditor(BuildContext context, WidgetRef ref) {
-    final sermon = ref.read(currentSermonProvider);
-    final position = ref.read(positionProvider).valueOrNull ?? Duration.zero;
-
-    Navigator.of(context)
-        .push<void>(
-          MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (_) => NoteEditorScreen(
-              sermon: sermon,
-              positionMs: position.inMilliseconds,
-            ),
-          ),
-        )
-        .then((_) {
-      // Bump revision so any open NotesScreen list stays fresh.
-      ref.read(notesRevisionProvider.notifier).state++;
-    });
   }
 }
 
@@ -93,14 +94,14 @@ class _ActionButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.darkMuted2, size: 22),
+          Icon(icon, color: context.kc.muted, size: 22),
           const SizedBox(height: AppSpacing.xs),
           Text(
             label,
             style: AppTypography.ui(
               size: 10,
               weight: FontWeight.w600,
-              color: AppColors.darkMuted2,
+              color: context.kc.muted,
             ),
           ),
         ],

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:kharis_app/core/constants/api_config.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 
 /// A church branch / campus. Gradient colours and a landmark image are stored
@@ -56,8 +57,7 @@ class BranchRepository {
 
   final FirebaseFirestore _firestore;
 
-  static const String _apiUrl =
-      'https://us-central1-kharis-church.cloudfunctions.net/getBranches';
+  static const String _apiUrl = ApiConfig.getBranches;
 
   static final Dio _dio = Dio(
     BaseOptions(
@@ -78,15 +78,32 @@ class BranchRepository {
           .orderBy('order')
           .snapshots()
           .map((snap) {
-        final list = snap.docs.map((d) => _map(d.id, d.data())).toList();
-        // Show the full bundled network until the live data is migrated
-        // (detected by the presence of any KP2 branch), so every branch and
-        // KP2 location is always visible.
-        return list.any((b) => b.group == 'KP2') ? list : seedBranches;
+        final live = snap.docs.map((d) => _map(d.id, d.data())).toList();
+        return _mergeWithSeed(live);
       });
     } catch (_) {
       yield seedBranches;
     }
+  }
+
+  /// Overlays live Firestore branches onto the bundled network by id.
+  ///
+  /// The bundled [seedBranches] guarantee the full Kharis + KP2 network stays
+  /// visible even when the live collection holds only a partial migration,
+  /// while any branch the admin has edited or added wins over its seed twin.
+  /// This replaces an earlier all-or-nothing swap that discarded every live
+  /// document unless a KP2 branch existed, which silently reverted admin edits.
+  static List<Branch> _mergeWithSeed(List<Branch> live) {
+    if (live.isEmpty) return seedBranches;
+    final byId = <String, Branch>{
+      for (final b in seedBranches) b.id: b,
+      for (final b in live) b.id: b,
+    };
+    return byId.values.toList()
+      ..sort((a, b) {
+        final byOrder = a.order.compareTo(b.order);
+        return byOrder != 0 ? byOrder : a.name.compareTo(b.name);
+      });
   }
 
   /// One-shot fetch from the `getBranches` API. Returns `null` on any
@@ -190,7 +207,13 @@ class BranchRepository {
   Branch _map(String id, Map<String, dynamic> data) => Branch(
         id: id,
         name: data['name'] as String? ?? '',
-        subtitle: data['subtitle'] as String? ?? '',
+        // The web portal (admin/index.html) offers both `subtitle` and
+        // `description` inputs, and legacy docs used `location`. Fall through
+        // all three so a branch authored in either admin surface renders.
+        subtitle: data['subtitle'] as String? ??
+            data['description'] as String? ??
+            data['location'] as String? ??
+            '',
         gradientStart:
             Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF3B2A6B)),
         gradientEnd:

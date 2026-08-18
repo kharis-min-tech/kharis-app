@@ -98,7 +98,37 @@ IPA="$(find build/ios/ipa -name '*.ipa' 2>/dev/null | head -1)"
 [[ -n "$IPA" ]] || { echo "ERROR: no .ipa was produced under build/ios/ipa"; exit 1; }
 
 echo "==> Uploading to TestFlight: $IPA"
+# altool exits 0 on some upload failures (e.g. no App Store Connect app record
+# matches the bundle id), so trusting its exit status alone reports a success
+# that never reached TestFlight. Tee the output and fail on an ERROR line.
+UPLOAD_LOG="$(mktemp -t kharis_upload)"
+set +e
 xcrun altool --upload-app --type ios --file "$IPA" \
-  --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+  --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$UPLOAD_LOG"
+upload_status=${PIPESTATUS[0]}
+set -e
+
+if [[ $upload_status -ne 0 ]] || grep -q "ERROR" "$UPLOAD_LOG"; then
+  echo
+  echo "ERROR: upload failed — this build did NOT reach TestFlight."
+  if grep -q "Cannot determine the Apple ID from Bundle ID" "$UPLOAD_LOG"; then
+    BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+      "$ARCHIVE_PLIST" 2>/dev/null || echo unknown)"
+    echo
+    echo "No App Store Connect app record matches bundle id '$BUNDLE_ID'."
+    echo "Cloud signing succeeded, so the App ID and provisioning profile exist;"
+    echo "only the App Store Connect app record is missing. Create it at"
+    echo "  https://appstoreconnect.apple.com -> Apps -> (+) -> New App"
+    echo "using that exact bundle id, then re-run this script. App records"
+    echo "cannot be created through the App Store Connect API."
+    echo
+    echo "Existing records for this team:"
+    xcrun altool --list-apps --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" \
+      2>/dev/null | grep -E "Name:|Bundle ID:" || true
+  fi
+  rm -f "$UPLOAD_LOG"
+  exit 1
+fi
+rm -f "$UPLOAD_LOG"
 
 echo "==> Done. Build $BUILD_NUMBER appears in TestFlight after Apple processing (~5-15 min)."
