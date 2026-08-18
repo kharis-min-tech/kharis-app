@@ -163,7 +163,7 @@ void main() {
       // FlutterError handler and exceptions fail the test loudly.
       ApiConfig.warnIfProjectSplit();
       await JustAudioBackground.init(
-        androidNotificationChannelId: 'com.kharis.app.channel.audio',
+        androidNotificationChannelId: 'com.kharis.church.channel.audio',
         androidNotificationChannelName: 'Kharis audio playback',
         androidNotificationOngoing: true,
         fastForwardInterval: const Duration(seconds: 15),
@@ -228,7 +228,10 @@ void main() {
         // finder to a BranchTile descendant and take the first (BRANCHES
         // section precedes KP2). Tile tap IS the confirm (routes onward).
         final londonTile = find
-            .descendant(of: find.byType(BranchTile), matching: find.text('London'))
+            .descendant(
+              of: find.byType(BranchTile),
+              matching: find.text('London'),
+            )
             .first;
         await tester.ensureVisible(londonTile);
         await tester.pumpAndSettle();
@@ -241,13 +244,14 @@ void main() {
         // Guest". Accept either: pump until the shell appears, tapping the
         // guest button if the login screen shows up on the way.
         final guestButton = find.text('Continue as Guest');
-        final shellDeadline =
-            DateTime.now().add(const Duration(seconds: 90));
+        final shellDeadline = DateTime.now().add(const Duration(seconds: 90));
         while (tester.widgetList(navHomeLabel).isEmpty) {
           if (DateTime.now().isAfter(shellDeadline)) {
-            fail('Timed out waiting for the main shell after branch '
-                'confirm (login screen shown: '
-                '${tester.widgetList(guestButton).isNotEmpty})');
+            fail(
+              'Timed out waiting for the main shell after branch '
+              'confirm (login screen shown: '
+              '${tester.widgetList(guestButton).isNotEmpty})',
+            );
           }
           if (tester.widgetList(guestButton).isNotEmpty) {
             await hostShot(tester, 'step1d-login');
@@ -291,15 +295,17 @@ void main() {
         timeout: const Duration(seconds: 60),
         reason: 'Message of the Day card',
       );
-      final motdCard =
-          find.ancestor(of: motdLabel, matching: find.byType(PressEffect)).first;
+      final motdCard = find
+          .ancestor(of: motdLabel, matching: find.byType(PressEffect))
+          .first;
       expect(
         find.descendant(
           of: motdCard,
           matching: find.textContaining('A Living Witness'),
         ),
         findsOneWidget,
-        reason: 'MOTD card must carry the configured sermon '
+        reason:
+            'MOTD card must carry the configured sermon '
             '"A Living Witness For Jesus"',
       );
       await hostShot(tester, 'step3-messages-featured-motd');
@@ -314,8 +320,9 @@ void main() {
       // Give the YouTube surface a moment to attach before inspecting/shooting.
       await pumpFor(tester, const Duration(seconds: 4));
 
-      final toggle =
-          tester.widget<MediaModeToggle>(find.byType(MediaModeToggle));
+      final toggle = tester.widget<MediaModeToggle>(
+        find.byType(MediaModeToggle),
+      );
       expect(
         toggle.activeMode,
         MediaMode.video,

@@ -8,7 +8,7 @@
 	<string>YOUR_TEAM_ID</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>org.kharis.app</key>
+		<key>com.kharis.church</key>
 		<string>YOUR_PROVISIONING_PROFILE_NAME</string>
 	</dict>
 	<key>compileBitcode</key>

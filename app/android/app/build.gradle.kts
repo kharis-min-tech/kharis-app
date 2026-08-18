@@ -17,7 +17,7 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.reader().use { keystoreProperties.load(it) }
 }
 android {
-    namespace = "com.kharis.app"
+    namespace = "com.kharis.church"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.kharis.app"
+        applicationId = "com.kharis.church"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
