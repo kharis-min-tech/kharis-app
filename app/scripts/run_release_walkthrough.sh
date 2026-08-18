@@ -17,7 +17,7 @@ cd "$APP_DIR"
 # invisible to the Flutter test harness and would otherwise block the run the
 # moment guest sign-in subscribes to FCM topics. Needs wix/brew applesimutils.
 if command -v applesimutils >/dev/null 2>&1; then
-  applesimutils --byId "$UDID" --bundle org.kharis.kharisApp \
+  applesimutils --byId "$UDID" --bundle com.kharis.app \
     --setPermissions notifications=YES >/dev/null 2>&1 || true
 fi
 
