@@ -88,10 +88,24 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       }
     }
 
+    final library = ref.watch(sermonLibraryProvider);
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
+        child: NotificationListener<ScrollNotification>(
+          // Infinite scroll: near the bottom, pull the next archive page.
+          // loadMore() self-guards (in-flight / archive exhausted), so firing
+          // on every scroll tick is safe. Search renders a separate list, and
+          // its short scroll extent would otherwise page in the background.
+          onNotification: (n) {
+            if (!isSearching &&
+                n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
+              ref.read(sermonLibraryProvider.notifier).loadMore();
+            }
+            return false;
+          },
+          child: CustomScrollView(
           slivers: [
             // ── 1. Header + Search ───────────────────────────────────────────
             SliverToBoxAdapter(
@@ -455,11 +469,42 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                     );
                   },
                 ),
+              // ── 7. Archive paging footer ─────────────────────────────────
+              if (library.isLoadingMore)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: context.kc.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else if (library.loaded && !library.hasMore && sermons.length > 20)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'You\'ve reached the beginning \u2022 ${library.sermons.length} sermons',
+                        style: AppTypography.bodySm
+                            .copyWith(color: context.kc.muted),
+                      ),
+                    ),
+                  ),
+                ),
             ],
 
             // ── Bottom pad ──────────────────────────────────────────────────
             const SliverPadding(padding: EdgeInsets.only(bottom: 150)),
           ],
+          ),
         ),
       ),
     );
