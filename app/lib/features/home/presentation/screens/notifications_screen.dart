@@ -80,12 +80,13 @@ String _relativeLabel(DateTime dt, DateTime now) {
 }
 
 /// Merges announcements and upcoming events into one feed, drops rows the
-/// member has dismissed, and orders by nearness to [now].
+/// member has dismissed, and pins reminders on top.
 ///
-/// Sorting on the raw date would bury tomorrow's service under an event a
-/// month away, because event dates run forwards while announcement dates run
-/// backwards. Distance from now puts what matters today at the top regardless
-/// of which side of now it sits on.
+/// Upcoming events are reminders — things a member can still act on — so they
+/// outrank announcements, which are informational and already published. A
+/// service starting tomorrow must not sit under this morning's news post.
+/// Within the reminder block the soonest event leads; within announcements
+/// the freshest post leads.
 List<_NotifItem> _buildFeed({
   required List<NewsItem> news,
   required List<Event> events,
@@ -96,8 +97,14 @@ List<_NotifItem> _buildFeed({
     for (final n in news) _NotifItem.announcement(n),
     for (final e in events) _NotifItem.event(e),
   ]..removeWhere((i) => dismissed.contains(i.id));
-  items.sort((a, b) =>
-      a.date.difference(now).abs().compareTo(b.date.difference(now).abs()));
+  int rank(_NotifItem i) => i.kind == _NotifKind.event ? 0 : 1;
+  items.sort((a, b) {
+    final byKind = rank(a).compareTo(rank(b));
+    if (byKind != 0) return byKind;
+    return a.kind == _NotifKind.event
+        ? a.date.compareTo(b.date) // soonest reminder first
+        : b.date.compareTo(a.date); // freshest announcement first
+  });
   return items;
 }
 
