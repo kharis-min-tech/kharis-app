@@ -661,3 +661,83 @@ export const pushDailyReading = onSchedule(
     }
   },
 );
+
+// ─── Birthday pushes ──────────────────────────────────────────────────────────
+
+/**
+ * Daily 08:00 London: members whose profile `dob` (yyyy-mm-dd) matches
+ * today's month-day get a direct push on their saved device token
+ * (`users/{uid}.fcmToken`, written by the app at sign-in/refresh).
+ *
+ * The users collection is small (tens of docs); when it grows past ~2k,
+ * add a `dobMMDD` field at write time and query on it instead of the
+ * in-memory filter. A create()-guarded marker in `birthdayPushes/{date}`
+ * keeps retried runs idempotent, mirroring the daily-reading worker.
+ * Dead tokens are pruned so the next run stays clean.
+ */
+export const pushBirthdays = onSchedule(
+  { schedule: '0 8 * * *', timeZone: 'Europe/London', region: 'us-central1' },
+  async () => {
+    const db = getFirestore();
+    const todayFull = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Europe/London',
+    }); // yyyy-mm-dd
+    const monthDay = todayFull.slice(5); // mm-dd
+
+    const marker = db.collection('birthdayPushes').doc(todayFull);
+    try {
+      await marker.create({ claimedAt: FieldValue.serverTimestamp() });
+    } catch {
+      console.log(`[birthday] ${todayFull} already claimed; skipping`);
+      return;
+    }
+
+    const snap = await db.collection('users').limit(2000).get();
+    const celebrants = snap.docs.filter((d) => {
+      const dob = d.data().dob;
+      return (
+        typeof dob === 'string' &&
+        dob.slice(5) === monthDay &&
+        typeof d.data().fcmToken === 'string' &&
+        d.data().fcmToken.length > 0
+      );
+    });
+    if (celebrants.length === 0) {
+      console.log(`[birthday] no celebrants for ${monthDay}`);
+      return;
+    }
+
+    let sent = 0;
+    for (const doc of celebrants) {
+      const { fcmToken, displayName } = doc.data() as {
+        fcmToken: string;
+        displayName?: string;
+      };
+      const first = (displayName ?? '').trim().split(/\s+/)[0];
+      try {
+        await getMessaging().send({
+          token: fcmToken,
+          notification: {
+            title: 'Happy birthday! 🎉',
+            body: first
+              ? `${first}, the whole Kharis family is celebrating you today.`
+              : 'The whole Kharis family is celebrating you today.',
+          },
+          data: { type: 'birthday' },
+        });
+        sent += 1;
+      } catch (err) {
+        const code = (err as { code?: string }).code ?? '';
+        console.warn(`[birthday] send failed for ${doc.id}: ${code}`);
+        if (code.includes('registration-token-not-registered')) {
+          await doc.ref.update({ fcmToken: FieldValue.delete() });
+        }
+      }
+    }
+    await marker.set(
+      { pushedAt: FieldValue.serverTimestamp(), celebrants: celebrants.length, sent },
+      { merge: true },
+    );
+    console.log(`[birthday] sent ${sent}/${celebrants.length} for ${monthDay}`);
+  },
+);
