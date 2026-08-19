@@ -43,7 +43,7 @@ fi
 echo ""
 echo "=== Next Steps (Google Play Console) ==="
 echo "1. Go to https://play.google.com/console"
-echo "2. Select or create the Kharis app (package: org.kharis.app)"
+echo "2. Select or create the Kharis app (package: com.kharis.church)"
 echo "3. Navigate to: Release > Production (or Internal testing)"
 echo "4. Click 'Create new release' and upload: $AAB_PATH"
 echo "5. Fill in release notes and roll out"

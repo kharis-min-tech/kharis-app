@@ -8,7 +8,7 @@
 PRODUCT_NAME = kharis_app
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.kharis.app
+PRODUCT_BUNDLE_IDENTIFIER = com.kharis.church
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 org.kharis. All rights reserved.

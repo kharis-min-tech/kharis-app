@@ -1,4 +1,4 @@
-package com.kharis.app
+package com.kharis.church
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
