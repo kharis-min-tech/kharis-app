@@ -34,7 +34,7 @@ Future<void> main() async {
       // CarPlay + lock screen podcast-style ±15 s buttons (sermons have no
       // next/previous queue, so skip buttons are the useful transport).
       await JustAudioBackground.init(
-        androidNotificationChannelId: 'com.kharis.app.channel.audio',
+        androidNotificationChannelId: 'com.kharis.church.channel.audio',
         androidNotificationChannelName: 'Kharis audio playback',
         androidNotificationOngoing: true,
         fastForwardInterval: const Duration(seconds: 15),

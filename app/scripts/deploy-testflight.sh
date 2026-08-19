@@ -7,7 +7,7 @@
 #
 # One-time setup (already done for this project — kept for reproducibility):
 #   1. developer.apple.com -> Certificates, IDs & Profiles -> Identifiers:
-#      register an explicit App ID for `com.kharis.app` (enable Push
+#      register an explicit App ID for `com.kharis.church` (enable Push
 #      Notifications for FCM).
 #   2. App Store Connect -> Apps -> (+) -> New App for that bundle ID
 #      ("Kharis Church App", primary language English (U.K.)).

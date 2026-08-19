@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # set-bundle-id.sh — Set iOS/macOS bundle ID and display name
 # Usage: ./scripts/set-bundle-id.sh [bundle-id] [display-name]
-#   Defaults: org.kharis.app / "Kharis Church"
+#   Defaults: com.kharis.church / "Kharis Church"
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-BUNDLE_ID="${1:-org.kharis.app}"
+BUNDLE_ID="${1:-com.kharis.church}"
 DISPLAY_NAME="${2:-Kharis Church}"
 
 PBXPROJ="$PROJECT_ROOT/ios/Runner.xcodeproj/project.pbxproj"
