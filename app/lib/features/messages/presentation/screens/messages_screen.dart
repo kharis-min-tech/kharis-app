@@ -106,6 +106,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             return false;
           },
           child: CustomScrollView(
+          // Retain scroll offset across tab switches and rebuilds.
+          key: const PageStorageKey<String>('messages-scroll'),
           slivers: [
             // ── 1. Header + Search ───────────────────────────────────────────
             SliverToBoxAdapter(

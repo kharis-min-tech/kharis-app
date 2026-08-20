@@ -237,11 +237,13 @@ final selectedCategoryProvider = StateProvider<String>((ref) {
 /// Always starts with 'All'; buckets with zero sermons are hidden.
 final categoryLabelsProvider = Provider<List<String>>((ref) {
   final sermonsAsync = ref.watch(sermonsProvider);
-  final present = sermonsAsync.when(
-    data: (sermons) => sermons.map((s) => s.category).whereType<String>().toSet(),
-    loading: () => const <String>{},
-    error: (_, _) => const <String>{},
-  );
+  // valueOrNull keeps the previous merge while a page-append reload is in
+  // flight. The old `when(loading:)` form emptied this on every loadMore,
+  // which collapsed the topic rails mid-scroll and shrank the scroll extent.
+  final present = (sermonsAsync.valueOrNull ?? const <Sermon>[])
+      .map((s) => s.category)
+      .whereType<String>()
+      .toSet();
   return [
     'All',
     for (final c in kSermonCategories)
@@ -255,33 +257,33 @@ final librarySermonsProvider = Provider<List<Sermon>>((ref) {
   final category = ref.watch(selectedCategoryProvider);
   final sort = ref.watch(sermonSortProvider);
 
-  return sermonsAsync.when(
-    data: (sermons) {
-      final filtered = category == 'All'
-          ? List.of(sermons)
-          : sermons.where((s) => s.category == category).toList();
-      switch (sort) {
-        case SermonSort.newest:
-          filtered.sort((a, b) => (b.publishedAt ?? DateTime(0))
-              .compareTo(a.publishedAt ?? DateTime(0)));
-        case SermonSort.oldest:
-          filtered.sort((a, b) => (a.publishedAt ?? DateTime(0))
-              .compareTo(b.publishedAt ?? DateTime(0)));
-        case SermonSort.longest:
-          filtered.sort((a, b) =>
-              (b.duration ?? Duration.zero).compareTo(a.duration ?? Duration.zero));
-        case SermonSort.shortest:
-          filtered.sort((a, b) =>
-              (a.duration ?? Duration.zero).compareTo(b.duration ?? Duration.zero));
-        case SermonSort.az:
-          filtered.sort(
-              (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-      }
-      return filtered;
-    },
-    loading: () => const [],
-    error: (_, _) => const [],
-  );
+  // Previous-data-aware: every loadMore append briefly re-runs
+  // [sermonsProvider], and the old `when(loading: () => const [])` swapped
+  // ~40 rows for a skeleton screen each time — the scroll extent shrank and
+  // the member's position clamped back to the top (Android device, 3/3
+  // repro). valueOrNull carries the prior list through reload cycles.
+  final sermons = sermonsAsync.valueOrNull ?? const <Sermon>[];
+  final filtered = category == 'All'
+      ? List.of(sermons)
+      : sermons.where((s) => s.category == category).toList();
+  switch (sort) {
+    case SermonSort.newest:
+      filtered.sort((a, b) => (b.publishedAt ?? DateTime(0))
+          .compareTo(a.publishedAt ?? DateTime(0)));
+    case SermonSort.oldest:
+      filtered.sort((a, b) => (a.publishedAt ?? DateTime(0))
+          .compareTo(b.publishedAt ?? DateTime(0)));
+    case SermonSort.longest:
+      filtered.sort((a, b) => (b.duration ?? Duration.zero)
+          .compareTo(a.duration ?? Duration.zero));
+    case SermonSort.shortest:
+      filtered.sort((a, b) => (a.duration ?? Duration.zero)
+          .compareTo(b.duration ?? Duration.zero));
+    case SermonSort.az:
+      filtered.sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+  }
+  return filtered;
 });
 
 // ── Videos (YouTube non-shorts, LIVE from feed) ──────────────────────────────
