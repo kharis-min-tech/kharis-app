@@ -7,6 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/core/utils/share_sermon.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart'
     show NoteTimelineBinding;
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
@@ -277,14 +278,24 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           child: Column(
             children: [
               _buildHeader(),
+              // The video stays pinned outside the scrollable so a swipe on
+              // the picture never scrolls the page out from under playback
+              // (tester feedback); everything below it still scrolls.
+              if (isVideo)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                  child: _buildVideoSurface(),
+                ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      isVideo ? _buildVideoSurface() : _buildArtwork(),
-                      const SizedBox(height: 24),
+                      if (!isVideo) ...[
+                        _buildArtwork(),
+                        const SizedBox(height: 24),
+                      ],
                       _buildInfoRow(),
                       const SizedBox(height: 18),
                       MediaModeToggle(
@@ -414,13 +425,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           _iconButton(
             Icons.ios_share_rounded,
             20,
-            () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Share link copied'),
-                behavior: SnackBarBehavior.floating,
-                duration: Duration(milliseconds: 1700),
-              ),
-            ),
+            () => unawaited(shareSermon(widget.sermon)),
           ),
         ],
       ),

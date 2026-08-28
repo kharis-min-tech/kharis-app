@@ -58,3 +58,8 @@ node_modules/
 app/env.json
 admin/.firebase/
 app/.omc/
+.claude/
+.omc/
+**/.omc/
+bugreport-*.zip
+**/xcshareddata/swiftpm/Package.resolved

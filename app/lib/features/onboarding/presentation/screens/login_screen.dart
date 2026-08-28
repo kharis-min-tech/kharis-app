@@ -58,7 +58,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authRepositoryProvider).loginAsGuest();
-      if (mounted) context.go('/home');
+      // Guests skip register's branch step, so ask here — otherwise the
+      // events feed defaults to every campus at once (tester feedback).
+      if (mounted) context.go('/branch-selection');
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -242,16 +244,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 40),
 
                 // ── Continue as Guest ───────────────────────────────────────
-                TextButton(
-                  onPressed: _isLoading ? null : _continueAsGuest,
-                  style: TextButton.styleFrom(
-                    foregroundColor: context.kc.muted,
-                  ),
-                  child: Text(
-                    'Continue as Guest',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      color: context.kc.muted,
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : _continueAsGuest,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.kc.onBg,
+                      side: BorderSide(color: context.kc.divider),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Continue as Guest',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: context.kc.onBg,
+                      ),
                     ),
                   ),
                 ),
