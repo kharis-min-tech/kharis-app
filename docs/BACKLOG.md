@@ -54,3 +54,18 @@ Sketch:
 First slice: "propose metadata from YouTube URL" only (no audio processing)
 — title/speaker/series parsing is already 80% regex on our own naming
 convention, LLM fills the rest.
+
+## Tester feedback — round 1 (24 Aug, NJ + New Believers lead)
+
+Quick fixes are on the working board (Fixes phase). Larger asks, roughly by leverage:
+
+1. **In-app registrations hub** — events (50/20, LTBS, seminars), K-Groups, departments, baptism, baby dedication, Spiritual Maturity, testimonies. Single dynamic-form system covers all.
+2. **"I AM KHARIS" personal journey** — milestones (joined, baptised, classes, department), prayer/reading streaks, reminders to pray. Pairs with birthday-worker infra + profile fields (dob/phone already added).
+3. **Prayer features** — record/track own prayers, prayer network (share requests, see praying activity), verse memorisation.
+4. **Offline downloads** for sermons (listen/view without data).
+5. **Giving** — pledge tracking + self-set reminders (bank-copy + building-fund progress already shipped).
+6. **AI** — FAQ/support bot; sermon translation + sign-language accessibility; post-sermon quizzes (Hebrew/Greek words).
+7. **Content** — church history timeline, social links, privacy/GDPR page, branch location data completeness (only Phase 2 + Chatham maps work — CMS data, not code).
+8. **Playlists** — creation exists but discoverability poor; add explicit "New playlist" entry.
+
+Notes: video = youtube_player_iframe, so in-app watching **does count toward YouTube viewership** (keep). Sermon coverage gaps (Phase 2 vs London) are catalogue/CMS-side, not app-side.
