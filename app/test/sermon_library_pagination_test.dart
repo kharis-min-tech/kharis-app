@@ -69,6 +69,13 @@ void main() {
       sermonRepositoryProvider.overrideWithValue(repo),
       // Manual-paging tests drive loadMore() themselves.
       sermonArchiveAutoHydrateProvider.overrideWithValue(autoHydrate),
+      // No Firebase in tests: emit an empty CMS layer immediately so the
+      // merged catalogue can settle.
+      adminSermonsProvider.overrideWith((ref) => Stream.value(const <Sermon>[])),
+      // Both read CacheService for their persisted value, which intentionally
+      // throws unless overridden; tests only need plain defaults.
+      selectedCategoryProvider.overrideWith((ref) => 'All'),
+      sermonSortProvider.overrideWith((ref) => SermonSort.newest),
     ]);
     addTearDown(container.dispose);
     return (container, repo);
@@ -167,6 +174,16 @@ void main() {
   // alone left 1,435 of 1,485 sermons unreachable, so "Oldest" sorted only the
   // newest page. The library must reach the end of the archive on its own.
 
+  /// Pumps until the merged catalogue has a value. [sermonsProvider] re-runs on
+  /// every appended page, so awaiting `.future` races the hydration loop.
+  Future<void> settleCatalogue(ProviderContainer c) async {
+    c.listen(sermonsProvider, (_, _) {}, fireImmediately: true);
+    for (var i = 0; i < 400; i++) {
+      if (c.read(sermonsProvider).valueOrNull != null) return;
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
+
   /// Pumps microtasks until the background walk finishes (or gives up).
   Future<void> settleHydration(ProviderContainer c) async {
     for (var i = 0; i < 200; i++) {
@@ -247,5 +264,73 @@ void main() {
     expect(restored.videoId, 'abc123');
     expect(restored.source, 'kharis-api');
     expect(restored.isFeatured, isTrue);
+  });
+
+  // ── Year navigation ────────────────────────────────────────────────────────
+  //
+  // Reachable is not the same as navigable: 1,485 sermons across 2013-2026 need
+  // a jump, not a scroll. These guard the year rail's data.
+
+  test('archive years are derived newest-first with per-year counts', () async {
+    Sermon dated(String id, DateTime when) => Sermon(
+          id: id,
+          title: 'Message $id',
+          speaker: 'David Antwi',
+          audioUrl: 'https://x.test/$id.mp3',
+          publishedAt: when,
+        );
+    final (container, _) = harness(
+      autoHydrate: true,
+      pages: [
+        [dated('1', DateTime(2026, 8, 23)), dated('2', DateTime(2026, 1, 4))],
+        [dated('3', DateTime(2019, 5, 5))],
+        [dated('4', DateTime(2013, 9, 18)), dated('5', DateTime(2013, 11, 20))],
+      ],
+    );
+    await container.read(sermonLibraryProvider.notifier).firstLoad;
+    await settleHydration(container);
+    // The year rails derive from the merged catalogue.
+    await settleCatalogue(container);
+
+    expect(container.read(archiveYearsProvider), [2026, 2019, 2013],
+        reason: 'newest year first, one entry per year');
+    expect(container.read(archiveYearCountsProvider),
+        {2026: 2, 2019: 1, 2013: 2});
+  });
+
+  test('selecting a year narrows the library and clearing restores it',
+      () async {
+    Sermon dated(String id, String title, DateTime when) => Sermon(
+          id: id,
+          title: title,
+          speaker: 'David Antwi',
+          audioUrl: 'https://x.test/$id.mp3',
+          publishedAt: when,
+        );
+    final (container, _) = harness(
+      autoHydrate: true,
+      pages: [
+        [dated('1', 'From Acts To Us', DateTime(2026, 8, 23))],
+        [dated('2', 'Question Time - Pt 1', DateTime(2013, 11, 20))],
+        [dated('3', 'Who You Are In Christ - 3', DateTime(2013, 9, 18))],
+      ],
+    );
+    await container.read(sermonLibraryProvider.notifier).firstLoad;
+    await settleHydration(container);
+    await settleCatalogue(container);
+
+    expect(container.read(librarySermonsProvider).length, 3);
+
+    container.read(selectedArchiveYearProvider.notifier).state = 2013;
+    final only2013 = container.read(librarySermonsProvider);
+    expect(only2013.length, 2);
+    expect(only2013.every((s) => s.publishedAt!.year == 2013), isTrue);
+    expect(
+      only2013.map((s) => s.title),
+      containsAll(['Question Time - Pt 1', 'Who You Are In Christ - 3']),
+    );
+
+    container.read(selectedArchiveYearProvider.notifier).state = null;
+    expect(container.read(librarySermonsProvider).length, 3);
   });
 }

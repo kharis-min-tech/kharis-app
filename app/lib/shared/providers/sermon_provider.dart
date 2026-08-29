@@ -319,6 +319,34 @@ final sermonSortProvider = StateProvider<SermonSort>((ref) {
   );
 });
 
+/// Active archive-year filter; `null` = every year.
+///
+/// Deliberately NOT persisted: waking up next launch still filtered to 2014
+/// would look like the archive had shrunk again.
+final selectedArchiveYearProvider = StateProvider<int?>((ref) => null);
+
+/// Years present in the hydrated catalogue, newest first.
+final archiveYearsProvider = Provider<List<int>>((ref) {
+  final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+  final years = {
+    for (final s in sermons)
+      if (s.publishedAt != null) s.publishedAt!.year,
+  }.toList()
+    ..sort((a, b) => b.compareTo(a));
+  return years;
+});
+
+/// How many sermons sit in each year, for the year rail's counts.
+final archiveYearCountsProvider = Provider<Map<int, int>>((ref) {
+  final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+  final counts = <int, int>{};
+  for (final s in sermons) {
+    final y = s.publishedAt?.year;
+    if (y != null) counts[y] = (counts[y] ?? 0) + 1;
+  }
+  return counts;
+});
+
 /// Active category filter — a label from [kSermonCategories]. 'All' = none.
 final selectedCategoryProvider = StateProvider<String>((ref) {
   final cache = ref.read(cacheServiceProvider);
@@ -349,6 +377,7 @@ final categoryLabelsProvider = Provider<List<String>>((ref) {
 final librarySermonsProvider = Provider<List<Sermon>>((ref) {
   final sermonsAsync = ref.watch(sermonsProvider);
   final category = ref.watch(selectedCategoryProvider);
+  final year = ref.watch(selectedArchiveYearProvider);
   final sort = ref.watch(sermonSortProvider);
 
   // Previous-data-aware: every loadMore append briefly re-runs
@@ -357,9 +386,14 @@ final librarySermonsProvider = Provider<List<Sermon>>((ref) {
   // the member's position clamped back to the top (Android device, 3/3
   // repro). valueOrNull carries the prior list through reload cycles.
   final sermons = sermonsAsync.valueOrNull ?? const <Sermon>[];
-  final filtered = category == 'All'
+  var filtered = category == 'All'
       ? List.of(sermons)
       : sermons.where((s) => s.category == category).toList();
+  if (year != null) {
+    filtered = filtered
+        .where((s) => s.publishedAt?.year == year)
+        .toList();
+  }
   switch (sort) {
     case SermonSort.newest:
       filtered.sort((a, b) => (b.publishedAt ?? DateTime(0))

@@ -69,6 +69,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final isFiltered = selectedCategory != 'All';
 
+    // Archive year navigation: 1,485 sermons across 2013-2026 are reachable
+    // once hydrated, but only navigable with a jump.
+    final archiveYears = ref.watch(archiveYearsProvider);
+    final archiveYearCounts = ref.watch(archiveYearCountsProvider);
+    final selectedYear = ref.watch(selectedArchiveYearProvider);
+
     // Featured + Message of the Day + recently played.
     final featured = ref.watch(featuredSermonsProvider);
     final motd = ref.watch(motdSermonProvider);
@@ -388,7 +394,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              isFiltered ? selectedCategory : 'All Messages',
+                              [
+                                if (isFiltered)
+                                  selectedCategory
+                                else
+                                  'All Messages',
+                                if (selectedYear != null) '$selectedYear',
+                              ].join(' \u00b7 '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.bodyLg.copyWith(
@@ -433,6 +445,49 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   ),
                 ),
               ),
+
+              // ── 5b. Jump to year ─────────────────────────────────────────
+              // A decade is reachable by sorting, but not navigable: this rail
+              // turns "scroll 1,400 rows" into one tap.
+              if (archiveYears.length > 1)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: SizedBox(
+                      height: 36,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: archiveYears.length + 1,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return _SortPill(
+                              label: 'All years',
+                              active: selectedYear == null,
+                              onTap: () => ref
+                                  .read(selectedArchiveYearProvider.notifier)
+                                  .state = null,
+                            );
+                          }
+                          final year = archiveYears[index - 1];
+                          final count = archiveYearCounts[year] ?? 0;
+                          return _SortPill(
+                            label: '$year ($count)',
+                            active: selectedYear == year,
+                            onTap: () {
+                              ref
+                                      .read(selectedArchiveYearProvider.notifier)
+                                      .state =
+                                  selectedYear == year ? null : year;
+                              _scrollToList();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
 
               // ── 6. Sermon list ───────────────────────────────────────────
               if (sermons.isEmpty && sermonsAsync.isLoading)
