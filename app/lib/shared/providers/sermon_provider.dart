@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/cache_service.dart';
 import '../../core/utils/sermon_categorizer.dart';
 import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
@@ -83,27 +86,55 @@ class SermonLibrary {
 /// the beginning of time (the earliest sermon), exactly as far as the user
 /// scrolls. Page 1 loads eagerly; [loadMore] appends the rest.
 class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
-  SermonLibraryNotifier(this._repo) : super(const SermonLibrary()) {
+  SermonLibraryNotifier(
+    this._repo, {
+    this.cache,
+    this.autoHydrate = true,
+  }) : super(const SermonLibrary()) {
     _firstLoad = _init();
   }
 
   final AbstractSermonRepository _repo;
+
+  /// Disk cache for the drained archive; null in tests/CI.
+  final CacheService? cache;
+
+  /// Drain the archive in the background once page 1 lands.
+  final bool autoHydrate;
+  bool _hydrating = false;
   late final Future<void> _firstLoad;
 
   /// Completes when page 1 (or the offline fallback) has landed.
   Future<void> get firstLoad => _firstLoad;
 
   Future<void> _init() async {
+    // Paint last session's fully-drained archive immediately: a decade of
+    // sermons, sortable and searchable, with no network round-trip.
+    final cached = cache?.getCachedSermons() ?? const <Map<String, dynamic>>[];
+    if (cached.isNotEmpty) {
+      state = SermonLibrary(
+        sermons: [for (final m in cached) Sermon.fromJson(m)],
+        totalCount: cached.length,
+        loaded: true,
+      );
+    }
     try {
       final page = await _repo.fetchPage();
       if (!mounted) return;
+      // Page 1 carries the newest arrivals; the cached tail follows it.
+      final seen = <String>{};
       state = SermonLibrary(
-        sermons: page.sermons,
+        sermons: [
+          ...page.sermons.where((s) => seen.add(s.id)),
+          ...state.sermons.where((s) => seen.add(s.id)),
+        ],
         nextUrl: page.nextUrl,
         totalCount: page.totalCount,
         loaded: true,
       );
     } catch (_) {
+      // A cached archive on screen beats any fallback.
+      if (!mounted || state.loaded) return;
       // Offline / CI fallback — never leaves the user with an empty screen.
       final catalogue = await _repo.loadCatalogue();
       if (!mounted) return;
@@ -113,7 +144,56 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
         loaded: true,
         usedFallback: true,
       );
+      return;
     }
+    if (autoHydrate) unawaited(hydrateArchive());
+  }
+
+  /// Drains every remaining page in the background so the *whole* archive is
+  /// browsable, sortable and searchable without the member scrolling for it.
+  ///
+  /// Paging on scroll alone made 1,435 of 1,485 sermons unreachable in
+  /// practice: nobody flings 29 times, so "Oldest" only ever sorted the newest
+  /// page and the library looked like it began in 2025. The full walk is 30
+  /// requests / ~1.4 MB / ~14 s, so it runs after first paint and is cached on
+  /// completion — later launches start from disk and only fetch page 1.
+  Future<void> hydrateArchive() async {
+    if (_hydrating) return;
+    _hydrating = true;
+    try {
+      // Cache already holds the archive; page 1 covered new arrivals.
+      if (state.totalCount > 0 && state.sermons.length >= state.totalCount) {
+        state = state.copyWith(clearNextUrl: true);
+        _persist();
+        return;
+      }
+      while (mounted && state.nextUrl != null) {
+        final page = await _repo.fetchPage(url: state.nextUrl);
+        if (!mounted) return;
+        final seen = {for (final s in state.sermons) s.id};
+        state = state.copyWith(
+          sermons: [
+            ...state.sermons,
+            ...page.sermons.where((s) => seen.add(s.id)),
+          ],
+          nextUrl: page.nextUrl,
+          clearNextUrl: page.nextUrl == null,
+          totalCount:
+              page.totalCount == 0 ? state.totalCount : page.totalCount,
+        );
+      }
+      if (mounted && state.nextUrl == null) _persist();
+    } catch (_) {
+      // Leave nextUrl intact so scroll-triggered loadMore still retries.
+    } finally {
+      _hydrating = false;
+    }
+  }
+
+  void _persist() {
+    final cache = this.cache;
+    if (cache == null || state.usedFallback || state.sermons.isEmpty) return;
+    cache.cacheSermons([for (final s in state.sermons) s.toJson()]);
   }
 
   /// Fetches the next page and appends it. Safe to call repeatedly from
@@ -122,6 +202,8 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   Future<void> loadMore() async {
     final next = state.nextUrl;
     if (next == null || state.isLoadingMore || !state.loaded) return;
+    // Background hydration owns sequential paging while it runs.
+    if (_hydrating) return;
     state = state.copyWith(isLoadingMore: true);
     try {
       final page = await _repo.fetchPage(url: next);
@@ -157,9 +239,21 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
 /// *stream*, and if the page fetches lived there too, every CMS emission —
 /// including the one that lands moments after first build — would re-run the
 /// API round-trips behind an already-populated list.
+/// Disk cache for the hydrated archive. Overridden in `main.dart`; stays null
+/// in tests and CI, where Hive is not initialised.
+final sermonArchiveCacheProvider = Provider<CacheService?>((ref) => null);
+
+/// Whether the library drains the whole archive in the background once page 1
+/// lands. Tests override this to `false` to drive [loadMore] page by page.
+final sermonArchiveAutoHydrateProvider = Provider<bool>((ref) => true);
+
 final sermonLibraryProvider =
     StateNotifierProvider<SermonLibraryNotifier, SermonLibrary>(
-  (ref) => SermonLibraryNotifier(ref.watch(sermonRepositoryProvider)),
+  (ref) => SermonLibraryNotifier(
+    ref.watch(sermonRepositoryProvider),
+    cache: ref.watch(sermonArchiveCacheProvider),
+    autoHydrate: ref.watch(sermonArchiveAutoHydrateProvider),
+  ),
 );
 
 /// All audio sermons, freshest source first.

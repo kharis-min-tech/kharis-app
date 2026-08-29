@@ -18,6 +18,7 @@ import 'shared/providers/theme_provider.dart';
 import 'core/theme/theme.dart';
 import 'shared/providers/auth_provider.dart';
 import 'shared/providers/cache_provider.dart';
+import 'shared/providers/sermon_provider.dart';
 import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
 
@@ -64,6 +65,7 @@ Future<void> main() async {
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
             cacheServiceProvider.overrideWithValue(cacheService),
+            sermonArchiveCacheProvider.overrideWithValue(cacheService),
           ],
           child: const KharisApp(),
         ),

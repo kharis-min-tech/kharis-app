@@ -51,8 +51,11 @@ class _FakePagedRepo extends AbstractSermonRepository {
 }
 
 void main() {
-  (ProviderContainer, _FakePagedRepo) harness(
-      {List<List<Sermon>>? pages, bool failFirstLoad = false}) {
+  (ProviderContainer, _FakePagedRepo) harness({
+    List<List<Sermon>>? pages,
+    bool failFirstLoad = false,
+    bool autoHydrate = false,
+  }) {
     final repo = _FakePagedRepo(
       pages ??
           [
@@ -64,6 +67,8 @@ void main() {
     );
     final container = ProviderContainer(overrides: [
       sermonRepositoryProvider.overrideWithValue(repo),
+      // Manual-paging tests drive loadMore() themselves.
+      sermonArchiveAutoHydrateProvider.overrideWithValue(autoHydrate),
     ]);
     addTearDown(container.dispose);
     return (container, repo);
@@ -154,5 +159,93 @@ void main() {
     expect(lib.hasMore, isTrue);
     expect(repo.requested.where((u) => u == null).length, 2,
         reason: 'refresh refetches page 1');
+  });
+
+  // ── Full-archive hydration ─────────────────────────────────────────────────
+  //
+  // Regression guard for "I can only see as far as 2025": paging on scroll
+  // alone left 1,435 of 1,485 sermons unreachable, so "Oldest" sorted only the
+  // newest page. The library must reach the end of the archive on its own.
+
+  /// Pumps microtasks until the background walk finishes (or gives up).
+  Future<void> settleHydration(ProviderContainer c) async {
+    for (var i = 0; i < 200; i++) {
+      if (!c.read(sermonLibraryProvider).hasMore &&
+          c.read(sermonLibraryProvider).loaded) {
+        return;
+      }
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
+
+  test('hydrates the whole archive in the background, no scrolling needed',
+      () async {
+    final (container, repo) = harness(autoHydrate: true);
+    await container.read(sermonLibraryProvider.notifier).firstLoad;
+    await settleHydration(container);
+
+    final lib = container.read(sermonLibraryProvider);
+    expect(lib.sermons.map((s) => s.id), ['1', '2', '3', '4'],
+        reason: 'every page must land without a single loadMore() call');
+    expect(lib.hasMore, isFalse);
+    expect(lib.sermons.length, lib.totalCount);
+    // Each page fetched exactly once.
+    expect(repo.requested.length, 3);
+  });
+
+  test('oldest-first sort spans the decade, not just page 1', () async {
+    // Mirrors the real archive: newest page first, 2013 on the last page.
+    Sermon dated(String id, String title, DateTime when) => Sermon(
+          id: id,
+          title: title,
+          speaker: 'David Antwi',
+          audioUrl: 'https://x.test/$id.mp3',
+          publishedAt: when,
+        );
+    final (container, _) = harness(
+      autoHydrate: true,
+      pages: [
+        [dated('1', 'From Acts To Us', DateTime(2026, 8, 23))],
+        [dated('2', 'Hope in God\u2019s Promise', DateTime(2019, 5, 5))],
+        [dated('3', 'Who You Are In Christ - 3', DateTime(2013, 9, 18))],
+      ],
+    );
+    await container.read(sermonLibraryProvider.notifier).firstLoad;
+    await settleHydration(container);
+
+    final sermons = container.read(sermonLibraryProvider).sermons.toList()
+      ..sort((a, b) => (a.publishedAt ?? DateTime(0))
+          .compareTo(b.publishedAt ?? DateTime(0)));
+    expect(sermons.first.title, 'Who You Are In Christ - 3',
+        reason: 'oldest-first must reach the end of the archive');
+    expect(sermons.first.publishedAt!.year, 2013);
+    expect(sermons.length, 3);
+  });
+
+  test('archive survives a JSON round-trip for the disk cache', () {
+    final original = Sermon(
+      id: '23929',
+      title: 'Who You Are In Christ - 3',
+      speaker: 'David Antwi',
+      audioUrl: 'https://yetanothersermon.host/_/kc/media/mp3/23929.mp3',
+      artworkUrl: 'https://x.test/art.jpg',
+      duration: const Duration(minutes: 47, seconds: 12),
+      publishedAt: DateTime(2013, 9, 18),
+      series: 'Who You Are In Christ',
+      description: 'Identity in Christ.',
+      artworkColor: 9,
+      category: 'Faith',
+      videoId: 'abc123',
+      source: 'kharis-api',
+      isFeatured: true,
+    );
+
+    final restored = Sermon.fromJson(original.toJson());
+    expect(restored, original);
+    expect(restored.duration, const Duration(minutes: 47, seconds: 12));
+    expect(restored.publishedAt, DateTime(2013, 9, 18));
+    expect(restored.videoId, 'abc123');
+    expect(restored.source, 'kharis-api');
+    expect(restored.isFeatured, isTrue);
   });
 }
