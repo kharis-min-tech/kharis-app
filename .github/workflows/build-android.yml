@@ -1,5 +1,21 @@
 name: Build Android
 
+# Builds a signed release App Bundle for Play upload.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions).
+# NONE of these are set today, so this workflow has never completed a run:
+#
+#   KEYSTORE_BASE64  Upload keystore, base64 of app/android/keystore/kharis-release.jks
+#                      base64 -i app/android/keystore/kharis-release.jks | pbcopy
+#   KEY_PROPERTIES   Verbatim copy of app/android/key.properties:
+#                      storeFile=../keystore/kharis-release.jks
+#                      storePassword=…
+#                      keyAlias=kharis-release
+#                      keyPassword=…
+#   ENV_JSON         Verbatim copy of app/env.json (YOUVERSION_API_KEY,
+#                    YOUTUBE_API_KEY). Without it the build still succeeds but
+#                    ships without the Bible-reading and YouTube keys.
+
 'on':
   workflow_dispatch:
     inputs:
@@ -15,12 +31,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Fail with a readable message instead of dying inside Gradle later.
+      - name: Check required secrets are present
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PROPERTIES: ${{ secrets.KEY_PROPERTIES }}
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: |
+          missing=""
+          [ -n "$KEYSTORE_BASE64" ] || missing="$missing KEYSTORE_BASE64"
+          [ -n "$KEY_PROPERTIES" ]  || missing="$missing KEY_PROPERTIES"
+          [ -n "$ENV_JSON" ]        || missing="$missing ENV_JSON"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing — see the header of .github/workflows/build-android.yml"
+            exit 1
+          fi
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
+      # Project needs Flutter >= 3.44 / Dart >= 3.12.1 (see BUILD.md).
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -30,19 +63,62 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      # Local builds all pass --dart-define-from-file=env.json; without this the
+      # CI artifact would differ from what we ship by hand.
+      - name: Restore env.json
+        working-directory: app
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: printf '%s' "$ENV_JSON" > env.json
+
+      # Gradle resolves `storeFile` relative to the app MODULE directory
+      # (app/android/app), and our convention is `../keystore/kharis-release.jks`
+      # -> app/android/keystore/. The previous version decoded to
+      # app/android/app/keystore.jks, which that key.properties never points at,
+      # so signing would have failed even with every secret set.
       - name: Decode keystore
         working-directory: app/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
+          mkdir -p keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > keystore/kharis-release.jks
+          test -s keystore/kharis-release.jks || {
+            echo "::error::Decoded keystore is empty — KEYSTORE_BASE64 is malformed"; exit 1; }
 
       - name: Create key.properties
         working-directory: app/android
+        env:
+          KEY_PROPERTIES: ${{ secrets.KEY_PROPERTIES }}
+        run: printf '%s' "$KEY_PROPERTIES" > key.properties
+
+      # A keystore that decodes but is not OUR upload key produces an AAB that
+      # Play rejects at upload. Assert the fingerprint before spending a build.
+      - name: Verify signing key is the Kharis upload key
+        working-directory: app/android
         run: |
-          printf '%s' "${{ secrets.KEY_PROPERTIES }}" > key.properties
+          EXPECTED="A8:B6:7B:79:C3:18:CB:81:B2:E0:73:1D:A3:7D:61:82:E6:94:AB:F2:75:86:1E:FC:8C:C2:23:18:B7:47:61:93"
+          PW="$(grep -m1 '^storePassword=' key.properties | cut -d= -f2-)"
+          ACTUAL="$(keytool -list -v -keystore keystore/kharis-release.jks -storepass "$PW" 2>/dev/null \
+                    | grep -m1 'SHA256:' | sed 's/.*SHA256: //' | tr -d ' \r')"
+          if [ -z "$ACTUAL" ]; then
+            echo "::error::Could not read the keystore — storePassword in KEY_PROPERTIES is wrong, or the keystore is corrupt"
+            exit 1
+          fi
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Keystore fingerprint mismatch — this is not the Kharis upload key"
+            exit 1
+          fi
+          echo "Signing key verified."
 
       - name: Build App Bundle
         working-directory: app
-        run: flutter build appbundle --release
+        run: |
+          EXTRA=""
+          if [ -n "${{ github.event.inputs.build_number }}" ]; then
+            EXTRA="--build-number=${{ github.event.inputs.build_number }}"
+          fi
+          flutter build appbundle --release --dart-define-from-file=env.json $EXTRA
 
       - name: Upload .aab artifact
         uses: actions/upload-artifact@v4
@@ -50,3 +126,9 @@ jobs:
           name: android-release-aab
           path: app/build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
+
+      # Runners are ephemeral, but do not leave the signing material sitting in
+      # the workspace for any later step to pick up.
+      - name: Scrub credentials from the workspace
+        if: always()
+        run: rm -f app/env.json app/android/key.properties app/android/keystore/kharis-release.jks

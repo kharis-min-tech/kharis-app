@@ -358,9 +358,44 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       // debugDisableVideoEngine: chrome renders, no engine runs.
       player = const ColoredBox(color: Colors.black);
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.card),
-      child: AspectRatio(aspectRatio: 16 / 9, child: player),
+    // The embed is a NATIVE platform view (WebView). Android composites those
+    // outside the Flutter layer, so neither ClipRRect nor
+    // Clip.antiAliasWithSaveLayer rounds it - verified on device, the corners
+    // stayed hard, which is what made the video read as "slapped on" beside
+    // the rounded artwork (tester feedback).
+    //
+    // So the rounding is painted ON TOP instead: four corner slivers in the
+    // page's ambient colour, over the video. The ambient shadow matches
+    // _buildArtwork so audio and video sit in the same design language.
+    final ambient = playerAmbientColors(context).first;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.34),
+            blurRadius: 44,
+            offset: const Offset(0, 20),
+            spreadRadius: -18,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          AspectRatio(aspectRatio: 16 / 9, child: player),
+          // Never steal taps from the player controls underneath.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _VideoCornerMask(
+                  radius: AppRadius.card,
+                  color: ambient,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -602,3 +637,32 @@ class _VideoTransport extends StatelessWidget {
     );
   }
 }
+
+/// Paints the four corner slivers of a rounded rectangle in [color].
+///
+/// Exists because Android platform views (the YouTube WebView) ignore Flutter
+/// clips: the only reliable way to round the video is to draw over its corners
+/// in the colour sitting behind it.
+class _VideoCornerMask extends CustomPainter {
+  const _VideoCornerMask({required this.radius, required this.color});
+
+  final double radius;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rounded = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    final corners = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(rect),
+      Path()..addRRect(rounded),
+    );
+    canvas.drawPath(corners, Paint()..color = color..isAntiAlias = true);
+  }
+
+  @override
+  bool shouldRepaint(_VideoCornerMask old) =>
+      old.radius != radius || old.color != color;
+}
+
