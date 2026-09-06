@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/usfm_books.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
@@ -75,6 +78,25 @@ class ReadingScreen extends ConsumerWidget {
               color: context.kc.onBg),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          // Hands the passage to YouVersion / bible.com for people who want
+          // their own Bible app (tester feedback).
+          IconButton(
+            tooltip: 'Open in Bible app',
+            icon: Icon(Icons.menu_book_rounded, color: context.kc.onBg),
+            onPressed: () {
+              final reading = contentAsync.valueOrNull?.reading;
+              if (reading == null) return;
+              final usfm =
+                  usfmPassageId(reading.book, '${reading.chapter}');
+              if (usfm == null) return;
+              unawaited(launchUrl(
+                Uri.parse('https://www.bible.com/bible/111/$usfm'),
+                mode: LaunchMode.externalApplication,
+              ));
+            },
+          ),
+        ],
         title: Text(
           'Reading plan \u00B7 Day ${_readingPlanDay()}',
           style: AppTypography.ui(

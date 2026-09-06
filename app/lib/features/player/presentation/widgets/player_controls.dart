@@ -261,31 +261,39 @@ class _SkipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: SizedBox(
-        width: 46,
-        height: 46,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(
-              isForward ? Icons.forward_rounded : Icons.replay_rounded,
-              color: context.kc.onBg,
-              size: 32,
-            ),
-            Positioned(
-              bottom: 7,
-              child: Text(
-                '$seconds',
-                style: AppTypography.ui(
-                  size: 8,
-                  weight: FontWeight.w800,
-                  color: context.kc.onBg,
-                ).copyWith(height: 1),
+    // Tonal circle so the seek controls read as buttons instead of floating
+    // glyphs, with a ripple and a bigger tap target (tester feedback).
+    return Material(
+      color: context.kc.chipBg,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: SizedBox(
+          width: 54,
+          height: 54,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                isForward ? Icons.forward_rounded : Icons.replay_rounded,
+                color: context.kc.onBg,
+                size: 28,
               ),
-            ),
-          ],
+              Positioned(
+                bottom: 12,
+                child: Text(
+                  '$seconds',
+                  style: AppTypography.ui(
+                    size: 8,
+                    weight: FontWeight.w800,
+                    color: context.kc.onBg,
+                  ).copyWith(height: 1),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

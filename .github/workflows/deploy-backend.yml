@@ -1,5 +1,18 @@
 name: Deploy Backend
 
+# Deploys Cloud Functions + Firestore rules/indexes to kharis-app-47c49.
+#
+# Auth, in order of preference — set ONE of these repository secrets:
+#
+#   FIREBASE_SERVICE_ACCOUNT  (preferred) JSON key for a service account with
+#                             Firebase Admin + Cloud Functions Developer on
+#                             kharis-app-47c49. Used via GOOGLE_APPLICATION_CREDENTIALS.
+#   FIREBASE_TOKEN            (legacy) output of `firebase login:ci`. Google has
+#                             deprecated these CI tokens; prefer the service
+#                             account above.
+#
+# Neither is set today, so this workflow has never completed a run.
+
 'on':
   workflow_dispatch:
     inputs:
@@ -15,6 +28,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check deploy credentials are present
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -z "$SA" ] && [ -z "$TOKEN" ]; then
+            echo "::error::Set FIREBASE_SERVICE_ACCOUNT (preferred) or FIREBASE_TOKEN — see the header of .github/workflows/deploy-backend.yml"
+            exit 1
+          fi
+          if [ -z "$SA" ]; then
+            echo "::warning::Using the deprecated FIREBASE_TOKEN. Migrate to FIREBASE_SERVICE_ACCOUNT."
+            echo "HAS_SA=false" >> "$GITHUB_ENV"
+          else
+            echo "HAS_SA=true" >> "$GITHUB_ENV"
+          fi
+
       - name: Set up Node 18
         uses: actions/setup-node@v4
         with:
@@ -24,9 +53,35 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend/functions
-        run: npm install
+        run: npm ci || npm install
+
+      - name: Build functions
+        working-directory: backend/functions
+        run: npm run build --if-present
+
+      - name: Write service-account key
+        if: env.HAS_SA == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/gcp-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-key.json" >> "$GITHUB_ENV"
 
       - name: Deploy to Firebase
         working-directory: backend
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          npx firebase-tools deploy --only functions,firestore --token "${{ secrets.FIREBASE_TOKEN }}" --non-interactive
+          # With GOOGLE_APPLICATION_CREDENTIALS set, firebase-tools picks the
+          # service account up automatically and --token is unnecessary.
+          if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+            npx firebase-tools deploy --only functions,firestore \
+              --project kharis-app-47c49 --non-interactive
+          else
+            npx firebase-tools deploy --only functions,firestore \
+              --project kharis-app-47c49 --token "$FIREBASE_TOKEN" --non-interactive
+          fi
+
+      - name: Scrub credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-key.json"

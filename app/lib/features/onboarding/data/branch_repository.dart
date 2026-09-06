@@ -207,12 +207,15 @@ class BranchRepository {
   Branch _map(String id, Map<String, dynamic> data) => Branch(
         id: id,
         name: data['name'] as String? ?? '',
-        // The web portal (admin/index.html) offers both `subtitle` and
-        // `description` inputs, and legacy docs used `location`. Fall through
-        // all three so a branch authored in either admin surface renders.
+        // The web portal offers `subtitle`, `shortDescription` and a full
+        // `description`; legacy docs used `location`. `description` is now a
+        // paragraph in the Studio's branch schema, so it sinks to last resort:
+        // promoting it would put a whole paragraph on the branch card whenever
+        // an admin left the subtitle blank.
         subtitle: data['subtitle'] as String? ??
-            data['description'] as String? ??
+            data['shortDescription'] as String? ??
             data['location'] as String? ??
+            data['description'] as String? ??
             '',
         gradientStart:
             Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF3B2A6B)),
