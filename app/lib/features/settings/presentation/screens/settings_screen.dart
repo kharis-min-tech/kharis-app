@@ -92,6 +92,16 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () => context.push('/branch-selection'),
                   ),
                   _MoreMenuItem(
+                    icon: Icons.edit_note_rounded,
+                    label: 'My Notes',
+                    onTap: () => context.push('/notes'),
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.queue_music_rounded,
+                    label: 'My Playlists',
+                    onTap: () => context.push('/playlists'),
+                  ),
+                  _MoreMenuItem(
                     icon: Icons.notifications_none,
                     label: 'Notifications',
                     accent: AppColors.accentPink,

@@ -64,6 +64,7 @@ dependencies:
   # youtube_player_iframe does not hold a wakelock; without this the screen can
   # sleep mid-video. Enabled only while the video engine reports playing.
   wakelock_plus: ^1.2.10
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:

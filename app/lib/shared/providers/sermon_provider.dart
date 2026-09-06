@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/cache_service.dart';
 import '../../core/utils/sermon_categorizer.dart';
 import '../../core/services/firebase_service.dart';
 import '../../features/calendar/data/event_repository.dart';
@@ -27,25 +30,231 @@ final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
   return KharisApiSermonRepository();
 });
 
-// ── Sermons (live fetch) ──────────────────────────────────────────────────────
-/// The public API library on its own.
+// ── Sermons (paged live fetch) ────────────────────────────────────────────────
+
+/// Paged view of the public API library.
+class SermonLibrary {
+  const SermonLibrary({
+    this.sermons = const [],
+    this.nextUrl,
+    this.totalCount = 0,
+    this.isLoadingMore = false,
+    this.loaded = false,
+    this.usedFallback = false,
+  });
+
+  /// Every sermon fetched so far, in archive order (newest first).
+  final List<Sermon> sermons;
+
+  /// `next` link of the last fetched page; `null` = archive exhausted.
+  final String? nextUrl;
+
+  /// Total sermons the server reports across all pages.
+  final int totalCount;
+
+  /// A follow-up page is currently in flight.
+  final bool isLoadingMore;
+
+  /// First page (or fallback) has landed.
+  final bool loaded;
+
+  /// First page failed and the bundled catalogue is being shown instead.
+  final bool usedFallback;
+
+  bool get hasMore => nextUrl != null;
+
+  SermonLibrary copyWith({
+    List<Sermon>? sermons,
+    String? nextUrl,
+    bool clearNextUrl = false,
+    int? totalCount,
+    bool? isLoadingMore,
+    bool? loaded,
+    bool? usedFallback,
+  }) =>
+      SermonLibrary(
+        sermons: sermons ?? this.sermons,
+        nextUrl: clearNextUrl ? null : (nextUrl ?? this.nextUrl),
+        totalCount: totalCount ?? this.totalCount,
+        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+        loaded: loaded ?? this.loaded,
+        usedFallback: usedFallback ?? this.usedFallback,
+      );
+}
+
+/// Streams the archive in pages, following the server's `next` links until
+/// the beginning of time (the earliest sermon), exactly as far as the user
+/// scrolls. Page 1 loads eagerly; [loadMore] appends the rest.
+class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
+  SermonLibraryNotifier(
+    this._repo, {
+    this.cache,
+    this.autoHydrate = true,
+  }) : super(const SermonLibrary()) {
+    _firstLoad = _init();
+  }
+
+  final AbstractSermonRepository _repo;
+
+  /// Disk cache for the drained archive; null in tests/CI.
+  final CacheService? cache;
+
+  /// Drain the archive in the background once page 1 lands.
+  final bool autoHydrate;
+  bool _hydrating = false;
+  late final Future<void> _firstLoad;
+
+  /// Completes when page 1 (or the offline fallback) has landed.
+  Future<void> get firstLoad => _firstLoad;
+
+  Future<void> _init() async {
+    // Paint last session's fully-drained archive immediately: a decade of
+    // sermons, sortable and searchable, with no network round-trip.
+    final cached = cache?.getCachedSermons() ?? const <Map<String, dynamic>>[];
+    if (cached.isNotEmpty) {
+      state = SermonLibrary(
+        sermons: [for (final m in cached) Sermon.fromJson(m)],
+        totalCount: cached.length,
+        loaded: true,
+      );
+    }
+    try {
+      final page = await _repo.fetchPage();
+      if (!mounted) return;
+      // Page 1 carries the newest arrivals; the cached tail follows it.
+      final seen = <String>{};
+      state = SermonLibrary(
+        sermons: [
+          ...page.sermons.where((s) => seen.add(s.id)),
+          ...state.sermons.where((s) => seen.add(s.id)),
+        ],
+        nextUrl: page.nextUrl,
+        totalCount: page.totalCount,
+        loaded: true,
+      );
+    } catch (_) {
+      // A cached archive on screen beats any fallback.
+      if (!mounted || state.loaded) return;
+      // Offline / CI fallback — never leaves the user with an empty screen.
+      final catalogue = await _repo.loadCatalogue();
+      if (!mounted) return;
+      state = SermonLibrary(
+        sermons: catalogue,
+        totalCount: catalogue.length,
+        loaded: true,
+        usedFallback: true,
+      );
+      return;
+    }
+    if (autoHydrate) unawaited(hydrateArchive());
+  }
+
+  /// Drains every remaining page in the background so the *whole* archive is
+  /// browsable, sortable and searchable without the member scrolling for it.
+  ///
+  /// Paging on scroll alone made 1,435 of 1,485 sermons unreachable in
+  /// practice: nobody flings 29 times, so "Oldest" only ever sorted the newest
+  /// page and the library looked like it began in 2025. The full walk is 30
+  /// requests / ~1.4 MB / ~14 s, so it runs after first paint and is cached on
+  /// completion — later launches start from disk and only fetch page 1.
+  Future<void> hydrateArchive() async {
+    if (_hydrating) return;
+    _hydrating = true;
+    try {
+      // Cache already holds the archive; page 1 covered new arrivals.
+      if (state.totalCount > 0 && state.sermons.length >= state.totalCount) {
+        state = state.copyWith(clearNextUrl: true);
+        _persist();
+        return;
+      }
+      while (mounted && state.nextUrl != null) {
+        final page = await _repo.fetchPage(url: state.nextUrl);
+        if (!mounted) return;
+        final seen = {for (final s in state.sermons) s.id};
+        state = state.copyWith(
+          sermons: [
+            ...state.sermons,
+            ...page.sermons.where((s) => seen.add(s.id)),
+          ],
+          nextUrl: page.nextUrl,
+          clearNextUrl: page.nextUrl == null,
+          totalCount:
+              page.totalCount == 0 ? state.totalCount : page.totalCount,
+        );
+      }
+      if (mounted && state.nextUrl == null) _persist();
+    } catch (_) {
+      // Leave nextUrl intact so scroll-triggered loadMore still retries.
+    } finally {
+      _hydrating = false;
+    }
+  }
+
+  void _persist() {
+    final cache = this.cache;
+    if (cache == null || state.usedFallback || state.sermons.isEmpty) return;
+    cache.cacheSermons([for (final s in state.sermons) s.toJson()]);
+  }
+
+  /// Fetches the next page and appends it. Safe to call repeatedly from
+  /// scroll notifications: no-ops while loading or once the archive ends.
+  /// A failed page keeps [SermonLibrary.nextUrl] so the next scroll retries.
+  Future<void> loadMore() async {
+    final next = state.nextUrl;
+    if (next == null || state.isLoadingMore || !state.loaded) return;
+    // Background hydration owns sequential paging while it runs.
+    if (_hydrating) return;
+    state = state.copyWith(isLoadingMore: true);
+    try {
+      final page = await _repo.fetchPage(url: next);
+      if (!mounted) return;
+      final seen = {for (final s in state.sermons) s.id};
+      state = state.copyWith(
+        sermons: [
+          ...state.sermons,
+          ...page.sermons.where((s) => seen.add(s.id)),
+        ],
+        nextUrl: page.nextUrl,
+        clearNextUrl: page.nextUrl == null,
+        totalCount:
+            page.totalCount == 0 ? state.totalCount : page.totalCount,
+        isLoadingMore: false,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(isLoadingMore: false);
+    }
+  }
+
+  /// Restarts from page 1 (pull-to-refresh / manual refresh).
+  Future<void> refresh() async {
+    state = const SermonLibrary();
+    await _init();
+  }
+}
+
+/// The paged public-API library. Invalidate this to force a real refresh.
 ///
 /// Deliberately has no CMS dependency: [sermonsProvider] watches a Firestore
-/// *stream*, and if the network fetch lived there too, every CMS emission —
-/// including the one that lands moments after first build — would re-run four
-/// more API round-trips behind an already-populated list. Keeping the fetch
-/// here means a CMS change re-runs only the cheap merge below.
-///
-/// Invalidate this (not [sermonsProvider]) to force a real library refresh.
-final apiSermonsProvider = FutureProvider<List<Sermon>>((ref) async {
-  final repo = ref.watch(sermonRepositoryProvider);
-  try {
-    return await repo.getSermons();
-  } catch (_) {
-    // Offline / CI fallback - never leaves the user with an empty screen.
-    return repo.loadCatalogue();
-  }
-});
+/// *stream*, and if the page fetches lived there too, every CMS emission —
+/// including the one that lands moments after first build — would re-run the
+/// API round-trips behind an already-populated list.
+/// Disk cache for the hydrated archive. Overridden in `main.dart`; stays null
+/// in tests and CI, where Hive is not initialised.
+final sermonArchiveCacheProvider = Provider<CacheService?>((ref) => null);
+
+/// Whether the library drains the whole archive in the background once page 1
+/// lands. Tests override this to `false` to drive [loadMore] page by page.
+final sermonArchiveAutoHydrateProvider = Provider<bool>((ref) => true);
+
+final sermonLibraryProvider =
+    StateNotifierProvider<SermonLibraryNotifier, SermonLibrary>(
+  (ref) => SermonLibraryNotifier(
+    ref.watch(sermonRepositoryProvider),
+    cache: ref.watch(sermonArchiveCacheProvider),
+    autoHydrate: ref.watch(sermonArchiveAutoHydrateProvider),
+  ),
+);
 
 /// All audio sermons, freshest source first.
 ///
@@ -62,12 +271,20 @@ final sermonsProvider = FutureProvider<List<Sermon>>((ref) async {
   // the library entirely.
   final cmsAudio = cms.where((s) => s.hasAudio).toList();
 
-  final api = await ref.watch(apiSermonsProvider.future);
+  // Watching the state (not just the future) re-runs this cheap merge every
+  // time a scrolled-in page appends to the library.
+  final library = ref.watch(sermonLibraryProvider);
+  await ref.watch(sermonLibraryProvider.notifier).firstLoad;
+  final api = library.sermons;
 
-  final seen = <String>{for (final s in cmsAudio) _dedupeTitle(s.title)};
+  // CMS docs mirror API sermons, so a CMS title hides its API twin. API rows
+  // dedupe by id only — a 10-year archive legitimately repeats titles.
+  final cmsTitles = <String>{for (final s in cmsAudio) _dedupeTitle(s.title)};
+  final seenIds = <String>{};
   return [
     ...cmsAudio,
-    ...api.where((s) => seen.add(_dedupeTitle(s.title))),
+    ...api.where((s) =>
+        !cmsTitles.contains(_dedupeTitle(s.title)) && seenIds.add(s.id)),
   ];
 });
 
@@ -102,6 +319,34 @@ final sermonSortProvider = StateProvider<SermonSort>((ref) {
   );
 });
 
+/// Active archive-year filter; `null` = every year.
+///
+/// Deliberately NOT persisted: waking up next launch still filtered to 2014
+/// would look like the archive had shrunk again.
+final selectedArchiveYearProvider = StateProvider<int?>((ref) => null);
+
+/// Years present in the hydrated catalogue, newest first.
+final archiveYearsProvider = Provider<List<int>>((ref) {
+  final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+  final years = {
+    for (final s in sermons)
+      if (s.publishedAt != null) s.publishedAt!.year,
+  }.toList()
+    ..sort((a, b) => b.compareTo(a));
+  return years;
+});
+
+/// How many sermons sit in each year, for the year rail's counts.
+final archiveYearCountsProvider = Provider<Map<int, int>>((ref) {
+  final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+  final counts = <int, int>{};
+  for (final s in sermons) {
+    final y = s.publishedAt?.year;
+    if (y != null) counts[y] = (counts[y] ?? 0) + 1;
+  }
+  return counts;
+});
+
 /// Active category filter — a label from [kSermonCategories]. 'All' = none.
 final selectedCategoryProvider = StateProvider<String>((ref) {
   final cache = ref.read(cacheServiceProvider);
@@ -114,11 +359,13 @@ final selectedCategoryProvider = StateProvider<String>((ref) {
 /// Always starts with 'All'; buckets with zero sermons are hidden.
 final categoryLabelsProvider = Provider<List<String>>((ref) {
   final sermonsAsync = ref.watch(sermonsProvider);
-  final present = sermonsAsync.when(
-    data: (sermons) => sermons.map((s) => s.category).whereType<String>().toSet(),
-    loading: () => const <String>{},
-    error: (_, _) => const <String>{},
-  );
+  // valueOrNull keeps the previous merge while a page-append reload is in
+  // flight. The old `when(loading:)` form emptied this on every loadMore,
+  // which collapsed the topic rails mid-scroll and shrank the scroll extent.
+  final present = (sermonsAsync.valueOrNull ?? const <Sermon>[])
+      .map((s) => s.category)
+      .whereType<String>()
+      .toSet();
   return [
     'All',
     for (final c in kSermonCategories)
@@ -130,35 +377,41 @@ final categoryLabelsProvider = Provider<List<String>>((ref) {
 final librarySermonsProvider = Provider<List<Sermon>>((ref) {
   final sermonsAsync = ref.watch(sermonsProvider);
   final category = ref.watch(selectedCategoryProvider);
+  final year = ref.watch(selectedArchiveYearProvider);
   final sort = ref.watch(sermonSortProvider);
 
-  return sermonsAsync.when(
-    data: (sermons) {
-      final filtered = category == 'All'
-          ? List.of(sermons)
-          : sermons.where((s) => s.category == category).toList();
-      switch (sort) {
-        case SermonSort.newest:
-          filtered.sort((a, b) => (b.publishedAt ?? DateTime(0))
-              .compareTo(a.publishedAt ?? DateTime(0)));
-        case SermonSort.oldest:
-          filtered.sort((a, b) => (a.publishedAt ?? DateTime(0))
-              .compareTo(b.publishedAt ?? DateTime(0)));
-        case SermonSort.longest:
-          filtered.sort((a, b) =>
-              (b.duration ?? Duration.zero).compareTo(a.duration ?? Duration.zero));
-        case SermonSort.shortest:
-          filtered.sort((a, b) =>
-              (a.duration ?? Duration.zero).compareTo(b.duration ?? Duration.zero));
-        case SermonSort.az:
-          filtered.sort(
-              (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-      }
-      return filtered;
-    },
-    loading: () => const [],
-    error: (_, _) => const [],
-  );
+  // Previous-data-aware: every loadMore append briefly re-runs
+  // [sermonsProvider], and the old `when(loading: () => const [])` swapped
+  // ~40 rows for a skeleton screen each time — the scroll extent shrank and
+  // the member's position clamped back to the top (Android device, 3/3
+  // repro). valueOrNull carries the prior list through reload cycles.
+  final sermons = sermonsAsync.valueOrNull ?? const <Sermon>[];
+  var filtered = category == 'All'
+      ? List.of(sermons)
+      : sermons.where((s) => s.category == category).toList();
+  if (year != null) {
+    filtered = filtered
+        .where((s) => s.publishedAt?.year == year)
+        .toList();
+  }
+  switch (sort) {
+    case SermonSort.newest:
+      filtered.sort((a, b) => (b.publishedAt ?? DateTime(0))
+          .compareTo(a.publishedAt ?? DateTime(0)));
+    case SermonSort.oldest:
+      filtered.sort((a, b) => (a.publishedAt ?? DateTime(0))
+          .compareTo(b.publishedAt ?? DateTime(0)));
+    case SermonSort.longest:
+      filtered.sort((a, b) => (b.duration ?? Duration.zero)
+          .compareTo(a.duration ?? Duration.zero));
+    case SermonSort.shortest:
+      filtered.sort((a, b) => (a.duration ?? Duration.zero)
+          .compareTo(b.duration ?? Duration.zero));
+    case SermonSort.az:
+      filtered.sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+  }
+  return filtered;
 });
 
 // ── Videos (YouTube non-shorts, LIVE from feed) ──────────────────────────────
@@ -266,22 +519,49 @@ final recentlyPlayedProvider = Provider<List<Sermon>>((ref) {
 /// Active search query for the Messages library. Empty string = no search.
 final sermonSearchProvider = StateProvider<String>((ref) => '');
 
-/// Search results: sermons whose title, speaker, or category contains the
-/// query (case-insensitive). Empty when no query is active.
+/// Server-side hits for the active query (`?search=`), so search covers the
+/// whole 1,400+ sermon archive — not just the pages scrolled in so far.
+/// Debounced; failures degrade silently to local-only results.
+final apiSearchProvider = FutureProvider.autoDispose<List<Sermon>>((ref) async {
+  final query = ref.watch(sermonSearchProvider).trim();
+  if (query.length < 2) return const [];
+  // Debounce: wait out the typing burst; the provider rebuilds per keystroke
+  // and only the build matching the settled query proceeds to the network.
+  await Future<void>.delayed(const Duration(milliseconds: 350));
+  if (query != ref.read(sermonSearchProvider).trim()) return const [];
+  try {
+    final repo = ref.read(sermonRepositoryProvider);
+    return (await repo.fetchPage(search: query)).sermons;
+  } catch (_) {
+    return const [];
+  }
+});
+
+/// Search results: local matches (title, speaker, or category contains the
+/// query, case-insensitive) merged with server-archive hits, newest first.
+/// Empty when no query is active.
 final searchResultsProvider = Provider<List<Sermon>>((ref) {
   final query = ref.watch(sermonSearchProvider).trim().toLowerCase();
   if (query.isEmpty) return const [];
   final sermons = ref.watch(sermonsProvider).valueOrNull ?? const [];
-  return sermons.where((s) {
+  final local = sermons.where((s) {
     final title = s.title.toLowerCase();
     final speaker = s.speaker.toLowerCase();
     final category = (s.category ?? '').toLowerCase();
     return title.contains(query) ||
         speaker.contains(query) ||
         category.contains(query);
-  }).toList()
-    ..sort((a, b) => (b.publishedAt ?? DateTime(0))
-        .compareTo(a.publishedAt ?? DateTime(0)));
+  }).toList();
+
+  final remote = ref.watch(apiSearchProvider).valueOrNull ?? const <Sermon>[];
+  final seenIds = {for (final s in local) s.id};
+  final seenTitles = {for (final s in local) _dedupeTitle(s.title)};
+  return [
+    ...local,
+    ...remote.where(
+        (s) => seenIds.add(s.id) && seenTitles.add(_dedupeTitle(s.title))),
+  ]..sort((a, b) => (b.publishedAt ?? DateTime(0))
+      .compareTo(a.publishedAt ?? DateTime(0)));
 });
 
 // ── Events ────────────────────────────────────────────────────────────────────

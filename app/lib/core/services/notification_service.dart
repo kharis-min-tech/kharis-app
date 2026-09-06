@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -67,6 +69,17 @@ class NotificationService {
       final token = await messaging.getToken();
       debugPrint('[FCM] Token: $token');
 
+      // Persist the device token on the signed-in member's profile so
+      // server-side workers (birthday pushes) can reach this device
+      // directly, not just via topics. Re-runs on refresh and on sign-in.
+      await _saveTokenToProfile(token);
+      messaging.onTokenRefresh.listen(_saveTokenToProfile);
+      fb_auth.FirebaseAuth.instance.authStateChanges().listen((u) async {
+        if (u != null && !u.isAnonymous) {
+          await _saveTokenToProfile(await messaging.getToken());
+        }
+      });
+
       // Register background handler.
       FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
 
@@ -87,6 +100,25 @@ class NotificationService {
       await subscribeToTopic(KharisTopics.all);
     } catch (e) {
       debugPrint('[FCM] init error: $e');
+    }
+  }
+
+  /// Best-effort write of `users/{uid}.fcmToken` for direct pushes.
+  ///
+  /// No-op for guests and signed-out sessions. Uses the same role-free
+  /// merge shape as notification prefs, which the rules already allow.
+  /// Failures only log — token persistence must never block startup.
+  Future<void> _saveTokenToProfile(String? token) async {
+    if (token == null || token.isEmpty) return;
+    try {
+      final user = fb_auth.FirebaseAuth.instance.currentUser;
+      if (user == null || user.isAnonymous) return;
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('[FCM] token save skipped: $e');
     }
   }
 

@@ -130,6 +130,8 @@ class FirebaseAuthRepository implements AuthRepository {
     String? displayName,
     String? branch,
     String? photoUrl,
+    String? phone,
+    DateTime? dob,
   }) async {
     final fbUser = _auth.currentUser;
     if (fbUser == null) {
@@ -139,6 +141,8 @@ class FirebaseAuthRepository implements AuthRepository {
       'displayName': ?displayName,
       'branch': ?branch,
       'photoUrl': ?photoUrl,
+      'phone': ?phone,
+      if (dob != null) 'dob': dob.toIso8601String().substring(0, 10),
     };
     if (updates.isNotEmpty) {
       await _upsertProfile(fbUser, updates);
@@ -199,6 +203,13 @@ class FirebaseAuthRepository implements AuthRepository {
     return false;
   }
 
+  /// Accepts the 'yyyy-MM-dd' strings we write plus any legacy Timestamp.
+  static DateTime? _parseDob(Object? raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
+    return null;
+  }
+
   /// Reads (or lazily creates) the Firestore profile doc for [fbUser].
   Future<User> _hydrate(fb.User fbUser) async {
     final ref = _firestore.collection('users').doc(fbUser.uid);
@@ -215,6 +226,8 @@ class FirebaseAuthRepository implements AuthRepository {
           role: (data['role'] as String?) ?? 'member',
           branch: data['branch'] as String?,
           photoUrl: (data['photoUrl'] as String?) ?? fbUser.photoURL,
+          phone: data['phone'] as String?,
+          dob: _parseDob(data['dob']),
           createdAt:
               (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );

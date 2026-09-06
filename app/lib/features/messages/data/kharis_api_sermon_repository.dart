@@ -31,37 +31,55 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
 
   final Dio _dio;
 
-  /// Library depth: up to [_maxPages] pages of [_pageSize] each.
-  static const int _maxPages = 4;
-  static const int _pageSize = 50;
+  /// Depth of the eager [getSermons] fetch. The full archive (~30 pages) is
+  /// reached incrementally through [fetchPage] as the user scrolls.
+  static const int _maxEagerPages = 4;
 
   @override
   Future<List<Sermon>> getSermons() async {
-    // Fetch the first N pages in parallel (~one round-trip) instead of
-    // serially, so the library is ready quickly.
-    final pages = await Future.wait([
-      for (var page = 1; page <= _maxPages; page++) _fetchPage(page),
-    ]);
+    // Follow the server's `next` links instead of guessing page numbers, so
+    // the fetch stops exactly where the archive does.
     final out = <Sermon>[];
-    for (final results in pages) {
-      for (final r in results) {
-        final s = _mapSermon(r as Map<String, dynamic>);
-        if (s != null) out.add(s);
-      }
+    String? url;
+    for (var i = 0; i < _maxEagerPages; i++) {
+      final page = await fetchPage(url: url);
+      out.addAll(page.sermons);
+      url = page.nextUrl;
+      if (url == null) break;
     }
     return out;
   }
 
-  Future<List<dynamic>> _fetchPage(int page) async {
-    try {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        'sermons/',
-        queryParameters: {'page': page, 'page_size': _pageSize},
-      );
-      return (resp.data?['results'] as List?) ?? const [];
-    } catch (_) {
-      return const [];
-    }
+  /// Fetches one page of the sermon archive.
+  ///
+  /// [url] is the absolute `next` link returned by the previous page (`null`
+  /// fetches page 1). [search] applies the server-side `?search=` filter.
+  /// Errors propagate to the caller — a paging UI must distinguish "archive
+  /// ended" from "request failed", so nothing is swallowed here.
+  @override
+  Future<SermonPage> fetchPage({String? url, String? search}) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      url ?? 'sermons/',
+      queryParameters: url == null && search != null && search.isNotEmpty
+          ? {'search': search}
+          : null,
+    );
+    final data = resp.data ?? const <String, dynamic>{};
+    final results = (data['results'] as List?) ?? const [];
+    return SermonPage(
+      sermons: [
+        for (final r in results) ?_mapSermon(r as Map<String, dynamic>),
+      ],
+      nextUrl: _nullableAbsolute(data['next'] as String?),
+      totalCount: (data['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// `next` links normally carry a scheme, but the API serves other URLs
+  /// scheme-less, so absolutise defensively.
+  static String? _nullableAbsolute(String? url) {
+    if (url == null || url.isEmpty) return null;
+    return _absolutise(url);
   }
 
   /// Offline fallback: the bundled archive, never the network.

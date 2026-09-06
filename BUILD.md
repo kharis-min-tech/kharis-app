@@ -13,6 +13,7 @@ Before starting, confirm you have:
 | macOS | 13+ | Required for iOS builds |
 | Xcode | 15+ | Install from the Mac App Store |
 | Flutter | 3.44+ | `flutter --version` to check |
+| Dart SDK | 3.12.1+ | Bundled with Flutter 3.44+; `pubspec.yaml` pins `^3.12.1`. If `flutter run` spews thousands of URI/resolution errors, your Flutter is too old — run `flutter upgrade` |
 | Android Studio / SDK | Latest | Or just Android command-line tools |
 | Java | 17 | `java -version`; use Temurin if unsure |
 | Node.js | 18+ | For Firebase CLI and backend functions |

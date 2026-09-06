@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/core/utils/share_sermon.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -53,24 +56,16 @@ class PlayerActions extends ConsumerWidget {
               sermonTitle: target.title,
             ),
           ),
-        _ActionButton(
-          icon: Icons.ios_share_rounded,
-          label: 'Share',
-          onTap: () => _toast(context, 'Share link copied'),
-        ),
+        if (target != null)
+          _ActionButton(
+            icon: Icons.ios_share_rounded,
+            label: 'Share',
+            onTap: () => unawaited(shareSermon(target)),
+          ),
       ],
     );
   }
 
-  void _toast(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(milliseconds: 1700),
-      ),
-    );
-  }
 }
 
 // ── Private icon + label button ───────────────────────────────────────────────

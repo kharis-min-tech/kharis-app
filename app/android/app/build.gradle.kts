@@ -19,7 +19,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.kharis.church"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -45,6 +45,14 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+        }
+    }
+    packaging {
+        jniLibs {
+            // NDK 28 strip step fails under Flutter 3.44 on macOS; keeping
+            // symbols makes the task a no-op so appbundle builds complete.
+            // Play strips on delivery; only the upload artifact is bigger.
+            keepDebugSymbols.add("**/*.so")
         }
     }
 }

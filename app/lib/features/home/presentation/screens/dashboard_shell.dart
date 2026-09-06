@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 /// Bottom-nav shell wrapping all 5 dashboard tabs.
@@ -27,7 +29,25 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreMiniPlayer());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreMiniPlayer();
+      _promptBranchOnce();
+    });
+  }
+
+  /// Accounts created before branch selection became part of onboarding (and
+  /// guests from older builds) have no saved branch, so events default to the
+  /// all-campus mush the testers flagged. Ask exactly once.
+  Future<void> _promptBranchOnce() async {
+    // Let the branch stream emit before deciding.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    final branch = ref.read(currentBranchProvider).valueOrNull;
+    if (branch != null && branch.isNotEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('branch_prompt_shown') ?? false) return;
+    await prefs.setBool('branch_prompt_shown', true);
+    if (mounted) context.push('/branch-selection');
   }
 
   /// Restores the minimised player with the last-played sermon (paused at its

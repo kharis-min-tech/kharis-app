@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:add_2_calendar_new/add_2_calendar_new.dart' as add2cal;
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
@@ -29,6 +30,7 @@ class _NotifItem {
     required this.title,
     required this.date,
     this.body,
+    this.event,
   });
 
   /// [id] is namespaced by source so a news item and an event that happen to
@@ -47,6 +49,7 @@ class _NotifItem {
         title: e.title,
         body: e.description,
         date: e.startTime,
+        event: e,
       );
 
   final String id;
@@ -54,6 +57,11 @@ class _NotifItem {
   final String title;
   final String? body;
   final DateTime date;
+
+  /// Full source event when [kind] is [_NotifKind.event], so a tap can show
+  /// date/time/venue without a second lookup (tester feedback: the calendar
+  /// notification could not be opened for details).
+  final Event? event;
 }
 
 /// Sign-aware relative label.
@@ -80,12 +88,13 @@ String _relativeLabel(DateTime dt, DateTime now) {
 }
 
 /// Merges announcements and upcoming events into one feed, drops rows the
-/// member has dismissed, and orders by nearness to [now].
+/// member has dismissed, and pins reminders on top.
 ///
-/// Sorting on the raw date would bury tomorrow's service under an event a
-/// month away, because event dates run forwards while announcement dates run
-/// backwards. Distance from now puts what matters today at the top regardless
-/// of which side of now it sits on.
+/// Upcoming events are reminders — things a member can still act on — so they
+/// outrank announcements, which are informational and already published. A
+/// service starting tomorrow must not sit under this morning's news post.
+/// Within the reminder block the soonest event leads; within announcements
+/// the freshest post leads.
 List<_NotifItem> _buildFeed({
   required List<NewsItem> news,
   required List<Event> events,
@@ -96,8 +105,14 @@ List<_NotifItem> _buildFeed({
     for (final n in news) _NotifItem.announcement(n),
     for (final e in events) _NotifItem.event(e),
   ]..removeWhere((i) => dismissed.contains(i.id));
-  items.sort((a, b) =>
-      a.date.difference(now).abs().compareTo(b.date.difference(now).abs()));
+  int rank(_NotifItem i) => i.kind == _NotifKind.event ? 0 : 1;
+  items.sort((a, b) {
+    final byKind = rank(a).compareTo(rank(b));
+    if (byKind != 0) return byKind;
+    return a.kind == _NotifKind.event
+        ? a.date.compareTo(b.date) // soonest reminder first
+        : b.date.compareTo(a.date); // freshest announcement first
+  });
   return items;
 }
 
@@ -212,9 +227,23 @@ class NotificationsScreen extends ConsumerWidget {
           secondaryBackground:
               const _SwipePlate(alignment: Alignment.centerRight),
           onDismissed: (_) => _dismiss(context, ref, item),
-          child: _NotifRow(item: item),
+          child: _NotifRow(
+            item: item,
+            onTap: () => _showDetail(context, item),
+          ),
         );
       },
+    );
+  }
+
+  void _showDetail(BuildContext context, _NotifItem item) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.kc.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) => _NotifDetailSheet(item: item),
     );
   }
 
@@ -259,14 +288,18 @@ class NotificationsScreen extends ConsumerWidget {
 // ── Row ───────────────────────────────────────────────────────────────────────
 
 class _NotifRow extends StatelessWidget {
-  const _NotifRow({required this.item});
+  const _NotifRow({required this.item, this.onTap});
 
   final _NotifItem item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final body = item.body;
-    return Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
       // Opaque so the swipe plate stays behind the row rather than bleeding
       // through it.
       color: context.kc.bg,
@@ -318,6 +351,7 @@ class _NotifRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -407,6 +441,120 @@ class _Empty extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Bottom sheet with the full story behind a feed row: events get their
+/// date, time and venue plus an add-to-calendar action; announcements get
+/// their untruncated body.
+class _NotifDetailSheet extends StatelessWidget {
+  const _NotifDetailSheet({required this.item});
+
+  final _NotifItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final event = item.event;
+    final body = item.body;
+    final date = DateFormat('EEEE d MMMM yyyy').format(item.date);
+    final time = DateFormat('HH:mm').format(item.date);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.kind.label.toUpperCase(),
+              style: AppTypography.labelMd.copyWith(
+                color: context.kc.muted,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              item.title,
+              style: AppTypography.ui(
+                size: 18,
+                weight: FontWeight.w700,
+                color: context.kc.onBg,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _DetailLine(icon: Icons.calendar_today_rounded, text: date),
+            if (event != null) ...[
+              const SizedBox(height: 8),
+              _DetailLine(icon: Icons.schedule_rounded, text: time),
+              if ((event.location ?? event.branch) != null) ...[
+                const SizedBox(height: 8),
+                _DetailLine(
+                  icon: Icons.location_on_outlined,
+                  text: event.location ?? event.branch!,
+                ),
+              ],
+            ],
+            if (body != null && body.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                body,
+                style: AppTypography.bodyLg.copyWith(
+                  color: context.kc.onBg,
+                  height: 1.5,
+                ),
+              ),
+            ],
+            if (event != null) ...[
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _addToCalendar(event),
+                  icon: const Icon(Icons.event_available_rounded, size: 18),
+                  label: const Text('Add to calendar'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addToCalendar(Event event) {
+    add2cal.Add2Calendar.addEvent2Cal(
+      add2cal.Event(
+        title: event.title,
+        description: event.description ?? '',
+        location: event.branch ?? '',
+        startDate: event.startTime,
+        endDate: event.endTime ?? event.startTime.add(const Duration(hours: 2)),
+      ),
+    );
+  }
+}
+
+/// Icon + text line inside [_NotifDetailSheet].
+class _DetailLine extends StatelessWidget {
+  const _DetailLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: context.kc.accentInk),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: AppTypography.bodyLg.copyWith(color: context.kc.onBg),
+          ),
+        ),
+      ],
     );
   }
 }

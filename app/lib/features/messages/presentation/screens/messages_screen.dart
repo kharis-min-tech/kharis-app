@@ -69,6 +69,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final isFiltered = selectedCategory != 'All';
 
+    // Archive year navigation: 1,485 sermons across 2013-2026 are reachable
+    // once hydrated, but only navigable with a jump.
+    final archiveYears = ref.watch(archiveYearsProvider);
+    final archiveYearCounts = ref.watch(archiveYearCountsProvider);
+    final selectedYear = ref.watch(selectedArchiveYearProvider);
+
     // Featured + Message of the Day + recently played.
     final featured = ref.watch(featuredSermonsProvider);
     final motd = ref.watch(motdSermonProvider);
@@ -88,10 +94,26 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       }
     }
 
+    final library = ref.watch(sermonLibraryProvider);
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
+        child: NotificationListener<ScrollNotification>(
+          // Infinite scroll: near the bottom, pull the next archive page.
+          // loadMore() self-guards (in-flight / archive exhausted), so firing
+          // on every scroll tick is safe. Search renders a separate list, and
+          // its short scroll extent would otherwise page in the background.
+          onNotification: (n) {
+            if (!isSearching &&
+                n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
+              ref.read(sermonLibraryProvider.notifier).loadMore();
+            }
+            return false;
+          },
+          child: CustomScrollView(
+          // Retain scroll offset across tab switches and rebuilds.
+          key: const PageStorageKey<String>('messages-scroll'),
           slivers: [
             // ── 1. Header + Search ───────────────────────────────────────────
             SliverToBoxAdapter(
@@ -372,7 +394,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              isFiltered ? selectedCategory : 'All Messages',
+                              [
+                                if (isFiltered)
+                                  selectedCategory
+                                else
+                                  'All Messages',
+                                if (selectedYear != null) '$selectedYear',
+                              ].join(' \u00b7 '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.bodyLg.copyWith(
@@ -418,6 +446,49 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 ),
               ),
 
+              // ── 5b. Jump to year ─────────────────────────────────────────
+              // A decade is reachable by sorting, but not navigable: this rail
+              // turns "scroll 1,400 rows" into one tap.
+              if (archiveYears.length > 1)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: SizedBox(
+                      height: 36,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: archiveYears.length + 1,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return _SortPill(
+                              label: 'All years',
+                              active: selectedYear == null,
+                              onTap: () => ref
+                                  .read(selectedArchiveYearProvider.notifier)
+                                  .state = null,
+                            );
+                          }
+                          final year = archiveYears[index - 1];
+                          final count = archiveYearCounts[year] ?? 0;
+                          return _SortPill(
+                            label: '$year ($count)',
+                            active: selectedYear == year,
+                            onTap: () {
+                              ref
+                                      .read(selectedArchiveYearProvider.notifier)
+                                      .state =
+                                  selectedYear == year ? null : year;
+                              _scrollToList();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+
               // ── 6. Sermon list ───────────────────────────────────────────
               if (sermons.isEmpty && sermonsAsync.isLoading)
                 SliverList.builder(
@@ -455,11 +526,42 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                     );
                   },
                 ),
+              // ── 7. Archive paging footer ─────────────────────────────────
+              if (library.isLoadingMore)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: context.kc.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else if (library.loaded && !library.hasMore && sermons.length > 20)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'You\'ve reached the beginning \u2022 ${library.sermons.length} sermons',
+                        style: AppTypography.bodySm
+                            .copyWith(color: context.kc.muted),
+                      ),
+                    ),
+                  ),
+                ),
             ],
 
             // ── Bottom pad ──────────────────────────────────────────────────
             const SliverPadding(padding: EdgeInsets.only(bottom: 150)),
           ],
+          ),
         ),
       ),
     );

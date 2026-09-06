@@ -56,7 +56,11 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _BackRow(onTap: () => context.go('/role-selection')),
+                  _BackRow(
+                    onTap: () => context.canPop()
+                        ? context.pop()
+                        : context.go('/role-selection'),
+                  ),
                   const SizedBox(height: 14),
                   Text(
                     'Find your branch',
@@ -119,7 +123,13 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
         ),
       );
     }
-    context.go('/home');
+    // Reached from More -> Switch Branch (pop back there) as well as from
+    // onboarding, where there is nothing underneath to pop to.
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
   }
 
   /// Section header + branch tiles; an empty group renders nothing.
@@ -207,6 +217,16 @@ class _SearchField extends StatelessWidget {
         filled: true,
         fillColor: context.kc.surfaceAlt,
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        // Same pill in both states — idle used to render square while focus
+        // rendered round (tester feedback).
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: BorderSide(color: context.kc.accentInk, width: 1.5),
+        ),
       ),
     );
   }

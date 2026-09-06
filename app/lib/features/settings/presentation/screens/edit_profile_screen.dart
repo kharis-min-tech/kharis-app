@@ -21,7 +21,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _photoController = TextEditingController();
+  final _phoneController = TextEditingController();
   String? _branch;
+  DateTime? _dob;
   bool _saving = false;
   bool _initialized = false;
 
@@ -29,6 +31,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _photoController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -43,6 +46,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             displayName: _nameController.text.trim(),
             branch: _branch,
             photoUrl: photo.isEmpty ? null : photo,
+            phone: _phoneController.text.trim().isEmpty
+                ? null
+                : _phoneController.text.trim(),
+            dob: _dob,
           );
       // Same shared code path as Switch Branch; a no-change save is a no-op.
       await ref.read(notificationServiceProvider).switchBranchTopic(
@@ -89,6 +96,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (!_initialized && user != null) {
       _nameController.text = user.displayName;
       _photoController.text = user.photoUrl ?? '';
+      _phoneController.text = user.phone ?? '';
+      _dob = user.dob;
       _branch = (user.branch != null && branchNames.contains(user.branch))
           ? user.branch
           : null;
@@ -135,6 +144,49 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   controller: _photoController,
                   hint: 'https://...',
                   keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 20),
+                _label('Phone (optional)'),
+                _field(
+                  controller: _phoneController,
+                  hint: '+44 ...',
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 20),
+                _label('Birthday (optional)'),
+                GestureDetector(
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate:
+                          _dob ?? DateTime(now.year - 25, now.month, now.day),
+                      firstDate: DateTime(1920),
+                      lastDate: now,
+                      helpText: 'Date of birth',
+                    );
+                    if (picked != null) setState(() => _dob = picked);
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 15),
+                    decoration: BoxDecoration(
+                      color: context.kc.surface,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      _dob == null
+                          ? 'Add your birthday'
+                          : '${_dob!.day.toString().padLeft(2, '0')}/'
+                              '${_dob!.month.toString().padLeft(2, '0')}/'
+                              '${_dob!.year}',
+                      style: AppTypography.ui(size: 15).copyWith(
+                        color:
+                            _dob == null ? context.kc.muted : context.kc.onBg,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 32),
                 SizedBox(

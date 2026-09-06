@@ -94,4 +94,105 @@ void main() {
     final s = (await repo().getSermons()).first;
     expect(s.artworkUrl, contains('width=512'));
   });
+
+  // ── Pagination ─────────────────────────────────────────────────────────────
+
+  Map<String, dynamic> pagedFixture({
+    required int id,
+    required String title,
+    String? next,
+    int count = 2,
+  }) {
+    final item =
+        Map<String, dynamic>.from((_fixture['results']! as List).first as Map)
+          ..['id'] = id
+          ..['title'] = title;
+    return {'count': count, 'next': next, 'previous': null, 'results': [item]};
+  }
+
+  KharisApiSermonRepository routedRepo(Map<String, String> routes) {
+    final dio = Dio(BaseOptions(baseUrl: 'https://x.test/api/'))
+      ..httpClientAdapter = _RoutingAdapter(routes);
+    return KharisApiSermonRepository(dio: dio);
+  }
+
+  test('fetchPage surfaces next link and total count', () async {
+    final repo = routedRepo({
+      'sermons/': jsonEncode(pagedFixture(
+        id: 1,
+        title: 'Page One',
+        next: 'https://x.test/api/sermons/?page=2',
+      )),
+    });
+    final page = await repo.fetchPage();
+    expect(page.sermons.single.title, 'Page One');
+    expect(page.nextUrl, 'https://x.test/api/sermons/?page=2');
+    expect(page.totalCount, 2);
+    expect(page.hasMore, isTrue);
+  });
+
+  test('fetchPage follows an absolute next URL to the second page', () async {
+    final repo = routedRepo({
+      'sermons/': jsonEncode(pagedFixture(
+        id: 1,
+        title: 'Page One',
+        next: 'https://x.test/api/sermons/?page=2',
+      )),
+      'sermons/?page=2': jsonEncode(pagedFixture(id: 2, title: 'Page Two')),
+    });
+    final first = await repo.fetchPage();
+    final second = await repo.fetchPage(url: first.nextUrl);
+    expect(second.sermons.single.title, 'Page Two');
+    expect(second.nextUrl, isNull);
+    expect(second.hasMore, isFalse);
+  });
+
+  test('getSermons concatenates pages by following next until it ends',
+      () async {
+    final repo = routedRepo({
+      'sermons/': jsonEncode(pagedFixture(
+        id: 1,
+        title: 'Page One',
+        next: 'https://x.test/api/sermons/?page=2',
+      )),
+      'sermons/?page=2': jsonEncode(pagedFixture(id: 2, title: 'Page Two')),
+    });
+    final sermons = await repo.getSermons();
+    expect(sermons.map((s) => s.title), ['Page One', 'Page Two']);
+  });
+
+  test('fetchPage passes the search query to the server', () async {
+    final repo = routedRepo({
+      'sermons/?search=grace':
+          jsonEncode(pagedFixture(id: 3, title: 'Grace Hit', count: 1)),
+    });
+    final page = await repo.fetchPage(search: 'grace');
+    expect(page.sermons.single.title, 'Grace Hit');
+  });
+}
+
+/// Routes requests by path+query so multi-page flows can be scripted.
+class _RoutingAdapter implements HttpClientAdapter {
+  _RoutingAdapter(this.routes);
+
+  /// Keys are `path?query` relative to the base URL (or any suffix thereof).
+  final Map<String, String> routes;
+
+  @override
+  Future<ResponseBody> fetch(RequestOptions options,
+      Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+    final uri = options.uri.toString();
+    final key = routes.keys.firstWhere(uri.endsWith,
+        orElse: () => throw StateError('no route for $uri'));
+    return ResponseBody.fromString(
+      routes[key]!,
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }

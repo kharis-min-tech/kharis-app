@@ -19,6 +19,45 @@ class Sermon {
     this.isFeatured = false,
   });
 
+  /// Rebuilds a sermon from the on-disk archive cache.
+  factory Sermon.fromJson(Map<String, dynamic> j) => Sermon(
+        id: j['id'] as String,
+        title: j['title'] as String? ?? '',
+        speaker: j['speaker'] as String? ?? '',
+        audioUrl: j['audioUrl'] as String? ?? '',
+        artworkUrl: j['artworkUrl'] as String?,
+        duration: j['durationSeconds'] != null
+            ? Duration(seconds: (j['durationSeconds'] as num).toInt())
+            : null,
+        publishedAt: DateTime.tryParse(j['publishedAt'] as String? ?? ''),
+        series: j['series'] as String?,
+        description: j['description'] as String?,
+        artworkColor: (j['artworkColor'] as num?)?.toInt(),
+        category: j['category'] as String?,
+        videoId: j['videoId'] as String?,
+        source: j['source'] as String?,
+        isFeatured: j['isFeatured'] as bool? ?? false,
+      );
+
+  /// Serialises for [CacheService.cacheSermons]. `Duration`/`DateTime` are not
+  /// JSON types, so they go out as seconds and ISO-8601.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'speaker': speaker,
+        'audioUrl': audioUrl,
+        if (artworkUrl != null) 'artworkUrl': artworkUrl,
+        if (duration != null) 'durationSeconds': duration!.inSeconds,
+        if (publishedAt != null) 'publishedAt': publishedAt!.toIso8601String(),
+        if (series != null) 'series': series,
+        if (description != null) 'description': description,
+        if (artworkColor != null) 'artworkColor': artworkColor,
+        if (category != null) 'category': category,
+        if (videoId != null) 'videoId': videoId,
+        if (source != null) 'source': source,
+        'isFeatured': isFeatured,
+      };
+
   /// Whether this sermon has a streamable audio recording.
   ///
   /// Media checks are deliberately split into [hasAudio] and [hasVideo]: most

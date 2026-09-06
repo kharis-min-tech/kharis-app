@@ -621,6 +621,47 @@
       .card { padding: 18px; }
       .field-row { grid-template-columns: 1fr; gap: 0; }
     }
+
+    /* ── Repeatable sub-forms (branch venues / services / gallery) ────────── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 26px 0 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .section-label:first-of-type { border-top: none; padding-top: 0; margin-top: 6px; }
+    .repeat-row {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.02);
+    }
+    .repeat-row-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .repeat-remove {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .repeat-empty { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+    .field-inline { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .field-inline input[type="checkbox"] { width: auto; margin: 0; }
+    .field-inline label { margin: 0; }
   </style>
 </head>
 <body>
@@ -1126,51 +1167,140 @@
         <div class="card">
           <div class="card-title"><span class="dot"></span> Add / Edit Branch</div>
           <form id="branch-form">
+            <div class="section-label">Basic information</div>
             <div class="field">
               <label for="br-name">Branch Name *</label>
-              <input type="text" id="br-name" placeholder="Kharis London" required />
+              <input type="text" id="br-name" placeholder="Brighton" required />
             </div>
             <div class="field">
-              <label for="br-subtitle">Subtitle / Location</label>
+              <label for="br-subtitle">Subtitle / Country</label>
               <input type="text" id="br-subtitle" placeholder="United Kingdom" />
             </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="br-group">Group</label>
+                <input type="text" id="br-group" placeholder="Kharis" />
+              </div>
+              <div class="field">
+                <label for="br-order">Display Order</label>
+                <input type="number" id="br-order" placeholder="2" min="0" />
+              </div>
+            </div>
+            <div class="field-inline">
+              <input type="checkbox" id="br-active" checked />
+              <label for="br-active">Active (visible in the app)</label>
+            </div>
+
+            <div class="section-label">Branding</div>
+            <div class="field-row">
+              <div class="field">
+                <label for="br-gradient-start">Gradient Start (hex)</label>
+                <input type="text" id="br-gradient-start" placeholder="#3B2A6B" />
+              </div>
+              <div class="field">
+                <label for="br-gradient-end">Gradient End (hex)</label>
+                <input type="text" id="br-gradient-end" placeholder="#7C3AED" />
+              </div>
+            </div>
+
+            <div class="section-label">Hero</div>
             <div class="field">
-              <label for="br-description">Description</label>
-              <input type="text" id="br-description" placeholder="Main Campus" />
+              <label for="br-hero-subtitle">Hero Subtitle</label>
+              <input type="text" id="br-hero-subtitle" placeholder="A thriving, multicultural congregation serving Brighton…" />
             </div>
             <div class="field">
-              <label for="br-image">Image URL (landmark photo)</label>
-              <input type="url" id="br-image" placeholder="https://…" />
+              <label for="br-hero-image">Hero / Landmark Image</label>
+              <input type="text" id="br-hero-image" placeholder="assets/design/city-brighton.jpg" />
             </div>
+
+            <div class="section-label">About the branch</div>
+            <div class="field">
+              <label for="br-short-desc">Short Description</label>
+              <input type="text" id="br-short-desc" placeholder="Welcome to Kharis Brighton." />
+            </div>
+            <div class="field">
+              <label for="br-description">Full Description</label>
+              <textarea id="br-description" rows="3" placeholder="Kharis Brighton is a growing family passionate about Jesus Christ…"></textarea>
+            </div>
+
+            <div class="section-label">Branch pastor</div>
+            <div class="field">
+              <label for="br-pastor-name">Pastor Name</label>
+              <input type="text" id="br-pastor-name" placeholder="Pastor John Smith" />
+            </div>
+            <div class="field">
+              <label for="br-pastor-image">Pastor Image</label>
+              <input type="text" id="br-pastor-image" placeholder="assets/pastors/john-smith.jpg" />
+            </div>
+            <div class="field">
+              <label for="br-pastor-bio">Pastor Bio</label>
+              <textarea id="br-pastor-bio" rows="2" placeholder="Pastor John leads Kharis Brighton with a passion for discipleship…"></textarea>
+            </div>
+
+            <div class="section-label">Contact</div>
+            <div class="field-row">
+              <div class="field">
+                <label for="br-contact-email">Email</label>
+                <input type="email" id="br-contact-email" placeholder="brighton@kharis.org" />
+              </div>
+              <div class="field">
+                <label for="br-contact-phone">Phone</label>
+                <input type="text" id="br-contact-phone" placeholder="+44 0000 000000" />
+              </div>
+            </div>
+
+            <div class="section-label">App card summary</div>
+            <p class="repeat-empty">Shown on the branch card in the app. Usually the Sunday venue and main service.</p>
             <div class="field">
               <label for="br-address">Meeting Address</label>
-              <input type="text" id="br-address" placeholder="123 High Street, London" />
+              <input type="text" id="br-address" placeholder="123 Example Road, Brighton BN1 1AA" />
             </div>
             <div class="field-row">
               <div class="field">
                 <label for="br-meeting-days">Meeting Day(s)</label>
-                <input type="text" id="br-meeting-days" placeholder="e.g. Sunday or Wed & Fri" />
+                <input type="text" id="br-meeting-days" placeholder="e.g. Sunday" />
               </div>
               <div class="field">
                 <label for="br-meeting-time">Meeting Time</label>
                 <input type="time" id="br-meeting-time" />
               </div>
             </div>
+
+            <div class="section-label">Venues</div>
+            <div id="br-venues"></div>
+            <button type="button" class="btn btn-secondary" id="br-add-venue" style="font-size:12px;padding:6px 12px;">+ Add venue</button>
+
+            <div class="section-label">Services</div>
+            <div id="br-services"></div>
+            <button type="button" class="btn btn-secondary" id="br-add-service" style="font-size:12px;padding:6px 12px;">+ Add service</button>
+
+            <div class="section-label">Instagram</div>
+            <div class="field">
+              <label for="br-instagram">Instagram URL</label>
+              <input type="url" id="br-instagram" placeholder="https://instagram.com/…" />
+            </div>
+
+            <div class="section-label">Featured video</div>
+            <div class="field">
+              <label for="br-fv-title">Title</label>
+              <input type="text" id="br-fv-title" placeholder="Latest From Brighton Branch" />
+            </div>
             <div class="field-row">
               <div class="field">
-                <label for="br-gradient-start">Gradient Start (hex)</label>
-                <input type="text" id="br-gradient-start" placeholder="#6B34FA" />
+                <label for="br-fv-url">YouTube URL</label>
+                <input type="url" id="br-fv-url" placeholder="https://youtu.be/…" />
               </div>
               <div class="field">
-                <label for="br-gradient-end">Gradient End (hex)</label>
-                <input type="text" id="br-gradient-end" placeholder="#FD7F20" />
+                <label for="br-fv-thumb">Thumbnail URL</label>
+                <input type="text" id="br-fv-thumb" placeholder="https://… or assets/…" />
               </div>
             </div>
-            <div class="field">
-              <label for="br-order">Display Order</label>
-              <input type="number" id="br-order" placeholder="1" min="0" />
-            </div>
-            <button type="submit" class="btn btn-primary btn-full" id="branch-submit-btn">Save Branch</button>
+
+            <div class="section-label">Gallery</div>
+            <div id="br-gallery"></div>
+            <button type="button" class="btn btn-secondary" id="br-add-gallery" style="font-size:12px;padding:6px 12px;">+ Add image</button>
+
+            <button type="submit" class="btn btn-primary btn-full" id="branch-submit-btn" style="margin-top:22px;">Save Branch</button>
           </form>
         </div>
         <div class="card">
@@ -2444,52 +2574,460 @@ async function loadBranches() {
   }
 }
 
+// ── Branch sub-forms: venues, services, gallery ─────────────────────────
+//
+// The branch document carries repeating structures (a branch can meet at
+// several venues and run any number of services). Rows are plain DOM built
+// from a template so the whole editor stays dependency-free, matching the rest
+// of this page. Row indices are only for input ids; order comes from position.
+
+/** Slug used when an admin leaves a venue/service id blank. */
+function slugify(v) {
+  return (v || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function venueRowHtml(i, v) {
+  v = v || {};
+  return `<div class="repeat-row" data-venue-row>
+    <div class="repeat-row-head">
+      <span>Venue ${i + 1}</span>
+      <button type="button" class="repeat-remove" data-remove-venue>Remove</button>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Venue Name</label>
+        <input type="text" data-v="name" value="${escAttr(v.name)}" placeholder="Brighton Sunday Venue" />
+      </div>
+      <div class="field">
+        <label>Venue ID</label>
+        <input type="text" data-v="id" value="${escAttr(v.id)}" placeholder="sunday" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Address Line 1</label>
+      <input type="text" data-v="addressLine1" value="${escAttr(v.addressLine1)}" placeholder="123 Example Road" />
+    </div>
+    <div class="field">
+      <label>Address Line 2</label>
+      <input type="text" data-v="addressLine2" value="${escAttr(v.addressLine2)}" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>City</label>
+        <input type="text" data-v="city" value="${escAttr(v.city)}" placeholder="Brighton" />
+      </div>
+      <div class="field">
+        <label>Postcode</label>
+        <input type="text" data-v="postcode" value="${escAttr(v.postcode)}" placeholder="BN1 1AA" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Country</label>
+      <input type="text" data-v="country" value="${escAttr(v.country)}" placeholder="United Kingdom" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Latitude</label>
+        <input type="number" step="any" data-v="latitude" value="${v.latitude ?? ''}" placeholder="50.8225" />
+      </div>
+      <div class="field">
+        <label>Longitude</label>
+        <input type="number" step="any" data-v="longitude" value="${v.longitude ?? ''}" placeholder="-0.1372" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Parking Info</label>
+      <input type="text" data-v="parkingInfo" value="${escAttr(v.parkingInfo)}" placeholder="Free parking is available at the venue." />
+    </div>
+    <div class="field">
+      <label>Public Transport Info</label>
+      <input type="text" data-v="publicTransportInfo" value="${escAttr(v.publicTransportInfo)}" placeholder="Five minutes from Brighton Station." />
+    </div>
+    <div class="field">
+      <label>Directions</label>
+      <input type="text" data-v="directionsText" value="${escAttr(v.directionsText)}" placeholder="Enter through the main entrance…" />
+    </div>
+  </div>`;
+}
+
+function serviceRowHtml(i, sv) {
+  sv = sv || {};
+  const active = sv.isActive === false ? '' : 'checked';
+  return `<div class="repeat-row" data-service-row>
+    <div class="repeat-row-head">
+      <span>Service ${i + 1}</span>
+      <button type="button" class="repeat-remove" data-remove-service>Remove</button>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Service Name</label>
+        <input type="text" data-s="name" value="${escAttr(sv.name)}" placeholder="Morning Celebration" />
+      </div>
+      <div class="field">
+        <label>Service ID</label>
+        <input type="text" data-s="id" value="${escAttr(sv.id)}" placeholder="sunday-morning" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Type</label>
+        <input type="text" data-s="type" value="${escAttr(sv.type)}" placeholder="sunday / midweek" />
+      </div>
+      <div class="field">
+        <label>Day</label>
+        <select data-s="day">
+          ${['','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+            .map(d => `<option value="${d}" ${sv.day === d ? 'selected' : ''}>${d || '—'}</option>`)
+            .join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Start Time</label>
+        <input type="time" data-s="startTime" value="${escAttr(sv.startTime)}" />
+      </div>
+      <div class="field">
+        <label>End Time</label>
+        <input type="time" data-s="endTime" value="${escAttr(sv.endTime)}" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Venue</label>
+      <select data-s="venueId" data-selected="${escAttr(sv.venueId)}"></select>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" data-s="description" value="${escAttr(sv.description)}" placeholder="Our main Sunday celebration service." />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Order</label>
+        <input type="number" data-s="order" min="0" value="${sv.order ?? i + 1}" />
+      </div>
+      <div class="field field-inline" style="margin-top:26px;">
+        <input type="checkbox" data-s="isActive" ${active} />
+        <label>Active</label>
+      </div>
+    </div>
+  </div>`;
+}
+
+function galleryRowHtml(i, g) {
+  g = g || {};
+  return `<div class="repeat-row" data-gallery-row>
+    <div class="repeat-row-head">
+      <span>Image ${i + 1}</span>
+      <button type="button" class="repeat-remove" data-remove-gallery>Remove</button>
+    </div>
+    <div class="field">
+      <label>Image URL</label>
+      <input type="text" data-g="imageUrl" value="${escAttr(g.imageUrl)}" placeholder="assets/branches/brighton/gallery-1.jpg" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Alt Text</label>
+        <input type="text" data-g="alt" value="${escAttr(g.alt)}" placeholder="Kharis Brighton Sunday service" />
+      </div>
+      <div class="field">
+        <label>Order</label>
+        <input type="number" data-g="order" min="0" value="${g.order ?? i + 1}" />
+      </div>
+    </div>
+  </div>`;
+}
+
+/** Attribute-safe escape for values echoed back into inputs. */
+function escAttr(v) {
+  return String(v ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function renderVenues(list) {
+  const host = document.getElementById('br-venues');
+  host.innerHTML = (list && list.length)
+    ? list.map((v, i) => venueRowHtml(i, v)).join('')
+    : '<p class="repeat-empty">No venues yet.</p>';
+  syncServiceVenueOptions();
+}
+
+function renderServices(list) {
+  const host = document.getElementById('br-services');
+  host.innerHTML = (list && list.length)
+    ? list.map((sv, i) => serviceRowHtml(i, sv)).join('')
+    : '<p class="repeat-empty">No services yet.</p>';
+  syncServiceVenueOptions();
+}
+
+function renderGallery(list) {
+  const host = document.getElementById('br-gallery');
+  host.innerHTML = (list && list.length)
+    ? list.map((g, i) => galleryRowHtml(i, g)).join('')
+    : '<p class="repeat-empty">No gallery images yet.</p>';
+}
+
+/**
+ * Keeps every service's venue dropdown in step with the venues currently in
+ * the form, so `service.venueId` can only ever point at a venue that exists.
+ * Preserves an already-saved selection even before its venue row is typed.
+ */
+function syncServiceVenueOptions() {
+  const venues = collectVenues({ silent: true });
+  document.querySelectorAll('[data-service-row] select[data-s="venueId"]').forEach(sel => {
+    const chosen = sel.value || sel.dataset.selected || '';
+    sel.innerHTML = '<option value="">— No venue —</option>' +
+      venues.map(v => `<option value="${escAttr(v.id)}" ${v.id === chosen ? 'selected' : ''}>${escHtml(v.name || v.id)}</option>`).join('') +
+      // A saved venueId whose row was removed stays visible rather than
+      // silently resetting to "no venue".
+      (chosen && !venues.some(v => v.id === chosen)
+        ? `<option value="${escAttr(chosen)}" selected>${escHtml(chosen)} (missing)</option>`
+        : '');
+  });
+}
+
+function collectVenues(opts) {
+  const out = [];
+  document.querySelectorAll('[data-venue-row]').forEach(row => {
+    const get = (k) => (row.querySelector(`[data-v="${k}"]`)?.value ?? '').trim();
+    const name = get('name');
+    const id = slugify(get('id')) || slugify(name);
+    // Blank rows are dropped on save but MUST survive an add/remove re-render,
+    // otherwise pressing "+ Add venue" twice collapses back to one row.
+    if (!name && !id && !(opts && opts.keepBlank)) return;
+    const lat = parseFloat(get('latitude'));
+    const lng = parseFloat(get('longitude'));
+    out.push({
+      id,
+      name,
+      addressLine1: get('addressLine1'),
+      addressLine2: get('addressLine2'),
+      city: get('city'),
+      postcode: get('postcode'),
+      country: get('country'),
+      latitude: Number.isFinite(lat) ? lat : null,
+      longitude: Number.isFinite(lng) ? lng : null,
+      parkingInfo: get('parkingInfo'),
+      publicTransportInfo: get('publicTransportInfo'),
+      directionsText: get('directionsText'),
+    });
+  });
+  if (!opts || !opts.silent) {
+    const ids = out.map(v => v.id);
+    if (new Set(ids).size !== ids.length) return { error: 'Venue IDs must be unique.' };
+  }
+  return out;
+}
+
+function collectServices(opts) {
+  const out = [];
+  document.querySelectorAll('[data-service-row]').forEach((row, i) => {
+    const get = (k) => (row.querySelector(`[data-s="${k}"]`)?.value ?? '').trim();
+    const name = get('name');
+    const id = slugify(get('id')) || slugify(name);
+    if (!name && !id && !(opts && opts.keepBlank)) return;
+    out.push({
+      id,
+      name,
+      type: get('type'),
+      day: get('day'),
+      startTime: get('startTime'),
+      endTime: get('endTime'),
+      venueId: get('venueId') || null,
+      description: get('description'),
+      order: parseInt(get('order') || String(i + 1), 10),
+      isActive: row.querySelector('[data-s="isActive"]')?.checked ?? true,
+    });
+  });
+  if (opts && opts.silent) return out;
+  const ids = out.map(sv => sv.id);
+  if (new Set(ids).size !== ids.length) return { error: 'Service IDs must be unique.' };
+  return out;
+}
+
+function collectGallery(opts) {
+  const out = [];
+  document.querySelectorAll('[data-gallery-row]').forEach((row, i) => {
+    const get = (k) => (row.querySelector(`[data-g="${k}"]`)?.value ?? '').trim();
+    const imageUrl = get('imageUrl');
+    if (!imageUrl && !(opts && opts.keepBlank)) return;
+    out.push({ imageUrl, alt: get('alt'), order: parseInt(get('order') || String(i + 1), 10) });
+  });
+  return out;
+}
+
+// Add / remove wiring. Rows are re-rendered so the "Venue 2" style headings and
+// the service venue dropdowns stay correct after any removal.
+const KEEP = { silent: true, keepBlank: true };
+document.getElementById('br-add-venue').addEventListener('click', () => {
+  renderVenues([...collectVenues(KEEP), {}]);
+});
+document.getElementById('br-add-service').addEventListener('click', () => {
+  renderServices([...collectServices(KEEP), {}]);
+});
+document.getElementById('br-add-gallery').addEventListener('click', () => {
+  renderGallery([...collectGallery(KEEP), {}]);
+});
+document.getElementById('br-venues').addEventListener('click', (e) => {
+  if (!e.target.matches('[data-remove-venue]')) return;
+  const rows = [...document.querySelectorAll('[data-venue-row]')];
+  const idx = rows.indexOf(e.target.closest('[data-venue-row]'));
+  renderVenues(collectVenues(KEEP).filter((_, i) => i !== idx));
+});
+document.getElementById('br-services').addEventListener('click', (e) => {
+  if (!e.target.matches('[data-remove-service]')) return;
+  const rows = [...document.querySelectorAll('[data-service-row]')];
+  const idx = rows.indexOf(e.target.closest('[data-service-row]'));
+  renderServices(collectServices(KEEP).filter((_, i) => i !== idx));
+});
+document.getElementById('br-gallery').addEventListener('click', (e) => {
+  if (!e.target.matches('[data-remove-gallery]')) return;
+  const rows = [...document.querySelectorAll('[data-gallery-row]')];
+  const idx = rows.indexOf(e.target.closest('[data-gallery-row]'));
+  renderGallery(collectGallery(KEEP).filter((_, i) => i !== idx));
+});
+// Venue name/id edits must reach the service dropdowns as they are typed.
+document.getElementById('br-venues').addEventListener('input', (e) => {
+  if (e.target.matches('[data-v="name"], [data-v="id"]')) syncServiceVenueOptions();
+});
+
+/** Clears the whole branch editor, including every repeatable row. */
+function resetBranchForm() {
+  const form = document.getElementById('branch-form');
+  form.reset();
+  delete form.dataset.editId;
+  document.getElementById('br-active').checked = true;
+  renderVenues([]);
+  renderServices([]);
+  renderGallery([]);
+  document.getElementById('branch-submit-btn').textContent = 'Save Branch';
+}
+
 async function editBranch(id) {
   const d = await getDoc(doc(db, 'branches', id));
   if (!d.exists()) return;
   const b = d.data();
-  document.getElementById('br-name').value = b.name || '';
-  document.getElementById('br-subtitle').value = b.subtitle || b.location || '';
-  document.getElementById('br-description').value = b.description || '';
-  document.getElementById('br-image').value = b.imageUrl || '';
-  document.getElementById('br-address').value = b.address || '';
-  document.getElementById('br-meeting-days').value = b.meetingDays || b.meetingDay || '';
-  document.getElementById('br-meeting-time').value = b.meetingTime || '';
-  document.getElementById('br-gradient-start').value = b.gradientStart || '';
-  document.getElementById('br-gradient-end').value = b.gradientEnd || '';
-  document.getElementById('br-order').value = b.order ?? '';
+  const set = (elId, val) => { document.getElementById(elId).value = val ?? ''; };
+
+  set('br-name', b.name);
+  set('br-subtitle', b.subtitle || b.location);
+  set('br-group', b.group || 'Kharis');
+  set('br-order', b.order ?? '');
+  document.getElementById('br-active').checked = b.isActive !== false;
+
+  // Nested `branding`/`hero` are the documented shape; the flat fields are the
+  // legacy mirror that shipped app versions still read.
+  set('br-gradient-start', b.branding?.gradientStart || b.gradientStart);
+  set('br-gradient-end', b.branding?.gradientEnd || b.gradientEnd);
+  set('br-hero-subtitle', b.hero?.subtitle);
+  set('br-hero-image', b.hero?.imageUrl || b.imageUrl);
+
+  set('br-short-desc', b.shortDescription);
+  set('br-description', b.description);
+
+  set('br-pastor-name', b.pastor?.name);
+  set('br-pastor-image', b.pastor?.imageUrl);
+  set('br-pastor-bio', b.pastor?.bio);
+
+  set('br-contact-email', b.contact?.email);
+  set('br-contact-phone', b.contact?.phone);
+
+  set('br-address', b.address);
+  set('br-meeting-days', b.meetingDays || b.meetingDay);
+  set('br-meeting-time', b.meetingTime);
+
+  set('br-instagram', b.instagram);
+  set('br-fv-title', b.featuredVideo?.title);
+  set('br-fv-url', b.featuredVideo?.youtubeUrl);
+  set('br-fv-thumb', b.featuredVideo?.thumbnailUrl);
+
+  const byOrder = (a, c) => (a.order ?? 0) - (c.order ?? 0);
+  renderVenues(Array.isArray(b.venues) ? b.venues : []);
+  renderServices(Array.isArray(b.services) ? [...b.services].sort(byOrder) : []);
+  renderGallery(Array.isArray(b.galleryImages) ? [...b.galleryImages].sort(byOrder) : []);
+
   document.getElementById('branch-form').dataset.editId = id;
   document.getElementById('branch-submit-btn').textContent = 'Update Branch';
+  document.getElementById('br-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 document.getElementById('branch-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const editId = e.target.dataset.editId;
+  const val = (id) => document.getElementById(id).value.trim();
+  const orNull = (id) => val(id) || null;
   const normHex = (v) => {
     v = v.trim();
     if (!v) return null;
     if (!v.startsWith('#')) v = '#' + v;
     return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : undefined;
   };
-  const gradientStart = normHex(document.getElementById('br-gradient-start').value);
-  const gradientEnd = normHex(document.getElementById('br-gradient-end').value);
+  const gradientStart = normHex(val('br-gradient-start'));
+  const gradientEnd = normHex(val('br-gradient-end'));
   if (gradientStart === undefined || gradientEnd === undefined) {
-    toast('Gradient colours must be 6-digit hex, e.g. #6B34FA', 'error');
+    toast('Gradient colours must be 6-digit hex, e.g. #3B2A6B', 'error');
     return;
   }
+
+  const venues = collectVenues();
+  if (venues.error) { toast(venues.error, 'error'); return; }
+  const services = collectServices();
+  if (services.error) { toast(services.error, 'error'); return; }
+  // A service pointing at a venue that no longer exists would break directions
+  // in the app, so it is rejected here rather than written.
+  const venueIds = new Set(venues.map(v => v.id));
+  const orphan = services.find(sv => sv.venueId && !venueIds.has(sv.venueId));
+  if (orphan) {
+    toast(`Service "${orphan.name || orphan.id}" points at a venue that no longer exists.`, 'error');
+    return;
+  }
+
+  const heroImage = orNull('br-hero-image');
   const data = {
-    name: document.getElementById('br-name').value.trim(),
-    subtitle: document.getElementById('br-subtitle').value.trim(),
-    description: document.getElementById('br-description').value.trim(),
-    imageUrl: document.getElementById('br-image').value.trim() || null,
-    address: document.getElementById('br-address').value.trim() || null,
-    meetingDays: document.getElementById('br-meeting-days').value.trim() || null,
-    meetingTime: document.getElementById('br-meeting-time').value || null,
+    name: val('br-name'),
+    subtitle: val('br-subtitle'),
+    group: val('br-group') || 'Kharis',
+    order: parseInt(val('br-order') || '0', 10),
+    isActive: document.getElementById('br-active').checked,
+
+    branding: { gradientStart, gradientEnd },
+    hero: { subtitle: orNull('br-hero-subtitle'), imageUrl: heroImage },
+
+    shortDescription: orNull('br-short-desc'),
+    description: orNull('br-description'),
+
+    pastor: {
+      name: orNull('br-pastor-name'),
+      imageUrl: orNull('br-pastor-image'),
+      bio: orNull('br-pastor-bio'),
+    },
+    contact: { email: orNull('br-contact-email'), phone: orNull('br-contact-phone') },
+
+    venues,
+    services,
+    instagram: orNull('br-instagram'),
+    featuredVideo: {
+      title: orNull('br-fv-title'),
+      youtubeUrl: orNull('br-fv-url'),
+      thumbnailUrl: orNull('br-fv-thumb'),
+    },
+    galleryImages: collectGallery(),
+
+    // ── Legacy mirrors ────────────────────────────────────────────────────
+    // Shipped app builds read these flat keys; keep writing them until the
+    // app reads `branding`/`hero` so an edit here never blanks a live card.
     gradientStart,
     gradientEnd,
-    order: parseInt(document.getElementById('br-order').value || '0', 10),
+    imageUrl: heroImage,
+    address: orNull('br-address'),
+    meetingDays: orNull('br-meeting-days'),
+    meetingTime: orNull('br-meeting-time'),
+
     updatedAt: serverTimestamp(),
   };
+
   const btn = document.getElementById('branch-submit-btn');
   btn.disabled = true;
   btn.textContent = 'Saving…';
@@ -2501,16 +3039,19 @@ document.getElementById('branch-form').addEventListener('submit', async (e) => {
       await addDoc(collection(db, 'branches'), data);
     }
     toast(editId ? 'Branch updated' : 'Branch created');
-    e.target.reset();
-    delete e.target.dataset.editId;
-    btn.textContent = 'Save Branch';
+    resetBranchForm();
     loadBranches();
   } catch (err) {
     toast('Error: ' + err.message, 'error');
-    btn.textContent = 'Save Branch';
+    btn.textContent = editId ? 'Update Branch' : 'Save Branch';
   }
   btn.disabled = false;
 });
+
+// Start with empty-state text rather than a bare form.
+renderVenues([]);
+renderServices([]);
+renderGallery([]);
 
 document.getElementById('refresh-branches').addEventListener('click', loadBranches);
 
