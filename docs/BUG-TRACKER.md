@@ -81,3 +81,7 @@ Code changes made this pass (all `flutter analyze` clean; full test suite 106/10
 4. **KA-012** new `features/settings/presentation/widgets/feedback_sheet.dart` + More-menu row + `in_app_review ^2.0.9` — `FeedbackSheet` (Rate the app / Send feedback / Not now) and `FeedbackNudge` (quarterly, ≥3 sessions, skips if another surface owns the screen, e.g. the branch prompt).
 
 Still open after this pass: KA-005 (scrub feel — needs device testing), KA-006 (needs repro), KA-010 (needs Pastor Luke's definition), KA-011 (default-branch half), KA-019 (filters — enhancement), KA-021/KA-022 (data/CMS), Q-1–Q-3.
+
+## Device verification — 9 Sep (iPhone, release-style debug build)
+
+`app/scripts/run_tester_round_fixes.sh` drives a fresh install through the real app (onboarding → shell) and checks each criterion in place; two consecutive runs passed 16/16. Highlights: Today's Reading first on Home; Read now renders 1 Corinthians 9 in-app; **audio kept playing (6s → 9s) on Giving with no bar**; swipe-down dismisses and stops; single Share + tonal skips on the player; More → My Notes / My Playlists; Rate & feedback sheet; nudge silent on session 1. The walkthrough also *found* KA-023 (bell dot always lit) and KA-024 (dismiss assert), both fixed and re-verified. Not exercised on device because the CMS had no data for it: KA-002 detail sheet (feed empty for London) and KA-015/018 (no Message of the Day today) — both covered by widget tests. Screenshots + log: `~/Desktop/kharis-device-walkthrough-2026-09-09/`.
