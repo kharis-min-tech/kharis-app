@@ -10,6 +10,7 @@ import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/theme_provider.dart';
 
+import '../widgets/feedback_sheet.dart';
 import 'notifications_settings_screen.dart';
 
 /// The profile hub (design-handoff v3): a light "More" screen with the
@@ -110,6 +111,12 @@ class SettingsScreen extends ConsumerWidget {
                         builder: (_) => const NotificationsSettingsScreen(),
                       ),
                     ),
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.star_border_rounded,
+                    label: 'Rate & Feedback',
+                    accent: context.kc.accentInk,
+                    onTap: () => FeedbackSheet.show(context),
                   ),
                   _MoreMenuItem(
                     icon: Icons.help_outline,

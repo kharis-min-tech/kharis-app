@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
+import 'package:kharis_app/features/settings/presentation/widgets/feedback_sheet.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,6 +33,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreMiniPlayer();
       _promptBranchOnce();
+      FeedbackNudge.maybeShow(context);
     });
   }
 
@@ -86,7 +88,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (currentSermon != null) const MiniPlayer(),
+          // The bar docks on every tab except Giving: testers couldn't push
+          // it away there and it crowded the bank details mid-gift (KA-001).
+          // Audio keeps playing — only the bar hides; any other tab brings
+          // it back, and swipe-down still dismisses it outright.
+          if (currentSermon != null &&
+              widget.navigationShell.currentIndex != 2)
+            const MiniPlayer(),
           Container(
             decoration: BoxDecoration(
               color: context.kc.surface,

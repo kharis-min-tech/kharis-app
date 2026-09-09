@@ -15,13 +15,31 @@ import 'package:kharis_app/shared/widgets/artwork_image.dart';
 /// play/pause button, plus a gold progress line pinned to the bottom edge.
 /// Tapping the body pushes `/player`; the play/pause button is isolated.
 /// Hidden entirely when [currentSermonProvider] is null.
-class MiniPlayer extends ConsumerWidget {
+class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MiniPlayer> createState() => _MiniPlayerState();
+}
+
+class _MiniPlayerState extends ConsumerState<MiniPlayer> {
+  /// Sermon whose bar the member just swiped away. `stop()` clears
+  /// [currentSermonProvider] through the engine's stream — a frame or more
+  /// later on a real device — and a dismissed [Dismissible] that is still in
+  /// the tree for that frame asserts ("A dismissed Dismissible widget is still
+  /// part of the tree", seen on iPhone during the KA-001 walkthrough). Hiding
+  /// synchronously here closes that gap; the flag resets once the sermon is
+  /// gone so the same message can come back later.
+  String? _dismissedSermonId;
+
+  @override
+  Widget build(BuildContext context) {
     final sermon = ref.watch(currentSermonProvider);
-    if (sermon == null) return const SizedBox.shrink();
+    if (sermon == null) {
+      _dismissedSermonId = null;
+      return const SizedBox.shrink();
+    }
+    if (sermon.id == _dismissedSermonId) return const SizedBox.shrink();
 
     final playerState = ref.watch(playerStateProvider).valueOrNull;
     final isPlaying = playerState?.playing ?? false;
@@ -53,7 +71,10 @@ class MiniPlayer extends ConsumerWidget {
         direction: DismissDirection.down,
         // A short fling should be enough; this is a 58px bar, not a list row.
         dismissThresholds: const {DismissDirection.down: 0.35},
-        onDismissed: (_) => unawaited(service.stop()),
+        onDismissed: (_) {
+          setState(() => _dismissedSermonId = sermon.id);
+          unawaited(service.stop());
+        },
         child: Container(
           height: 58,
           margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),

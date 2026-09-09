@@ -7,7 +7,6 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/core/utils/share_sermon.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart'
     show NoteTimelineBinding;
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
@@ -457,11 +456,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
               ),
             ),
           ),
-          _iconButton(
-            Icons.ios_share_rounded,
-            20,
-            () => unawaited(shareSermon(widget.sermon)),
-          ),
+          // Share lives in the actions row below (Notes · Playlist · Share).
+          // This header copy was the duplicate testers flagged (KA-013); the
+          // spacer keeps the series label optically centred.
+          const SizedBox(width: 40, height: 40),
         ],
       ),
     );

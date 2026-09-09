@@ -5,6 +5,7 @@ import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import '../widgets/latest_message_card.dart';
 import '../widgets/todays_reading_card.dart';
 import '../widgets/campus_card.dart';
@@ -42,19 +43,20 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
 
-            // Featured hero sermon
+            // Today's reading leads the page: it is one of the key reasons
+            // members open the app daily (product ask, 19 Aug — KA-009).
             const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 24),
-                child: LatestMessageCard(),
+                child: TodaysReadingCard(),
               ),
             ),
 
-            // Today's reading card
+            // Featured hero sermon
             const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
-                child: TodaysReadingCard(),
+                child: LatestMessageCard(),
               ),
             ),
 
@@ -200,22 +202,23 @@ class _HomeHeader extends ConsumerWidget {
                   size: 21,
                 ),
               ),
-              Positioned(
-                top: 2,
-                right: 2,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.accentPink,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: context.kc.surface,
-                      width: 1.5,
+              // KA-023: the dot only lights when the feed actually holds
+              // something the member hasn't dismissed.
+              if (ref.watch(hasPendingNotificationsProvider))
+                Positioned(
+                  key: const Key('home-bell-unread-dot'),
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentPink,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: context.kc.surface, width: 1.5),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

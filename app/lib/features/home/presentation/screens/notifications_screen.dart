@@ -7,6 +7,7 @@ import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/dismissed_notifications_provider.dart';
+import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 /// What a feed row came from. Carries its own iconography and eyebrow label so
@@ -36,21 +37,21 @@ class _NotifItem {
   /// [id] is namespaced by source so a news item and an event that happen to
   /// share a document id can never dismiss each other.
   factory _NotifItem.announcement(NewsItem n) => _NotifItem(
-        id: 'news:${n.id}',
-        kind: _NotifKind.announcement,
-        title: n.title,
-        body: n.body,
-        date: n.publishedAt,
-      );
+    id: announcementNotificationId(n.id),
+    kind: _NotifKind.announcement,
+    title: n.title,
+    body: n.body,
+    date: n.publishedAt,
+  );
 
   factory _NotifItem.event(Event e) => _NotifItem(
-        id: 'event:${e.id}',
-        kind: _NotifKind.event,
-        title: e.title,
-        body: e.description,
-        date: e.startTime,
-        event: e,
-      );
+    id: eventNotificationId(e.id),
+    kind: _NotifKind.event,
+    title: e.title,
+    body: e.description,
+    date: e.startTime,
+    event: e,
+  );
 
   final String id;
   final _NotifKind kind;
@@ -82,8 +83,8 @@ String _relativeLabel(DateTime dt, DateTime now) {
   final amount = magnitude.inMinutes < 60
       ? '${magnitude.inMinutes}m'
       : magnitude.inHours < 24
-          ? '${magnitude.inHours}h'
-          : '${magnitude.inDays}d';
+      ? '${magnitude.inHours}h'
+      : '${magnitude.inDays}d';
   return diff.isNegative ? '$amount ago' : 'in $amount';
 }
 
@@ -154,8 +155,9 @@ class NotificationsScreen extends ConsumerWidget {
               onPressed: () => _clearAll(context, ref, items),
               child: Text(
                 'Clear all',
-                style:
-                    AppTypography.labelMd.copyWith(color: context.kc.accentInk),
+                style: AppTypography.labelMd.copyWith(
+                  color: context.kc.accentInk,
+                ),
               ),
             ),
         ],
@@ -164,7 +166,8 @@ class NotificationsScreen extends ConsumerWidget {
         context,
         ref,
         loading: loading,
-        failed: !newsAsync.hasValue &&
+        failed:
+            !newsAsync.hasValue &&
             !eventsAsync.hasValue &&
             (newsAsync.hasError || eventsAsync.hasError),
         items: items,
@@ -194,8 +197,9 @@ class NotificationsScreen extends ConsumerWidget {
         icon: hasDismissed
             ? Icons.mark_email_read_outlined
             : Icons.notifications_none_rounded,
-        title:
-            hasDismissed ? 'You\u2019re all caught up' : 'No notifications yet',
+        title: hasDismissed
+            ? 'You\u2019re all caught up'
+            : 'No notifications yet',
         subtitle: hasDismissed
             ? 'Dismissed notifications stay hidden on this device.'
             : 'Announcements and upcoming events will show up here.',
@@ -224,13 +228,11 @@ class NotificationsScreen extends ConsumerWidget {
         return Dismissible(
           key: ValueKey(item.id),
           background: const _SwipePlate(alignment: Alignment.centerLeft),
-          secondaryBackground:
-              const _SwipePlate(alignment: Alignment.centerRight),
-          onDismissed: (_) => _dismiss(context, ref, item),
-          child: _NotifRow(
-            item: item,
-            onTap: () => _showDetail(context, item),
+          secondaryBackground: const _SwipePlate(
+            alignment: Alignment.centerRight,
           ),
+          onDismissed: (_) => _dismiss(context, ref, item),
+          child: _NotifRow(item: item, onTap: () => _showDetail(context, item)),
         );
       },
     );
@@ -300,58 +302,64 @@ class _NotifRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-      // Opaque so the swipe plate stays behind the row rather than bleeding
-      // through it.
-      color: context.kc.bg,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: context.kc.chipBg,
+        // Opaque so the swipe plate stays behind the row rather than bleeding
+        // through it.
+        color: context.kc.bg,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.kc.chipBg,
+              ),
+              child: Icon(
+                item.kind.icon,
+                color: context.kc.accentInk,
+                size: 20,
+              ),
             ),
-            child: Icon(item.kind.icon, color: context.kc.accentInk, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${item.kind.label} \u00b7 '
-                  '${_relativeLabel(item.date, DateTime.now())}',
-                  style:
-                      AppTypography.labelMd.copyWith(color: context.kc.muted),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  item.title,
-                  style: AppTypography.bodyLg.copyWith(
-                    color: context.kc.onBg,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (body != null && body.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    body,
-                    style:
-                        AppTypography.bodySm.copyWith(color: context.kc.muted),
+                    '${item.kind.label} \u00b7 '
+                    '${_relativeLabel(item.date, DateTime.now())}',
+                    style: AppTypography.labelMd.copyWith(
+                      color: context.kc.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.title,
+                    style: AppTypography.bodyLg.copyWith(
+                      color: context.kc.onBg,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (body != null && body.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      style: AppTypography.bodySm.copyWith(
+                        color: context.kc.muted,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -371,8 +379,11 @@ class _SwipePlate extends StatelessWidget {
         alignment: alignment,
         child: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 24),
-          child:
-              Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
+          child: Icon(
+            Icons.delete_outline_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
         ),
       ),
     );
@@ -433,8 +444,9 @@ class _Empty extends StatelessWidget {
                 onPressed: action.onPressed,
                 child: Text(
                   action.label,
-                  style: AppTypography.labelMd
-                      .copyWith(color: context.kc.accentInk),
+                  style: AppTypography.labelMd.copyWith(
+                    color: context.kc.accentInk,
+                  ),
                 ),
               ),
             ],
