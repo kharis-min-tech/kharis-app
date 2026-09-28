@@ -58,3 +58,7 @@ node_modules/
 app/env.json
 admin/.firebase/
 app/.omc/
+
+# Wrangler's local dev-simulation cache (fake local R2/D1 state) — never
+# reflects anything real, shouldn't be shared.
+backend/cloudflare-worker/.wrangler/
