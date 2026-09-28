@@ -93,7 +93,8 @@ class _PlayerControlsState extends ConsumerState<PlayerControls> {
       final playerState = ref.watch(playerStateProvider).valueOrNull;
       isPlaying = playerState?.playing ?? false;
       final processingState = playerState?.processingState;
-      isBuffering = processingState == ProcessingState.loading ||
+      isBuffering =
+          processingState == ProcessingState.loading ||
           processingState == ProcessingState.buffering;
       position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
       duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
@@ -232,8 +233,9 @@ class _PlayPauseButton extends StatelessWidget {
                 height: 26,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(context.kc.onAccent),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    context.kc.onAccent,
+                  ),
                 ),
               )
             : Icon(
@@ -275,7 +277,7 @@ class _SkipButton extends StatelessWidget {
               size: 32,
             ),
             Positioned(
-              bottom: 7,
+              bottom: isForward ? 6 : 18,
               child: Text(
                 '$seconds',
                 style: AppTypography.ui(

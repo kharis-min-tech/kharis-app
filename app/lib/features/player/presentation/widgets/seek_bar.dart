@@ -54,9 +54,9 @@ class _SeekBarState extends State<SeekBar> {
   }
 
   void _seekToFraction(double f) {
-    widget.onSeek(Duration(
-      milliseconds: (f * widget.duration.inMilliseconds).round(),
-    ));
+    widget.onSeek(
+      Duration(milliseconds: (f * widget.duration.inMilliseconds).round()),
+    );
   }
 
   @override
@@ -72,36 +72,39 @@ class _SeekBarState extends State<SeekBar> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LayoutBuilder(builder: (_, constraints) {
-          final trackWidth = constraints.maxWidth;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (d) => _seekToFraction(
-                (d.localPosition.dx / trackWidth).clamp(0.0, 1.0)),
-            onHorizontalDragUpdate: (d) {
-              setState(() {
-                _dragFraction =
-                    ((_dragFraction ?? _fraction) + d.delta.dx / trackWidth)
-                        .clamp(0.0, 1.0);
-              });
-            },
-            onHorizontalDragEnd: (_) {
-              if (_dragFraction != null) _seekToFraction(_dragFraction!);
-              setState(() => _dragFraction = null);
-            },
-            child: SizedBox(
-              height: waveH,
-              width: trackWidth,
-              child: CustomPaint(
-                painter: _WaveformPainter(
-                  fraction: _fraction,
-                  played: context.kc.accent,
-                  unplayed: context.kc.muted.withValues(alpha: 0.35),
+        LayoutBuilder(
+          builder: (_, constraints) {
+            final trackWidth = constraints.maxWidth;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (d) => _seekToFraction(
+                (d.localPosition.dx / trackWidth).clamp(0.0, 1.0),
+              ),
+              onHorizontalDragUpdate: (d) {
+                setState(() {
+                  _dragFraction =
+                      ((_dragFraction ?? _fraction) + d.delta.dx / trackWidth)
+                          .clamp(0.0, 1.0);
+                });
+              },
+              onHorizontalDragEnd: (_) {
+                if (_dragFraction != null) _seekToFraction(_dragFraction!);
+                setState(() => _dragFraction = null);
+              },
+              child: SizedBox(
+                height: waveH,
+                width: trackWidth,
+                child: CustomPaint(
+                  painter: _WaveformPainter(
+                    fraction: _fraction,
+                    played: context.kc.accent,
+                    unplayed: context.kc.muted.withValues(alpha: 0.35),
+                  ),
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          },
+        ),
         const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -29,8 +29,8 @@ export 'package:kharis_app/features/player/presentation/media_mode.dart';
 /// lavender that fades into the warm page background.
 List<Color> playerAmbientColors(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-        ? [const Color(0xFF3A1D6E), const Color(0xFF1A0F33), context.kc.bg]
-        : [const Color(0xFFE6DEF8), const Color(0xFFF2ECF9), context.kc.bg];
+    ? [const Color(0xFF3A1D6E), const Color(0xFF1A0F33), context.kc.bg]
+    : [const Color(0xFFE6DEF8), const Color(0xFFF2ECF9), context.kc.bg];
 
 /// Unified media player: one screen for every message, whatever media it
 /// carries. An Audio | Video segmented toggle switches engines in place,
@@ -131,7 +131,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     final controller = YoutubePlayerController.fromVideoId(
       videoId: widget.sermon.videoId!,
       autoPlay: true,
-      startSeconds: startAt > Duration.zero ? startAt.inSeconds.toDouble() : null,
+      startSeconds: startAt > Duration.zero
+          ? startAt.inSeconds.toDouble()
+          : null,
       params: const YoutubePlayerParams(
         showControls: true,
         showFullscreenButton: true,
@@ -159,7 +161,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   }
 
   void _syncWakelock(YoutubePlayerValue value) {
-    final active = value.playerState == PlayerState.playing ||
+    final active =
+        value.playerState == PlayerState.playing ||
         value.playerState == PlayerState.buffering;
     if (active == _wakelockOn) return;
     _wakelockOn = active;
@@ -322,13 +325,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   }
 
   BoxDecoration get _gradient => BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: playerAmbientColors(context),
-          stops: const [0.0, 0.44, 1.0],
-        ),
-      );
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: playerAmbientColors(context),
+      stops: const [0.0, 0.44, 1.0],
+    ),
+  );
 
   Widget _buildVideoSurface() {
     final Widget player;
@@ -363,11 +366,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PlaybackErrorBanner(sermonId: widget.sermon.id),
-        SeekBar(
-          position: position,
-          duration: duration,
-          onSeek: service.seek,
-        ),
+        SeekBar(position: position, duration: duration, onSeek: service.seek),
         const SizedBox(height: 18),
         const PlayerControls(),
       ],
@@ -547,10 +546,12 @@ class _VideoTransport extends StatelessWidget {
   final YoutubePlayerController controller;
 
   void _seek(Duration target) {
-    unawaited(controller.seekTo(
-      seconds: target.inMilliseconds / 1000,
-      allowSeekAhead: true,
-    ));
+    unawaited(
+      controller.seekTo(
+        seconds: target.inMilliseconds / 1000,
+        allowSeekAhead: true,
+      ),
+    );
   }
 
   @override
@@ -570,16 +571,13 @@ class _VideoTransport extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SeekBar(
-                  position: position,
-                  duration: duration,
-                  onSeek: _seek,
-                ),
+                SeekBar(position: position, duration: duration, onSeek: _seek),
                 const SizedBox(height: 18),
                 PlayerControls(
                   transport: TransportBinding(
                     isPlaying: state == PlayerState.playing,
-                    isBuffering: state == PlayerState.buffering ||
+                    isBuffering:
+                        state == PlayerState.buffering ||
                         state == PlayerState.unStarted,
                     position: position,
                     duration: duration,
