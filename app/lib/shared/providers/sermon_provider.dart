@@ -9,7 +9,7 @@ import '../../features/home/data/news_repository.dart';
 import '../../features/home/data/kharis_api_announcement_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
-import '../../features/messages/data/kharis_api_sermon_repository.dart';
+import '../../features/messages/data/r2_messages_repository.dart';
 import '../../features/messages/data/sermon_collections_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/kharis_content.dart';
@@ -22,9 +22,13 @@ import 'cache_provider.dart';
 // ── Repository ────────────────────────────────────────────────────────────────
 
 final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
-  // Kharis public sermon API (yetanothersermon.host). Falls back to the bundled
-  // catalogue via sermonsProvider's catch if the network is unreachable.
-  return KharisApiSermonRepository();
+  // R2 catalogue from the Cloudflare import Worker (backend/cloudflare-worker),
+  // with the Kharis public sermon API (yetanothersermon.host) as its own
+  // built-in fallback — and the bundled catalogue via sermonsProvider's catch
+  // behind that if even the network is unreachable. Until the Worker is
+  // actually deployed (see kR2MessagesUrl), this just falls straight through
+  // to the API every time, i.e. today's behaviour, unchanged.
+  return R2MessagesRepository();
 });
 
 // ── Sermons (live fetch) ──────────────────────────────────────────────────────
