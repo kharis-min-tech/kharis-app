@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
 import 'package:flutter/material.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
@@ -13,17 +14,67 @@ import 'package:kharis_app/core/theme/theme.dart';
 /// Until the engine reports a duration the timeline is inert: gestures are
 /// ignored (a tap would otherwise compute 0:00 and throw the member back to
 /// the start) and the unknown times read `--:--`.
+///
+/// [pins] mark the member's notes on this timeline: a small gold bead on the
+/// rail per note, so the moments they pinned are visible while scrubbing.
+/// Positions must already be on the timeline this bar draws (the caller maps
+/// audio-timeline notes onto a video timeline). See [pinCentres].
 class SeekBar extends StatefulWidget {
   const SeekBar({
     super.key,
     required this.position,
     required this.duration,
     required this.onSeek,
+    this.pins = const <Duration>[],
   });
 
   final Duration position;
   final Duration duration;
   final ValueChanged<Duration> onSeek;
+
+  /// Note positions on this bar's timeline.
+  final List<Duration> pins;
+
+  /// Radius of a pin's gold core.
+  static const pinRadius = 3.0;
+
+  /// Ring in the page colour around each pin, separating it from the solid
+  /// played fill and the faint rail alike.
+  static const pinHalo = 1.5;
+
+  /// Full painted width of one pin, halo included. Pins closer than this
+  /// would overlap, so they merge into one marker.
+  static const pinWidth = 2 * (pinRadius + pinHalo);
+
+  /// The x centre of every pin marker on a track [width] wide.
+  ///
+  /// Pins outside `[0, duration]` are dropped and nothing is placed while
+  /// [duration] is unknown. Centres are clamped so a whole marker stays inside
+  /// the track, then any marker closer than [pinWidth] to the one before it
+  /// is merged into that one (which keeps the earliest position).
+  @visibleForTesting
+  static List<double> pinCentres(
+    List<Duration> pins, {
+    required Duration duration,
+    required double width,
+  }) {
+    final total = duration.inMicroseconds;
+    if (total <= 0 || width <= 0 || pins.isEmpty) return const <double>[];
+    const half = pinWidth / 2;
+    final lo = half < width / 2 ? half : width / 2;
+    final hi = width - lo;
+    final xs = [
+      for (final pin in pins)
+        if (pin >= Duration.zero && pin <= duration)
+          pin.inMicroseconds * width / total,
+    ]..sort();
+    final centres = <double>[];
+    for (final raw in xs) {
+      final x = raw.clamp(lo, hi);
+      if (centres.isEmpty || x - centres.last >= pinWidth) centres.add(x);
+    }
+    return centres;
+  }
 
   @override
   State<SeekBar> createState() => _SeekBarState();
@@ -65,6 +116,25 @@ class _SeekBarState extends State<SeekBar> {
 
   bool get _known => widget.duration > Duration.zero;
 
+  /// Notes this bar actually marks: none until the duration is known, and
+  /// never one outside the timeline. Counted before merging, so the spoken
+  /// count matches the member's notes, not the painted beads.
+  int get _pinCount {
+    if (!_known) return 0;
+    var count = 0;
+    for (final pin in widget.pins) {
+      if (pin >= Duration.zero && pin <= widget.duration) count++;
+    }
+    return count;
+  }
+
+  String get _label {
+    final count = _pinCount;
+    if (count == 0) return 'Playback position';
+    return 'Playback position, $count ${count == 1 ? 'note' : 'notes'} '
+        'on this message';
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.kc;
@@ -93,6 +163,13 @@ class _SeekBarState extends State<SeekBar> {
               showThumb: known,
               played: colors.onBg,
               rail: colors.onBg.withValues(alpha: 0.22),
+              pins: SeekBar.pinCentres(
+                widget.pins,
+                duration: widget.duration,
+                width: width,
+              ),
+              pin: colors.accentInk,
+              pinHalo: colors.bg,
             ),
           ),
         );
@@ -122,7 +199,7 @@ class _SeekBarState extends State<SeekBar> {
     return Semantics(
       slider: true,
       enabled: known,
-      label: 'Playback position',
+      label: _label,
       value: known ? '${_fmt(elapsed)} of ${_fmt(widget.duration)}' : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -147,7 +224,8 @@ class _SeekBarState extends State<SeekBar> {
   static const _unknown = '--:--';
 }
 
-/// Thin rounded rail, solid fill up to [fraction], round thumb at the head.
+/// Thin rounded rail, solid fill up to [fraction], a gold bead per note pin,
+/// round thumb at the head (drawn last, so it rides over a pin it reaches).
 class _TimelinePainter extends CustomPainter {
   const _TimelinePainter({
     required this.fraction,
@@ -155,6 +233,9 @@ class _TimelinePainter extends CustomPainter {
     required this.showThumb,
     required this.played,
     required this.rail,
+    required this.pins,
+    required this.pin,
+    required this.pinHalo,
   });
 
   final double fraction;
@@ -165,6 +246,11 @@ class _TimelinePainter extends CustomPainter {
   final bool showThumb;
   final Color played;
   final Color rail;
+
+  /// Pin centres along the track, from [SeekBar.pinCentres].
+  final List<double> pins;
+  final Color pin;
+  final Color pinHalo;
 
   static const _trackHeight = 4.0;
   static const _thumbRadius = 6.0;
@@ -190,6 +276,17 @@ class _TimelinePainter extends CustomPainter {
       );
     }
 
+    if (pins.isNotEmpty) {
+      final halo = Paint()..color = pinHalo;
+      final core = Paint()..color = pin;
+      for (final x in pins) {
+        final centre = Offset(x, cy);
+        canvas
+          ..drawCircle(centre, SeekBar.pinRadius + SeekBar.pinHalo, halo)
+          ..drawCircle(centre, SeekBar.pinRadius, core);
+      }
+    }
+
     if (!showThumb) return;
     canvas.drawCircle(
       Offset(headX, cy),
@@ -204,5 +301,8 @@ class _TimelinePainter extends CustomPainter {
       old.dragging != dragging ||
       old.showThumb != showThumb ||
       old.played != played ||
-      old.rail != rail;
+      old.rail != rail ||
+      old.pin != pin ||
+      old.pinHalo != pinHalo ||
+      !listEquals(old.pins, pins);
 }

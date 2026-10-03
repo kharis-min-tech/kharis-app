@@ -25,6 +25,7 @@ import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
@@ -107,6 +108,12 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
   /// The position the most recent video engine was started at.
   @visibleForTesting
   static Duration? debugLastVideoStart;
+
+  /// The note pins most recently handed to the video seek bar (video
+  /// timeline). The bar itself needs a live YouTube bridge, which
+  /// [debugDisableVideoEngine] skips, so tests read the mapping here.
+  @visibleForTesting
+  static List<Duration>? debugLastVideoPins;
 
   @override
   ConsumerState<MediaPlayerScreen> createState() => _MediaPlayerScreenState();
@@ -200,6 +207,26 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   Duration _toAudio(Duration video) {
     final audio = video - _videoOffset;
     return audio.isNegative ? Duration.zero : audio;
+  }
+
+  /// An audio-timeline position mapped onto the running video's timeline.
+  Duration _toVideo(Duration audio) => audio + _videoOffset;
+
+  /// This message's anchored notes as seek-bar pins, on the timeline of the
+  /// engine on screen. Notes live on the AUDIO timeline (one per message), so
+  /// video mode shifts them by the same offset the handoff and the notes
+  /// binding use. General notes carry no position and pin nothing. Watching
+  /// the notes keeps the pins live as the notes sheet adds or deletes one.
+  List<Duration> _notePins() {
+    final notes = ref.watch(sermonNotesProvider(NoteTimelineKey.of(_sermon)));
+    final isVideo = _mode == MediaMode.video;
+    return [
+      for (final note in notes)
+        if (note.positionMs case final ms?)
+          isVideo
+              ? _toVideo(Duration(milliseconds: ms))
+              : Duration(milliseconds: ms),
+    ];
   }
 
   /// Where video should start (video timeline): the live audio position when
@@ -578,11 +605,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             );
     }
     if (engine == null || _videoOffset == Duration.zero) return engine;
-    final offset = _videoOffset;
     final seek = engine.seek;
     return NoteTimelineBinding(
       position: engine.position?.map(_toAudio),
-      seek: seek == null ? null : (target) => seek(target + offset),
+      seek: seek == null ? null : (target) => seek(_toVideo(target)),
     );
   }
 
@@ -785,7 +811,12 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PlaybackErrorBanner(sermonId: _sermon.id),
-        SeekBar(position: position, duration: duration, onSeek: _audio.seek),
+        SeekBar(
+          position: position,
+          duration: duration,
+          onSeek: _audio.seek,
+          pins: _notePins(),
+        ),
         const SizedBox(height: 18),
         const PlayerControls(),
       ],
@@ -803,6 +834,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                 : () => unawaited(_switchMode(MediaMode.audio)),
             onOpenYouTube: () => unawaited(_openInYouTube()),
           );
+    final pins = _notePins();
+    MediaPlayerScreen.debugLastVideoPins = pins;
     final controller = _youtubeController;
     if (controller == null) {
       // Web iframe (and the test seam) have no JS bridge; the embed's native
@@ -821,6 +854,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           queue: queue,
           speed: speed,
           repeatOn: repeatOn,
+          pins: pins,
           onSetSpeed: (value) {
             unawaited(controller.setPlaybackRate(value));
             // One persisted rate for both engines.
@@ -1064,6 +1098,7 @@ class _VideoTransport extends StatelessWidget {
     required this.queue,
     required this.speed,
     required this.repeatOn,
+    required this.pins,
     required this.onSetSpeed,
     required this.onToggleRepeat,
     required this.onRestart,
@@ -1074,6 +1109,9 @@ class _VideoTransport extends StatelessWidget {
   final PlaybackQueue queue;
   final double speed;
   final bool repeatOn;
+
+  /// Note pins, already on the video timeline.
+  final List<Duration> pins;
   final ValueChanged<double> onSetSpeed;
   final VoidCallback onToggleRepeat;
   final VoidCallback onRestart;
@@ -1112,7 +1150,12 @@ class _VideoTransport extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SeekBar(position: position, duration: duration, onSeek: _seek),
+                SeekBar(
+                  position: position,
+                  duration: duration,
+                  onSeek: _seek,
+                  pins: pins,
+                ),
                 const SizedBox(height: 18),
                 PlayerControls(
                   transport: TransportBinding(
