@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/core/utils/artwork_gradient.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -466,7 +465,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                   child: _TopicCard(
                                     category: cat,
                                     count: categoryCounts[cat] ?? 0,
-                                    gradientIndex: index,
                                     active: selectedCategory == cat,
                                     onTap: () {
                                       ref
@@ -837,8 +835,10 @@ class _OfflineBanner extends StatelessWidget {
 // ── Archive footer ─────────────────────────────────────────────────────────────
 
 /// Progress of the archive walk under the list: "Loading archive n/total"
-/// while older pages stream in, a retry when the walk gave up, and a quiet
-/// end marker once everything is here.
+/// while older pages stream in (or a gap fill re-walks them), a retry when
+/// the walk gave up, the honest "n of total" with a retry when the library
+/// came up short, and a quiet end marker only once it holds every message
+/// the server lists.
 class _ArchiveFooter extends StatelessWidget {
   const _ArchiveFooter({
     required this.library,
@@ -855,25 +855,31 @@ class _ArchiveFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muted = AppTypography.bodySm.copyWith(color: context.kc.muted);
+    final retry = TextButton(
+      onPressed: onRetry,
+      child: Text(
+        'Retry',
+        style: AppTypography.labelMd.copyWith(
+          fontWeight: FontWeight.w700,
+          color: context.kc.accentInk,
+        ),
+      ),
+    );
+    final held = _count.format(library.sermons.length);
+    final total = _count.format(library.totalCount);
+    final walked = library.loaded && !library.hasMore;
+    final short = walked && library.countMismatch;
     final Widget child;
     if (library.hydrationFailed) {
       child = Column(
         children: [
           Text('Older messages could not be loaded.', style: muted),
-          TextButton(
-            onPressed: onRetry,
-            child: Text(
-              'Retry',
-              style: AppTypography.labelMd.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.kc.accentInk,
-              ),
-            ),
-          ),
+          retry,
         ],
       );
-    } else if (library.hasMore &&
-        (library.hydrating || library.isLoadingMore)) {
+    } else if ((library.hasMore &&
+            (library.hydrating || library.isLoadingMore)) ||
+        (short && (library.hydrating || !library.incomplete))) {
       child = Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -881,15 +887,23 @@ class _ArchiveFooter extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             library.totalCount > 0
-                ? 'Loading archive ${_count.format(library.sermons.length)}/${_count.format(library.totalCount)}'
+                ? 'Loading archive $held/$total'
                 : 'Loading archive',
             style: muted,
           ),
         ],
       );
-    } else if (library.loaded && !library.hasMore && shown > 20) {
+    } else if (short) {
+      child = Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('$held of $total messages \u2022', style: muted),
+          retry,
+        ],
+      );
+    } else if (walked && shown > 20) {
       child = Text(
-        'You\'ve reached the beginning \u2022 ${_count.format(library.sermons.length)} messages',
+        'You\'ve reached the beginning \u2022 $held messages',
         style: muted,
       );
     } else {
@@ -1135,7 +1149,6 @@ class _FeaturedCarouselState extends State<_FeaturedCarousel> {
                 child: _FeaturedCard(
                   sermon: sermon,
                   isPlaying: isPlaying,
-                  isActive: index == _currentPage,
                   onPlay: () => widget.onPlay(sermon),
                 ),
               );
@@ -1173,167 +1186,145 @@ class _FeaturedCard extends StatelessWidget {
   const _FeaturedCard({
     required this.sermon,
     required this.isPlaying,
-    required this.isActive,
     required this.onPlay,
   });
 
   final Sermon sermon;
   final bool isPlaying;
-  final bool isActive;
   final VoidCallback onPlay;
 
   @override
   Widget build(BuildContext context) {
-    final gradColors = sermonGradient(sermon.artworkColor ?? 0);
     return PressEffect(
       onTap: onPlay,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: gradColors[1].withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : null,
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Sermon artwork thumbnail as the card background.
-            ArtworkImage(
-              url: sermon.artworkUrl,
-              gradientIndex: sermon.artworkColor ?? 0,
-              radius: AppRadius.lg,
-            ),
-            // Bottom scrim for text legibility
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(AppRadius.lg),
-                    bottomRight: Radius.circular(AppRadius.lg),
-                  ),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Color(0xE6000000)],
-                  ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Sermon artwork thumbnail as the card background.
+          ArtworkImage(
+            url: sermon.artworkUrl,
+            gradientIndex: sermon.artworkColor ?? 0,
+            radius: AppRadius.lg,
+          ),
+          // Bottom scrim for text legibility
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(AppRadius.lg),
+                  bottomRight: Radius.circular(AppRadius.lg),
+                ),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xE6000000)],
                 ),
               ),
             ),
-            // Featured badge
-            Positioned(
-              top: 14,
-              left: 14,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: context.kc.accent.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isPlaying ? Icons.equalizer_rounded : Icons.star_rounded,
-                      size: 12,
-                      color: context.kc.onAccent,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isPlaying ? 'NOW PLAYING' : 'FEATURED',
-                      style: AppTypography.labelMd.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: context.kc.onAccent,
-                        letterSpacing: 0.08,
-                      ),
-                    ),
-                  ],
-                ),
+          ),
+          // Featured badge
+          Positioned(
+            top: 14,
+            left: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: context.kc.accent.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
-            ),
-            // Play button
-            Positioned(
-              top: 14,
-              right: 14,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Icon(
-                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-            ),
-            // Title + speaker
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    sermon.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodyLg.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      height: 1.25,
-                      letterSpacing: -0.15,
-                    ),
+                  Icon(
+                    isPlaying ? Icons.equalizer_rounded : Icons.star_rounded,
+                    size: 12,
+                    color: context.kc.onAccent,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        sermon.speaker,
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      if (sermon.category != null) ...[
-                        Text(
-                          ' · ${sermon.category}',
-                          style: AppTypography.labelMd.copyWith(
-                            fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.6),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
+                  const SizedBox(width: 4),
+                  Text(
+                    isPlaying ? 'NOW PLAYING' : 'FEATURED',
+                    style: AppTypography.labelMd.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: context.kc.onAccent,
+                      letterSpacing: 0.08,
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          // Play button
+          Positioned(
+            top: 14,
+            right: 14,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+          // Title + speaker
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  sermon.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodyLg.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.25,
+                    letterSpacing: -0.15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      sermon.speaker,
+                      style: AppTypography.labelMd.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    if (sermon.category != null) ...[
+                      Text(
+                        ' · ${sermon.category}',
+                        style: AppTypography.labelMd.copyWith(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1508,13 +1499,6 @@ class _RecentlyPlayedCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: context.kc.accent,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: Icon(
                       isPlaying
@@ -1548,29 +1532,22 @@ class _RecentlyPlayedCard extends StatelessWidget {
 
 // ── Topic playlist card (150x150) ─────────────────────────────────────────────
 
-/// Ink for the circular chip that floats over a topic card's artwork gradient.
-/// Invariant on purpose: the gradient beneath it does not follow the theme, so
-/// neither does the chip.
-const Color _onArtworkChipInk = Color(0xFF0B0A10);
-
 class _TopicCard extends StatelessWidget {
   const _TopicCard({
     required this.category,
     required this.count,
-    required this.gradientIndex,
     required this.active,
     required this.onTap,
   });
 
   final String category;
   final int count;
-  final int gradientIndex;
   final bool active;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colors = sermonGradient(gradientIndex);
+    final kc = context.kc;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -1581,47 +1558,18 @@ class _TopicCard extends StatelessWidget {
             duration: const Duration(milliseconds: 160),
             width: 150,
             height: 150,
+            // Flat design-system tile: no decorative gradient, so no scrim is
+            // needed to keep the label legible.
             decoration: BoxDecoration(
+              color: kc.surfaceAlt,
               borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: colors,
+              border: Border.all(
+                color: active ? kc.accent : kc.divider,
+                width: active ? 2.5 : 1,
               ),
-              border: active
-                  ? Border.all(color: context.kc.accent, width: 2.5)
-                  : null,
-              boxShadow: active
-                  ? [
-                      BoxShadow(
-                        color: context.kc.accent.withValues(alpha: 0.35),
-                        blurRadius: 18,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
             ),
             child: Stack(
               children: [
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 90,
-                    decoration: const BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xBB000000)],
-                      ),
-                    ),
-                  ),
-                ),
                 Positioned(
                   bottom: 44,
                   left: 10,
@@ -1633,7 +1581,7 @@ class _TopicCard extends StatelessWidget {
                     style: AppTypography.bodyLg.copyWith(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: kc.onBg,
                       height: 1.2,
                     ),
                   ),
@@ -1645,12 +1593,12 @@ class _TopicCard extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: active ? context.kc.accent : Colors.white,
+                      color: active ? kc.accent : kc.onBg,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                     child: Icon(
                       active ? Icons.check_rounded : Icons.play_arrow_rounded,
-                      color: active ? context.kc.onAccent : _onArtworkChipInk,
+                      color: active ? kc.onAccent : kc.bg,
                       size: 20,
                     ),
                   ),

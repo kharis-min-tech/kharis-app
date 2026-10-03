@@ -33,8 +33,10 @@ class TransportBinding {
   final bool isBuffering;
   final double speed;
   final bool repeatOn;
-  final VoidCallback onPlay;
-  final VoidCallback onPause;
+
+  /// Null disables Play / Pause (the engine cannot act on it yet).
+  final VoidCallback? onPlay;
+  final VoidCallback? onPause;
   final ValueChanged<double> onSetSpeed;
   final VoidCallback onToggleRepeat;
 
@@ -51,7 +53,8 @@ class TransportBinding {
 /// Previous and Next walk the queue the member launched from, Spotify-style:
 /// Previous restarts the message once it is past three seconds, otherwise
 /// steps back; both disable at the ends of the queue. The play/pause button
-/// is a 70-px gold circle with a spinner while buffering. The speed pill
+/// is a flat 70-px accent circle (no shadow) with an ink press state, a
+/// dimmed disabled state and a spinner while buffering. The speed pill
 /// cycles 1× → 1.25× → 1.5× → 2× → 0.75× and persists; Repeat loops the
 /// current message.
 class PlayerControls extends ConsumerWidget {
@@ -219,48 +222,57 @@ class _PlayPauseButton extends StatelessWidget {
 
   final bool isPlaying;
   final bool isBuffering;
-  final VoidCallback onTap;
+
+  /// Null disables the button: dimmed fill and glyph, no ink, no taps.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final kc = context.kc;
+    final enabled = onTap != null;
+    final glyph = enabled ? kc.onAccent : kc.onAccent.withValues(alpha: 0.6);
+    // Solid accent, no shadow. Buffering keeps the button live so a member
+    // can still pause a stalled stream. excludeSemantics drops the InkWell's
+    // own tap action, so the node carries it.
     return Semantics(
       button: true,
+      enabled: enabled,
       label: isPlaying ? 'Pause' : 'Play',
+      value: isBuffering ? 'Loading' : null,
+      onTap: onTap,
       excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 70,
-          height: 70,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: context.kc.accent,
-            boxShadow: [
-              BoxShadow(
-                color: context.kc.accent.withValues(alpha: 0.5),
-                blurRadius: 22,
-                offset: const Offset(0, 12),
-                spreadRadius: -6,
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: isBuffering
-              ? SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      context.kc.onAccent,
+      child: Material(
+        key: const ValueKey('player-play-pause'),
+        color: enabled ? kc.accent : kc.accent.withValues(alpha: 0.38),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          highlightColor: kc.onAccent.withValues(alpha: 0.16),
+          splashColor: kc.onAccent.withValues(alpha: 0.12),
+          child: SizedBox(
+            width: 70,
+            height: 70,
+            child: Center(
+              child: isBuffering
+                  ? SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(glyph),
+                      ),
+                    )
+                  : Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: glyph,
+                      size: 34,
                     ),
-                  ),
-                )
-              : Icon(
-                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: context.kc.onAccent,
-                  size: 34,
-                ),
+            ),
+          ),
         ),
       ),
     );

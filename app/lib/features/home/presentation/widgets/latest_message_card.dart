@@ -107,13 +107,10 @@ class _VideoHeroCard extends ConsumerWidget {
         aspectRatio: 16 / 9,
         child: Container(
           decoration: BoxDecoration(
+            // Solid brand fill under the thumbnail; shows while it loads.
+            color: AppColors.primaryDeep,
             borderRadius: BorderRadius.circular(AppRadius.card),
             boxShadow: AppShadows.card,
-            gradient: const LinearGradient(
-              begin: Alignment(-.8, -1),
-              end: Alignment(.6, 1),
-              colors: [Color(0xFF4A1D8F), Color(0xFF23104A), Color(0xFF0C0A12)],
-            ),
           ),
           clipBehavior: Clip.antiAlias,
           child: Stack(
@@ -378,13 +375,9 @@ class _HeroSkeleton extends StatelessWidget {
       aspectRatio: 16 / 9,
       child: Container(
         decoration: BoxDecoration(
+          color: AppColors.primaryDeep,
           borderRadius: BorderRadius.circular(AppRadius.card),
           boxShadow: AppShadows.card,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF4A1D8F), Color(0xFF0C0A12)],
-          ),
         ),
         child: const Center(
           child: SizedBox(
@@ -415,13 +408,9 @@ class _HeroError extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
+          color: AppColors.primaryDeep,
           borderRadius: BorderRadius.circular(AppRadius.card),
           boxShadow: AppShadows.card,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF4A1D8F), Color(0xFF0C0A12)],
-          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

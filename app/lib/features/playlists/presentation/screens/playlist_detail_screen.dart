@@ -247,7 +247,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(AppRadius.card),
-                          boxShadow: AppShadows.miniPlayer,
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: PlaylistArt(playlist: playlist),

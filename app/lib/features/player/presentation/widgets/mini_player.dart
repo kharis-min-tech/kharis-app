@@ -11,8 +11,9 @@ import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 /// Persistent mini player shown above the tab bar when a sermon is loaded.
 ///
-/// A 58-px `context.kc.surface` bar (radius [AppRadius.tile], lifted by
-/// [AppShadows.miniPlayer]) with the artwork thumbnail, title/speaker, and a
+/// A 58-px `context.kc.surface` bar (radius [AppRadius.tile], separated by
+/// a 1px `kc.divider` border and the neutral [AppShadows.card]) with the
+/// artwork thumbnail, title/speaker, and a
 /// play/pause button, plus a gold progress line pinned to the bottom edge.
 /// Tapping the body pushes `/player`; the play/pause button is isolated.
 /// Hidden entirely when [currentSermonProvider] is null.
@@ -89,7 +90,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
           decoration: BoxDecoration(
             color: context.kc.surface,
             borderRadius: BorderRadius.circular(AppRadius.tile),
-            boxShadow: AppShadows.miniPlayer,
+            border: Border.all(color: context.kc.divider),
+            boxShadow: AppShadows.card,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.tile),

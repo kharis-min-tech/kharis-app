@@ -16,7 +16,7 @@ String? readingPlanDayLabel(DailyContent content) {
   return total == null ? 'Day $day' : 'Day $day of $total';
 }
 
-/// Purple gradient card showing today's Bible reading with a serif scripture
+/// Solid purple card showing today's Bible reading with a serif scripture
 /// line and Read now / Daily prayer actions (design-handoff v3, light screen).
 ///
 /// Loading shows a skeleton of the card; a failure says so and offers Retry.
@@ -191,7 +191,7 @@ class _Pill extends StatelessWidget {
   }
 }
 
-/// The card's brand surface: deep purple base, radial wash, dove watermark.
+/// The card's brand surface: solid deep purple and a dove watermark.
 class _CardShell extends StatelessWidget {
   const _CardShell({super.key, required this.child});
 
@@ -203,6 +203,7 @@ class _CardShell extends StatelessWidget {
     // shadow through its clip.
     return DecoratedBox(
       decoration: BoxDecoration(
+        color: AppColors.primaryDeep,
         borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: AppShadows.card,
       ),
@@ -210,30 +211,6 @@ class _CardShell extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.card),
         child: Stack(
           children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF2A1A6B), Color(0xFF0B0A12)],
-                  ),
-                ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(-0.75, -0.85),
-                      radius: 1.1,
-                      colors: [
-                        AppColors.primary.withValues(alpha: 0.85),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.55],
-                    ),
-                  ),
-                ),
-              ),
-            ),
             Positioned(
               right: -14,
               top: -10,
@@ -272,7 +249,7 @@ class _ReadingCard extends StatelessWidget {
     final scripture = verse.isNotEmpty ? verse : theme;
     final day = dayLabel;
 
-    // Brand gradient (via _CardShell), identical in both themes, so its text
+    // Brand fill (via _CardShell), identical in both themes, so its text
     // stays light regardless of the active brightness.
     return _CardShell(
       child: Column(

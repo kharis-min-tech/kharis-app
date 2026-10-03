@@ -42,8 +42,8 @@ void openEventDetail(BuildContext context, Event event) {
 /// and a split RSVP | Add-to-calendar footer. The whole card opens the event
 /// detail; the footer buttons keep their own actions.
 ///
-/// [accent] tints the date chip and the fallback banner gradient; the caller
-/// cycles a palette so no two adjacent cards match.
+/// [accent] tints the date chip and fills the banner when there is no photo;
+/// the caller cycles a palette so no two adjacent cards match.
 class EventCard extends ConsumerWidget {
   const EventCard({super.key, required this.event, required this.accent});
 
@@ -173,15 +173,7 @@ class EventCard extends ConsumerWidget {
   }
 
   Widget _banner() {
-    final fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [accent.withValues(alpha: 0.85), AppColors.primaryDeep],
-        ),
-      ),
-    );
+    final fallback = ColoredBox(color: accent);
     final url = event.imageUrl;
     if (url == null || url.isEmpty) return fallback;
     return CachedNetworkImage(

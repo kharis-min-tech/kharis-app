@@ -7,15 +7,6 @@ import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 import 'announcement_detail.dart';
 
-// Brand gradient pairs cycled across announcement cards.
-const _kCardGradients = [
-  [Color(0xFF6B1E8B), Color(0xFF2A0A52)],
-  [Color(0xFF1A0A3B), Color(0xFF6B34FA)],
-  [Color(0xFF2A0A1A), Color(0xFFDC3F9E)],
-  [Color(0xFF0A2A1A), Color(0xFF059669)],
-  [Color(0xFF3B1A0A), Color(0xFFF59E0B)],
-];
-
 const double _kCardWidth = 220;
 const double _kCardHeight = 164;
 
@@ -60,10 +51,7 @@ class AnnouncementsCarousel extends ConsumerWidget {
           final item = items[i];
           return Padding(
             padding: EdgeInsets.only(right: i < items.length - 1 ? 12 : 0),
-            child: _AnnouncementCard(
-              item: item,
-              gradientColors: _kCardGradients[i % _kCardGradients.length],
-            ),
+            child: _AnnouncementCard(item: item),
           );
         },
       ),
@@ -151,10 +139,9 @@ class _CarouselMessage extends StatelessWidget {
 }
 
 class _AnnouncementCard extends ConsumerWidget {
-  const _AnnouncementCard({required this.item, required this.gradientColors});
+  const _AnnouncementCard({required this.item});
 
   final NewsItem item;
-  final List<Color> gradientColors;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -176,19 +163,15 @@ class _AnnouncementCard extends ConsumerWidget {
         child: Container(
           width: _kCardWidth,
           decoration: BoxDecoration(
+            color: AppColors.primaryDeep,
             borderRadius: BorderRadius.circular(AppRadius.card),
             boxShadow: AppShadows.card,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradientColors,
-            ),
           ),
           clipBehavior: Clip.antiAlias,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Admin-set image over the gradient, under the scrim.
+              // Admin-set image over the solid fill, under the scrim.
               if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
                 Positioned.fill(
                   child: Image.network(

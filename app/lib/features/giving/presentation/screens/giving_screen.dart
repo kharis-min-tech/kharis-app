@@ -99,15 +99,9 @@ class _ScriptureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: AppRadius.cardBorder,
-      child: DecoratedBox(
-        // Brand ink card in both themes; text on it stays light.
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primaryDeep, AppColors.ink],
-          ),
-        ),
+      child: ColoredBox(
+        // Solid brand card in both themes; text on it stays light.
+        color: AppColors.primaryDeep,
         child: Stack(
           children: [
             Positioned(

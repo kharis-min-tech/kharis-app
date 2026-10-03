@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/messages/data/sermon_repository_base.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -201,4 +202,58 @@ void main() {
     await tester.pumpAndSettle();
     expect(activeDot(), 1, reason: 'the last card is the one on screen');
   });
+
+  testWidgets('a library short of the server count shows the honest count '
+      'and its Retry re-walks the archive', (tester) async {
+    final archive = [
+      for (var i = 1; i <= 25; i++)
+        testSermon(
+          'a$i',
+          title: 'Archive message $i',
+          publishedAt: DateTime(2026, 8, i),
+        ),
+    ];
+    final repo = _ShortRepo([archive]);
+    await tester.pumpWidget(app(repo));
+    await tester.pumpAndSettle();
+
+    final short = find.text('25 of 26 messages \u2022');
+    await tester.scrollUntilVisible(
+      short,
+      600,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(short, findsOneWidget);
+    expect(find.textContaining('reached the beginning'), findsNothing);
+
+    repo.missing = 0;
+    final pageOnes = repo.requested.where((u) => u == null).length;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(repo.requested.where((u) => u == null), hasLength(pageOnes + 1));
+    expect(short, findsNothing);
+    expect(
+      find.text('You\'ve reached the beginning \u2022 25 messages'),
+      findsOneWidget,
+    );
+  });
+}
+
+/// Reports [missing] more sermons than it serves, like an archive with a
+/// record no walk ever sees.
+class _ShortRepo extends FakePagedSermonRepository {
+  _ShortRepo(super.pages);
+
+  int missing = 1;
+
+  @override
+  Future<SermonPage> fetchPage({String? url, String? search}) async {
+    final page = await super.fetchPage(url: url, search: search);
+    return SermonPage(
+      sermons: page.sermons,
+      nextUrl: page.nextUrl,
+      totalCount: page.totalCount + missing,
+    );
+  }
 }
