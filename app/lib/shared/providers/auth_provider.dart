@@ -31,10 +31,9 @@ final currentUserProvider = StreamProvider<User?>((ref) {
 
 /// Synchronous auth flag derived from the stream. Safe to read in redirects.
 final isAuthenticatedProvider = Provider<bool>((ref) {
-  return ref.watch(currentUserProvider).maybeWhen(
-        data: (user) => user != null,
-        orElse: () => false,
-      );
+  return ref
+      .watch(currentUserProvider)
+      .maybeWhen(data: (user) => user != null, orElse: () => false);
 });
 
 /// Guarantees the session always has a Firebase user.
@@ -93,11 +92,13 @@ final isAdminProvider = FutureProvider<bool>((ref) async {
 
 // ── Notification preferences ──────────────────────────────────────────────────
 
+/// One entry per FCM topic the backend actually publishes to (see
+/// `KharisTopics.byPreference`). A toggle with no publisher behind it is a
+/// promise the app cannot keep, so there is no "new sermons" switch.
 const _kDefaultNotificationPrefs = <String, bool>{
   'serviceReminders': true,
   'events': true,
   'dailyReading': true,
-  'newSermons': true,
 };
 
 /// Streams notification preference toggles from the user's Firestore doc.
@@ -112,23 +113,26 @@ final notificationPrefsProvider = StreamProvider<Map<String, bool>>((ref) {
       .doc(user.id)
       .snapshots()
       .map((snap) {
-    final raw = snap.data()?['notificationPrefs'] as Map<String, dynamic>?;
-    if (raw == null) return Map.unmodifiable(_kDefaultNotificationPrefs);
-    return {
-      'serviceReminders': (raw['serviceReminders'] as bool?) ?? true,
-      'events': (raw['events'] as bool?) ?? true,
-      'dailyReading': (raw['dailyReading'] as bool?) ?? true,
-      'newSermons': (raw['newSermons'] as bool?) ?? true,
-    };
-  });
+        final raw = snap.data()?['notificationPrefs'] as Map<String, dynamic>?;
+        if (raw == null) return Map.unmodifiable(_kDefaultNotificationPrefs);
+        return {
+          for (final key in _kDefaultNotificationPrefs.keys)
+            key: (raw[key] as bool?) ?? true,
+        };
+      });
 });
 // ── Router notifier ───────────────────────────────────────────────────────────
 
-/// [ChangeNotifier] that pings [GoRouter] whenever auth state changes,
-/// causing redirect logic to re-evaluate the current location.
+/// [ChangeNotifier] that pings [GoRouter] whenever auth or admin state
+/// changes, causing redirect logic to re-evaluate the current location.
 class RouterNotifier extends ChangeNotifier {
   RouterNotifier(this._ref) {
     _ref.listen<AsyncValue<User?>>(currentUserProvider, (_, _) {
+      notifyListeners();
+    });
+    // Keeps the admin check alive and re-runs the guard when it resolves, so
+    // a member who loses the role is moved off an admin screen.
+    _ref.listen<AsyncValue<bool>>(isAdminProvider, (_, _) {
       notifyListeners();
     });
   }
@@ -137,16 +141,28 @@ class RouterNotifier extends ChangeNotifier {
 
   /// Called by [GoRouter] on every navigation and after [notifyListeners].
   String? redirect(BuildContext context, GoRouterState state) {
+    final location = state.matchedLocation;
+
+    // Admin console: only a confirmed admin gets in. The More entry is only
+    // rendered once [isAdminProvider] has resolved true, so an admin never
+    // hits the unresolved case through the UI; a deep link that arrives
+    // before the check resolves is bounced rather than shown.
+    if (location == '/admin' || location.startsWith('/admin/')) {
+      final isAdmin = _ref.read(isAdminProvider).valueOrNull ?? false;
+      return isAdmin ? null : '/home';
+    }
+
     // One-time welcome: once onboarding is complete (or the user is signed in),
     // the '/' splash entry routes straight to Home. Only '/' is gated, so
     // "Switch Branch" (/branch-selection) and re-onboarding still work.
-    if (state.matchedLocation == '/') {
+    if (location == '/') {
       final completed = _ref.read(onboardingCompletedProvider);
       final authed = _ref.read(isAuthenticatedProvider);
       if (completed || authed) {
         const tabs = ['/home', '/messages', '/giving', '/calendar', '/more'];
-        final i =
-            _ref.read(cacheServiceProvider).getPreference<int>('last_tab', 0);
+        final i = _ref
+            .read(cacheServiceProvider)
+            .getPreference<int>('last_tab', 0);
         return tabs[i >= 0 && i < tabs.length ? i : 0];
       }
     }

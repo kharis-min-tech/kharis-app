@@ -36,8 +36,8 @@ class _ProfileCompletionCardState extends ConsumerState<ProfileCompletionCard> {
     final ask = missingDob && missingPhone
         ? 'Add your birthday and phone'
         : missingDob
-            ? 'Add your birthday'
-            : 'Add your phone number';
+        ? 'Add your birthday'
+        : 'Add your phone number';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
@@ -46,9 +46,7 @@ class _ProfileCompletionCardState extends ConsumerState<ProfileCompletionCard> {
         decoration: BoxDecoration(
           color: context.kc.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: context.kc.accent.withValues(alpha: 0.35),
-          ),
+          border: Border.all(color: context.kc.accent.withValues(alpha: 0.35)),
         ),
         child: Row(
           children: [
@@ -60,14 +58,17 @@ class _ProfileCompletionCardState extends ConsumerState<ProfileCompletionCard> {
                 children: [
                   Text(
                     'Complete your profile',
-                    style: AppTypography.ui(size: 14, weight: FontWeight.w700)
-                        .copyWith(color: context.kc.onBg),
+                    style: AppTypography.ui(
+                      size: 14,
+                      weight: FontWeight.w700,
+                    ).copyWith(color: context.kc.onBg),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     '$ask so your church family can celebrate you.',
-                    style: AppTypography.ui(size: 12)
-                        .copyWith(color: context.kc.muted, height: 1.35),
+                    style: AppTypography.ui(
+                      size: 12,
+                    ).copyWith(color: context.kc.muted, height: 1.35),
                   ),
                 ],
               ),
@@ -76,8 +77,10 @@ class _ProfileCompletionCardState extends ConsumerState<ProfileCompletionCard> {
               onPressed: () => context.push('/profile/edit'),
               child: Text(
                 'Add',
-                style: AppTypography.ui(size: 13, weight: FontWeight.w700)
-                    .copyWith(color: context.kc.accent),
+                style: AppTypography.ui(
+                  size: 13,
+                  weight: FontWeight.w700,
+                ).copyWith(color: context.kc.accent),
               ),
             ),
             IconButton(

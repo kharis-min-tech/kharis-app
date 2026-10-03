@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:add_2_calendar_new/add_2_calendar_new.dart' as add2cal;
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
-import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
 import 'package:kharis_app/shared/providers/dismissed_notifications_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 /// What a feed row came from. Carries its own iconography and eyebrow label so
 /// a member can tell an announcement from an event at a glance.
@@ -32,6 +33,7 @@ class _NotifItem {
     required this.date,
     this.body,
     this.event,
+    this.news,
   });
 
   /// [id] is namespaced by source so a news item and an event that happen to
@@ -42,6 +44,7 @@ class _NotifItem {
     title: n.title,
     body: n.body,
     date: n.publishedAt,
+    news: n,
   );
 
   factory _NotifItem.event(Event e) => _NotifItem(
@@ -59,10 +62,11 @@ class _NotifItem {
   final String? body;
   final DateTime date;
 
-  /// Full source event when [kind] is [_NotifKind.event], so a tap can show
-  /// date/time/venue without a second lookup (tester feedback: the calendar
-  /// notification could not be opened for details).
+  /// Source event when [kind] is [_NotifKind.event].
   final Event? event;
+
+  /// Source announcement when [kind] is [_NotifKind.announcement].
+  final NewsItem? news;
 }
 
 /// Sign-aware relative label.
@@ -100,7 +104,6 @@ List<_NotifItem> _buildFeed({
   required List<NewsItem> news,
   required List<Event> events,
   required Set<String> dismissed,
-  required DateTime now,
 }) {
   final items = <_NotifItem>[
     for (final n in news) _NotifItem.announcement(n),
@@ -117,42 +120,85 @@ List<_NotifItem> _buildFeed({
   return items;
 }
 
-/// Shows real announcements and upcoming events as a unified, dismissible
-/// notification feed. Both sources are already scoped to the active branch by
-/// their providers, all-campus content included.
-class NotificationsScreen extends ConsumerWidget {
-  const NotificationsScreen({super.key});
+/// The member's notification feed, or (via [NotificationsScreen.announcements])
+/// the full announcements list behind Home's "See all".
+///
+/// Both sources are scoped to the member's campus plus all-campus content by
+/// [campusNewsProvider] / [campusUpcomingEventsProvider]. Rows open what they
+/// are about: an event row (or an announcement promoting an event) opens the
+/// event; a plain announcement opens its full text and call-to-action.
+class NotificationsScreen extends ConsumerStatefulWidget {
+  /// Unified feed: upcoming events plus announcements, dismissible.
+  const NotificationsScreen({super.key})
+    : announcementsOnly = false,
+      focusId = null;
+
+  /// Every live announcement for the member's campus, newest first. Not
+  /// dismissible: this is the archive, not an inbox. [focusId] (a `news` doc
+  /// id, from a push) opens that announcement as soon as it has loaded.
+  const NotificationsScreen.announcements({super.key, this.focusId})
+    : announcementsOnly = true;
+
+  final bool announcementsOnly;
+  final String? focusId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final branch = ref.watch(currentBranchProvider).valueOrNull;
-    final newsAsync = ref.watch(newsProvider(branch));
-    final eventsAsync = ref.watch(upcomingEventsProvider(branch));
-    final dismissed = ref.watch(dismissedNotificationsProvider);
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
+}
 
-    final loading = newsAsync.isLoading || eventsAsync.isLoading;
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  bool _focusHandled = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final newsAsync = ref.watch(campusNewsProvider);
+    final eventsAsync = widget.announcementsOnly
+        ? const AsyncData<List<Event>>([])
+        : ref.watch(campusUpcomingEventsProvider);
+    final dismissed = widget.announcementsOnly
+        ? const <String>{}
+        : ref.watch(dismissedNotificationsProvider);
+
+    _maybeOpenFocused(newsAsync.valueOrNull);
+
+    final loading =
+        (newsAsync.isLoading && !newsAsync.hasValue) ||
+        (eventsAsync.isLoading && !eventsAsync.hasValue);
+    final failed =
+        !loading &&
+        !newsAsync.hasValue &&
+        !eventsAsync.hasValue &&
+        (newsAsync.hasError || eventsAsync.hasError);
     final items = loading
         ? const <_NotifItem>[]
         : _buildFeed(
             news: newsAsync.valueOrNull ?? const [],
             events: eventsAsync.valueOrNull ?? const [],
             dismissed: dismissed,
-            now: DateTime.now(),
           );
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: Icon(Icons.arrow_back_rounded, color: context.kc.onBg),
+          onPressed: () {
+            final router = GoRouter.of(context);
+            router.canPop() ? router.pop() : router.go('/home');
+          },
+        ),
         title: Text(
-          'Notifications',
+          widget.announcementsOnly ? 'Announcements' : 'Notifications',
           style: AppTypography.titleMd.copyWith(color: context.kc.onBg),
         ),
         iconTheme: IconThemeData(color: context.kc.onBg),
         actions: [
-          if (items.isNotEmpty)
+          if (!widget.announcementsOnly && items.isNotEmpty)
             TextButton(
-              onPressed: () => _clearAll(context, ref, items),
+              onPressed: () => _clearAll(items),
               child: Text(
                 'Clear all',
                 style: AppTypography.labelMd.copyWith(
@@ -162,37 +208,61 @@ class NotificationsScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: _body(
-        context,
-        ref,
-        loading: loading,
-        failed:
-            !newsAsync.hasValue &&
-            !eventsAsync.hasValue &&
-            (newsAsync.hasError || eventsAsync.hasError),
-        items: items,
-        hasDismissed: dismissed.isNotEmpty,
-      ),
+      body: loading
+          ? const _FeedSkeleton()
+          : RefreshIndicator(
+              color: context.kc.accentInk,
+              backgroundColor: context.kc.surface,
+              onRefresh: () => refreshCampusContent(ref),
+              child: _body(
+                failed: failed,
+                items: items,
+                hasDismissed: dismissed.isNotEmpty,
+              ),
+            ),
     );
   }
 
-  Widget _body(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool loading,
+  /// Opens the pushed announcement once, after the feed that contains it has
+  /// loaded. An id the feed does not hold (expired, other campus) just leaves
+  /// the member on the list.
+  void _maybeOpenFocused(List<NewsItem>? news) {
+    final id = widget.focusId;
+    if (_focusHandled || id == null || news == null) return;
+    _focusHandled = true;
+    final match = news.where((n) => n.id == id).firstOrNull;
+    if (match == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) openAnnouncement(context, match);
+    });
+  }
+
+  Widget _body({
     required bool failed,
     required List<_NotifItem> items,
     required bool hasDismissed,
   }) {
-    if (loading) return const Center(child: CircularProgressIndicator());
     if (failed) {
-      return const _Empty(
+      return _Empty(
         icon: Icons.wifi_off_rounded,
-        title: 'Unable to load notifications',
+        title: widget.announcementsOnly
+            ? 'Unable to load announcements'
+            : 'Unable to load notifications',
         subtitle: 'Please check your connection and try again.',
+        action: _EmptyAction(
+          label: 'Retry',
+          onPressed: () => refreshCampusContent(ref),
+        ),
       );
     }
     if (items.isEmpty) {
+      if (widget.announcementsOnly) {
+        return const _Empty(
+          icon: Icons.campaign_outlined,
+          title: 'No announcements right now',
+          subtitle: 'News from your campus will show up here.',
+        );
+      }
       return _Empty(
         icon: hasDismissed
             ? Icons.mark_email_read_outlined
@@ -215,6 +285,7 @@ class NotificationsScreen extends ConsumerWidget {
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: items.length,
       separatorBuilder: (_, _) => Divider(
@@ -225,46 +296,42 @@ class NotificationsScreen extends ConsumerWidget {
       ),
       itemBuilder: (context, index) {
         final item = items[index];
+        final row = _NotifRow(item: item, onTap: () => _open(item));
+        if (widget.announcementsOnly) return row;
         return Dismissible(
           key: ValueKey(item.id),
           background: const _SwipePlate(alignment: Alignment.centerLeft),
           secondaryBackground: const _SwipePlate(
             alignment: Alignment.centerRight,
           ),
-          onDismissed: (_) => _dismiss(context, ref, item),
-          child: _NotifRow(item: item, onTap: () => _showDetail(context, item)),
+          onDismissed: (_) => _dismiss(item),
+          child: row,
         );
       },
     );
   }
 
-  void _showDetail(BuildContext context, _NotifItem item) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: context.kc.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (sheetContext) => _NotifDetailSheet(item: item),
-    );
+  void _open(_NotifItem item) {
+    final event = item.event;
+    if (event != null) {
+      openEventDetail(context, event);
+      return;
+    }
+    final news = item.news;
+    if (news != null) openAnnouncement(context, news);
   }
 
-  void _dismiss(BuildContext context, WidgetRef ref, _NotifItem item) {
+  void _dismiss(_NotifItem item) {
     final controller = ref.read(dismissedNotificationsProvider.notifier);
     controller.dismiss(item.id);
-    _showUndo(
-      context,
-      'Notification dismissed.',
-      () => controller.restore([item.id]),
-    );
+    _showUndo('Notification dismissed.', () => controller.restore([item.id]));
   }
 
-  void _clearAll(BuildContext context, WidgetRef ref, List<_NotifItem> items) {
+  void _clearAll(List<_NotifItem> items) {
     final ids = items.map((i) => i.id).toList(growable: false);
     final controller = ref.read(dismissedNotificationsProvider.notifier);
     controller.dismissAll(ids);
     _showUndo(
-      context,
       ids.length == 1
           ? 'Notification cleared.'
           : '${ids.length} notifications cleared.',
@@ -274,7 +341,7 @@ class NotificationsScreen extends ConsumerWidget {
 
   /// Toast styling comes from `snackBarTheme`; this route overlays the shell,
   /// so there is no tab bar to clear and the default margin is correct.
-  void _showUndo(BuildContext context, String message, VoidCallback onUndo) {
+  void _showUndo(String message, VoidCallback onUndo) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -289,15 +356,20 @@ class NotificationsScreen extends ConsumerWidget {
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
-class _NotifRow extends StatelessWidget {
+class _NotifRow extends ConsumerWidget {
   const _NotifRow({required this.item, this.onTap});
 
   final _NotifItem item;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final body = item.body;
+    final linkedId = item.news?.eventId;
+    final event =
+        item.event ??
+        (linkedId == null ? null : ref.watch(linkedEventProvider(linkedId)));
+    final venue = event == null ? null : eventVenueLine(event);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -344,6 +416,29 @@ class _NotifRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (venue != null) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.place_outlined,
+                          size: 13,
+                          color: context.kc.muted,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            venue,
+                            style: AppTypography.bodySm.copyWith(
+                              color: context.kc.muted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (body != null && body.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
@@ -358,6 +453,14 @@ class _NotifRow extends StatelessWidget {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.only(top: 10, left: 8),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: context.kc.faint,
+              ),
+            ),
           ],
         ),
       ),
@@ -365,7 +468,8 @@ class _NotifRow extends StatelessWidget {
   }
 }
 
-/// The plate revealed behind a row mid-swipe.
+/// The plate revealed behind a row mid-swipe. Swiping hides the row on this
+/// device; nothing is deleted, so the icon says "hide", not "trash".
 class _SwipePlate extends StatelessWidget {
   const _SwipePlate({required this.alignment});
 
@@ -374,14 +478,14 @@ class _SwipePlate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: AppColors.danger,
+      color: context.kc.surfaceMuted,
       child: Align(
         alignment: alignment,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Icon(
-            Icons.delete_outline_rounded,
-            color: Colors.white,
+            Icons.visibility_off_outlined,
+            color: context.kc.muted,
             size: 22,
           ),
         ),
@@ -390,7 +494,43 @@ class _SwipePlate extends StatelessWidget {
   }
 }
 
-// ── Empty / error state ───────────────────────────────────────────────────────
+// ── Loading / empty / error state ─────────────────────────────────────────────
+
+class _FeedSkeleton extends StatelessWidget {
+  const _FeedSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      key: const Key('notifications-skeleton'),
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: 5,
+      itemBuilder: (_, _) => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Skeleton(width: 40, height: 40, radius: 20),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonLine(width: 110, height: 11),
+                  SizedBox(height: 8),
+                  SkeletonLine(width: 220),
+                  SizedBox(height: 6),
+                  SkeletonLine(width: 160, height: 12),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 @immutable
 class _EmptyAction {
@@ -400,6 +540,7 @@ class _EmptyAction {
   final VoidCallback onPressed;
 }
 
+/// Empty/error message. Scrollable (always) so pull-to-refresh works on it.
 class _Empty extends StatelessWidget {
   const _Empty({
     required this.icon,
@@ -416,157 +557,53 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final action = this.action;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: context.kc.muted, size: 44),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              style: AppTypography.bodyLg.copyWith(
-                color: context.kc.onBg,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: AppTypography.bodySm.copyWith(color: context.kc.muted),
-              textAlign: TextAlign.center,
-            ),
-            if (action != null) ...[
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: action.onPressed,
-                child: Text(
-                  action.label,
-                  style: AppTypography.labelMd.copyWith(
-                    color: context.kc.accentInk,
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: context.kc.muted, size: 44),
+                  const SizedBox(height: 14),
+                  Text(
+                    title,
+                    style: AppTypography.bodyLg.copyWith(
+                      color: context.kc.onBg,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Bottom sheet with the full story behind a feed row: events get their
-/// date, time and venue plus an add-to-calendar action; announcements get
-/// their untruncated body.
-class _NotifDetailSheet extends StatelessWidget {
-  const _NotifDetailSheet({required this.item});
-
-  final _NotifItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final event = item.event;
-    final body = item.body;
-    final date = DateFormat('EEEE d MMMM yyyy').format(item.date);
-    final time = DateFormat('HH:mm').format(item.date);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              item.kind.label.toUpperCase(),
-              style: AppTypography.labelMd.copyWith(
-                color: context.kc.muted,
-                letterSpacing: 1.1,
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: AppTypography.bodySm.copyWith(
+                      color: context.kc.muted,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (action != null) ...[
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: action.onPressed,
+                      child: Text(
+                        action.label,
+                        style: AppTypography.labelMd.copyWith(
+                          color: context.kc.accentInk,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              item.title,
-              style: AppTypography.ui(
-                size: 18,
-                weight: FontWeight.w700,
-                color: context.kc.onBg,
-              ),
-            ),
-            const SizedBox(height: 14),
-            _DetailLine(icon: Icons.calendar_today_rounded, text: date),
-            if (event != null) ...[
-              const SizedBox(height: 8),
-              _DetailLine(icon: Icons.schedule_rounded, text: time),
-              if ((event.location ?? event.branch) != null) ...[
-                const SizedBox(height: 8),
-                _DetailLine(
-                  icon: Icons.location_on_outlined,
-                  text: event.location ?? event.branch!,
-                ),
-              ],
-            ],
-            if (body != null && body.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Text(
-                body,
-                style: AppTypography.bodyLg.copyWith(
-                  color: context.kc.onBg,
-                  height: 1.5,
-                ),
-              ),
-            ],
-            if (event != null) ...[
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => _addToCalendar(event),
-                  icon: const Icon(Icons.event_available_rounded, size: 18),
-                  label: const Text('Add to calendar'),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _addToCalendar(Event event) {
-    add2cal.Add2Calendar.addEvent2Cal(
-      add2cal.Event(
-        title: event.title,
-        description: event.description ?? '',
-        location: event.branch ?? '',
-        startDate: event.startTime,
-        endDate: event.endTime ?? event.startTime.add(const Duration(hours: 2)),
-      ),
-    );
-  }
-}
-
-/// Icon + text line inside [_NotifDetailSheet].
-class _DetailLine extends StatelessWidget {
-  const _DetailLine({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: context.kc.accentInk),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: AppTypography.bodyLg.copyWith(color: context.kc.onBg),
           ),
         ),
-      ],
+      ),
     );
   }
 }

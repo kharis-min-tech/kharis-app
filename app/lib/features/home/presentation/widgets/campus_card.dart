@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
@@ -8,6 +7,7 @@ import 'package:kharis_app/core/utils/service_time.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
 /// "Your campus" card: where the member's branch meets and when.
 ///
@@ -32,8 +32,10 @@ class CampusCard extends ConsumerWidget {
     if (matches.isEmpty) return const SizedBox.shrink();
     final branch = matches.first;
 
-    final schedule =
-        formatServiceSchedule(branch.meetingDays, branch.meetingTime);
+    final schedule = formatServiceSchedule(
+      branch.meetingDays,
+      branch.meetingTime,
+    );
     final address = branch.address?.trim();
     final hasAddress = address != null && address.isNotEmpty;
     if (schedule == null && !hasAddress) return const SizedBox.shrink();
@@ -63,13 +65,20 @@ class CampusCard extends ConsumerWidget {
                 ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: () => context.push('/profile/edit'),
-                  child: Text(
-                    'Change',
-                    style: AppTypography.ui(
-                      size: 12,
-                      weight: FontWeight.w600,
-                    ).copyWith(color: AppColors.primary, height: 1),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => pickActiveBranch(context, ref),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      'Change',
+                      style: AppTypography.ui(
+                        size: 12,
+                        weight: FontWeight.w600,
+                      ).copyWith(color: context.kc.onChip, height: 1),
+                    ),
                   ),
                 ),
               ],
@@ -77,8 +86,10 @@ class CampusCard extends ConsumerWidget {
             const SizedBox(height: 10),
             Text(
               branch.name,
-              style: AppTypography.display(size: 20, weight: FontWeight.w700)
-                  .copyWith(color: context.kc.onBg, height: 1.1),
+              style: AppTypography.display(
+                size: 20,
+                weight: FontWeight.w700,
+              ).copyWith(color: context.kc.onBg, height: 1.1),
             ),
             if (schedule != null) ...[
               const SizedBox(height: 10),
@@ -128,7 +139,7 @@ class _VenueRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = emphasised ? AppColors.primary : context.kc.muted;
+    final color = emphasised ? context.kc.onChip : context.kc.muted;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

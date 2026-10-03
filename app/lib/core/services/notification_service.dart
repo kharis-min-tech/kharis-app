@@ -28,20 +28,29 @@ class KharisTopics {
   static const String all = 'all';
 
   // Preference-controlled topics. Keys mirror `notificationPrefsProvider`.
+  // Every topic here has a publisher in `backend/functions/src`: events are
+  // sent under `'events' in topics && '<branch topic>' in topics`, service
+  // reminders under `'service_reminders' in topics && ...`, and the daily
+  // reading straight to `daily_reading`.
   static const String serviceReminders = 'service_reminders';
   static const String events = 'events';
   static const String dailyReading = 'daily_reading';
-  static const String newSermons = 'new_sermons';
 
   /// Maps a `notificationPrefsProvider` key to the topic it gates.
   static const Map<String, String> byPreference = <String, String>{
     'serviceReminders': serviceReminders,
     'events': events,
     'dailyReading': dailyReading,
-    'newSermons': newSermons,
   };
 
   /// Branch-scoped topic for a raw branch name (e.g. `KP2 London`).
+  ///
+  /// Rule for members on "All campuses" (no branch): the app SHOWS every
+  /// campus's announcements and events, but the device follows no branch
+  /// topic, so it is only PUSHED church-wide items (`all`, all-campus
+  /// events). Subscribing them to every campus would send them each campus's
+  /// service reminder every Sunday. A member who wants a campus's pushes
+  /// picks that campus.
   ///
   /// The slug MUST stay character-identical to the backend's in
   /// `backend/functions/src/index.ts` (`pushPendingAnnouncements`), which is
@@ -53,53 +62,165 @@ class KharisTopics {
       name.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
 }
 
+/// Where a tapped push takes the member.
+@immutable
+class NotificationTarget {
+  const NotificationTarget(this.location, {this.overlay = false});
+
+  /// go_router location.
+  final String location;
+
+  /// Overlay routes (detail screens, the reader, the feeds) are pushed on top
+  /// of `/home` so their back button always has somewhere to return to. Tab
+  /// roots are simply switched to.
+  final bool overlay;
+
+  @override
+  bool operator ==(Object other) =>
+      other is NotificationTarget &&
+      other.location == location &&
+      other.overlay == overlay;
+
+  @override
+  int get hashCode => Object.hash(location, overlay);
+
+  @override
+  String toString() => 'NotificationTarget($location, overlay: $overlay)';
+}
+
+/// Resolves a push's `data` payload to the screen that shows what it is
+/// about.
+///
+/// `data['type']` (plus `newsId` / `eventId`) is the contract with the
+/// backend: `pushPendingAnnouncements` sends `{type: 'announcement', newsId}`,
+/// `onEventWritten` sends `{type: 'event', eventId}`, `pushServiceReminders`
+/// sends `{type: 'service_reminder', branch}`, the reading job sends
+/// `{type: 'reading'}` and venue changes send `{type: 'venue'}`. Adding a type
+/// server-side without a case here drops the member on `/home`.
+NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
+  String? id(String key) {
+    final value = data[key];
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  final eventId = id('eventId');
+  NotificationTarget eventDetail(String id) =>
+      NotificationTarget('/events/${Uri.encodeComponent(id)}', overlay: true);
+
+  switch (data['type'] as String?) {
+    case 'announcement':
+    case 'news':
+      // An announcement about an event opens the event itself.
+      if (eventId != null) return eventDetail(eventId);
+      final newsId = id('newsId');
+      return NotificationTarget(
+        newsId == null
+            ? '/announcements'
+            : '/announcements?id=${Uri.encodeQueryComponent(newsId)}',
+        overlay: true,
+      );
+    case 'sermon':
+      return const NotificationTarget('/messages');
+    case 'event':
+    case KharisTopics.events:
+      return eventId != null
+          ? eventDetail(eventId)
+          : const NotificationTarget('/calendar');
+    case 'service_reminder':
+    case KharisTopics.serviceReminders:
+    case 'venue':
+      // Service times and the campus address live on Home's campus card.
+      return const NotificationTarget('/home');
+    case 'reading':
+    case KharisTopics.dailyReading:
+      return const NotificationTarget('/reading', overlay: true);
+    default:
+      return const NotificationTarget('/home');
+  }
+}
+
+/// Opens [target] without leaving a one-page stack: overlays are pushed above
+/// `/home`, tab roots are switched to.
+void openNotificationTarget(GoRouter router, NotificationTarget target) {
+  if (target.overlay) {
+    router.go('/home');
+    router.push(target.location);
+  } else {
+    router.go(target.location);
+  }
+}
+
 class NotificationService {
-  NotificationService({this.router});
+  NotificationService({this.router, this.onContentPush});
 
   final GoRouter? router;
 
+  /// Called with `data['type']` whenever a push arrives in the foreground or
+  /// is tapped, so cached feeds (announcements, events) can be refetched and
+  /// the screen the member lands on shows the item they were told about.
+  final void Function(String? type)? onContentPush;
+
+  /// One-time FCM wiring that needs no user consent: message handlers, the
+  /// mandatory `all` topic and token persistence.
+  ///
+  /// It deliberately does NOT show the OS permission prompt — that waits
+  /// until onboarding is complete (see `notificationPermissionGateProvider`).
+  /// Handlers are registered before anything that can fail (token, topics),
+  /// each step in its own guard, so a `getToken` failure can never leave a
+  /// tapped notification unrouted.
   Future<void> init() async {
     if (!kUseFirebase) return;
+    final FirebaseMessaging messaging;
     try {
-      final messaging = FirebaseMessaging.instance;
-
-      await requestPermission();
-
-      // Print token for testing / admin console.
-      final token = await messaging.getToken();
-      debugPrint('[FCM] Token: $token');
-
-      // Persist the device token on the signed-in member's profile so
-      // server-side workers (birthday pushes) can reach this device
-      // directly, not just via topics. Re-runs on refresh and on sign-in.
-      await _saveTokenToProfile(token);
-      messaging.onTokenRefresh.listen(_saveTokenToProfile);
-      fb_auth.FirebaseAuth.instance.authStateChanges().listen((u) async {
-        if (u != null && !u.isAnonymous) {
-          await _saveTokenToProfile(await messaging.getToken());
-        }
-      });
-
-      // Register background handler.
+      messaging = FirebaseMessaging.instance;
       FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
-
-      // Foreground messages.
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-
-      // Tap while app is in background (not terminated).
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
-
-      // Tap that launched the app from terminated state.
       final initial = await messaging.getInitialMessage();
-      if (initial != null) {
-        _handleNotificationTap(initial);
-      }
-
-      // Global announcements are not opt-out; the preference-gated topics are
-      // applied by `notificationTopicSyncProvider`.
-      await subscribeToTopic(KharisTopics.all);
+      if (initial != null) _handleNotificationTap(initial);
     } catch (e) {
-      debugPrint('[FCM] init error: $e');
+      debugPrint('[FCM] handler setup error: $e');
+      return;
+    }
+
+    // Global announcements are not opt-out; the preference-gated topics are
+    // applied by `notificationTopicSyncProvider`.
+    await subscribeToTopic(KharisTopics.all);
+
+    try {
+      messaging.onTokenRefresh.listen(_saveTokenToProfile);
+      fb_auth.FirebaseAuth.instance.authStateChanges().listen((u) {
+        if (u != null && !u.isAnonymous) syncToken();
+      });
+    } catch (e) {
+      debugPrint('[FCM] token listener error: $e');
+    }
+    await syncToken();
+  }
+
+  /// Re-applies everything that depends on the OS having let us in: iOS
+  /// refuses topic subscriptions and tokens until permission is granted, so
+  /// the `all` and branch topics subscribed before the prompt are retried
+  /// here, and the token is (re)persisted.
+  Future<void> onPermissionGranted({String? branch}) async {
+    await subscribeToTopic(KharisTopics.all);
+    final name = branch?.trim();
+    if (name != null && name.isNotEmpty) {
+      await subscribeToTopic(KharisTopics.branch(name));
+    }
+    await syncToken();
+  }
+
+  /// Persists the current FCM token on the member's profile. Never throws.
+  Future<void> syncToken() async {
+    if (!kUseFirebase) return;
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      await _saveTokenToProfile(token);
+    } catch (e) {
+      debugPrint('[FCM] getToken skipped: $e');
     }
   }
 
@@ -190,64 +311,42 @@ class NotificationService {
       enabled ? subscribeToTopic(topic) : unsubscribeFromTopic(topic);
 
   void _handleForegroundMessage(RemoteMessage message) {
+    onContentPush?.call(message.data['type'] as String?);
     final title = message.notification?.title;
     final body = message.notification?.body;
-    debugPrint('[FCM] Foreground: $title — $body');
+    debugPrint('[FCM] Foreground: $title / $body');
     // FCM draws nothing while the app is foregrounded, so surface it in-app.
-    final text =
-        [title, body].whereType<String>().where((s) => s.isNotEmpty).join(' — ');
+    final text = [
+      title,
+      body,
+    ].whereType<String>().where((s) => s.isNotEmpty).join(': ');
     if (text.isEmpty) return;
     kharisMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text(text),
         duration: const Duration(seconds: 6),
-        action: SnackBarAction(
-          label: 'View',
-          onPressed: () => _handleNotificationTap(message),
-        ),
+        action: SnackBarAction(label: 'View', onPressed: () => _open(message)),
       ),
     );
   }
 
-  /// Routes a tapped push to the screen that shows what it is about.
-  ///
-  /// `message.data['type']` is the contract with the backend: every push sent
-  /// from `backend/functions/src/content-notifications.ts` and
-  /// `pushPendingAnnouncements` carries one of the types cased below. Adding a
-  /// type server-side without a case here drops the member on `/home` with no
-  /// sign of what they tapped, so the two move together.
   void _handleNotificationTap(RemoteMessage message) {
     debugPrint('[FCM] Tapped: ${message.notification?.title}');
-    final type = message.data['type'] as String?;
+    onContentPush?.call(message.data['type'] as String?);
+    _open(message);
+  }
 
-    switch (type) {
-      case 'announcement':
-      case 'news':
-        router?.go('/notifications');
-      case 'sermon':
-      case KharisTopics.newSermons:
-        router?.go('/messages');
-      case 'event':
-      case KharisTopics.events:
-      case KharisTopics.serviceReminders:
-        router?.go('/calendar');
-      case 'venue':
-        // Branch address and service times are read off the home screen's
-        // campus card — the only member-facing surface for them.
-        router?.go('/home');
-      case 'reading':
-      case KharisTopics.dailyReading:
-        router?.go('/reading');
-      default:
-        router?.go('/home');
-    }
+  void _open(RemoteMessage message) {
+    final router = this.router;
+    if (router == null) return;
+    openNotificationTarget(router, notificationTargetFor(message.data));
   }
 
   /// Subscribe to an FCM topic.
   ///
-  /// Built-in topics: [KharisTopics.all], [KharisTopics.newSermons],
-  /// [KharisTopics.events], [KharisTopics.dailyReading],
-  /// [KharisTopics.serviceReminders]. Branch topics: [KharisTopics.branch].
+  /// Built-in topics: [KharisTopics.all], [KharisTopics.events],
+  /// [KharisTopics.dailyReading], [KharisTopics.serviceReminders]. Branch
+  /// topics: [KharisTopics.branch].
   Future<void> subscribeToTopic(String topic) async {
     if (!kUseFirebase) return;
     try {

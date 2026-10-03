@@ -1,13 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/calendar/data/event_repository.dart';
 import '../../features/calendar/presentation/screens/calendar_screen.dart';
+import '../../features/calendar/presentation/screens/event_detail_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../features/giving/presentation/screens/giving_screen.dart';
 import '../../features/home/presentation/screens/dashboard_shell.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/browse/presentation/screens/browse_screen.dart';
 import '../../features/messages/presentation/screens/messages_screen.dart';
 import '../../features/onboarding/presentation/screens/branch_selection_screen.dart';
 import '../../features/onboarding/presentation/screens/login_screen.dart';
@@ -36,11 +37,16 @@ import '../../shared/providers/auth_provider.dart';
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
 /// reactive redirects when auth state changes.
 ///
-/// Onboarding flow (unauthenticated):
-///   / → /role-selection → /branch-selection → /login → /home
+/// Redirects (see [RouterNotifier.redirect]):
+///   - `/` (welcome) routes straight to the last tab once onboarding is
+///     complete or the member is signed in;
+///   - `/admin/*` is only reachable for admins and bounces everyone else to
+///     `/home`.
 ///
-/// Authenticated users: redirect straight to /home from /, /login, /register.
-/// Unauthenticated users: redirect to /login from any protected main-app route.
+/// Overlay routes (`/reading`, `/notifications`, `/announcements`,
+/// `/events/:id`, ...) sit on the root navigator above the tab shell and are
+/// meant to be PUSHED, so the AppBar back button always returns to the tab
+/// underneath.
 final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
 
@@ -82,12 +88,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home',
                 builder: (context, state) => const HomeScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'browse',
-                    builder: (context, state) => const BrowseScreen(),
-                  ),
-                ],
               ),
             ],
           ),
@@ -161,6 +161,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
+      ),
+
+      // ── Announcements feed (Home "See all"; announcement push target) ─────
+      // `?id=` opens that announcement's detail as soon as it is loaded.
+      GoRoute(
+        path: '/announcements',
+        builder: (context, state) => NotificationsScreen.announcements(
+          focusId: state.uri.queryParameters['id'],
+        ),
+      ),
+
+      // ── Event detail (cards, linked announcements, event pushes) ──────────
+      // `extra` may carry the already-loaded [Event] so the screen paints
+      // instantly; the screen still re-reads the doc by id.
+      GoRoute(
+        path: '/events/:id',
+        builder: (context, state) => EventDetailScreen(
+          eventId: state.pathParameters['id']!,
+          initial: state.extra is Event ? state.extra as Event : null,
+        ),
       ),
 
       // ── Profile (overlays shell) ──────────────────────────────────────────
