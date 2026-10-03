@@ -1,54 +1,48 @@
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:kharis_app/core/constants/app_links.dart';
+import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 
-/// Public page of a message on the church's sermon host.
-const String kSermonPageBase = 'https://yetanothersermon.host/_/kc/sermons/';
-
-/// The link that opens [sermon] for someone without the app.
+/// The Kharis link for [sermon] (see [AppLinks.message]).
 ///
-/// - Shared while watching ([asVideo]), or a message that only exists on
-///   YouTube: the `youtu.be` link, starting at [position] when there is one.
-/// - A message from the church's sermon API: its sermon page, which carries
-///   the recording (and the video when there is one).
-/// - Anything else with a video: the `youtu.be` link.
-/// - Otherwise the church site.
-String sermonShareLink(
+/// Keyed by the [NoteTimelineKey] canonical id, so the audio and video
+/// variants of one message share one link. [position] is on the AUDIO
+/// timeline and becomes `t`; [asVideo] (shared while watching) adds `v=1`.
+Uri sermonShareLink(
   Sermon sermon, {
   Duration? position,
   bool asVideo = false,
-}) {
-  final videoId = sermon.videoId?.trim();
-  final hasVideo = videoId != null && videoId.isNotEmpty;
-  String youtube() {
-    final seconds = position?.inSeconds ?? 0;
-    return seconds > 0
-        ? 'https://youtu.be/$videoId?t=$seconds'
-        : 'https://youtu.be/$videoId';
-  }
+}) => AppLinks.message(
+  NoteTimelineKey.of(sermon).canonical,
+  at: position,
+  video: asVideo && sermon.hasVideo,
+);
 
-  if (hasVideo && (asVideo || !sermon.hasAudio)) return youtube();
-  if (sermon.source == 'kharis-api' && sermon.id.isNotEmpty) {
-    return '$kSermonPageBase${sermon.id}/';
-  }
-  if (hasVideo) return youtube();
-  return 'https://kharis.org';
-}
-
-/// The text handed to the share sheet: title, speaker and link.
+/// The text handed to the share sheet: the title, the speaker and date when
+/// known, then the Kharis link.
 String sermonShareText(
   Sermon sermon, {
   Duration? position,
   bool asVideo = false,
 }) {
   final speaker = sermon.speaker.trim();
-  final by = speaker.isNotEmpty ? ' by $speaker' : '';
-  final link = sermonShareLink(sermon, position: position, asVideo: asVideo);
-  return '${sermon.title}$by\n$link';
+  final date = sermon.publishedAt;
+  final byline = [
+    if (speaker.isNotEmpty) speaker,
+    if (date != null) DateFormat('d MMMM yyyy').format(date),
+  ].join(', ');
+  return [
+    sermon.title.trim(),
+    if (byline.isNotEmpty) byline,
+    AppLinks.shareLine(
+      sermonShareLink(sermon, position: position, asVideo: asVideo),
+    ),
+  ].join('\n');
 }
 
-/// Opens the OS share sheet for [sermon]. See [sermonShareLink] for which
-/// link is shared.
+/// Opens the OS share sheet for [sermon]. See [sermonShareLink] for the link.
 Future<void> shareSermon(
   Sermon sermon, {
   Duration? position,

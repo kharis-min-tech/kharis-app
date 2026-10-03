@@ -33,6 +33,7 @@ import '../../features/admin/presentation/screens/admin_bible_reading_screen.dar
 import '../../features/admin/presentation/screens/admin_reading_plans_screen.dart';
 import '../../features/admin/presentation/screens/admin_sermons_screen.dart';
 import '../../features/admin/presentation/screens/admin_branch_detail_screen.dart';
+import '../../features/shared_links/presentation/shared_link_screens.dart';
 import '../../shared/providers/auth_provider.dart';
 
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
@@ -191,6 +192,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           initial: state.extra is Event ? state.extra as Event : null,
         ),
       ),
+
+      // ── Shared links: /m/:id, /e/:id, /a/:id (see AppLinks) ───────────────
+      ...sharedLinkRoutes,
 
       // ── Profile (overlays shell) ──────────────────────────────────────────
       GoRoute(

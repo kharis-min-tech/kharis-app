@@ -6,5 +6,13 @@
 	     "production" when the archive is exported for App Store/TestFlight. -->
 	<key>aps-environment</key>
 	<string>development</string>
+	<!-- Universal Links: shared links (AppLinks.host, paths /m/ /e/ /a/) open
+	     the app. Verified against
+	     https://kharis-app-47c49.web.app/.well-known/apple-app-site-association
+	     (app/web/.well-known/). -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:kharis-app-47c49.web.app</string>
+	</array>
 </dict>
 </plist>

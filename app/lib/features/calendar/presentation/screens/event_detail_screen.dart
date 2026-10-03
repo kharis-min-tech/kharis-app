@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:kharis_app/core/constants/app_links.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
@@ -62,6 +63,30 @@ String eventTimeRange(Event event) {
   return sameDay
       ? '$start \u2013 ${time.format(end)}'
       : '$start \u2013 ${DateFormat('EEE d MMM, h:mm a').format(end)}';
+}
+
+/// The text handed to the share sheet for [event]: title, day and time,
+/// where (venue and address, else the campus), then the Kharis link.
+String eventShareText(Event event) {
+  String? clean(String? raw) {
+    final value = raw?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  final when =
+      '${DateFormat('EEEE d MMMM yyyy').format(event.startTime)}, '
+      '${eventTimeRange(event)}';
+  final place = [
+    clean(event.location),
+    clean(event.address),
+  ].whereType<String>().join(', ');
+  final where = place.isNotEmpty ? place : clean(event.branch);
+  return [
+    event.title.trim(),
+    when,
+    ?where,
+    AppLinks.shareLine(AppLinks.event(event.id)),
+  ].join('\n');
 }
 
 /// Maps search URL for [query]: Apple Maps on iOS/macOS, Google Maps elsewhere
@@ -325,16 +350,8 @@ class _EventBody extends ConsumerWidget {
   }
 
   void _share() {
-    final when =
-        '${DateFormat('EEEE d MMMM yyyy').format(event.startTime)}, '
-        '${eventTimeRange(event)}';
-    final where = _mapsQuery ?? _clean(event.branch);
     unawaited(
-      SharePlus.instance.share(
-        ShareParams(
-          text: [event.title, when, ?where, 'Kharis Church'].join('\n'),
-        ),
-      ),
+      SharePlus.instance.share(ShareParams(text: eventShareText(event))),
     );
   }
 }
@@ -346,15 +363,8 @@ class _Banner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDeep],
-        ),
-      ),
-    );
+    // Solid brand fill when the event has no photo (or it fails).
+    const fallback = ColoredBox(color: AppColors.primaryDeep);
     final url = event.imageUrl;
     final image = (url == null || url.isEmpty)
         ? fallback

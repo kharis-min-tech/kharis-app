@@ -557,37 +557,40 @@ void main() {
 
   // ── Share ───────────────────────────────────────────────────────────────────
 
+  // Shared links lead into the Kharis app (full contract: app_links_test).
   group('share links', () {
-    test('audio-only API message shares its sermon page', () {
+    const origin = 'https://kharis-app-47c49.web.app';
+
+    test('audio-only API message links its own id', () {
       final s = _sermon(2611, source: 'kharis-api');
-      expect(
-        sermonShareLink(s),
-        'https://yetanothersermon.host/_/kc/sermons/s2611/',
-      );
+      expect(sermonShareLink(s).toString(), '$origin/m/s2611');
     });
 
-    test('watching shares youtu.be at the current second', () {
+    test('watching links the canonical id at the current second', () {
       final s = _sermon(1, videoId: 'abc123', source: 'kharis-api');
       expect(
         sermonShareLink(
           s,
           asVideo: true,
           position: const Duration(seconds: 95),
-        ),
-        'https://youtu.be/abc123?t=95',
+        ).toString(),
+        '$origin/m/yt_abc123?t=95&v=1',
       );
       expect(
-        sermonShareLink(s),
-        'https://yetanothersermon.host/_/kc/sermons/s1/',
-        reason: 'listening to an API message shares its page',
+        sermonShareLink(s).toString(),
+        '$origin/m/yt_abc123',
+        reason: 'listening shares the same message link',
       );
     });
 
-    test('video-only feed message shares youtu.be; text has no em dash', () {
+    test('video-only feed message: Kharis link; text has no em dash', () {
       final s = _sermon(3, audio: false, videoId: 'xyz789', source: 'youtube');
-      expect(sermonShareLink(s), 'https://youtu.be/xyz789');
+      expect(sermonShareLink(s).toString(), '$origin/m/yt_xyz789');
       final text = sermonShareText(s);
-      expect(text, 'Message 3 by Pastor A\nhttps://youtu.be/xyz789');
+      expect(
+        text,
+        'Message 3\nPastor A\nOpen in the Kharis app: $origin/m/yt_xyz789',
+      );
       expect(text.contains('\u2014'), isFalse);
     });
   });

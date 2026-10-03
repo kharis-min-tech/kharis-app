@@ -31,15 +31,6 @@ import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 export 'package:kharis_app/features/player/presentation/media_mode.dart';
 
-/// Ambient wash shared by the player screens, settling into the page background
-/// at the bottom so they belong to whichever theme is active. Dark mode keeps
-/// the deep purple→ink gradient from the design handoff; light mode uses a soft
-/// lavender that fades into the warm page background.
-List<Color> playerAmbientColors(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? [const Color(0xFF3A1D6E), const Color(0xFF1A0F33), context.kc.bg]
-    : [const Color(0xFFE6DEF8), const Color(0xFFF2ECF9), context.kc.bg];
-
 /// Whether [a] and [b] are variants of the same physical message (API mp3,
 /// `yt_` CMS doc, bare feed entry), which share one timeline.
 bool _sameMessage(Sermon a, Sermon b) =>
@@ -72,6 +63,7 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
     required this.sermon,
     this.mode,
     this.queue,
+    this.startAt,
   });
 
   final Sermon sermon;
@@ -83,6 +75,10 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
   /// The list playback was launched from. Null uses the audio engine's
   /// current queue (opened from the mini player).
   final List<Sermon>? queue;
+
+  /// Where to open, on the AUDIO timeline (a shared link's `t`). Wins over
+  /// the live and saved positions; null keeps the usual resume behaviour.
+  final Duration? startAt;
 
   /// A video that has not started after this long gets the error banner.
   static const Duration videoStartTimeout = Duration(seconds: 15);
@@ -171,12 +167,25 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     _mode = resolveInitialMode(widget.sermon, widget.mode);
     _queueItems = widget.queue ?? _audio.queue?.items ?? const <Sermon>[];
     if (_mode == MediaMode.video) {
-      final handoff = _audioHandoff();
+      final startAt = widget.startAt;
+      final handoff = startAt != null
+          ? startAt + _offsetFor(_sermon)
+          : _audioHandoff();
       // Video owns playback now: release the audio source and session
       // entirely so nothing competes in the background. The stop saves the
       // resume position, so the message picks up cleanly if audio returns.
       unawaited(_audio.stop());
       _startVideoEngine(startAt: handoff);
+    } else if (widget.startAt != null) {
+      // play() seeks in place when this message is already on air.
+      unawaited(
+        startAudioPlayback(
+          ref,
+          _sermon,
+          startAt: widget.startAt,
+          queue: _queueItems,
+        ),
+      );
     } else {
       _attachOrStartAudio();
     }
@@ -634,9 +643,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     yield* controller.videoStateStream.map((state) => state.position);
   }
 
-  /// The active engine's position, for a share link.
+  /// The active engine's position for a share link, on the AUDIO timeline
+  /// so one link means the same moment in audio and in video.
   Duration _sharePosition() {
-    if (_mode == MediaMode.video) return _videoPosition;
+    if (_mode == MediaMode.video) return _toAudio(_videoPosition);
     final playing = _audio.currentSermon;
     return playing != null && _sameMessage(playing, _sermon)
         ? _audio.position
@@ -667,79 +677,70 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       ref.watch(sermonsProvider);
       _videoOffset = _offsetFor(_sermon);
     }
+    // Flat page colour: no ambient wash. _buildVideoSurface's corner mask
+    // paints this same colour, so the two must stay in step.
     return Scaffold(
-      body: DecoratedBox(
-        decoration: _gradient,
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              // The video stays pinned outside the scrollable so a swipe on
-              // the picture never scrolls the page out from under playback
-              // (tester feedback); everything below it still scrolls.
-              if (isVideo)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
-                  child: _buildVideoSurface(),
-                ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (!isVideo) ...[
-                        _buildArtwork(),
-                        const SizedBox(height: 24),
-                      ],
-                      _buildInfoRow(),
-                      const SizedBox(height: 18),
-                      MediaModeToggle(
-                        sermon: isVideo
-                            ? _sermon.copyWith(audioUrl: _audioTwin()?.audioUrl)
-                            : _sermon,
-                        activeMode: _mode,
-                        onSelect: (mode) => unawaited(_switchMode(mode)),
-                      ),
-                      const SizedBox(height: 22),
-                      if (isVideo)
-                        _buildVideoTransport()
-                      else
-                        _buildAudioTransport(),
-                      const SizedBox(height: 26),
-                      Container(
-                        padding: const EdgeInsets.only(top: 18),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            top: BorderSide(color: context.kc.divider),
-                          ),
-                        ),
-                        child: PlayerActions(
-                          sermon: _sermon,
-                          timeline: _videoNoteBinding(),
-                          asVideo: isVideo,
-                          positionOf: _sharePosition,
-                        ),
-                      ),
+      backgroundColor: context.kc.bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            // The video stays pinned outside the scrollable so a swipe on
+            // the picture never scrolls the page out from under playback
+            // (tester feedback); everything below it still scrolls.
+            if (isVideo)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                child: _buildVideoSurface(),
+              ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!isVideo) ...[
+                      _buildArtwork(),
+                      const SizedBox(height: 24),
                     ],
-                  ),
+                    _buildInfoRow(),
+                    const SizedBox(height: 18),
+                    MediaModeToggle(
+                      sermon: isVideo
+                          ? _sermon.copyWith(audioUrl: _audioTwin()?.audioUrl)
+                          : _sermon,
+                      activeMode: _mode,
+                      onSelect: (mode) => unawaited(_switchMode(mode)),
+                    ),
+                    const SizedBox(height: 22),
+                    if (isVideo)
+                      _buildVideoTransport()
+                    else
+                      _buildAudioTransport(),
+                    const SizedBox(height: 26),
+                    Container(
+                      padding: const EdgeInsets.only(top: 18),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: context.kc.divider),
+                        ),
+                      ),
+                      child: PlayerActions(
+                        sermon: _sermon,
+                        timeline: _videoNoteBinding(),
+                        asVideo: isVideo,
+                        positionOf: _sharePosition,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-
-  BoxDecoration get _gradient => BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: playerAmbientColors(context),
-      stops: const [0.0, 0.44, 1.0],
-    ),
-  );
 
   Widget _buildVideoSurface() {
     final Widget player;
@@ -768,37 +769,24 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     // the rounded artwork (tester feedback).
     //
     // So the rounding is painted ON TOP instead: four corner slivers in the
-    // page's ambient colour, over the video. The ambient shadow matches
-    // _buildArtwork so audio and video sit in the same design language.
-    final ambient = playerAmbientColors(context).first;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.34),
-            blurRadius: 44,
-            offset: const Offset(0, 20),
-            spreadRadius: -18,
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          AspectRatio(aspectRatio: 16 / 9, child: player),
-          // Never steal taps from the player controls underneath.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _VideoCornerMask(
-                  radius: AppRadius.card,
-                  color: ambient,
-                ),
+    // page colour (the Scaffold's kc.bg), over the video. Flat, like
+    // _buildArtwork: no glow under the frame.
+    final pageColor = context.kc.bg;
+    return Stack(
+      children: [
+        AspectRatio(aspectRatio: 16 / 9, child: player),
+        // Never steal taps from the player controls underneath.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: _VideoCornerMask(
+                radius: AppRadius.card,
+                color: pageColor,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -925,23 +913,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: AspectRatio(
         aspectRatio: 1,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.5),
-                blurRadius: 60,
-                offset: const Offset(0, 28),
-                spreadRadius: -20,
-              ),
-            ],
-          ),
-          child: ArtworkImage(
-            url: _sermon.artworkUrl,
-            gradientIndex: _sermon.artworkColor ?? 0,
-            radius: AppRadius.card,
-          ),
+        child: ArtworkImage(
+          url: _sermon.artworkUrl,
+          gradientIndex: _sermon.artworkColor ?? 0,
+          radius: AppRadius.card,
         ),
       ),
     );

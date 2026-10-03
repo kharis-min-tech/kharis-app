@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/services/app_router.dart';
+import 'features/shared_links/presentation/open_in_app_banner.dart';
 import 'core/constants/api_config.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
@@ -29,6 +31,10 @@ Future<void> main() async {
       final binding = WidgetsFlutterBinding.ensureInitialized();
       FlutterNativeSplash.preserve(widgetsBinding: binding);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      // Real paths on web (no `#/`), so a shared link such as
+      // https://<AppLinks.host>/m/<id> routes in the web app exactly as it
+      // does in the native apps. No-op off the web.
+      usePathUrlStrategy();
 
       // Lock-screen / notification / CarPlay media controls (Now Playing).
       // Must run before any AudioPlayer is created. The transport is
@@ -122,7 +128,12 @@ class KharisApp extends ConsumerWidget {
         darkTheme: kharisTheme(brightness: Brightness.dark),
         scaffoldMessengerKey: kharisMessengerKey,
         routerConfig: ref.watch(appRouterProvider),
-        builder: clampTextScaling,
+        // On web, a shared link opened in the browser gets the "Open in the
+        // Kharis app" bar above every route.
+        builder: (context, child) => clampTextScaling(
+          context,
+          OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
   }
