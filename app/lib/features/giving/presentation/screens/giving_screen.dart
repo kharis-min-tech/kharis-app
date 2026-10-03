@@ -1,28 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_webview_screen.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
-/// The secure Kharis giving portal (opened via the web-view / payment flow).
-///
-/// Org-wide, not per-branch: the portal itself handles fund designation and the
-/// branch model carries no giving URL, so there is nothing branch-specific to
+/// The secure Kharis giving page (verified 200). It lists every campus and
+/// fund, each opening its own Tithe.ly form, so it is org-wide: the branch
+/// model carries no giving URL and there is nothing branch-specific to
 /// substitute here.
-const String _kGivingUrl = 'https://kharis.org/giving';
+const String kGivingUrl = 'https://kharis.org/giving/';
 
-/// Shown in the "Giving to" row when the member has not picked a campus.
-const String _kAllCampusesLabel = 'All campuses';
+/// Bank transfer details exactly as published on kharis.org/giving. The card
+/// renders these rows and "Copy bank details" copies the same rows, so what
+/// the member sees is what lands on the clipboard.
+const List<(String, String)> kBankTransferRows = [
+  ('Account name', 'Kharis Ministries'),
+  ('Account number', '80608335'),
+  ('Sort code', '20-71-82'),
+  ('SWIFT/BIC', 'BUKBGB22'),
+  ('IBAN', 'GB88BUKB20718280608335'),
+];
 
-/// Giving tab (design-handoff v3).
+/// Clipboard text for [kBankTransferRows], one `Label: value` per line.
+String get bankTransferClipboardText =>
+    kBankTransferRows.map((r) => '${r.$1}: ${r.$2}').join('\n');
+
+/// Giving tab.
 ///
-/// A calm, single-column giving landing: a scripture card, the branch the gift
-/// is directed to, a full-width **Give securely** call-to-action that opens the
-/// secure portal, and offline bank-transfer + campaign cards below.
+/// A calm, single-column giving landing: a scripture card, the campus the
+/// gift is directed to, a full-width gold **Give securely** call to action
+/// that opens the secure giving page, and the bank-transfer details below.
 class GivingScreen extends ConsumerWidget {
   const GivingScreen({super.key});
 
@@ -40,7 +51,12 @@ class GivingScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
-                child: Text('Giving', style: AppTypography.headlineLgMobile),
+                child: Text(
+                  'Giving',
+                  style: AppTypography.headlineLgMobile.copyWith(
+                    color: context.kc.onBg,
+                  ),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -51,24 +67,18 @@ class GivingScreen extends ConsumerWidget {
                     const SizedBox(height: 18),
                     const _SectionLabel('GIVING TO'),
                     const SizedBox(height: 9),
-                    // Tapping opens the profile editor — the one place a member
-                    // can actually change their campus — not the payment flow.
                     _BranchSelector(
-                      branch: branch ?? _kAllCampusesLabel,
-                      onTap: () => context.push('/profile/edit'),
+                      branch: branch ?? kAllCampusesLabel,
+                      onTap: () => pickActiveBranch(context, ref),
                     ),
                     const SizedBox(height: 14),
                     _GiveSecurelyButton(
-                      onTap: () => openGivingFlow(context, _kGivingUrl),
+                      onTap: () => openGivingFlow(context, kGivingUrl),
                     ),
                     const SizedBox(height: 9),
                     const _SecureNote(),
                     const SizedBox(height: 22),
                     const _BankTransferCard(),
-                    const SizedBox(height: 14),
-                    _CampaignCard(
-                      onTap: () => openGivingFlow(context, _kGivingUrl),
-                    ),
                   ],
                 ),
               ),
@@ -88,69 +98,56 @@ class _ScriptureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Stack(
-        children: [
-          // Base + accent wash approximating the prototype's layered gradient.
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF2A1A6B), Color(0xFF0B0A12)],
-                ),
-              ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(-0.75, -0.85),
-                    radius: 1.1,
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.85),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.55],
-                  ),
-                ),
+      borderRadius: AppRadius.cardBorder,
+      child: DecoratedBox(
+        // Brand ink card in both themes; text on it stays light.
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.primaryDeep, AppColors.ink],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -14,
+              top: -10,
+              child: Opacity(
+                opacity: 0.12,
+                child: Image.asset(AppAssets.doveWhite, width: 96),
               ),
             ),
-          ),
-          // Dove watermark.
-          Positioned(
-            right: -14,
-            top: -10,
-            child: Opacity(
-              opacity: 0.12,
-              child: Image.asset(AppAssets.doveWhite, width: 96),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Giving is a response to the generosity of a good God.',
-                  style: AppTypography.serif(
-                    size: 20,
-                    italic: true,
-                    height: 1.3,
-                    color: Colors.white,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'So let each one give as he purposes in his heart, not '
+                    'grudgingly or of necessity; for God loves a cheerful '
+                    'giver.',
+                    style: AppTypography.serif(
+                      size: 19,
+                      italic: true,
+                      height: 1.35,
+                      color: AppColors.onPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '2 Corinthians 9:7',
-                  style: AppTypography.ui(
-                    size: 12,
-                    color: AppColors.darkMuted2,
+                  const SizedBox(height: 10),
+                  Text(
+                    '2 Corinthians 9:7 (NKJV)',
+                    style: AppTypography.ui(
+                      size: 12,
+                      weight: FontWeight.w600,
+                      color: AppColors.darkMuted2,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -166,47 +163,58 @@ class _BranchSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: context.kc.surface,
-          borderRadius: AppRadius.cardBorder,
-          boxShadow: AppShadows.card,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: context.kc.chipBg,
-                borderRadius: AppRadius.tileBorder,
-              ),
-              child: const Icon(
-                Icons.location_on_outlined,
-                size: 19,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                branch,
-                style: AppTypography.ui(
-                  size: 15,
-                  weight: FontWeight.w700,
-                  color: context.kc.onBg,
+    final kc = context.kc;
+    return Semantics(
+      button: true,
+      label: 'Giving to $branch. Change campus',
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: const ValueKey('giving-branch-selector'),
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: kc.surface,
+            borderRadius: AppRadius.cardBorder,
+            boxShadow: AppShadows.card,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: kc.chipBg,
+                  borderRadius: AppRadius.tileBorder,
+                ),
+                child: Icon(
+                  Icons.location_on_outlined,
+                  size: 19,
+                  color: kc.onChip,
                 ),
               ),
-            ),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 20,
-              color: context.kc.muted,
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  branch,
+                  style: AppTypography.ui(
+                    size: 15,
+                    weight: FontWeight.w700,
+                    color: kc.onBg,
+                  ),
+                ),
+              ),
+              Text(
+                'Change',
+                style: AppTypography.ui(
+                  size: 13,
+                  weight: FontWeight.w600,
+                  color: kc.onChip,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -222,17 +230,17 @@ class _GiveSecurelyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 17),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primary, AppColors.primaryDeep],
-          ),
-          borderRadius: AppRadius.buttonBorder,
+    final kc = context.kc;
+    return SizedBox(
+      height: 56,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: kc.accent,
+          foregroundColor: kc.onAccent,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.buttonBorder),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -242,15 +250,11 @@ class _GiveSecurelyButton extends StatelessWidget {
               style: AppTypography.ui(
                 size: 16,
                 weight: FontWeight.w700,
-                color: AppColors.onPrimary,
+                color: kc.onAccent,
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(
-              Icons.north_east_rounded,
-              size: 17,
-              color: AppColors.onPrimary,
-            ),
+            Icon(Icons.north_east_rounded, size: 17, color: kc.onAccent),
           ],
         ),
       ),
@@ -268,18 +272,11 @@ class _SecureNote extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          Icons.lock_outline_rounded,
-          size: 13,
-          color: context.kc.muted,
-        ),
+        Icon(Icons.lock_outline_rounded, size: 13, color: context.kc.muted),
         const SizedBox(width: 6),
         Text(
           'Opens the secure Kharis giving page',
-          style: AppTypography.ui(
-            size: 11.5,
-            color: context.kc.muted,
-          ),
+          style: AppTypography.ui(size: 12, color: context.kc.muted),
         ),
       ],
     );
@@ -291,19 +288,10 @@ class _SecureNote extends StatelessWidget {
 class _BankTransferCard extends StatelessWidget {
   const _BankTransferCard();
 
-  static const List<(String, String)> _rows = [
-    ('Account', '80608335'),
-    ('Sort code', '20-71-82'),
-    ('SWIFT/BIC', 'BUKBGB22'),
-    ('IBAN', 'GB88BUKB20718280608335'),
-  ];
-
-  void _copy(BuildContext context) {
-    const details =
-        'Kharis Ministries\nAccount: 80608335\nSort code: 20-71-82\n'
-        'SWIFT/BIC: BUKBGB22\nIBAN: GB88BUKB20718280608335';
-    Clipboard.setData(const ClipboardData(text: details));
-    ScaffoldMessenger.of(context)
+  Future<void> _copy(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: bankTransferClipboardText));
+    messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
@@ -316,153 +304,96 @@ class _BankTransferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kc = context.kc;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF137A6D),
-        borderRadius: BorderRadius.circular(20),
+        color: kc.surface,
+        borderRadius: AppRadius.cardBorder,
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Bank Transfer',
-            style: AppTypography.ui(
-              size: 13,
-              color: Colors.white.withValues(alpha: 0.85),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Kharis Ministries',
-            style: AppTypography.display(size: 22, color: Colors.white),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: kc.chipBg,
+                  borderRadius: AppRadius.tileBorder,
+                ),
+                child: Icon(
+                  Icons.account_balance_outlined,
+                  size: 19,
+                  color: kc.onChip,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bank transfer',
+                      style: AppTypography.display(
+                        size: 18,
+                        weight: FontWeight.w700,
+                        color: kc.onBg,
+                      ),
+                    ),
+                    Text(
+                      'UK bank account',
+                      style: AppTypography.ui(size: 12.5, color: kc.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
-          for (final (label, value) in _rows) ...[
+          for (final (label, value) in kBankTransferRows)
             Padding(
-              padding: const EdgeInsets.only(bottom: 7),
+              padding: const EdgeInsets.only(bottom: 8),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: AppTypography.ui(
-                      size: 13.5,
-                      weight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: AppTypography.ui(size: 13.5, color: kc.muted),
                     ),
                   ),
-                  Text(
+                  const SizedBox(width: 12),
+                  SelectableText(
                     value,
                     style: AppTypography.ui(
-                      size: label == 'IBAN' ? 11.5 : 13.5,
-                      weight: FontWeight.w500,
-                      color: Colors.white,
+                      size: 13.5,
+                      weight: FontWeight.w600,
+                      color: kc.onBg,
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-          const SizedBox(height: 7),
-          GestureDetector(
-            onTap: () => _copy(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
-                  const SizedBox(width: 7),
-                  Text(
-                    'Copy details',
-                    style: AppTypography.ui(
-                      size: 12.5,
-                      weight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: () => _copy(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: kc.onBg,
+              side: BorderSide(color: kc.outline),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.pillBorder),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: Text(
+              'Copy bank details',
+              style: AppTypography.ui(size: 13, weight: FontWeight.w700),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Campaign card ─────────────────────────────────────────────────────────────
-
-class _CampaignCard extends StatelessWidget {
-  const _CampaignCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          height: 150,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1A1205), Color(0xFF3A1240)],
-            ),
-          ),
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [Color(0xB3000000), Colors.transparent],
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Build God a House',
-                    style: AppTypography.display(size: 22, color: Colors.white),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    "We're believing for a permanent home "
-                    '\u2014 \u00A31.4M of \u00A33M raised',
-                    style: AppTypography.ui(
-                      size: 12,
-                      color: AppColors.darkMuted3,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: 0.47,
-                      minHeight: 6,
-                      backgroundColor: Colors.white.withValues(alpha: 0.2),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.secondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

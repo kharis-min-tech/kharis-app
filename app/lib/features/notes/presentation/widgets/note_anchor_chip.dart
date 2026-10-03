@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 
@@ -34,8 +33,10 @@ class NoteAnchorChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final position = positionMs;
-    final label =
-        position != null ? '$title · ${formatNotePosition(position)}' : title;
+    final ink = context.kc.onChip;
+    final label = position != null
+        ? '$title · ${formatNotePosition(position)}'
+        : title;
 
     final chip = Container(
       constraints: BoxConstraints(maxWidth: maxWidth),
@@ -44,25 +45,27 @@ class NoteAnchorChip extends StatelessWidget {
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.15),
+        color: context.kc.chipBg,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            onTap != null ? Icons.play_arrow_rounded : Icons.headphones_outlined,
+            onTap != null
+                ? Icons.play_arrow_rounded
+                : Icons.headphones_outlined,
             size: 14,
-            color: AppColors.primary,
+            color: ink,
           ),
           const SizedBox(width: AppSpacing.xs),
           Flexible(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w500,
+              style: AppTypography.ui(
+                size: 11,
+                color: ink,
+                weight: FontWeight.w500,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

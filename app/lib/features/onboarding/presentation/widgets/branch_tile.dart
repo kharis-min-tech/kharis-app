@@ -47,16 +47,19 @@ class BranchTile extends StatelessWidget {
                 children: [
                   Text(
                     name,
-                    style: AppTypography.ui(size: 16, weight: FontWeight.w700)
-                        .copyWith(color: context.kc.onBg),
+                    style: AppTypography.ui(
+                      size: 16,
+                      weight: FontWeight.w700,
+                    ).copyWith(color: context.kc.onBg),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     region,
-                    style: AppTypography.ui(size: 13)
-                        .copyWith(color: context.kc.muted),
+                    style: AppTypography.ui(
+                      size: 13,
+                    ).copyWith(color: context.kc.muted),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -66,15 +69,20 @@ class BranchTile extends StatelessWidget {
             if (isHq) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: context.kc.accent,
                   borderRadius: AppRadius.pillBorder,
                 ),
                 child: Text(
                   'HQ',
-                  style: AppTypography.ui(size: 11, weight: FontWeight.w800)
-                      .copyWith(color: context.kc.onAccent, letterSpacing: 0.5),
+                  style: AppTypography.ui(
+                    size: 11,
+                    weight: FontWeight.w800,
+                  ).copyWith(color: context.kc.onAccent, letterSpacing: 0.5),
                 ),
               ),
             ],
@@ -110,17 +118,17 @@ class _Thumb extends StatelessWidget {
         child: (imageUrl == null || imageUrl!.isEmpty)
             ? gradient
             : imageUrl!.startsWith('assets/')
-                ? Image.asset(
-                    imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => gradient,
-                  )
-                : CachedNetworkImage(
-                    imageUrl: imageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (_, _) => gradient,
-                    errorWidget: (_, _, _) => gradient,
-                  ),
+            ? Image.asset(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => gradient,
+              )
+            : CachedNetworkImage(
+                imageUrl: imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => gradient,
+                errorWidget: (_, _, _) => gradient,
+              ),
       ),
     );
   }

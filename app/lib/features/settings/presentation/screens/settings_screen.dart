@@ -3,20 +3,52 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
+import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/theme_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
 import 'notifications_settings_screen.dart';
 
-/// The profile hub (design-handoff v3): a light "More" screen with the
-/// signed-in identity card, a grouped app list, and the sign-out action. All
-/// routing, providers, and auth logic are preserved — presentation only.
+/// Church contact page (verified 200). The old `/help` path is a 404.
+const String kHelpUrl = 'https://kharis.org/contact-us/';
+
+/// Church privacy policy (verified 200). kharis.org publishes no terms of
+/// service page, so none is linked.
+const String kPrivacyPolicyUrl = 'https://kharis.org/privacy-policy/';
+
+/// The installed build, e.g. `1.0.0 (1)`, read from the platform bundle so
+/// More always reports what is actually running.
+final appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return '${info.version} (${info.buildNumber})';
+});
+
+/// Opens [url] in the system browser.
+Future<void> _openExternal(String url) =>
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+
+/// Pushes a full-screen page above the tab shell.
+void _pushPage(BuildContext context, Widget page) {
+  unawaited(
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(MaterialPageRoute<void>(builder: (_) => page)),
+  );
+}
+
+/// The profile hub ("More"): identity card, grouped app list, sign in or
+/// out, and the installed version.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -24,6 +56,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
     final isAdmin = ref.watch(isAdminProvider).valueOrNull ?? false;
+    final branch = ref.watch(currentBranchProvider).valueOrNull;
+    final version = ref.watch(appVersionProvider).valueOrNull;
     final signedIn =
         user != null && user.role != 'guest' && user.email.isNotEmpty;
 
@@ -86,17 +120,6 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () => context.push('/reading'),
                   ),
                   _MoreMenuItem(
-                    icon: Icons.volunteer_activism,
-                    label: 'My Giving History',
-                    accent: AppColors.success,
-                    onTap: () => context.go('/giving'),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.sync_alt,
-                    label: 'Switch Branch',
-                    onTap: () => context.push('/branch-selection'),
-                  ),
-                  _MoreMenuItem(
                     icon: Icons.edit_note_rounded,
                     label: 'My Notes',
                     onTap: () => context.push('/notes'),
@@ -107,16 +130,54 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () => context.push('/playlists'),
                   ),
                   _MoreMenuItem(
+                    icon: Icons.sync_alt,
+                    label: 'Switch Branch',
+                    value: branch ?? kAllCampusesLabel,
+                    onTap: () => context.push('/branch-selection'),
+                  ),
+                  _MoreMenuItem(
                     icon: Icons.notifications_none,
                     label: 'Notifications',
                     accent: AppColors.accentPink,
                     onTap: () =>
-                        Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const NotificationsSettingsScreen(),
-                          ),
-                        ),
+                        _pushPage(context, const NotificationsSettingsScreen()),
                   ),
+                  _MoreMenuItem(
+                    icon: Icons.volunteer_activism,
+                    label: 'Give',
+                    accent: context.kc.accentInk,
+                    isLast: true,
+                    onTap: () => context.go('/giving'),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 22),
+
+              const _SectionLabel('Connect'),
+              const SizedBox(height: 8),
+              _MenuCard(
+                children: [
+                  _MoreMenuItem(
+                    icon: Icons.waving_hand_outlined,
+                    label: "I'm new here",
+                    onTap: () => _pushPage(context, const NewHereScreen()),
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.record_voice_over_outlined,
+                    label: 'Share a testimony',
+                    isLast: true,
+                    onTap: () => _pushPage(context, const TestimonyScreen()),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 22),
+
+              const _SectionLabel('Support'),
+              const SizedBox(height: 8),
+              _MenuCard(
+                children: [
                   _MoreMenuItem(
                     icon: Icons.star_border_rounded,
                     label: 'Rate & Feedback',
@@ -132,13 +193,15 @@ class SettingsScreen extends ConsumerWidget {
                   _MoreMenuItem(
                     icon: Icons.help_outline,
                     label: 'Help & Support',
+                    external: true,
+                    onTap: () => unawaited(_openExternal(kHelpUrl)),
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.privacy_tip_outlined,
+                    label: 'Privacy Policy',
+                    external: true,
                     isLast: true,
-                    onTap: () => unawaited(
-                      launchUrl(
-                        Uri.parse('https://kharis.org/help'),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                    ),
+                    onTap: () => unawaited(_openExternal(kPrivacyPolicyUrl)),
                   ),
                 ],
               ),
@@ -174,7 +237,8 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 22),
               Center(
                 child: Text(
-                  'Kharis Church v2.0.0',
+                  version == null ? 'Kharis Church' : 'Kharis Church $version',
+                  key: const ValueKey('app-version'),
                   style: AppTypography.ui(
                     size: 11,
                   ).copyWith(color: context.kc.muted),
@@ -194,7 +258,7 @@ class SettingsScreen extends ConsumerWidget {
         backgroundColor: context.kc.surface,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
         title: Text(
-          'Sign Out',
+          'Sign out',
           style: AppTypography.ui(
             size: 16,
             weight: FontWeight.w700,
@@ -218,7 +282,7 @@ class SettingsScreen extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Sign Out',
+              'Sign out',
               style: AppTypography.ui(
                 size: 14,
                 weight: FontWeight.w700,
@@ -332,7 +396,7 @@ class _EditButton extends StatelessWidget {
           style: AppTypography.ui(
             size: 13,
             weight: FontWeight.w700,
-          ).copyWith(color: AppColors.primary),
+          ).copyWith(color: context.kc.onChip),
         ),
       ),
     );
@@ -410,7 +474,7 @@ class _SignedOutCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Sign in to save your branch, follow along, and personalize your experience.',
+            'Sign in to keep your notes, playlists and campus on every device.',
             style: AppTypography.ui(
               size: 13,
               height: 1.5,
@@ -529,6 +593,8 @@ class _MoreMenuItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.accent,
+    this.value,
+    this.external = false,
     this.danger = false,
     this.isLast = false,
   });
@@ -537,52 +603,78 @@ class _MoreMenuItem extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final Color? accent;
+
+  /// Current setting shown before the chevron (e.g. the active campus).
+  final String? value;
+
+  /// Opens outside the app; shows an external-link glyph instead of a
+  /// chevron so the hand-off is not a surprise.
+  final bool external;
   final bool danger;
   final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    final tint = accent ?? AppColors.primary;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: isLast
-            ? null
-            : BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: context.kc.divider, width: 1),
+    final kc = context.kc;
+    final tint = accent ?? kc.onChip;
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: isLast
+              ? null
+              : BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: kc.divider, width: 1),
+                  ),
+                ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.tileBorder,
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, color: tint, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTypography.ui(
+                    size: 15,
+                    weight: FontWeight.w600,
+                  ).copyWith(color: danger ? AppColors.danger : kc.onBg),
                 ),
               ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: tint.withValues(alpha: 0.12),
-                borderRadius: AppRadius.tileBorder,
+              if (value != null) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    value!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: AppTypography.ui(size: 13).copyWith(color: kc.muted),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 4),
+              Icon(
+                external
+                    ? Icons.open_in_new_rounded
+                    : Icons.chevron_right_rounded,
+                color: kc.muted,
+                size: external ? 18 : 22,
               ),
-              alignment: Alignment.center,
-              child: Icon(icon, color: tint, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                style: AppTypography.ui(
-                  size: 15,
-                  weight: FontWeight.w600,
-                ).copyWith(color: danger ? AppColors.danger : context.kc.onBg),
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: context.kc.muted,
-              size: 22,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -619,13 +711,13 @@ class _ThemeCard extends ConsumerWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
+                  color: kc.onChip.withValues(alpha: 0.12),
                   borderRadius: AppRadius.tileBorder,
                 ),
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   Icons.brightness_6_outlined,
-                  color: AppColors.primary,
+                  color: kc.onChip,
                   size: 20,
                 ),
               ),

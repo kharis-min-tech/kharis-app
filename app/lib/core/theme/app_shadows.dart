@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Shadow / border decoration tokens — Kharis Church design system v2.
-/// No box shadows — elevation via colour contrast and borders only.
+/// Shadow / border decoration tokens. Light surfaces use the single soft
+/// [card] shadow; dark surfaces rely on colour contrast instead.
 abstract final class AppShadows {
   /// 1px white 10% border — applied to cards and elevated surfaces.
   static const Border cardBorder = Border.fromBorderSide(
@@ -37,8 +37,6 @@ abstract final class AppShadows {
         Color(0xFF131313), // surfaceDark opaque
       ],
     ),
-    border: Border(
-      top: BorderSide(color: Color(0x1AFFFFFF), width: 1),
-    ),
+    border: Border(top: BorderSide(color: Color(0x1AFFFFFF), width: 1)),
   );
 }

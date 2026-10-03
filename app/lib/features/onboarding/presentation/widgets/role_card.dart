@@ -66,14 +66,17 @@ class _RoleCardState extends State<RoleCard> {
                   children: [
                     Text(
                       widget.title,
-                      style: AppTypography.ui(size: 16, weight: FontWeight.w700)
-                          .copyWith(color: context.kc.onBg),
+                      style: AppTypography.ui(
+                        size: 16,
+                        weight: FontWeight.w700,
+                      ).copyWith(color: context.kc.onBg),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       widget.description,
-                      style: AppTypography.ui(size: 13)
-                          .copyWith(color: context.kc.muted, height: 1.3),
+                      style: AppTypography.ui(
+                        size: 13,
+                      ).copyWith(color: context.kc.muted, height: 1.3),
                     ),
                   ],
                 ),

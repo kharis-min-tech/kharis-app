@@ -5,30 +5,23 @@ import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/role_card.dart';
-import 'package:kharis_app/shared/widgets/language_bottom_sheet.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Role selection (design-handoff v3) — light screen. Pick how the user relates
+/// Church privacy policy (verified 200). kharis.org publishes no terms of
+/// service, so none is linked.
+const String _kPrivacyPolicyUrl = 'https://kharis.org/privacy-policy/';
+
+/// Role selection (design-handoff v3), light screen. Pick how the user relates
 /// to Kharis; every role continues to branch selection.
 class RoleSelectionScreen extends ConsumerStatefulWidget {
   const RoleSelectionScreen({super.key});
 
   @override
-  ConsumerState<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+  ConsumerState<RoleSelectionScreen> createState() =>
+      _RoleSelectionScreenState();
 }
 
 class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
-  String _selectedLanguage = 'English (UK)';
-
-  Future<void> _openLanguageSheet() async {
-    final result = await showLanguageBottomSheet(
-      context,
-      selected: _selectedLanguage,
-    );
-    if (result != null && mounted) {
-      setState(() => _selectedLanguage = result);
-    }
-  }
-
   void _select(String role) {
     ref.read(onboardingRepositoryProvider).saveRole(role);
     context.go('/branch-selection');
@@ -47,14 +40,18 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
               const SizedBox(height: 18),
               Text(
                 'Welcome home',
-                style: AppTypography.display(size: 30, weight: FontWeight.w700)
-                    .copyWith(color: context.kc.onBg),
+                style: AppTypography.display(
+                  size: 30,
+                  weight: FontWeight.w700,
+                ).copyWith(color: context.kc.onBg),
               ),
               const SizedBox(height: 6),
               Text(
                 'How do you journey with Kharis?',
-                style: AppTypography.serif(size: 17, italic: true)
-                    .copyWith(color: context.kc.muted),
+                style: AppTypography.serif(
+                  size: 17,
+                  italic: true,
+                ).copyWith(color: context.kc.muted),
               ),
               const SizedBox(height: 22),
 
@@ -66,14 +63,14 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 icon: Icons.home_outlined,
                 title: 'Member',
                 description: 'I call Kharis my church home',
-                accent: AppColors.primary,
+                accent: context.kc.onChip,
                 onTap: () => _select('member'),
               ),
               const SizedBox(height: 12),
               RoleCard(
                 icon: Icons.auto_awesome_outlined,
                 title: 'New here',
-                description: 'First time — help me settle in',
+                description: 'First time? Help me settle in',
                 accent: context.kc.accentInk,
                 onTap: () => _select('new_here'),
               ),
@@ -82,7 +79,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 icon: Icons.explore_outlined,
                 title: 'Visitor',
                 description: 'Just exploring for now',
-                accent: AppColors.primary,
+                accent: context.kc.onChip,
                 onTap: () => _select('visitor'),
               ),
               const SizedBox(height: 12),
@@ -94,21 +91,15 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 onTap: () => _select('partner'),
               ),
 
-              const SizedBox(height: 26),
+              const SizedBox(height: 22),
               Center(
-                child: _LanguagePill(
-                  label: _selectedLanguage,
-                  onTap: _openLanguageSheet,
+                child: _FooterLink(
+                  label: 'Privacy Policy',
+                  onTap: () => launchUrl(
+                    Uri.parse(_kPrivacyPolicyUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _FooterLink(label: 'Privacy Policy', onTap: () {}),
-                  const SizedBox(width: 22),
-                  _FooterLink(label: 'Terms of Service', onTap: () {}),
-                ],
               ),
             ],
           ),
@@ -149,50 +140,13 @@ class _CommunityBanner extends StatelessWidget {
                 // stays white in both brightnesses.
                 child: Text(
                   'One family, many stories',
-                  style: AppTypography.ui(size: 14, weight: FontWeight.w700)
-                      .copyWith(color: Colors.white),
+                  style: AppTypography.ui(
+                    size: 14,
+                    weight: FontWeight.w700,
+                  ).copyWith(color: Colors.white),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LanguagePill extends StatelessWidget {
-  const _LanguagePill({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppRadius.pillBorder,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: context.kc.surface,
-          borderRadius: AppRadius.pillBorder,
-          border: Border.all(color: context.kc.outline),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.language_rounded,
-                size: 16, color: context.kc.muted),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: AppTypography.ui(size: 13, weight: FontWeight.w600)
-                  .copyWith(color: context.kc.onBg),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down_rounded,
-                size: 18, color: context.kc.muted),
           ],
         ),
       ),
@@ -210,10 +164,16 @@ class _FooterLink extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Text(
-        label,
-        style: AppTypography.ui(size: 12, weight: FontWeight.w500)
-            .copyWith(color: context.kc.muted),
+      borderRadius: AppRadius.pillBorder,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Text(
+          label,
+          style: AppTypography.ui(
+            size: 12,
+            weight: FontWeight.w500,
+          ).copyWith(color: context.kc.muted),
+        ),
       ),
     );
   }

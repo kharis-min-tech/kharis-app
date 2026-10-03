@@ -35,16 +35,19 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final branches =
-        ref.watch(branchesProvider).valueOrNull ?? BranchRepository.seedBranches;
+        ref.watch(branchesProvider).valueOrNull ??
+        BranchRepository.seedBranches;
 
     final q = _query.trim().toLowerCase();
     final filtered = q.isEmpty
         ? branches
         : branches
-            .where((b) =>
-                b.name.toLowerCase().contains(q) ||
-                b.subtitle.toLowerCase().contains(q))
-            .toList();
+              .where(
+                (b) =>
+                    b.name.toLowerCase().contains(q) ||
+                    b.subtitle.toLowerCase().contains(q),
+              )
+              .toList();
 
     return Scaffold(
       body: SafeArea(
@@ -64,15 +67,18 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
                   const SizedBox(height: 14),
                   Text(
                     'Find your branch',
-                    style:
-                        AppTypography.display(size: 30, weight: FontWeight.w700)
-                            .copyWith(color: context.kc.onBg),
+                    style: AppTypography.display(
+                      size: 30,
+                      weight: FontWeight.w700,
+                    ).copyWith(color: context.kc.onBg),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Kharis is one family across many cities.',
-                    style: AppTypography.serif(size: 17, italic: true)
-                        .copyWith(color: context.kc.muted),
+                    style: AppTypography.serif(
+                      size: 17,
+                      italic: true,
+                    ).copyWith(color: context.kc.muted),
                   ),
                   const SizedBox(height: 18),
                   _SearchField(
@@ -87,10 +93,18 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
                 children: [
-                  ..._section(context, ref, 'BRANCHES',
-                      filtered.where((b) => b.group != 'KP2')),
-                  ..._section(context, ref, 'KHARIS PHASE TWO',
-                      filtered.where((b) => b.group == 'KP2')),
+                  ..._section(
+                    context,
+                    ref,
+                    'BRANCHES',
+                    filtered.where((b) => b.group != 'KP2'),
+                  ),
+                  ..._section(
+                    context,
+                    ref,
+                    'KHARIS PHASE TWO',
+                    filtered.where((b) => b.group == 'KP2'),
+                  ),
                 ],
               ),
             ),
@@ -100,15 +114,22 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
     );
   }
 
-  /// Marks onboarding complete and persists the chosen campus through the one
-  /// shared path, so prefs, the FCM topic and the profile cannot disagree.
+  /// Persists the chosen campus through the one shared path, so prefs, the
+  /// FCM topic and the profile cannot disagree. First-run onboarding is also
+  /// marked complete here; a member switching campus from More is already
+  /// onboarded, so their saved role is left untouched.
   Future<void> _confirm(
-      BuildContext context, WidgetRef ref, Branch branch) async {
+    BuildContext context,
+    WidgetRef ref,
+    Branch branch,
+  ) async {
     final onboardingRepo = ref.read(onboardingRepositoryProvider);
-    await onboardingRepo.completeOnboarding(
-      role: onboardingRepo.selectedRole ?? 'member',
-      branch: branch.name,
-    );
+    if (!onboardingRepo.isCompleted) {
+      await onboardingRepo.completeOnboarding(
+        role: onboardingRepo.selectedRole ?? 'member',
+        branch: branch.name,
+      );
+    }
 
     final result = await setActiveBranch(ref, branch.name);
 
@@ -118,7 +139,7 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
         SnackBar(
           content: Text(
             'Switched to ${branch.name} on this device. We could not reach '
-            'your profile — it will sync automatically.',
+            'your profile, so it will sync automatically.',
           ),
         ),
       );
@@ -146,8 +167,7 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
         padding: const EdgeInsets.only(top: 6, bottom: 10),
         child: Text(
           label,
-          style:
-              AppTypography.labelMd.copyWith(color: context.kc.muted),
+          style: AppTypography.labelMd.copyWith(color: context.kc.muted),
         ),
       ),
       for (final b in list)
@@ -181,12 +201,13 @@ class _BackRow extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.chevron_left_rounded,
-                size: 24, color: context.kc.onBg),
+            Icon(Icons.chevron_left_rounded, size: 24, color: context.kc.onBg),
             Text(
               'Back',
-              style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                  .copyWith(color: context.kc.onBg),
+              style: AppTypography.ui(
+                size: 15,
+                weight: FontWeight.w600,
+              ).copyWith(color: context.kc.onBg),
             ),
           ],
         ),
@@ -207,13 +228,15 @@ class _SearchField extends StatelessWidget {
       controller: controller,
       onChanged: onChanged,
       style: AppTypography.ui(size: 15).copyWith(color: context.kc.onBg),
-      cursorColor: AppColors.primary,
+      cursorColor: context.kc.accentInk,
       decoration: InputDecoration(
         hintText: 'Search cities, KP2, Ghana, Sierra Leone',
-        hintStyle:
-            AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
-        prefixIcon: Icon(Icons.search_rounded,
-            size: 20, color: context.kc.muted),
+        hintStyle: AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          size: 20,
+          color: context.kc.muted,
+        ),
         filled: true,
         fillColor: context.kc.surfaceAlt,
         contentPadding: const EdgeInsets.symmetric(vertical: 14),

@@ -21,14 +21,13 @@ abstract final class AppTypography {
     FontWeight weight = FontWeight.w700,
     double? height,
     Color? color,
-  }) =>
-      GoogleFonts.bricolageGrotesque(
-        fontSize: size,
-        fontWeight: weight,
-        height: height,
-        letterSpacing: size * -0.015,
-        color: color,
-      );
+  }) => GoogleFonts.bricolageGrotesque(
+    fontSize: size,
+    fontWeight: weight,
+    height: height,
+    letterSpacing: size * -0.015,
+    color: color,
+  );
 
   /// Hanken Grotesk UI / body font.
   static TextStyle ui({
@@ -37,14 +36,13 @@ abstract final class AppTypography {
     double? height,
     double? letterSpacing,
     Color? color,
-  }) =>
-      GoogleFonts.hankenGrotesk(
-        fontSize: size,
-        fontWeight: weight,
-        height: height,
-        letterSpacing: letterSpacing,
-        color: color,
-      );
+  }) => GoogleFonts.hankenGrotesk(
+    fontSize: size,
+    fontWeight: weight,
+    height: height,
+    letterSpacing: letterSpacing,
+    color: color,
+  );
 
   /// Newsreader serif accent (scripture, taglines).
   static TextStyle serif({
@@ -53,14 +51,13 @@ abstract final class AppTypography {
     bool italic = false,
     double? height,
     Color? color,
-  }) =>
-      GoogleFonts.newsreader(
-        fontSize: size,
-        fontWeight: weight,
-        fontStyle: italic ? FontStyle.italic : FontStyle.normal,
-        height: height,
-        color: color,
-      );
+  }) => GoogleFonts.newsreader(
+    fontSize: size,
+    fontWeight: weight,
+    fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+    height: height,
+    color: color,
+  );
 
   // ── Retained scale (re-pointed to new families) ────────────────────────────
 
@@ -88,9 +85,9 @@ abstract final class AppTypography {
 
   /// 12 px · Hanken 600 · lh 16 · ls 0.05em — label / eyebrow.
   static TextStyle get labelMd => ui(
-        size: 12,
-        weight: FontWeight.w600,
-        height: 16 / 12,
-        letterSpacing: 12 * 0.05,
-      );
+    size: 12,
+    weight: FontWeight.w600,
+    height: 16 / 12,
+    letterSpacing: 12 * 0.05,
+  );
 }

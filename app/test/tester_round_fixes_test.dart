@@ -6,12 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart';
-import 'package:kharis_app/features/player/data/audio_player_service.dart';
+import 'support/fake_audio_player_service.dart';
+import 'support/fake_cache_service.dart';
+import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
+import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
@@ -19,6 +21,7 @@ import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
@@ -28,71 +31,22 @@ import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 /// change cannot quietly reopen the complaint. The on-device counterpart is
 /// integration_test/tester_round_fixes_test.dart.
 
-/// Fake with no just_audio engine behind it (mirrors playback_launcher_test).
-class _FakeAudio implements AudioPlayerService {
-  Sermon? _current;
-  int stopCalls = 0;
-
-  @override
-  Sermon? get currentSermon => _current;
-
-  @override
-  Duration get position => Duration.zero;
-
-  @override
-  PlaybackFailure? get failure => null;
-
-  @override
-  Stream<PlaybackFailure?> get failureStream => const Stream.empty();
-
-  @override
-  Stream<PlayerState> get playerStateStream => const Stream.empty();
-
-  @override
-  Stream<Duration> get positionStream => const Stream.empty();
-
-  @override
-  Stream<Duration?> get durationStream => const Stream.empty();
-
-  @override
-  Future<bool> play(Sermon sermon) async {
-    _current = sermon;
-    return true;
-  }
-
-  @override
-  Future<bool> retry() async => false;
-
-  @override
-  Future<void> loadPaused(Sermon sermon) async {
-    _current = sermon;
-  }
-
-  @override
-  Future<void> pause() async {}
-
-  @override
-  Future<void> resume() async {}
-
+/// Shared engine-less fake, plus the hooks these regressions need.
+class _FakeAudio extends FakeAudioPlayerService {
   /// Lets a test model a real engine, whose stream clears the sermon a frame
   /// or more *after* `stop()` returns.
   void Function()? onStop;
 
   @override
-  Future<void> stop() async {
-    stopCalls++;
-    _current = null;
-    onStop?.call();
+  Future<void> loadPaused(Sermon sermon) async {
+    current = sermon;
   }
 
   @override
-  Future<void> seek(Duration position) async {}
-
-  @override
-  Future<void> setSpeed(double speed) async {}
-
-  @override
-  Future<void> dispose() async {}
+  Future<void> stop() async {
+    await super.stop();
+    onStop?.call();
+  }
 }
 
 final _sermon = Sermon(
@@ -281,7 +235,14 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [audioPlayerServiceProvider.overrideWithValue(audio)],
+        overrides: [
+          audioPlayerServiceProvider.overrideWithValue(audio),
+          cacheServiceProvider.overrideWithValue(FakeCacheService()),
+          // The like button reads the member's playlists; keep it offline.
+          playlistsProvider.overrideWith(
+            (ref) => Stream.value(const <Playlist>[]),
+          ),
+        ],
         child: MaterialApp(
           home: MediaPlayerScreen(sermon: _sermon, mode: MediaMode.audio),
         ),
@@ -299,10 +260,11 @@ void main() {
     expect(find.text('Playlist'), findsOneWidget);
     // KA-007: the player keeps its close chevron.
     expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
-    // KA-017: skip controls are real buttons with a ripple.
+    // KA-017: the transport controls (now Previous / Next message) are real
+    // buttons with a ripple.
     expect(
       find.ancestor(
-        of: find.byIcon(Icons.replay_rounded),
+        of: find.byIcon(Icons.skip_previous_rounded),
         matching: find.byType(InkWell),
       ),
       findsWidgets,
