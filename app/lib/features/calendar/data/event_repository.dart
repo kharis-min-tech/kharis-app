@@ -320,8 +320,17 @@ class EventRepository {
     return _firestore.collection('events').doc(id).update(data);
   }
 
-  Future<void> deleteEvent(String id) =>
-      _firestore.collection('events').doc(id).delete();
+  /// Deletes an event. A website import (`web_*`) is hidden instead: the
+  /// hourly sync recreates any missing `web_*` doc, but keeps a `hidden`
+  /// tombstone hidden, and every reader drops it.
+  Future<void> deleteEvent(String id) {
+    final ref = _firestore.collection('events').doc(id);
+    if (!id.startsWith('web_')) return ref.delete();
+    return ref.update({
+      'hidden': true,
+      'hiddenAt': FieldValue.serverTimestamp(),
+    });
+  }
 
   static String? _blankToNull(String? value) {
     final trimmed = value?.trim();
@@ -355,9 +364,11 @@ class EventRepository {
       _mapData(doc.id, doc.data());
 
   /// Returns `null` when the document has no usable `startTime` — a single
-  /// malformed document must never take out the whole list. `endTime` is
+  /// malformed document must never take out the whole list — or is a hidden
+  /// tombstone (a removed website event, see [deleteEvent]). `endTime` is
   /// genuinely optional, so its absence is not a failure.
   Event? _mapData(String id, Map<String, dynamic> data) {
+    if (data['hidden'] == true) return null;
     final start = _toDate(data['startTime']);
     if (start == null) return null;
     return Event(

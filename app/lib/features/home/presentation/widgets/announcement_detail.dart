@@ -37,16 +37,62 @@ String? eventVenueLine(Event event) {
 }
 
 /// Opens what an announcement is about: the event it promotes when it is
-/// linked to one, otherwise its full text (with its call-to-action link).
-/// Shared by the Home carousel, the announcements feed and push deep links so
-/// a tap means the same thing everywhere.
-void openAnnouncement(BuildContext context, NewsItem item) {
+/// linked to one that still exists, otherwise its full text (with its
+/// call-to-action link). Shared by the Home carousel, the announcements feed
+/// and push deep links so a tap means the same thing everywhere.
+///
+/// Never a dead end: an event that has been deleted (or cannot be read) falls
+/// back to the announcement itself, and a legacy item carrying both an event
+/// and a link opens the full text with both actions, so neither is lost.
+Future<void> openAnnouncement(BuildContext context, NewsItem item) async {
   final eventId = item.eventId?.trim();
-  if (eventId != null && eventId.isNotEmpty) {
-    context.push('/events/${Uri.encodeComponent(eventId)}');
+  if (eventId == null || eventId.isEmpty || announcementLink(item) != null) {
+    await showAnnouncementDetail(context, item);
     return;
   }
-  showAnnouncementDetail(context, item);
+  final event = await _findEvent(
+    ProviderScope.containerOf(context, listen: false),
+    eventId,
+  );
+  if (!context.mounted) return;
+  if (event == null) {
+    await showAnnouncementDetail(context, item);
+    return;
+  }
+  unawaited(
+    context.push('/events/${Uri.encodeComponent(eventId)}', extra: event),
+  );
+}
+
+/// The event [id], from the loaded campus list when it is there, else read
+/// once. `null` when it no longer exists or cannot be read.
+Future<Event?> _findEvent(ProviderContainer container, String id) async {
+  final cached = container
+      .read(campusUpcomingEventsProvider)
+      .valueOrNull
+      ?.where((e) => e.id == id)
+      .firstOrNull;
+  if (cached != null) return cached;
+  // Listened, not read: an unlistened autoDispose provider can be torn down
+  // before its future completes.
+  final sub = container.listen(eventByIdProvider(id).future, (_, _) {});
+  try {
+    return await sub.read();
+  } catch (_) {
+    return null;
+  } finally {
+    sub.close();
+  }
+}
+
+/// The announcement's call-to-action link when it is an http(s) address.
+Uri? announcementLink(NewsItem item) {
+  final link = item.linkUrl?.trim();
+  if (link == null || link.isEmpty) return null;
+  final uri = Uri.tryParse(link);
+  return uri != null && (uri.scheme == 'https' || uri.scheme == 'http')
+      ? uri
+      : null;
 }
 
 /// Bottom sheet with an announcement's untruncated body, image and CTA.
@@ -62,19 +108,22 @@ Future<void> showAnnouncementDetail(BuildContext context, NewsItem item) {
   );
 }
 
-class AnnouncementDetailSheet extends StatelessWidget {
+/// The full announcement: untruncated body, image, its call-to-action link
+/// and, when it promotes an event that still exists, a way to open it.
+class AnnouncementDetailSheet extends ConsumerWidget {
   const AnnouncementDetailSheet({super.key, required this.item});
 
   final NewsItem item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final body = item.body?.trim();
     final image = item.imageUrl?.trim();
-    final link = item.linkUrl?.trim();
-    final uri = (link == null || link.isEmpty) ? null : Uri.tryParse(link);
-    final canOpen =
-        uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+    final uri = announcementLink(item);
+    final eventId = item.eventId?.trim();
+    final event = (eventId == null || eventId.isEmpty)
+        ? null
+        : ref.watch(linkedEventProvider(eventId));
 
     return SafeArea(
       child: ConstrainedBox(
@@ -141,8 +190,36 @@ class AnnouncementDetailSheet extends StatelessWidget {
                   ),
                 ),
               ],
-              if (canOpen) ...[
+              if (event != null) ...[
                 const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: const Key('announcement-event'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.kc.onBg,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                      ),
+                    ),
+                    onPressed: () {
+                      final router = GoRouter.of(context);
+                      Navigator.of(context).pop();
+                      unawaited(
+                        router.push(
+                          '/events/${Uri.encodeComponent(event.id)}',
+                          extra: event,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.event_rounded, size: 18),
+                    label: const Text('View event'),
+                  ),
+                ),
+              ],
+              if (uri != null) ...[
+                SizedBox(height: event != null ? 10 : 22),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(

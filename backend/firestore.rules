@@ -165,7 +165,7 @@ service cloud.firestore {
                     && (!('linkUrl' in request.resource.data)
                         || request.resource.data.linkUrl == null
                         || (request.resource.data.linkUrl is string
-                            && request.resource.data.linkUrl.matches('https?://.+')));
+                            && request.resource.data.linkUrl.matches('[Hh][Tt][Tt][Pp][Ss]?://.+')));
       allow delete: if isAdmin();
     }
 

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kharis_app/features/messages/data/curation_repository.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -169,6 +172,61 @@ void main() {
         isNot(contains('doc0')),
       );
     });
+
+    test('pinned: nothing shows until the starred docs arrive, so auto picks '
+        'never flash first', () async {
+      final starred = StreamController<List<Sermon>>();
+      addTearDown(starred.close);
+      final container = ProviderContainer(
+        overrides: [
+          featuredModeProvider.overrideWith(
+            (ref) => Stream.value(FeaturedMode.pinned),
+          ),
+          pinnedFeaturedProvider.overrideWith((ref) => starred.stream),
+          sermonRepositoryProvider.overrideWithValue(
+            FakePagedSermonRepository([archive()]),
+          ),
+          sermonArchiveAutoHydrateProvider.overrideWithValue(false),
+          cmsSermonsProvider.overrideWith(
+            (ref) => Stream.value(const <Sermon>[]),
+          ),
+          videosProvider.overrideWith((ref) async => feed()),
+        ],
+      );
+      addTearDown(container.dispose);
+      final shown = <List<String>>[];
+      container.listen(
+        featuredSermonsProvider,
+        (_, next) => shown.add([for (final s in next) s.id]),
+        fireImmediately: true,
+      );
+      await container.read(sermonLibraryProvider.notifier).firstLoad;
+      await container.read(videosProvider.future);
+      for (var i = 0; i < 50; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(container.read(featuredSermonsProvider), isEmpty);
+
+      starred.add([
+        testSermon(
+          'doc1',
+          audioUrl: '',
+          publishedAt: DateTime(2026, 9, 1),
+          source: 'youtube',
+        ),
+      ]);
+      for (var i = 0; i < 50; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(container.read(featuredSermonsProvider).map((s) => s.id), [
+        'doc1',
+      ]);
+      expect(
+        shown.where((ids) => ids.isNotEmpty && !ids.contains('doc1')),
+        isEmpty,
+        reason: 'only the pinned card may ever be shown: $shown',
+      );
+    });
   });
 
   group('Message of the Day (contract 2)', () {
@@ -256,6 +314,39 @@ void main() {
         dailyMotdPick(library.reversed.toList(), today)!.id,
         dailyMotdPick(library, today)!.id,
       );
+    });
+
+    test('a same-day upload does not change the automatic pick', () {
+      final library = archive();
+      for (var d = 1; d <= 31; d++) {
+        final date = DateTime(2026, 10, d);
+        final upload = testSermon(
+          'new$d',
+          publishedAt: DateTime(2026, 10, d, 9, 30),
+        );
+        expect(
+          dailyMotdPick([...library, upload], date)!.id,
+          dailyMotdPick(library, date)!.id,
+          reason: 'pick for ${motdDateKey(date)} must hold all day',
+        );
+      }
+    });
+
+    test('the automatic pick hashes over ids, not publish order', () {
+      // The same messages with their dates shuffled: only the set of ids in
+      // the window decides the pick.
+      final a = [
+        for (var i = 0; i < 12; i++)
+          testSermon('m$i', publishedAt: DateTime(2026, 9, 1 + i)),
+      ];
+      final b = [
+        for (var i = 0; i < 12; i++)
+          testSermon('m$i', publishedAt: DateTime(2026, 9, 25 - i)),
+      ];
+      for (var d = 1; d <= 10; d++) {
+        final date = DateTime(2026, 10, d);
+        expect(dailyMotdPick(b, date)!.id, dailyMotdPick(a, date)!.id);
+      }
     });
   });
 }

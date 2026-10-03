@@ -10,6 +10,7 @@ import 'package:kharis_app/features/admin/data/london_time.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/features/messages/data/curation_repository.dart';
 
 /// The getEvents API is unreachable, so the Firestore path is what is tested.
 class _OfflineAdapter implements HttpClientAdapter {

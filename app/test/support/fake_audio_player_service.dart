@@ -33,6 +33,9 @@ class FakeAudioPlayerService implements AudioPlayerService {
   /// What [play] reports; set false to simulate a failed load.
   bool playResult = true;
 
+  /// When set, [play] does not return until this completes: a slow load.
+  Future<void>? playGate;
+
   /// Live position reported to callers ([position]).
   Duration positionValue = Duration.zero;
 
@@ -108,6 +111,8 @@ class FakeAudioPlayerService implements AudioPlayerService {
     current = sermon;
     _setQueue(PlaybackQueue.from(sermon, queue));
     if (startAt != null) positionValue = startAt;
+    final gate = playGate;
+    if (gate != null) await gate;
     return true;
   }
 

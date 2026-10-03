@@ -59,7 +59,8 @@ function effectiveEndMs(data: EventDoc): number {
  * (upcoming: soonest first; past: most recent first), capped at [limit].
  *
  * Past-ness is decided by the effective END, exactly as the app does: an
- * event that has started but not finished stays upcoming.
+ * event that has started but not finished stays upcoming. Hidden docs
+ * (tombstones of deleted website events) are never returned.
  *
  * [branchDocs] hold the window's docs whose `branch` equals [branch];
  * [anyDocs] the window's docs of every campus, from which the all-campus ones
@@ -76,7 +77,9 @@ export function pickEvents(
   nowMs: number,
 ): EventJson[] {
   const inView = (r: EventRecord) =>
-    r.data.startTime instanceof Timestamp && (effectiveEndMs(r.data) < nowMs) === past;
+    r.data.hidden !== true &&
+    r.data.startTime instanceof Timestamp &&
+    (effectiveEndMs(r.data) < nowMs) === past;
 
   const candidates = branch
     ? [...branchDocs, ...anyDocs.filter((r) => isAllCampus(r.data))]

@@ -61,16 +61,19 @@ void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  Future<(FakeFirebaseFirestore, NewsItem)> seeded() async {
+  Future<(FakeFirebaseFirestore, NewsItem)> seeded({
+    String? eventId,
+    String? linkUrl = 'https://kharis.org/choir',
+  }) async {
     final db = FakeFirebaseFirestore();
     await db.collection('news').doc('n1').set({
       'title': 'Choir auditions',
       'type': 'Notice',
       'publishedAt': Timestamp.fromDate(_published),
       'expiresAt': Timestamp.fromDate(_expires),
-      'eventId': 'ev1',
-      'linkUrl': 'https://kharis.org/choir',
-      'ctaLabel': 'Sign up',
+      'eventId': eventId,
+      'linkUrl': linkUrl,
+      'ctaLabel': linkUrl == null ? null : 'Sign up',
     });
     final item = NewsItem(
       id: 'n1',
@@ -78,30 +81,28 @@ void main() {
       type: 'Notice',
       publishedAt: _published,
       expiresAt: _expires,
-      eventId: 'ev1',
-      linkUrl: 'https://kharis.org/choir',
-      ctaLabel: 'Sign up',
+      eventId: eventId,
+      linkUrl: linkUrl,
+      ctaLabel: linkUrl == null ? null : 'Sign up',
     );
     return (db, item);
   }
+
+  AnnouncementFormSheet sheetFor(FakeFirebaseFirestore db, NewsItem item) =>
+      AnnouncementFormSheet(
+        item: item,
+        scopeBranch: 'London',
+        repo: NewsRepository(firestore: db),
+        onSuccess: (_) {},
+        onError: (_) {},
+      );
 
   testWidgets(
     'editing an all-campus announcement from a branch page keeps its scope, '
     'publish time, expiry and link',
     (tester) async {
       final (db, item) = await seeded();
-      await _open(
-        tester,
-        AnnouncementFormSheet(
-          item: item,
-          scopeBranch: 'London',
-          repo: NewsRepository(firestore: db),
-          onSuccess: (_) {},
-          onError: (_) {},
-        ),
-      );
-
-      expect(find.text('Harvest Sunday · Mon 12 Oct'), findsOneWidget);
+      await _open(tester, sheetFor(db, item));
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Choir auditions'),
@@ -114,24 +115,74 @@ void main() {
       expect(data['branch'], isNull);
       expect((data['publishedAt'] as Timestamp).toDate().toUtc(), _published);
       expect((data['expiresAt'] as Timestamp).toDate().toUtc(), _expires);
-      expect(data['eventId'], 'ev1');
+      expect(data['eventId'], isNull);
       expect(data['linkUrl'], 'https://kharis.org/choir');
       expect(data['ctaLabel'], 'Sign up');
     },
   );
 
+  testWidgets('an event-linked announcement keeps its event', (tester) async {
+    final (db, item) = await seeded(eventId: 'ev1', linkUrl: null);
+    await _open(tester, sheetFor(db, item));
+
+    expect(find.text('Harvest Sunday · Mon 12 Oct'), findsOneWidget);
+    await _save(tester);
+
+    final data = (await db.collection('news').doc('n1').get()).data()!;
+    expect(data['eventId'], 'ev1');
+    expect(data['linkUrl'], isNull);
+  });
+
+  testWidgets('a linked event and a button link together block the save', (
+    tester,
+  ) async {
+    // Legacy data written before the two were exclusive.
+    final (db, item) = await seeded(eventId: 'ev1');
+    await _open(tester, sheetFor(db, item));
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Choir auditions'),
+      'Choir auditions this Sunday',
+    );
+    await _save(tester);
+
+    expect(
+      find.text('Choose a linked event or a button link, not both'),
+      findsOneWidget,
+    );
+    final data = (await db.collection('news').doc('n1').get()).data()!;
+    expect(data['title'], 'Choir auditions');
+  });
+
+  testWidgets('an upper-case scheme is stored lower-case', (tester) async {
+    final (db, item) = await seeded();
+    await _open(tester, sheetFor(db, item));
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'https://kharis.org/choir'),
+      ' HTTPS://kharis.org/Choir ',
+    );
+    await _save(tester);
+
+    final data = (await db.collection('news').doc('n1').get()).data()!;
+    expect(data['linkUrl'], 'https://kharis.org/Choir');
+  });
+
+  test('the stored link always matches the news rule', () {
+    // Mirrors `linkUrl.matches(...)` in backend/firestore.rules.
+    final rule = RegExp(r'^[Hh][Tt][Tt][Pp][Ss]?://.+$');
+    for (final raw in ['HTTPS://a.org', 'Http://a.org/x', 'https://a.org']) {
+      expect(validateAnnouncementLink(raw), isNull);
+      final stored = normaliseAnnouncementLink(raw);
+      expect(stored, matches(RegExp('^https?://')));
+      expect(rule.hasMatch(stored), isTrue);
+    }
+    expect(normaliseAnnouncementLink(''), '');
+  });
+
   testWidgets('a button link without http(s) blocks the save', (tester) async {
     final (db, item) = await seeded();
-    await _open(
-      tester,
-      AnnouncementFormSheet(
-        item: item,
-        scopeBranch: 'London',
-        repo: NewsRepository(firestore: db),
-        onSuccess: (_) {},
-        onError: (_) {},
-      ),
-    );
+    await _open(tester, sheetFor(db, item));
 
     await tester.enterText(
       find.widgetWithText(TextFormField, 'https://kharis.org/choir'),

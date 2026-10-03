@@ -24,7 +24,10 @@ import { slugifyBranch } from './topics';
  * Idempotent: doc ids are derived from the WordPress post id (plus the repeat
  * index for repeating events), unchanged events are not rewritten, and a site
  * event that disappears is deleted only if it was still upcoming. An admin's
- * branch, banner image and featured flag survive every re-sync.
+ * branch, banner image and featured flag survive every re-sync, and so does a
+ * Studio delete: it leaves a `hidden: true` tombstone (deleting the doc would
+ * only have it recreated next hour) that the sync never rewrites and every
+ * reader filters out.
  */
 
 const SITE = 'https://kharis.org';
@@ -229,20 +232,88 @@ export function changedFields(stored: DocumentData, fields: DocumentData): Docum
   return changed;
 }
 
-async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+/** What the sync does to one occurrence's `events` doc. */
+export type WebEventWrite =
+  | { kind: 'create' }
+  | { kind: 'update'; changed: DocumentData }
+  | { kind: 'keep' };
+
+/**
+ * Create a missing doc, rewrite the site fields that changed, or leave it.
+ * A hidden doc is an admin's delete and is never touched: rewriting it would
+ * fire the event-change push for an event the admin removed.
+ */
+export function webEventWrite(
+  stored: DocumentData | undefined,
+  fields: DocumentData,
+): WebEventWrite {
+  if (stored === undefined) return { kind: 'create' };
+  if (stored.hidden === true) return { kind: 'keep' };
+  const changed = changedFields(stored, fields);
+  return Object.keys(changed).length === 0 ? { kind: 'keep' } : { kind: 'update', changed };
+}
+
+async function request(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, {
     ...init,
     headers: { 'User-Agent': USER_AGENT, Accept: 'application/json', ...init?.headers },
   });
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
-  return (await res.json()) as T;
+  return res;
 }
 
-interface WpEvent {
+async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+  return (await (await request(url, init)).json()) as T;
+}
+
+/**
+ * Every page of a WordPress REST collection ([url] already has a query
+ * string). A page cap of `per_page=100` silently drops the rest, so the
+ * `X-WP-TotalPages` header is followed to the end.
+ */
+export async function getAllPages<T>(url: string): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; ; page++) {
+    const res = await request(`${url}&page=${page}`);
+    items.push(...((await res.json()) as T[]));
+    const totalPages = Number(res.headers.get('x-wp-totalpages') ?? '1');
+    if (!(page < totalPages)) return items;
+  }
+}
+
+/** WordPress allows at most this many ids in one `include=` page. */
+const WP_PAGE_SIZE = 100;
+
+export interface WpEvent {
   id: number;
   link?: string;
   event_type?: number[];
   content?: { rendered?: string };
+}
+
+/**
+ * Campuses for one occurrence, or why it must be skipped. An occurrence
+ * whose post the REST API did not return, or whose `event_type` ids it could
+ * not name, has unknown campuses: importing it as all-campus would push it to
+ * every member in the church.
+ */
+export function eventCampuses(
+  post: WpEvent | undefined,
+  termName: Record<number, string>,
+  branchNames: string[],
+): { campuses: Array<string | null>; skip: string | null } {
+  if (!post) return { campuses: [], skip: 'post not returned by the REST API' };
+  const ids = post.event_type ?? [];
+  const unresolved = ids.filter((id) => termName[id] === undefined);
+  if (unresolved.length > 0) {
+    return { campuses: [], skip: `unresolved event_type ${unresolved.join(', ')}` };
+  }
+  const { campuses, unknown } = campusesFor(
+    ids.map((id) => termName[id]),
+    branchNames,
+  );
+  if (unknown.length > 0) return { campuses: [], skip: `unknown campus ${unknown.join(', ')}` };
+  return { campuses, skip: null };
 }
 
 export const syncWebsiteEvents = onSchedule(
@@ -280,22 +351,28 @@ export const syncWebsiteEvents = onSchedule(
     }
 
     const wpIds = [...new Set(occurrences.map((e) => e.wpId))];
-    const [terms, posts, branchSnap] = await Promise.all([
-      getJson<Array<{ id: number; name: string }>>(
-        `${REST}/event_type?per_page=100&_fields=id,name`,
+    const idPages: number[][] = [];
+    for (let i = 0; i < wpIds.length; i += WP_PAGE_SIZE) {
+      idPages.push(wpIds.slice(i, i + WP_PAGE_SIZE));
+    }
+    const [terms, postPages, branchSnap] = await Promise.all([
+      getAllPages<{ id: number; name: string }>(
+        `${REST}/event_type?per_page=${WP_PAGE_SIZE}&_fields=id,name`,
       ),
-      wpIds.length === 0
-        ? Promise.resolve([] as WpEvent[])
-        : getJson<WpEvent[]>(
-            `${REST}/ajde_events?per_page=100&include=${wpIds.join(',')}` +
+      Promise.all(
+        idPages.map((ids) =>
+          getAllPages<WpEvent>(
+            `${REST}/ajde_events?per_page=${WP_PAGE_SIZE}&include=${ids.join(',')}` +
               '&_fields=id,link,event_type,content',
           ),
+        ),
+      ),
       db.collection('branches').get(),
     ]);
     const termName: Record<number, string> = {};
     for (const term of terms) termName[term.id] = term.name;
     const postById: Record<number, WpEvent> = {};
-    for (const post of posts) postById[post.id] = post;
+    for (const post of postPages.flat()) postById[post.id] = post;
     const branchNames = branchSnap.docs
       .map((d) => (d.data().name ?? '').toString())
       .filter((n) => n.trim());
@@ -306,10 +383,9 @@ export const syncWebsiteEvents = onSchedule(
     let skipped = 0;
     for (const event of occurrences) {
       const post = postById[event.wpId];
-      const names = (post?.event_type ?? []).map((id) => termName[id]).filter(Boolean);
-      const { campuses, unknown } = campusesFor(names, branchNames);
-      if (unknown.length > 0) {
-        console.warn(`[web-events] skip ${event.wpId}: unknown campus ${unknown.join(', ')}`);
+      const { campuses, skip } = eventCampuses(post, termName, branchNames);
+      if (skip !== null) {
+        console.warn(`[web-events] skip ${event.wpId}: ${skip}`);
         skipped++;
         continue;
       }
@@ -321,7 +397,9 @@ export const syncWebsiteEvents = onSchedule(
         seen.add(id);
         const ref = db.collection('events').doc(id);
         const snap = await ref.get();
-        if (!snap.exists) {
+        // branch, imageUrl and isFeatured are the admin's to change.
+        const write = webEventWrite(snap.exists ? snap.data() ?? {} : undefined, fields);
+        if (write.kind === 'create') {
           await ref.set({
             ...fields,
             branch: campus,
@@ -331,13 +409,10 @@ export const syncWebsiteEvents = onSchedule(
             syncedAt: FieldValue.serverTimestamp(),
           });
           created++;
-          continue;
+        } else if (write.kind === 'update') {
+          await ref.update({ ...write.changed, syncedAt: FieldValue.serverTimestamp() });
+          updated++;
         }
-        // branch, imageUrl and isFeatured are the admin's to change.
-        const changed = changedFields(snap.data() ?? {}, fields);
-        if (Object.keys(changed).length === 0) continue;
-        await ref.update({ ...changed, syncedAt: FieldValue.serverTimestamp() });
-        updated++;
       }
     }
 

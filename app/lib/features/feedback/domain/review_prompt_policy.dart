@@ -30,6 +30,7 @@ class ReviewPromptState {
     this.sheetAutoShows = 0,
     this.lastNativeAt,
     this.nativeRequests = 0,
+    this.optedOut = false,
   });
 
   /// First launch that recorded engagement. Null until the first launch.
@@ -50,7 +51,12 @@ class ReviewPromptState {
   final DateTime? lastNativeAt;
   final int nativeRequests;
 
-  bool get sheetOptedOut => lastSheetOutcome == FeedbackSheetOutcome.optOut;
+  /// "Don't ask again" was chosen at some point. Sticky: a later send from
+  /// Settings updates [lastSheetOutcome] but never clears this.
+  final bool optedOut;
+
+  bool get sheetOptedOut =>
+      optedOut || lastSheetOutcome == FeedbackSheetOutcome.optOut;
 }
 
 /// Decides when to ask. Pure, so every threshold is unit-testable.

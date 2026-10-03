@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -100,6 +101,16 @@ void main() {
   test('requests a larger artwork width than the default 256', () async {
     final s = ((await repo().fetchPage()).sermons).first;
     expect(s.artworkUrl, contains('width=512'));
+  });
+
+  test('a page maps in a background isolate: records and sermons cross the '
+      'isolate boundary intact', () async {
+    final results = _fixture['results']! as List;
+    final offThread = await Isolate.run(() => mapApiSermons(results));
+    expect(offThread, [
+      for (final r in results) mapApiSermon(r as Map<String, dynamic>),
+    ]);
+    expect((await repo().fetchPage()).sermons, offThread);
   });
 
   // ── Pagination ─────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,8 @@ import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_shee
 import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/data/playback_queue.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
+import 'package:kharis_app/features/player/presentation/widgets/like_button.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
 import 'package:kharis_app/features/playlists/presentation/screens/playlist_detail_screen.dart';
@@ -209,12 +212,22 @@ void main() {
       await videoPositions.close();
     });
 
-    Future<void> open(WidgetTester tester, MediaMode mode) async {
+    Future<void> open(
+      WidgetTester tester,
+      MediaMode mode, {
+      Sermon? sermon,
+      List<Sermon>? queue,
+      List<Sermon> library = const [],
+    }) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: overrides(),
+          overrides: overrides(library: library),
           child: MaterialApp(
-            home: MediaPlayerScreen(sermon: both, mode: mode),
+            home: MediaPlayerScreen(
+              sermon: sermon ?? both,
+              mode: mode,
+              queue: queue,
+            ),
           ),
         ),
       );
@@ -289,6 +302,175 @@ void main() {
         const Duration(seconds: 23),
       );
     });
+
+    group('full-service video (videoStart 8:07)', () {
+      // Like API sermon 101897: the mp3 starts 487 s into the service video.
+      final service = _sermon(
+        7,
+        videoId: 'vid7',
+      ).copyWith(videoStart: const Duration(seconds: 487));
+
+      testWidgets('a fresh video opens where the message begins', (
+        tester,
+      ) async {
+        await open(tester, MediaMode.video, sermon: service);
+        expect(
+          MediaPlayerScreen.debugLastVideoStart,
+          const Duration(minutes: 8, seconds: 7),
+        );
+      });
+
+      testWidgets('audio 10:00 -> video opens at 18:07', (tester) async {
+        await audio.play(service);
+        audio.positionValue = const Duration(minutes: 10);
+        await open(tester, MediaMode.audio, sermon: service);
+
+        await tapChip(tester, 'Video');
+
+        expect(
+          MediaPlayerScreen.debugLastVideoStart,
+          const Duration(minutes: 18, seconds: 7),
+        );
+      });
+
+      testWidgets('video 30:00 -> audio starts at 21:53', (tester) async {
+        await open(tester, MediaMode.video, sermon: service);
+        videoPositions.add(const Duration(minutes: 30));
+        await tester.pump();
+
+        await tapChip(tester, 'Audio');
+
+        expect(
+          audio.calls.last.startAt,
+          const Duration(minutes: 21, seconds: 53),
+        );
+      });
+
+      testWidgets(
+        'video saves land on the audio timeline: resume, Continue listening '
+        'and the next video open all agree',
+        (tester) async {
+          final timed = service.copyWith(duration: const Duration(minutes: 40));
+          await open(tester, MediaMode.video, sermon: timed);
+          videoPositions.add(const Duration(minutes: 30));
+          await tester.pump();
+          await tester.pumpWidget(const SizedBox());
+
+          const audioPoint = Duration(minutes: 21, seconds: 53);
+          final history = PlaybackHistory(cache);
+          expect(cache.positions['s7'], audioPoint.inMilliseconds);
+          expect(cache.positions['yt_vid7'], audioPoint.inMilliseconds);
+          expect(history.resumePoint(timed), audioPoint);
+          final unfinished = history.lastUnfinished();
+          expect(unfinished?.position, audioPoint);
+          expect(unfinished?.duration, const Duration(minutes: 40));
+
+          await open(tester, MediaMode.video, sermon: timed);
+          expect(
+            MediaPlayerScreen.debugLastVideoStart,
+            const Duration(minutes: 30),
+          );
+        },
+      );
+
+      testWidgets('a note taken in video is stamped on the audio timeline', (
+        tester,
+      ) async {
+        await open(tester, MediaMode.video, sermon: service);
+        final binding = tester
+            .widget<PlayerActions>(find.byType(PlayerActions))
+            .timeline!;
+        final stamped = binding.position!.first;
+        videoPositions.add(const Duration(minutes: 30));
+        expect(await stamped, const Duration(minutes: 21, seconds: 53));
+      });
+    });
+
+    testWidgets('a finished video is not written back by a later save', (
+      tester,
+    ) async {
+      final values = StreamController<YoutubePlayerValue>.broadcast();
+      MediaPlayerScreen.debugVideoValues = values.stream;
+      addTearDown(() async {
+        MediaPlayerScreen.debugVideoValues = null;
+        await values.close();
+      });
+      // duration unknown (a CMS doc whose length fetch failed): the end
+      // guard cannot catch a written-back final tick.
+      await open(tester, MediaMode.video);
+      videoPositions.add(const Duration(minutes: 39, seconds: 50));
+      await tester.pump();
+      values.add(YoutubePlayerValue(playerState: PlayerState.ended));
+      await tester.pump();
+
+      // Close: dispose flushes the video position.
+      await tester.pumpWidget(const SizedBox());
+
+      expect(cache.positions['s5'], 0);
+      expect(PlaybackHistory(cache).lastUnfinished(), isNull);
+    });
+
+    testWidgets('Video stays tappable while the audio load is still running', (
+      tester,
+    ) async {
+      final load = Completer<void>();
+      audio.playGate = load.future;
+      addTearDown(load.complete);
+      await open(tester, MediaMode.video);
+      expect(audio.stopCalls, 1);
+
+      await tapChip(tester, 'Audio');
+      expect(audio.calls, hasLength(1), reason: 'audio load in flight');
+      MediaPlayerScreen.debugLastVideoStart = null;
+
+      await tapChip(tester, 'Video');
+
+      expect(audio.stopCalls, 2, reason: 'switched back to video');
+      expect(MediaPlayerScreen.debugLastVideoStart, isNotNull);
+    });
+
+    testWidgets(
+      'a video variant switched to its audio twin keeps the launch queue',
+      (tester) async {
+        final twin = _sermon(2, videoId: 'v2');
+        const variant = Sermon(
+          id: 'yt_v2',
+          title: 'Message 2',
+          speaker: 'Pastor A',
+          audioUrl: '',
+          videoId: 'v2',
+          source: 'youtube',
+        );
+        final videoOnly = _sermon(9, audio: false, videoId: 'v9');
+        await open(
+          tester,
+          MediaMode.video,
+          sermon: variant,
+          queue: [_library[0], variant, videoOnly, _library[2]],
+          library: [_library[0], twin, _library[2]],
+        );
+        await tester.pump();
+
+        await tapChip(tester, 'Audio');
+
+        final call = audio.calls.last;
+        expect(call.sermon.id, 's2');
+        expect(call.queue?.map((s) => s.id), ['s1', 's2', 's9', 's3']);
+        expect(audio.queue?.previous?.id, 's1');
+        expect(audio.queue?.next?.id, 's3');
+
+        // Back to video and audio again: the video-only entry survived the
+        // audio engine's filtered queue.
+        await tapChip(tester, 'Video');
+        await tapChip(tester, 'Audio');
+        expect(audio.calls.last.queue?.map((s) => s.id), [
+          's1',
+          's2',
+          's9',
+          's3',
+        ]);
+      },
+    );
   });
 
   group('video errors', () {
@@ -473,6 +655,127 @@ void main() {
       await pumpEventQueue();
       expect((await doc.get()).data()?['sermonIds'], ['s2']);
     });
+
+    test(
+      'a first like on a lagging snapshot adds to the stored list instead of '
+      'replacing it; unlike clears every id the message was liked under',
+      () async {
+        final db = FakeFirebaseFirestore();
+        final repo = PlaylistRepository(db, uid: 'm1');
+        final doc = db
+            .collection('users')
+            .doc('m1')
+            .collection('playlists')
+            .doc(PlaylistRepository.likedPlaylistId);
+        final now = Timestamp.now();
+        await doc.set({
+          'name': 'Liked messages',
+          'sermonIds': ['s1', 's2'],
+          'createdAt': now,
+          'updatedAt': now,
+        });
+
+        repo.setLiked('yt_v3', liked: true, playlistExists: false);
+        await pumpEventQueue();
+        expect((await doc.get()).data()?['sermonIds'], ['s1', 's2', 'yt_v3']);
+
+        repo.setLiked(
+          'yt_v1',
+          liked: false,
+          playlistExists: true,
+          aliases: ['s1'],
+        );
+        await pumpEventQueue();
+        expect((await doc.get()).data()?['sermonIds'], ['s2', 'yt_v3']);
+      },
+    );
+
+    testWidgets(
+      'the heart waits for the playlists snapshot, then likes the message '
+      'under its canonical key',
+      (tester) async {
+        final db = FakeFirebaseFirestore();
+        final repo = PlaylistRepository(db, uid: 'm1');
+        final doc = db
+            .collection('users')
+            .doc('m1')
+            .collection('playlists')
+            .doc(PlaylistRepository.likedPlaylistId);
+        final liked = Playlist(
+          id: PlaylistRepository.likedPlaylistId,
+          name: 'Liked messages',
+          sermonIds: const ['s1'],
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        );
+        await tester.runAsync(
+          () => doc.set({
+            'name': liked.name,
+            'sermonIds': liked.sermonIds,
+            'createdAt': Timestamp.now(),
+            'updatedAt': Timestamp.now(),
+          }),
+        );
+        // Cold start: the stream has not delivered its first snapshot.
+        final snapshots = StreamController<List<Playlist>>();
+        addTearDown(snapshots.close);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              playlistRepositoryProvider.overrideWithValue(repo),
+              playlistsProvider.overrideWith((ref) => snapshots.stream),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
+                body: LikeButton(sermon: _sermon(2, videoId: 'v2')),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+        await tester.pump();
+        await tester.runAsync(pumpEventQueue);
+        expect(
+          find.text('Your playlists are still loading. Try again in a moment.'),
+          findsOneWidget,
+        );
+        final untouched = await tester.runAsync(doc.get);
+        expect(untouched?.data()?['sermonIds'], ['s1']);
+
+        snapshots.add([liked]);
+        await tester.pump();
+        await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+        await tester.runAsync(pumpEventQueue);
+        final after = await tester.runAsync(doc.get);
+        expect(after?.data()?['sermonIds'], ['s1', 'yt_v2']);
+      },
+    );
+
+    testWidgets('the heart stays filled across the audio <-> video swap', (
+      tester,
+    ) async {
+      // Liked while watching the yt_ variant; the toggle swaps in the twin.
+      final liked = Playlist(
+        id: PlaylistRepository.likedPlaylistId,
+        name: 'Liked messages',
+        sermonIds: const ['yt_v2'],
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: overrides(playlists: [liked]),
+          child: MaterialApp(
+            home: Scaffold(
+              body: LikeButton(sermon: _sermon(2, videoId: 'v2')),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    });
   });
 
   // ── Notes ───────────────────────────────────────────────────────────────────
@@ -576,6 +879,54 @@ void main() {
   // ── Continue listening ──────────────────────────────────────────────────────
 
   group('Continue listening', () {
+    test('one Recently played row per message across its variants', () {
+      final api = _sermon(7, videoId: 'v7');
+      const variant = Sermon(
+        id: 'yt_v7',
+        title: 'Message 7',
+        speaker: 'Pastor A',
+        audioUrl: '',
+        videoId: 'v7',
+        source: 'youtube',
+      );
+      final history = PlaybackHistory(cache)
+        ..recordPlay(api)
+        ..recordPlay(_sermon(1))
+        ..recordPlay(variant);
+      expect(cache.getRecentlyPlayed(), ['yt_v7', 's1']);
+      expect(history.snapshots().map((s) => s.id), ['yt_v7', 's1']);
+
+      history.recordPlay(api);
+      expect(cache.getRecentlyPlayed(), ['s7', 's1']);
+      expect(history.snapshots().map((s) => s.id), ['s7', 's1']);
+    });
+
+    test('the live stream is never recorded, saved or resumed', () {
+      const live = Sermon(
+        id: 'live',
+        title: 'Live Stream',
+        speaker: 'Kharis Church',
+        audioUrl: '',
+        videoId: 'liveA',
+        source: 'youtube',
+      );
+      final history = PlaybackHistory(cache)
+        ..recordPlay(live)
+        ..savePosition(live, const Duration(minutes: 20));
+      expect(cache.getRecentlyPlayed(), isEmpty);
+      expect(history.snapshots(), isEmpty);
+      expect(cache.positions, isEmpty);
+
+      // A point left under the fixed id by an older build must not open the
+      // next stream mid-way.
+      cache.cachePlaybackPosition(
+        'live',
+        const Duration(minutes: 9).inMilliseconds,
+      );
+      expect(history.resumePoint(live.copyWith(videoId: 'liveB')), isNull);
+      expect(history.lastUnfinished(), isNull);
+    });
+
     test('picks the newest unfinished message, skipping finished ones', () {
       final history = PlaybackHistory(cache);
       final older = _sermon(1).copyWith(duration: const Duration(minutes: 40));

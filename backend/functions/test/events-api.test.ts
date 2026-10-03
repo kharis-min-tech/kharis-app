@@ -37,6 +37,14 @@ test('no branch returns every campus', () => {
   assert.deepEqual(ids(pickEvents(undefined, [], docs, false, 50, NOW)), ['a', 'b']);
 });
 
+test('hidden tombstones of deleted website events are never served', () => {
+  const gone = ev('web_1', 1, { hidden: true, branch: 'Chatham' });
+  const goneAll = ev('web_2', 2, { hidden: true });
+  const kept = ev('web_3', 3);
+  assert.deepEqual(ids(pickEvents('Chatham', [gone], [gone, goneAll, kept], false, 50, NOW)), ['web_3']);
+  assert.deepEqual(ids(pickEvents(undefined, [], [gone, goneAll, kept], false, 50, NOW)), ['web_3']);
+});
+
 test('upcoming keeps an event that started but has not finished', () => {
   const running = ev('running', -2, { endH: 1 });
   const over = ev('over', -3, { endH: -1 });

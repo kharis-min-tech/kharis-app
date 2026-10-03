@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/features/admin/data/content_config_repository.dart';
+import 'package:kharis_app/features/messages/data/curation_repository.dart'
+    show FeaturedMode;
 
 export 'package:kharis_app/features/admin/data/content_config_repository.dart';
 

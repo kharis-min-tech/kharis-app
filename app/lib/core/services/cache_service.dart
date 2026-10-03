@@ -152,6 +152,13 @@ class CacheService implements SermonArchiveStore {
     _preferencesBox.put(_recentlyPlayedKey, jsonEncode(list));
   }
 
+  /// Drops [sermonId] from the recently played list, if present.
+  void removeRecentlyPlayed(String sermonId) {
+    final list = getRecentlyPlayed();
+    if (!list.remove(sermonId)) return;
+    _preferencesBox.put(_recentlyPlayedKey, jsonEncode(list));
+  }
+
   List<String> getRecentlyPlayed() {
     final raw = _preferencesBox.get(_recentlyPlayedKey);
     if (raw == null) return [];

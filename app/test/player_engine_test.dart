@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
@@ -115,6 +117,60 @@ void main() {
     expect(again, isTrue);
     expect(native().loads, hasLength(1), reason: 'no second load');
     expect(native().playing, isTrue, reason: 'paused playback resumes');
+  });
+
+  group('a request aimed at a message still loading', () {
+    // just_audio drops seeks while loading, so these used to land nowhere.
+
+    /// Starts [target] with its load held open on an already-active native
+    /// player (the first activation is serialised by just_audio itself).
+    Future<(Future<bool>, Completer<void>)> loadHeld(Sermon target) async {
+      await service.play(library[4]);
+      await settle();
+      final gate = Completer<void>();
+      platform.holdNextLoad = gate.future;
+      final pending = service.play(target, queue: library);
+      await settle();
+      expect(native().loads, hasLength(2), reason: 'second load still held');
+      return (pending, gate);
+    }
+
+    test('startAt reloads at that point instead of being dropped', () async {
+      final (first, gate) = await loadHeld(library[1]);
+
+      final started = await service.play(
+        library[1],
+        startAt: const Duration(minutes: 5),
+        queue: library,
+      );
+      gate.complete();
+      await first;
+      await settle();
+
+      expect(started, isTrue);
+      expect(native().loads, hasLength(3), reason: 'a fresh load, not a seek');
+      expect(native().loads.last.initialPosition, const Duration(minutes: 5));
+      expect(native().position, const Duration(minutes: 5));
+    });
+
+    test('Next moves to the next message', () async {
+      final (first, gate) = await loadHeld(library[1]);
+
+      await service.skipToNext();
+      gate.complete();
+      await first;
+      await settle();
+
+      expect(service.currentSermon?.id, 's3');
+      expect(service.queue!.index, 2);
+      final window =
+          native().loads.last.audioSourceMessage
+              as ConcatenatingAudioSourceMessage;
+      expect(
+        (window.children[native().index!] as UriAudioSourceMessage).uri,
+        library[2].audioUrl,
+      );
+    });
   });
 
   test(

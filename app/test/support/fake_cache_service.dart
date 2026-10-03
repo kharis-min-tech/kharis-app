@@ -39,6 +39,9 @@ class FakeCacheService implements CacheService {
   }
 
   @override
+  void removeRecentlyPlayed(String sermonId) => recentlyPlayed.remove(sermonId);
+
+  @override
   List<String> getRecentlyPlayed() => List.of(recentlyPlayed);
 
   @override

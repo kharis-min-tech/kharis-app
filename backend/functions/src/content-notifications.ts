@@ -202,9 +202,9 @@ function eventBody(changed: string[], whenWhere: string): string {
  * Sent only to devices that keep the app's Events toggle on (`events` topic)
  * and follow the event's campus.
  *
- * Silent for deletions (nowhere to route a tap), for events without a start
- * time, and for events already in the past — backfilling history must not
- * blast the congregation.
+ * Silent for deletions (nowhere to route a tap), for hidden tombstones of
+ * deleted website events, for events without a start time, and for events
+ * already in the past — backfilling history must not blast the congregation.
  */
 export const onEventWritten = onDocumentWritten(
   { document: 'events/{eventId}', memory: '256MiB', timeoutSeconds: 60 },
@@ -212,6 +212,7 @@ export const onEventWritten = onDocumentWritten(
     const after = event.data?.after;
     if (!after?.exists) return;
     const next = after.data() as DocumentData;
+    if (next.hidden === true) return;
 
     const start = next.startTime;
     if (!(start instanceof Timestamp) || start.toMillis() <= Date.now()) return;

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
-import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -37,16 +36,12 @@ class _NotificationsSettingsScreenState
   }
 
   Future<void> _requestPermission() async {
+    // Taken before the OS sheet opens: the member can leave this screen
+    // while it is up, after which this widget's `ref` is dead. The follow-up
+    // runs on its own provider, so the topics are still re-applied.
     final service = ref.read(notificationServiceProvider);
-    final granted = await service.requestPermission();
-    if (granted) {
-      await service.onPermissionGranted(
-        branch: ref.read(onboardingRepositoryProvider).selectedBranch,
-      );
-      // Re-apply the preference topics iOS refused before permission.
-      ref.invalidate(notificationTopicSyncProvider);
-    }
-    ref.invalidate(notificationPermissionProvider);
+    final onAnswer = ref.read(notificationPermissionAnsweredProvider);
+    await onAnswer(await service.requestPermission());
   }
 
   @override

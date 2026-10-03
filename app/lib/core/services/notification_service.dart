@@ -112,9 +112,12 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
   switch (data['type'] as String?) {
     case 'announcement':
     case 'news':
-      // An announcement about an event opens the event itself.
-      if (eventId != null) return eventDetail(eventId);
+      // The feed opens the announcement, and through it the event it
+      // promotes, falling back to the announcement's own text when that event
+      // is gone. Only a push with no announcement id goes straight to the
+      // event.
       final newsId = id('newsId');
+      if (newsId == null && eventId != null) return eventDetail(eventId);
       return NotificationTarget(
         newsId == null
             ? '/announcements'
@@ -143,13 +146,22 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
 
 /// Opens [target] without leaving a one-page stack: overlays are pushed above
 /// `/home`, tab roots are switched to.
+///
+/// The push waits for the frame after the `go`: `push` stacks onto the
+/// router's current configuration, which only holds `/home` once the router
+/// has processed the `go`. On a cold start (a tap that launched the app) the
+/// router is not even on screen yet, and an immediate push would leave the
+/// overlay alone on the stack with nothing behind it.
 void openNotificationTarget(GoRouter router, NotificationTarget target) {
-  if (target.overlay) {
-    router.go('/home');
-    router.push(target.location);
-  } else {
+  if (!target.overlay) {
     router.go(target.location);
+    return;
   }
+  router.go('/home');
+  final binding = WidgetsBinding.instance;
+  binding.addPostFrameCallback((_) => router.push(target.location));
+  // A go to the current location schedules nothing; make sure a frame comes.
+  binding.ensureVisualUpdate();
 }
 
 class NotificationService {
@@ -166,7 +178,7 @@ class NotificationService {
   /// mandatory `all` topic and token persistence.
   ///
   /// It deliberately does NOT show the OS permission prompt — that waits
-  /// until onboarding is complete (see `notificationPermissionGateProvider`).
+  /// until the member is in the app (see `notificationPermissionGateProvider`).
   /// Handlers are registered before anything that can fail (token, topics),
   /// each step in its own guard, so a `getToken` failure can never leave a
   /// tapped notification unrouted.

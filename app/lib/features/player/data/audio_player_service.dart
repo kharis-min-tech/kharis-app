@@ -464,10 +464,16 @@ class AudioPlayerService {
 
   /// Whether [sermon] is already loaded and healthy, so a new request can
   /// attach to it instead of reloading the source.
+  ///
+  /// A load still in flight does not count: just_audio drops a seek while
+  /// it is loading, so a Next / Previous / `startAt` aimed at it would land
+  /// nowhere. Those requests take the fresh-load path instead, which applies
+  /// the position as the load's initial position and supersedes the old one.
   bool _isLive(Sermon sermon) =>
       _currentSermon?.id == sermon.id &&
       _failure == null &&
       _source != null &&
+      _loadsInFlight == 0 &&
       _player.processingState != ProcessingState.idle;
 
   // ── Playback control ───────────────────────────────────────────────────────

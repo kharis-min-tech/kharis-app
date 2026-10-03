@@ -13,9 +13,15 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 const int kAnnouncementCtaMaxLength = 24;
 
 /// Validates an optional button link: blank, or a full http(s) address.
-String? validateAnnouncementLink(String? value) {
+///
+/// A link is refused while an event is linked ([eventId]): tapping such an
+/// announcement opens the event, so the button would never be reachable.
+String? validateAnnouncementLink(String? value, {String? eventId}) {
   final link = value?.trim() ?? '';
   if (link.isEmpty) return null;
+  if (eventId != null && eventId.trim().isNotEmpty) {
+    return 'Choose a linked event or a button link, not both';
+  }
   final lower = link.toLowerCase();
   if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
     return 'Links must start with http:// or https://';
@@ -24,6 +30,14 @@ String? validateAnnouncementLink(String? value) {
   if (uri == null || uri.host.isEmpty) return 'Enter a full web address';
   return null;
 }
+
+/// [link] trimmed, with its scheme lower-cased. [validateAnnouncementLink]
+/// accepts `HTTPS://x`; storing it as `https://x` keeps it within the `news`
+/// rule and every reader's scheme check.
+String normaliseAnnouncementLink(String link) => link.trim().replaceFirstMapped(
+  RegExp(r'^[A-Za-z][A-Za-z0-9+.-]*:'),
+  (m) => m[0]!.toLowerCase(),
+);
 
 /// `Title · Sat 12 Oct`, the label for a linkable event.
 String linkedEventLabel(Event event) =>
@@ -302,8 +316,13 @@ class _AnnouncementFormSheetState extends ConsumerState<AnnouncementFormSheet> {
           decoration: studioInputDecoration(hint: 'https://...'),
           keyboardType: TextInputType.url,
           textInputAction: TextInputAction.next,
-          validator: validateAnnouncementLink,
+          validator: (v) => validateAnnouncementLink(v, eventId: _eventId),
         ),
+        if (_eventId != null)
+          const StudioHint(
+            'Linked to an event: tapping opens the event. Set Linked event '
+            'to None to use a button link instead.',
+          ),
         const SizedBox(height: AppSpacing.sm),
 
         const StudioFieldLabel('Button label (optional)'),
@@ -477,7 +496,7 @@ class _AnnouncementFormSheetState extends ConsumerState<AnnouncementFormSheet> {
           publishAt: _publishInstant,
           expiresAt: _expiresInstant,
           eventId: _eventId,
-          linkUrl: _linkCtrl.text,
+          linkUrl: normaliseAnnouncementLink(_linkCtrl.text),
           ctaLabel: _ctaCtrl.text,
         );
         widget.onSuccess(
@@ -500,7 +519,7 @@ class _AnnouncementFormSheetState extends ConsumerState<AnnouncementFormSheet> {
           // Always written: unchanged passes the stored value through.
           expiresAt: _expiresInstant,
           eventId: _eventId,
-          linkUrl: _linkCtrl.text,
+          linkUrl: normaliseAnnouncementLink(_linkCtrl.text),
           ctaLabel: _ctaCtrl.text,
         );
         widget.onSuccess('Announcement updated.');

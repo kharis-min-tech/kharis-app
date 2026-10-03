@@ -60,7 +60,10 @@ bool _sameMessage(Sermon a, Sermon b) =>
 ///
 /// Both engines save their position into one shared resume point
 /// ([PlaybackHistory]), so a handoff is exact even when the other engine was
-/// not the last one playing. Previous / Next walk [queue] in both modes; in
+/// not the last one playing. That point lives on the AUDIO timeline: an API
+/// sermon's video is the whole service and its mp3 starts [Sermon.videoStart]
+/// into it, so every position crossing into or out of the video engine is
+/// shifted by that offset. Previous / Next walk [queue] in both modes; in
 /// audio mode the screen follows the audio engine as it moves through it.
 class MediaPlayerScreen extends ConsumerStatefulWidget {
   const MediaPlayerScreen({
@@ -132,11 +135,17 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   bool _wakelockOn = false;
   bool _switching = false;
 
-  /// Last position the video engine reported, kept so a dispose (when the
-  /// bridge is already gone) still saves where the member was.
+  /// Last position the video engine reported (VIDEO timeline), kept so a
+  /// dispose (when the bridge is already gone) still saves where the member
+  /// was. Zero once the video ended, so nothing writes the finished point back.
   Duration _videoPosition = Duration.zero;
   DateTime? _lastVideoSave;
   bool _videoRecorded = false;
+
+  /// Where the message begins inside the running video: [Sermon.videoStart]
+  /// of its audio recording. Set when the engine starts; refreshed in build
+  /// once the library reveals a video-only variant's audio twin.
+  Duration _videoOffset = Duration.zero;
 
   /// Whether the embed ever left "unstarted"; the watchdog's question.
   bool _videoStarted = false;
@@ -176,16 +185,35 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   // ── Engine management ──────────────────────────────────────────────────────
 
-  /// Where video should start: the live audio position when audio is on this
-  /// message, else the shared saved resume point.
+  /// Where [sermon]'s message begins inside its video. The audio recording
+  /// carries the offset (the yt_ CMS variant does not), so the twin wins.
+  Duration _offsetFor(Sermon sermon) =>
+      (_audioTwinOf(sermon) ?? sermon).videoStart ?? Duration.zero;
+
+  /// The saved shared resume point (audio timeline) for [sermon]. Read
+  /// through the audio recording so the end guard compares against the
+  /// audio length, not a whole-service video's.
+  Duration _savedAudioPoint(Sermon sermon) =>
+      _history.resumePoint(_audioTwinOf(sermon) ?? sermon) ?? Duration.zero;
+
+  /// A video-timeline position mapped onto the audio timeline.
+  Duration _toAudio(Duration video) {
+    final audio = video - _videoOffset;
+    return audio.isNegative ? Duration.zero : audio;
+  }
+
+  /// Where video should start (video timeline): the live audio position when
+  /// audio is on this message, else the shared saved resume point — shifted
+  /// to where the message sits in the video. A fresh start therefore opens
+  /// at the message itself in a full-service video.
   Duration _audioHandoff() {
+    final offset = _offsetFor(_sermon);
     final playing = _audio.currentSermon;
     if (playing != null && _sameMessage(playing, _sermon)) {
       final live = _audio.position;
-      if (live > Duration.zero) return live;
+      if (live > Duration.zero) return live + offset;
     }
-    // Fresh start: open where the message begins in a full-service video.
-    return _history.resumePoint(_sermon) ?? _sermon.videoStart ?? Duration.zero;
+    return _savedAudioPoint(_sermon) + offset;
   }
 
   /// Starts audio, unless the service already holds this message healthy —
@@ -200,6 +228,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   void _startVideoEngine({required Duration startAt}) {
     MediaPlayerScreen.debugLastVideoStart = startAt;
+    _videoOffset = _offsetFor(_sermon);
     _videoPosition = startAt;
     _videoRecorded = false;
     _videoStarted = false;
@@ -280,7 +309,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   void _recordVideoPlay() {
     if (_videoRecorded) return;
     _videoRecorded = true;
-    _history.recordPlay(_sermon);
+    // The audio recording when there is one: its snapshot carries the audio
+    // length and videoStart the shared (audio-timeline) point is measured on.
+    _history.recordPlay(_audioTwin() ?? _sermon);
   }
 
   /// Throttled (5 s) save of the video position into the shared resume point.
@@ -290,12 +321,12 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     final last = _lastVideoSave;
     if (last == null || now.difference(last) >= const Duration(seconds: 5)) {
       _lastVideoSave = now;
-      _history.savePosition(_sermon, position);
+      _history.savePosition(_sermon, _toAudio(position));
     }
   }
 
   void _saveVideoPosition() {
-    _history.savePosition(_sermon, _videoPosition);
+    _history.savePosition(_sermon, _toAudio(_videoPosition));
     _lastVideoSave = DateTime.now();
   }
 
@@ -337,6 +368,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         _videoWatchdog?.cancel();
         _saveVideoPosition();
       case PlayerState.ended:
+        // Forget the last tick too: later saves (dispose, switch, skip) must
+        // not write the finished point back over the cleared one.
+        _videoPosition = Duration.zero;
         _history.clearPosition(_sermon);
         if (_audio.repeatOne) {
           final controller = _youtubeController;
@@ -365,78 +399,98 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     unawaited(WakelockPlus.toggle(enable: active));
   }
 
-  /// The video engine's position for a handoff: a live query when the bridge
-  /// is up, else the last reported tick, else the shared saved point.
+  /// The video engine's position for a handoff, on the AUDIO timeline: a
+  /// live query when the bridge is up, else the last reported tick, else the
+  /// shared saved point.
   Future<Duration> _videoHandoff() async {
     final controller = _youtubeController;
     if (controller != null) {
       try {
         final seconds = await controller.currentTime;
         final live = Duration(milliseconds: (seconds * 1000).round());
-        if (live > Duration.zero) return live;
+        if (live > Duration.zero) return _toAudio(live);
       } catch (_) {
         // Bridge gone (already closed / never loaded): fall through.
       }
     }
-    if (_videoPosition > Duration.zero) return _videoPosition;
-    return _history.resumePoint(_sermon) ?? Duration.zero;
+    if (_videoPosition > Duration.zero) return _toAudio(_videoPosition);
+    return _savedAudioPoint(_sermon);
   }
 
-  /// Switches engines in place, handing the playback position across.
-  /// The same message backs both media, so the timelines map 1:1.
+  /// Switches engines in place, handing the playback position across
+  /// (mapped through [Sermon.videoStart], see [MediaPlayerScreen]).
   Future<void> _switchMode(MediaMode target) async {
     if (target == _mode || _switching) return;
-    _switching = true;
-    try {
-      if (target == MediaMode.video) {
-        if (!_sermon.hasVideo) return;
-        final handoff = _audioHandoff();
-        _queueItems = _audio.queue?.items ?? _queueItems;
-        // Full stop, not pause: the video session must not fight a live
-        // audio source. The stop also saves the shared resume point.
-        unawaited(_audio.stop());
-        _startVideoEngine(startAt: handoff);
-        setState(() => _mode = MediaMode.video);
-        return;
-      }
+    if (target == MediaMode.video) {
+      if (!_sermon.hasVideo) return;
+      final handoff = _audioHandoff();
+      // Full stop, not pause: the video session must not fight a live
+      // audio source. The stop also saves the shared resume point.
+      unawaited(_audio.stop());
+      _startVideoEngine(startAt: handoff);
+      setState(() => _mode = MediaMode.video);
+      return;
+    }
 
-      final twin = _audioTwin();
-      if (twin == null) return;
-      final handoff = await _videoHandoff();
-      _videoPosition = handoff;
-      _saveVideoPosition();
-      // Dispose, don't pause: an iframe kept alive under an audio session is
-      // exactly the battery drain this screen exists to avoid.
-      _disposeVideoEngine();
-      if (!mounted) return;
-      setState(() {
-        _sermon = twin;
-        _mode = MediaMode.audio;
-      });
-      // The engine seeks at load time, so the member hears the handoff
-      // point straight away instead of a blip from the old resume point.
-      await startAudioPlayback(
+    final twin = _audioTwin();
+    if (twin == null) return;
+    // Held only across the position query: the audio load below can take up
+    // to its timeout, and a Video tap meanwhile must still switch back.
+    _switching = true;
+    final Duration handoff;
+    try {
+      handoff = await _videoHandoff();
+    } finally {
+      _switching = false;
+    }
+    if (!mounted || _mode != MediaMode.video) return;
+    _history.savePosition(_sermon, handoff);
+    _lastVideoSave = DateTime.now();
+    // Dispose, don't pause: an iframe kept alive under an audio session is
+    // exactly the battery drain this screen exists to avoid.
+    _disposeVideoEngine();
+    _adoptIntoQueue(twin);
+    setState(() {
+      _sermon = twin;
+      _mode = MediaMode.audio;
+    });
+    // The engine seeks at load time, so the member hears the handoff
+    // point straight away instead of a blip from the old resume point.
+    unawaited(
+      startAudioPlayback(
         ref,
         twin,
         startAt: handoff > Duration.zero ? handoff : null,
         queue: _queueItems,
-      );
-    } finally {
-      _switching = false;
-    }
+      ),
+    );
   }
 
-  /// The audio recording of the message on screen: itself when it carries
-  /// one, else the library's mp3 of the same video.
-  Sermon? _audioTwin() {
-    if (_sermon.hasAudio) return _sermon;
-    final videoId = _sermon.videoId;
+  /// The audio recording of the message on screen. See [_audioTwinOf].
+  Sermon? _audioTwin() => _audioTwinOf(_sermon);
+
+  /// The audio recording of [sermon]: itself when it carries one, else the
+  /// library's mp3 of the same video.
+  Sermon? _audioTwinOf(Sermon sermon) {
+    if (sermon.hasAudio) return sermon;
+    final videoId = sermon.videoId;
     if (videoId == null || videoId.isEmpty) return null;
     final library = ref.read(sermonsProvider).valueOrNull ?? const <Sermon>[];
-    for (final sermon in library) {
-      if (sermon.hasAudio && sermon.videoId == videoId) return sermon;
+    for (final candidate in library) {
+      if (candidate.hasAudio && candidate.videoId == videoId) return candidate;
     }
     return null;
+  }
+
+  /// Puts [sermon] in place of any other variant of its message in
+  /// [_queueItems], so a queue built around it (audio after a twin swap,
+  /// video after the engine moved) finds it where the member launched it,
+  /// instead of collapsing to a one-item queue.
+  void _adoptIntoQueue(Sermon sermon) {
+    if (_queueItems.any((s) => s.id == sermon.id)) return;
+    _queueItems = [
+      for (final s in _queueItems) _sameMessage(s, sermon) ? sermon : s,
+    ];
   }
 
   // ── Queue (video mode) ─────────────────────────────────────────────────────
@@ -451,10 +505,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     _disposeVideoEngine();
     if (target.hasVideo) {
       setState(() => _sermon = target);
-      _startVideoEngine(
-        startAt:
-            _history.resumePoint(target) ?? target.videoStart ?? Duration.zero,
-      );
+      _startVideoEngine(startAt: _savedAudioPoint(target) + _offsetFor(target));
       return;
     }
     setState(() {
@@ -472,11 +523,21 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   /// Follows the audio engine through its queue (Next, lock-screen skip,
   /// auto-advance), so the title, artwork and notes always match what plays.
+  ///
+  /// The launch list is kept while it holds the message on air: the audio
+  /// queue is filtered to audio-bearing entries, and adopting it would drop
+  /// the video-only ones from Previous / Next once the member is back in
+  /// video. Only playback that moved outside the list replaces it.
   void _followAudioQueue(PlaybackQueue? queue) {
     if (queue == null || _mode != MediaMode.audio || !mounted) return;
-    _queueItems = queue.items;
-    if (queue.current.id != _sermon.id) {
-      setState(() => _sermon = queue.current);
+    final current = queue.current;
+    if (_queueItems.any((s) => _sameMessage(s, current))) {
+      _adoptIntoQueue(current);
+    } else {
+      _queueItems = queue.items;
+    }
+    if (current.id != _sermon.id) {
+      setState(() => _sermon = current);
     }
   }
 
@@ -486,30 +547,42 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   /// Video mode must pass a binding: the audio source is fully stopped here,
   /// so without one a note would be written unstamped and an anchor tap would
   /// wake audio playback underneath the video.
+  ///
+  /// Notes share the audio timeline (one timeline per message), so the
+  /// binding stamps `video - videoStart` and seeks to `anchor + videoStart`.
   NoteTimelineBinding? _videoNoteBinding() {
     if (_mode != MediaMode.video) return null;
+    final NoteTimelineBinding? engine;
     if (MediaPlayerScreen.debugDisableVideoEngine) {
-      return MediaPlayerScreen.debugVideoNoteBinding;
-    }
-    if (kIsWeb) {
+      engine = MediaPlayerScreen.debugVideoNoteBinding;
+    } else if (kIsWeb) {
       // The iframe embed has no JS bridge: no live position (notes are
       // written unstamped), and a seek recreates the embed at the anchor via
       // the keyed start parameter.
-      return NoteTimelineBinding(
+      engine = NoteTimelineBinding(
         seek: (target) async {
           if (!mounted) return;
           setState(() => _webStartSeconds = target.inSeconds);
         },
       );
+    } else {
+      final controller = _youtubeController;
+      engine = controller == null
+          ? null
+          : NoteTimelineBinding(
+              position: _videoNotePositions(controller),
+              seek: (target) => controller.seekTo(
+                seconds: target.inMilliseconds / 1000,
+                allowSeekAhead: true,
+              ),
+            );
     }
-    final controller = _youtubeController;
-    if (controller == null) return null;
+    if (engine == null || _videoOffset == Duration.zero) return engine;
+    final offset = _videoOffset;
+    final seek = engine.seek;
     return NoteTimelineBinding(
-      position: _videoNotePositions(controller),
-      seek: (target) => controller.seekTo(
-        seconds: target.inMilliseconds / 1000,
-        allowSeekAhead: true,
-      ),
+      position: engine.position?.map(_toAudio),
+      seek: seek == null ? null : (target) => seek(target + offset),
     );
   }
 
@@ -561,6 +634,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       (_, next) => _followAudioQueue(next.valueOrNull),
     );
     final isVideo = _mode == MediaMode.video;
+    if (isVideo && !_sermon.hasAudio) {
+      // A video-only variant finds its audio twin, and the videoStart it
+      // carries, in the library: follow the library as it arrives so the
+      // Audio option appears and positions map through the right offset.
+      ref.watch(sermonsProvider);
+      _videoOffset = _offsetFor(_sermon);
+    }
     return Scaffold(
       body: DecoratedBox(
         decoration: _gradient,
@@ -877,7 +957,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          LikeButton(sermonId: _sermon.id),
+          LikeButton(sermon: _sermon),
         ],
       ),
     );

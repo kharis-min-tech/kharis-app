@@ -78,4 +78,31 @@ void main() {
       );
     },
   );
+
+  test('a later send from Settings never clears "Don\'t ask again"', () async {
+    final now = DateTime(2026, 10, 3, 12);
+    await store.recordSheetOutcome(FeedbackSheetOutcome.optOut, now);
+    await store.recordSheetOutcome(
+      FeedbackSheetOutcome.sent,
+      now.add(const Duration(days: 1)),
+    );
+    final s = store.read();
+    expect(s.lastSheetOutcome, FeedbackSheetOutcome.sent);
+    expect(s.sheetOptedOut, isTrue);
+    expect(
+      ReviewPromptPolicy.decide(
+        ReviewPromptState(
+          firstOpenAt: DateTime(2026, 1, 1),
+          activeDays: 50,
+          completedListens: 50,
+          lastSheetAt: DateTime(2025, 1, 1),
+          lastSheetOutcome: s.lastSheetOutcome,
+          optedOut: s.optedOut,
+        ),
+        DateTime(2026, 10, 3),
+        nativeAvailable: false,
+      ),
+      ReviewPromptAction.none,
+    );
+  });
 }

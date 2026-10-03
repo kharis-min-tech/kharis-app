@@ -31,6 +31,7 @@ void main() {
   Widget app(
     FakePagedSermonRepository repo, {
     Duration? debounce,
+    List<Override> extra = const [],
   }) => ProviderScope(
     overrides: [
       sermonRepositoryProvider.overrideWithValue(repo),
@@ -41,6 +42,7 @@ void main() {
       cacheServiceProvider.overrideWithValue(FakeCacheService()),
       audioPlayerServiceProvider.overrideWithValue(FakeAudioPlayerService()),
       if (debounce != null) searchDebounceProvider.overrideWithValue(debounce),
+      ...extra,
     ],
     child: const MaterialApp(home: MessagesScreen()),
   );
@@ -127,5 +129,48 @@ void main() {
     await tester.tap(find.text('Live message 2').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('1 result for'), findsOneWidget);
+  });
+
+  testWidgets('the featured dots stay in range when the carousel shrinks', (
+    tester,
+  ) async {
+    final cards = StateProvider<List<Sermon>>(
+      (ref) => [
+        for (var i = 0; i < 5; i++) testSermon('f$i', title: 'Featured $i'),
+      ],
+    );
+    await tester.pumpWidget(
+      app(
+        FakePagedSermonRepository([live]),
+        extra: [
+          featuredSermonsProvider.overrideWith((ref) => ref.watch(cards)),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    /// Index of the highlighted page dot, or -1 when none is.
+    int activeDot() {
+      final dots = tester
+          .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+          .where((w) => w.constraints?.maxHeight == 6)
+          .toList();
+      return dots.indexWhere((w) => w.constraints?.maxWidth == 18);
+    }
+
+    for (var i = 0; i < 4; i++) {
+      await tester.drag(find.byType(PageView), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+    }
+    expect(activeDot(), 4);
+
+    ProviderScope.containerOf(
+      tester.element(find.byType(MessagesScreen)),
+    ).read(cards.notifier).state = [
+      testSermon('p0', title: 'Pinned 0'),
+      testSermon('p1', title: 'Pinned 1'),
+    ];
+    await tester.pumpAndSettle();
+    expect(activeDot(), 1, reason: 'the last card is the one on screen');
   });
 }

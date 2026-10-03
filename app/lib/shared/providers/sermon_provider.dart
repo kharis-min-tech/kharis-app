@@ -1,5 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart'
+    show
+        AppLifecycleState,
+        VoidCallback,
+        WidgetsBinding,
+        WidgetsBindingObserver;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -230,9 +236,14 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
       final complete =
           page.nextUrl == null ||
           (hasArchive && merged.length >= page.totalCount);
+      // Page 1 only adds new arrivals at the head. A walk already past it
+      // (running, or paused between retries) keeps its cursor: pointing it
+      // back at page 2 would re-fetch every page the library already holds.
+      final resume =
+          !state.usedFallback && (_hydrating || state.nextUrl != null);
       state = state.copyWith(
         sermons: merged,
-        nextUrl: page.nextUrl,
+        nextUrl: resume ? null : page.nextUrl,
         clearNextUrl: complete,
         totalCount: page.totalCount,
         loaded: true,
@@ -322,17 +333,25 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   /// archive stays on screen meanwhile; a failure mid-walk leaves it intact.
   Future<void> _rewalk() async {
     final head = _firstPage!;
-    final seen = <String>{};
-    final fresh = [...head.sermons.where((s) => seen.add(s.id))];
+    final older = <Sermon>[];
     var url = head.nextUrl;
     var total = head.totalCount;
     while (url != null) {
       final page = await _repo.fetchPage(url: url);
       if (!mounted) return;
-      fresh.addAll(page.sermons.where((s) => seen.add(s.id)));
+      older.addAll(page.sermons);
       if (page.totalCount > 0) total = page.totalCount;
       url = page.nextUrl;
     }
+    // Headed by page 1 as it is now: a refresh during the walk may have
+    // brought newer arrivals. The walk's own page 1 follows it, since those
+    // arrivals pushed its last entries onto a page 2 already walked.
+    final seen = <String>{};
+    final fresh = [
+      ..._firstPage!.sermons.where((s) => seen.add(s.id)),
+      ...head.sermons.where((s) => seen.add(s.id)),
+      ...older.where((s) => seen.add(s.id)),
+    ];
     state = state.copyWith(
       sermons: fresh,
       clearNextUrl: true,
@@ -774,15 +793,17 @@ const int kFeaturedLimit = 5;
 /// - pinned: the Studio-starred docs, newest first, as audio twins where
 ///   possible; falls back to auto when nothing is starred.
 ///
-/// Empty while the mode is still loading, so pinned picks never flash auto
-/// content first.
+/// Empty while the mode (or, in pinned mode, the starred docs) is still
+/// loading, so pinned picks never flash auto content first.
 final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
   final mode = ref.watch(featuredModeProvider);
   if (mode.isLoading && !mode.hasValue) return const [];
   final twins = ref.watch(audioTwinByVideoIdProvider);
 
   if (mode.valueOrNull == FeaturedMode.pinned) {
-    final pinned = ref.watch(pinnedFeaturedProvider).valueOrNull ?? const [];
+    final pinnedAsync = ref.watch(pinnedFeaturedProvider);
+    if (pinnedAsync.isLoading && !pinnedAsync.hasValue) return const [];
+    final pinned = pinnedAsync.valueOrNull ?? const [];
     if (pinned.isNotEmpty) {
       return _distinct([
         for (final s in pinned.take(kFeaturedLimit)) withAudioTwin(s, twins),
@@ -809,8 +830,39 @@ List<Sermon> _distinct(List<Sermon> sermons) {
   ];
 }
 
-/// The member's local date; overridden in tests.
-final todayProvider = Provider<DateTime>((ref) => DateTime.now());
+/// Wall clock behind [todayProvider]; tests override it.
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+/// The member's local calendar date, at midnight.
+///
+/// Rolls over at local midnight while the app is alive, and is re-evaluated
+/// whenever the app returns to the foreground: a suspended app's timers do
+/// not fire on time. Dependents only rebuild when the date actually changes.
+final todayProvider = Provider<DateTime>((ref) {
+  final now = ref.watch(clockProvider)();
+  final midnight = Timer(
+    DateTime(now.year, now.month, now.day + 1).difference(now),
+    ref.invalidateSelf,
+  );
+  final resume = _OnResume(ref.invalidateSelf);
+  WidgetsBinding.instance.addObserver(resume);
+  ref.onDispose(() {
+    midnight.cancel();
+    WidgetsBinding.instance.removeObserver(resume);
+  });
+  return DateTime(now.year, now.month, now.day);
+});
+
+class _OnResume with WidgetsBindingObserver {
+  _OnResume(this.onResume);
+
+  final VoidCallback onResume;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) onResume();
+  }
+}
 
 /// `YYYY-MM-DD` key of a local calendar date (the `motdSchedule` doc id).
 String motdDateKey(DateTime date) =>
@@ -836,9 +888,7 @@ const Duration kMotdWindow = Duration(days: 90);
 /// Message of the Day.
 ///
 /// Today's `motdSchedule` doc when it resolves to a sermon (as its audio twin
-/// where possible). Otherwise a deterministic daily pick, the same for
-/// everyone on a given date, among audio sermons from the last 90 days; if
-/// none are that recent, the newest audio sermon. Null while today's schedule
+/// where possible). Otherwise [dailyMotdPick]. Null while today's schedule
 /// or a scheduled sermon is still loading, so the card never swaps.
 final motdSermonProvider = Provider<Sermon?>((ref) {
   final schedule = ref.watch(motdScheduledIdProvider);
@@ -856,30 +906,37 @@ final motdSermonProvider = Provider<Sermon?>((ref) {
   return dailyMotdPick(library, ref.watch(todayProvider));
 });
 
-/// The automatic Message of the Day for [today] from [library]. Pure, so it
-/// is the same on every device that sees the same library.
+/// The automatic Message of the Day for [today] from [library].
+///
+/// A deterministic pick among audio sermons published in the [kMotdWindow]
+/// before [today], excluding [today] itself, so a same-day upload cannot
+/// reshuffle the pick mid-day. The pool is ordered by id before hashing the
+/// date, so the pick does not depend on load order and is the same on every
+/// device that holds the same messages. With nothing that recent, the newest
+/// audio sermon from before [today] (or, failing that, from [today]).
 Sermon? dailyMotdPick(List<Sermon> library, DateTime today) {
   final day = DateTime(today.year, today.month, today.day);
-  final end = day.add(const Duration(days: 1));
-  final start = day.subtract(kMotdWindow);
-  final audio =
-      [
-        for (final s in library)
-          if (s.hasAudio &&
-              s.publishedAt != null &&
-              s.publishedAt!.isBefore(end))
-            s,
-      ]..sort((a, b) {
-        final byDate = b.publishedAt!.compareTo(a.publishedAt!);
-        return byDate != 0 ? byDate : a.id.compareTo(b.id);
-      });
-  if (audio.isEmpty) return null;
-  final recent = [
-    for (final s in audio)
-      if (!s.publishedAt!.isBefore(start)) s,
+  final start = DateTime(day.year, day.month, day.day - kMotdWindow.inDays);
+  final end = DateTime(day.year, day.month, day.day + 1);
+  final audio = [
+    for (final s in library)
+      if (s.hasAudio && s.publishedAt != null && s.publishedAt!.isBefore(end))
+        s,
   ];
-  if (recent.isEmpty) return audio.first;
-  return recent[_fnv1a(motdDateKey(day)) % recent.length];
+  final pool = [
+    for (final s in audio)
+      if (!s.publishedAt!.isBefore(start) && s.publishedAt!.isBefore(day)) s,
+  ]..sort((a, b) => a.id.compareTo(b.id));
+  if (pool.isNotEmpty) return pool[_fnv1a(motdDateKey(day)) % pool.length];
+  if (audio.isEmpty) return null;
+  audio.sort((a, b) {
+    final byDate = b.publishedAt!.compareTo(a.publishedAt!);
+    return byDate != 0 ? byDate : a.id.compareTo(b.id);
+  });
+  return audio.firstWhere(
+    (s) => s.publishedAt!.isBefore(day),
+    orElse: () => audio.first,
+  );
 }
 
 /// 32-bit FNV-1a. Unlike [String.hashCode] it is identical on every platform,

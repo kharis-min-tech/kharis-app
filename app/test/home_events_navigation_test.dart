@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +21,7 @@ import 'package:kharis_app/features/home/presentation/screens/notifications_scre
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/continue_listening_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
+import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -127,8 +130,10 @@ Future<void> _pump(
   String initial = '/home',
   String? branch = 'London',
   List<NewsItem> news = const [],
+  Future<List<NewsItem>> Function()? loadNews,
   List<Event> events = const [],
   Stream<DailyContent>? reading,
+  void Function(GoRouter router)? beforeMount,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final prefs = await SharedPreferences.getInstance();
@@ -137,6 +142,8 @@ Future<void> _pump(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
+  final router = _router(initial, start);
+  beforeMount?.call(router);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -146,7 +153,9 @@ Future<void> _pump(
         branchesProvider.overrideWith(
           (ref) => Stream.value(BranchRepository.seedBranches),
         ),
-        newsProvider.overrideWith((ref, b) async => news),
+        newsProvider.overrideWith(
+          (ref, b) async => loadNews == null ? news : await loadNews(),
+        ),
         upcomingEventsProvider.overrideWith((ref, b) => Stream.value(events)),
         pastEventsProvider.overrideWith((ref, b) => Stream.value(const [])),
         myRsvpsProvider.overrideWith((ref) => Stream.value(const <Rsvp>[])),
@@ -161,7 +170,7 @@ Future<void> _pump(
         // Nothing to resume: the card collapses (its engine is WP2's).
         continueListeningProvider.overrideWith((ref) => null),
       ],
-      child: MaterialApp.router(routerConfig: _router(initial, start)),
+      child: MaterialApp.router(routerConfig: router),
     ),
   );
   await _frames(tester);
@@ -300,6 +309,56 @@ void main() {
       expect(find.text('Prayer Night'), findsOneWidget);
       // Pushed above Home: Back has somewhere to go.
       expect(router.canPop(), isTrue);
+    });
+
+    testWidgets('a push opened from another tab is stacked over Home', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        initial: '/calendar',
+        start: () => const HomeScreen(),
+        events: [_prayerNight],
+      );
+      final router = GoRouter.of(tester.element(find.byType(CalendarScreen)));
+
+      openNotificationTarget(
+        router,
+        notificationTargetFor({'type': 'event', 'eventId': _prayerNight.id}),
+      );
+      await _frames(tester);
+      expect(find.byType(EventDetailScreen), findsOneWidget);
+
+      router.pop();
+      await _frames(tester);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(CalendarScreen), findsNothing);
+    });
+
+    testWidgets('a push tapped before the router is on screen (cold start) '
+        'is still stacked over Home', (tester) async {
+      late GoRouter router;
+      await _pump(
+        tester,
+        initial: '/calendar',
+        start: () => const HomeScreen(),
+        events: [_prayerNight],
+        beforeMount: (r) {
+          router = r;
+          openNotificationTarget(
+            r,
+            notificationTargetFor({
+              'type': 'event',
+              'eventId': _prayerNight.id,
+            }),
+          );
+        },
+      );
+      expect(find.byType(EventDetailScreen), findsOneWidget);
+
+      router.pop();
+      await _frames(tester);
+      expect(find.byType(HomeScreen), findsOneWidget);
     });
   });
 
@@ -578,16 +637,20 @@ void main() {
   });
 
   group('notification permission (C7)', () {
-    testWidgets('not requested before onboarding completes; requested once '
-        'after', (tester) async {
+    Future<(ProviderContainer, GoRouter)> gate(
+      WidgetTester tester,
+      _RecordingNotificationService fcm, {
+      required Stream<User?> user,
+      String? profileBranch,
+    }) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
-      final fcm = _RecordingNotificationService();
       final router = GoRouter(
         initialLocation: '/',
         routes: [
           GoRoute(path: '/', builder: (_, _) => const Text('welcome')),
           GoRoute(path: '/branch', builder: (_, _) => const Text('branch')),
+          GoRoute(path: '/login', builder: (_, _) => const Text('login')),
           GoRoute(path: '/home', builder: (_, _) => const Text('home')),
         ],
       );
@@ -597,6 +660,10 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
           appRouterProvider.overrideWithValue(router),
           notificationServiceProvider.overrideWithValue(fcm),
+          currentUserProvider.overrideWith((ref) => user),
+          currentBranchProvider.overrideWith(
+            (ref) => Stream.value(profileBranch),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -606,9 +673,29 @@ void main() {
           child: MaterialApp.router(routerConfig: router),
         ),
       );
-
       container.read(notificationPermissionGateProvider);
       await tester.pump();
+      return (container, router);
+    }
+
+    User member(String role) => User(
+      id: 'u1',
+      email: role == 'guest' ? '' : 'm@kharis.org',
+      displayName: 'M',
+      role: role,
+      createdAt: DateTime(2024),
+    );
+
+    testWidgets('not requested before onboarding completes; requested once '
+        'after', (tester) async {
+      final fcm = _RecordingNotificationService();
+      final (container, router) = await gate(
+        tester,
+        fcm,
+        // Every launch signs in anonymously: a guest is not "in the app".
+        user: Stream.value(member('guest')),
+      );
+
       router.go('/branch');
       await tester.pumpAndSettle();
       expect(
@@ -629,6 +716,33 @@ void main() {
       await tester.pumpAndSettle();
       expect(fcm.permissionRequests, 1, reason: 'asked once, never again');
     });
+
+    testWidgets('a returning member who signs in without onboarding is asked, '
+        'and subscribed to their profile campus', (tester) async {
+      final fcm = _RecordingNotificationService(granted: true);
+      final auth = StreamController<User?>();
+      addTearDown(auth.close);
+      final (container, router) = await gate(
+        tester,
+        fcm,
+        user: auth.stream,
+        profileBranch: 'Chatham',
+      );
+
+      auth.add(member('guest'));
+      router.go('/login');
+      await tester.pumpAndSettle();
+      expect(fcm.permissionRequests, 0);
+
+      // Sign in (login_screen goes straight to /home; onboarding never ran).
+      auth.add(member('member'));
+      router.go('/home');
+      await tester.pumpAndSettle();
+
+      expect(container.read(onboardingRepositoryProvider).isCompleted, isFalse);
+      expect(fcm.permissionRequests, 1);
+      expect(fcm.grantedBranches, ['Chatham']);
+    });
   });
 
   group('push routing', () {
@@ -640,6 +754,15 @@ void main() {
       expect(
         notificationTargetFor({'type': 'announcement', 'eventId': 'e1'}),
         const NotificationTarget('/events/e1', overlay: true),
+      );
+      expect(
+        notificationTargetFor({
+          'type': 'announcement',
+          'newsId': 'n1',
+          'eventId': 'e1',
+        }),
+        const NotificationTarget('/announcements?id=n1', overlay: true),
+        reason: 'the feed falls back to the text if the event is gone',
       );
       expect(
         notificationTargetFor({'type': 'event', 'eventId': 'e1'}),
@@ -682,6 +805,147 @@ void main() {
 
       expect(find.widgetWithText(AppBar, 'Announcements'), findsOneWidget);
       expect(find.byKey(const Key('announcement-cta')), findsOneWidget);
+    });
+
+    testWidgets('on a warm app the pushed announcement opens once the '
+        'refetched feed holds it', (tester) async {
+      var feed = [_news('old', 'Last week notice')];
+      await _pump(
+        tester,
+        start: () => const HomeScreen(),
+        loadNews: () async {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          return feed;
+        },
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Last week notice'), findsOneWidget);
+
+      // What NotificationService does on a tap: refetch, then open.
+      feed = [
+        _news('n-new', 'Baptism sign-ups are open', linkUrl: 'https://k.org'),
+        ...feed,
+      ];
+      final home = tester.element(find.byType(HomeScreen));
+      ProviderScope.containerOf(home).invalidate(newsProvider);
+      openNotificationTarget(
+        GoRouter.of(home),
+        notificationTargetFor({'type': 'announcement', 'newsId': 'n-new'}),
+      );
+      await _frames(tester);
+      await tester.pump(const Duration(milliseconds: 400));
+      await _frames(tester);
+
+      expect(find.byType(AnnouncementDetailSheet), findsOneWidget);
+      expect(find.byKey(const Key('announcement-cta')), findsOneWidget);
+    });
+
+    testWidgets('a push for an event-linked announcement opens the event; '
+        'Back returns to the feed', (tester) async {
+      await _pump(
+        tester,
+        start: () => const HomeScreen(),
+        news: [_news('n1', 'Join us for prayer', eventId: _prayerNight.id)],
+        events: [_prayerNight],
+      );
+      final router = GoRouter.of(tester.element(find.byType(HomeScreen)));
+      openNotificationTarget(
+        router,
+        notificationTargetFor({
+          'type': 'announcement',
+          'newsId': 'n1',
+          'eventId': _prayerNight.id,
+        }),
+      );
+      await _frames(tester);
+      expect(find.byType(EventDetailScreen), findsOneWidget);
+
+      router.pop();
+      await _frames(tester);
+      expect(find.widgetWithText(AppBar, 'Announcements'), findsOneWidget);
+    });
+  });
+
+  group('announcements linked to events', () {
+    testWidgets('a deleted event falls back to the announcement text', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        start: () => const HomeScreen(),
+        news: [
+          NewsItem(
+            id: 'n-gone',
+            title: 'Harvest picnic',
+            body: 'Bring a dish to share.',
+            type: 'Announcement',
+            publishedAt: _now.subtract(const Duration(hours: 2)),
+            eventId: 'e-deleted',
+          ),
+        ],
+      );
+
+      await tester.tap(find.text('Harvest picnic'));
+      await _frames(tester);
+
+      expect(find.byType(EventDetailScreen), findsNothing);
+      expect(find.byType(AnnouncementDetailSheet), findsOneWidget);
+      expect(find.text('Bring a dish to share.'), findsWidgets);
+      expect(find.byKey(const Key('announcement-event')), findsNothing);
+    });
+
+    testWidgets('a push for an announcement whose event is gone shows the '
+        'announcement, not a dead end', (tester) async {
+      await _pump(
+        tester,
+        start: () => const HomeScreen(),
+        news: [_news('n1', 'Harvest picnic', eventId: 'e-deleted')],
+      );
+      openNotificationTarget(
+        GoRouter.of(tester.element(find.byType(HomeScreen))),
+        notificationTargetFor({
+          'type': 'announcement',
+          'newsId': 'n1',
+          'eventId': 'e-deleted',
+        }),
+      );
+      await _frames(tester);
+
+      expect(find.byType(EventDetailScreen), findsNothing);
+      expect(find.byType(AnnouncementDetailSheet), findsOneWidget);
+    });
+
+    testWidgets('legacy data with both an event and a link offers both', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        start: () => const HomeScreen(),
+        news: [
+          _news(
+            'n-both',
+            'Join us for prayer',
+            eventId: _prayerNight.id,
+            linkUrl: 'https://kharis.org/prayer',
+            ctaLabel: 'Register',
+          ),
+        ],
+        events: [_prayerNight],
+      );
+
+      await tester.tap(find.text('Join us for prayer'));
+      await _frames(tester);
+
+      expect(find.byType(AnnouncementDetailSheet), findsOneWidget);
+      expect(find.byKey(const Key('announcement-cta')), findsOneWidget);
+      expect(find.text('Register'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('announcement-event')));
+      await _frames(tester);
+      final detail = tester.widget<EventDetailScreen>(
+        find.byType(EventDetailScreen),
+      );
+      expect(detail.eventId, _prayerNight.id);
     });
   });
 
@@ -747,11 +1011,20 @@ void main() {
 }
 
 class _RecordingNotificationService extends NotificationService {
+  _RecordingNotificationService({this.granted = false});
+
+  final bool granted;
   int permissionRequests = 0;
+  final grantedBranches = <String?>[];
 
   @override
   Future<bool> requestPermission() async {
     permissionRequests++;
-    return false;
+    return granted;
+  }
+
+  @override
+  Future<void> onPermissionGranted({String? branch}) async {
+    grantedBranches.add(branch);
   }
 }

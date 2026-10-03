@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -77,6 +78,9 @@ class _ArchiveAdapter implements HttpClientAdapter {
   /// Pages that fail once (HTTP 500) before succeeding.
   final failOnce = <int>{};
 
+  /// Pages that wait for their completer before answering (once).
+  final hold = <int, Completer<void>>{};
+
   int get pageCount => (records.length / _pageSize).ceil();
 
   @override
@@ -90,6 +94,7 @@ class _ArchiveAdapter implements HttpClientAdapter {
     if (failOnce.remove(page)) {
       return ResponseBody.fromString('{}', 500);
     }
+    await hold.remove(page)?.future;
     final start = (page - 1) * _pageSize;
     final end = (start + _pageSize).clamp(0, records.length);
     final body = {
@@ -134,6 +139,7 @@ void main() {
   (ProviderContainer, _ArchiveAdapter) harness({
     _MemoryStore? store,
     List<Map<String, dynamic>>? records,
+    Duration backoff = Duration.zero,
   }) {
     final adapter = _ArchiveAdapter(records ?? _archive());
     final dio = Dio(BaseOptions(baseUrl: 'https://x.test/api/'))
@@ -144,7 +150,7 @@ void main() {
           KharisApiSermonRepository(dio: dio),
         ),
         sermonArchiveCacheProvider.overrideWithValue(store),
-        sermonArchiveBackoffProvider.overrideWithValue((_) => Duration.zero),
+        sermonArchiveBackoffProvider.overrideWithValue((_) => backoff),
         cmsSermonsProvider.overrideWith(
           (ref) => Stream.value(const <Sermon>[]),
         ),
@@ -156,10 +162,13 @@ void main() {
     return (container, adapter);
   }
 
+  /// Pages are mapped in a background isolate, so this waits on wall-clock
+  /// time rather than a fixed number of event-loop turns.
   Future<void> settle(ProviderContainer c, bool Function() done) async {
     c.listen(sermonsProvider, (_, _) {}, fireImmediately: true);
-    for (var i = 0; i < 2000 && !done(); i++) {
-      await Future<void>.delayed(Duration.zero);
+    final clock = Stopwatch()..start();
+    while (!done() && clock.elapsed < const Duration(seconds: 30)) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
     }
     expect(done(), isTrue, reason: 'library never settled');
   }
@@ -281,5 +290,77 @@ void main() {
     expect(lib.sermons.length, 1488);
     expect(lib.sermons.any((s) => s.id == removedId), isFalse);
     expect(lib.sermons.any((s) => s.title == 'Retitled 2013 message'), isTrue);
+  });
+
+  test('a refresh while the drain waits to retry resumes where it stopped, '
+      'not from page 2', () async {
+    // A long backoff keeps the failed walk parked until the refresh.
+    final (container, adapter) = harness(backoff: const Duration(hours: 1));
+    adapter.failOnce.add(6);
+    final notifier = container.read(sermonLibraryProvider.notifier);
+    await settle(
+      container,
+      () =>
+          adapter.requestedPages.contains(6) &&
+          !container.read(sermonLibraryProvider).hydrating,
+    );
+    expect(container.read(sermonLibraryProvider).sermons.length, 250);
+
+    await notifier.refresh();
+    await settle(container, () => complete(container));
+
+    final lib = container.read(sermonLibraryProvider);
+    expect(lib.sermons.length, 1489);
+    for (var p = 2; p <= 5; p++) {
+      expect(
+        adapter.requestedPages.where((r) => r == p),
+        hasLength(1),
+        reason: 'page $p was already held; refetching it is wasted work',
+      );
+    }
+    expect(adapter.requestedPages.where((r) => r == 6), hasLength(2));
+    expect(adapter.requestedPages.where((r) => r == 1), hasLength(2));
+  });
+
+  test('a refresh during a re-walk keeps its new arrivals when the walk '
+      'swaps in', () async {
+    final records = _archive();
+    final store = _MemoryStore(
+      SermonArchiveSnapshot(
+        sermons: [for (final r in records) mapApiSermon(r)],
+        fetchedAt: DateTime.now().subtract(const Duration(days: 3)),
+      ),
+    );
+    final (container, adapter) = harness(store: store, records: records);
+    final held = Completer<void>();
+    adapter.hold[10] = held;
+    final before = DateTime.now();
+    await settle(container, () => adapter.requestedPages.contains(10));
+
+    // A message is published while the walk is parked on page 10, and the
+    // member pulls to refresh.
+    adapter.records = [
+      {...records.first, 'id': 300000, 'title': 'Brand new message'},
+      ...records,
+    ];
+    await container.read(sermonLibraryProvider.notifier).refresh();
+    expect(
+      container
+          .read(sermonLibraryProvider)
+          .sermons
+          .any((s) => s.title == 'Brand new message'),
+      isTrue,
+    );
+
+    held.complete();
+    await settle(
+      container,
+      () =>
+          complete(container) &&
+          container.read(sermonLibraryProvider).fetchedAt!.isAfter(before),
+    );
+    final lib = container.read(sermonLibraryProvider);
+    expect(lib.sermons.first.title, 'Brand new message');
+    expect(lib.sermons.length, 1490);
   });
 }

@@ -35,7 +35,16 @@ class UnfinishedPlay {
 /// raw [Sermon.id] of the variant that played and its [NoteTimelineKey]
 /// canonical (`yt_<videoId>` when it has a video). Audio and video variants
 /// of one message therefore share a single resume point, whichever engine
-/// played last.
+/// played last. Positions are on the AUDIO timeline (the video engine maps
+/// its clock through [Sermon.videoStart] before saving).
+///
+/// "Recently played" holds one entry per message, deduplicated by that same
+/// canonical key, and keeps the raw id of the variant that played last so the
+/// entry resolves through its snapshot.
+///
+/// The live stream ([liveSermonId]) is never recorded: it is not a message
+/// that can be resumed or replayed, and its fixed id would hand one stream's
+/// position to the next.
 class PlaybackHistory {
   PlaybackHistory(this._cache);
 
@@ -43,6 +52,9 @@ class PlaybackHistory {
 
   /// Preference key of the snapshot list (read by `sermonByIdProvider`).
   static const String snapshotsKey = 'recent_sermon_snapshots';
+
+  /// Id of the live-stream pseudo-sermon the home hero plays.
+  static const String liveSermonId = 'live';
 
   /// Snapshots kept, newest first.
   static const int maxSnapshots = 30;
@@ -52,6 +64,8 @@ class PlaybackHistory {
 
   /// A saved position this close to the end counts as finished.
   static const Duration endGuard = Duration(seconds: 15);
+
+  static bool _isLive(Sermon sermon) => sermon.id == liveSermonId;
 
   static List<String> _keys(Sermon sermon) {
     final canonical = NoteTimelineKey.of(sermon).canonical;
@@ -70,6 +84,7 @@ class PlaybackHistory {
   void clearPosition(Sermon sermon) => _write(sermon, 0);
 
   void _write(Sermon sermon, int ms) {
+    if (_isLive(sermon)) return;
     for (final key in _keys(sermon)) {
       _cache.cachePlaybackPosition(key, ms);
     }
@@ -78,6 +93,7 @@ class PlaybackHistory {
   /// The last saved position, or zero. The canonical key wins; the raw id is
   /// the fallback for positions saved before keys were shared.
   Duration savedPosition(Sermon sermon) {
+    if (_isLive(sermon)) return Duration.zero;
     for (final key in _keys(sermon)) {
       final ms = _cache.getPlaybackPosition(key);
       if (ms > 0) return Duration(milliseconds: ms);
@@ -102,9 +118,30 @@ class PlaybackHistory {
 
   /// Records a real play: "Recently played" order plus a snapshot of the
   /// sermon, so the entry resolves even before the catalogue has loaded.
+  ///
+  /// Any other variant of the same message (the numeric API id vs the `yt_`
+  /// CMS doc vs the bare feed id) is dropped first, so one message is one
+  /// row whichever engine or variant played it.
   void recordPlay(Sermon sermon) {
+    if (_isLive(sermon)) return;
+    final key = NoteTimelineKey.of(sermon);
+    final snapshots = _rawSnapshots()
+      ..removeWhere((json) {
+        final id = json['id'] as String;
+        if (id == sermon.id ||
+            NoteTimelineKey.of(Sermon.fromJson(json)).canonical !=
+                key.canonical) {
+          return false;
+        }
+        _cache.removeRecentlyPlayed(id);
+        return true;
+      });
+    // Alias ids that may sit in the list without a snapshot.
+    for (final alias in {key.canonical, ?key.videoId}) {
+      if (alias != sermon.id) _cache.removeRecentlyPlayed(alias);
+    }
     _cache.addRecentlyPlayed(sermon.id);
-    _upsertSnapshot(sermon, moveToFront: true);
+    _upsertSnapshot(snapshots, sermon);
   }
 
   /// Fills in a length the catalogue did not know, once a player reports it.
@@ -120,8 +157,8 @@ class PlaybackHistory {
     _cache.cachePreference(snapshotsKey, snapshots);
   }
 
-  void _upsertSnapshot(Sermon sermon, {required bool moveToFront}) {
-    final snapshots = _rawSnapshots();
+  /// Moves [sermon]'s snapshot to the front of [snapshots] and persists them.
+  void _upsertSnapshot(List<Map<String, dynamic>> snapshots, Sermon sermon) {
     final existing = snapshots.indexWhere((s) => s['id'] == sermon.id);
     final json = sermon.toJson();
     if (existing >= 0) {

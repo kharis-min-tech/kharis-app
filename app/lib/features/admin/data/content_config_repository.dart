@@ -3,19 +3,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:kharis_app/features/home/data/reading_plan.dart'
     show readingDateKey;
-
-/// How the Messages tab picks its featured carousel (`config/featured.mode`).
-enum FeaturedMode {
-  /// The newest YouTube uploads, mapped to their audio twins. The default
-  /// whenever the doc or its `mode` is missing.
-  auto,
-
-  /// Firestore `sermons` docs the Studio starred (`isFeatured == true`).
-  pinned;
-
-  static FeaturedMode parse(Object? raw) =>
-      raw == 'pinned' ? FeaturedMode.pinned : FeaturedMode.auto;
-}
+import 'package:kharis_app/features/messages/data/curation_repository.dart'
+    show FeaturedMode;
 
 /// One scheduled Message of the Day: `motdSchedule/{dateKey}`.
 @immutable

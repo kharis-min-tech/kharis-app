@@ -34,6 +34,12 @@ export interface EventDoc {
   imageUrl?: string | null;
   isFeatured?: boolean;
   createdAt?: Timestamp;
+  /**
+   * Tombstone for a website-synced (`web_*`) event an admin deleted. The
+   * hourly sync recreates missing `web_*` docs, so Studio marks them hidden
+   * instead of deleting them; every reader must drop hidden docs.
+   */
+  hidden?: boolean;
 }
 
 export interface DailyContentDoc {

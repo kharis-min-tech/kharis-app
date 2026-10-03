@@ -1094,6 +1094,15 @@ class _FeaturedCarouselState extends State<_FeaturedCarousel> {
   }
 
   @override
+  void didUpdateWidget(covariant _FeaturedCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A shorter list (e.g. pinned picks replacing auto ones) must not leave
+    // the active dot past the end; the PageView clamps without telling us.
+    final last = widget.sermons.length - 1;
+    if (_currentPage > last) _currentPage = last < 0 ? 0 : last;
+  }
+
+  @override
   void dispose() {
     _pageCtrl.dispose();
     super.dispose();

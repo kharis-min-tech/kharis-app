@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show compute, kIsWeb;
 
 import 'package:kharis_app/core/constants/api_config.dart';
 import 'package:kharis_app/core/constants/http_constants.dart';
@@ -53,9 +53,11 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
     final data = resp.data ?? const <String, dynamic>{};
     final results = (data['results'] as List?) ?? const [];
     return SermonPage(
-      sermons: [
-        for (final r in results) mapApiSermon(r as Map<String, dynamic>),
-      ],
+      // Categorising runs hundreds of regexes per record; keep it off the UI
+      // isolate, which is scrolling while the archive drains.
+      sermons: results.isEmpty
+          ? const []
+          : await compute(mapApiSermons, results, debugLabel: 'mapApiSermons'),
       nextUrl: _nullableAbsolute(data['next'] as String?),
       totalCount: (data['count'] as num?)?.toInt() ?? 0,
     );
@@ -72,6 +74,12 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
   @override
   Future<List<Sermon>> loadCatalogue() => SermonRepository().loadCatalogue();
 }
+
+/// Maps one page of API sermon records. Top-level so [compute] can run it in
+/// a background isolate.
+List<Sermon> mapApiSermons(List<dynamic> results) => [
+  for (final r in results) mapApiSermon(r as Map<String, dynamic>),
+];
 
 /// Maps one API sermon record.
 ///

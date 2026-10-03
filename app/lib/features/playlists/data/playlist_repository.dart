@@ -185,11 +185,17 @@ class PlaylistRepository {
 
   /// Likes or unlikes [sermonId]. [playlistExists] says whether the liked
   /// playlist is already in the member's library: the first like creates it,
-  /// later ones update it in place.
+  /// later ones update it in place. Unliking also removes [aliases] (other
+  /// ids the same message was liked under).
+  ///
+  /// The create path merges rather than replaces: if the playlist does exist
+  /// after all (a snapshot that had not caught up, another device), the like
+  /// is added to it instead of overwriting every earlier one.
   void setLiked(
     String sermonId, {
     required bool liked,
     required bool playlistExists,
+    Iterable<String> aliases = const [],
   }) {
     final uid = _requireUid();
     final doc = _playlistsOf(uid).doc(likedPlaylistId);
@@ -199,10 +205,10 @@ class PlaylistRepository {
       _commit(
         doc.set({
           'name': likedPlaylistName,
-          'sermonIds': [sermonId],
+          'sermonIds': FieldValue.arrayUnion([sermonId]),
           'createdAt': now,
           'updatedAt': now,
-        }),
+        }, SetOptions(merge: true)),
         'like',
       );
       return;
@@ -211,7 +217,7 @@ class PlaylistRepository {
       doc.update({
         'sermonIds': liked
             ? FieldValue.arrayUnion([sermonId])
-            : FieldValue.arrayRemove([sermonId]),
+            : FieldValue.arrayRemove([sermonId, ...aliases]),
         'updatedAt': now,
       }),
       liked ? 'like' : 'unlike',

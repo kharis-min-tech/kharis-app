@@ -830,7 +830,7 @@
           <div class="card-title"><span class="dot"></span> <span id="event-form-title">Create Event</span></div>
           <div class="where-panel" id="ev-sync-warning" style="display:none;">
             <span class="where-title">From website</span>
-            This event is imported from kharis.org. Branch, featured and image edits stay, but title, time and venue edits may be overwritten by the next sync.
+            This event is imported from kharis.org. Branch, featured and image edits stay, but title, time and venue edits may be overwritten by the next sync. Remove hides it from the app for good (the sync keeps it hidden); to cancel it everywhere, remove it on the website.
           </div>
           <form id="event-form">
             <div class="field">
@@ -1539,7 +1539,9 @@ async function loadEvents() {
   try {
     const q      = query(collection(db, 'events'), orderBy('startTime', 'asc'));
     const snap   = await getDocs(q);
-    const events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Hidden docs are removed website events, kept only so the sync does not
+    // re-import them.
+    const events = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(ev => ev.hidden !== true);
     eventsById = new Map(events.map(ev => [ev.id, ev]));
     document.getElementById('events-count').textContent = events.length;
     renderEventList(events);
@@ -1585,7 +1587,9 @@ function renderEventList(events) {
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;">
         <button class="btn btn-secondary event-edit-btn" data-id="${escHtml(ev.id)}" style="font-size:12px;padding:6px 12px;">Edit</button>
-        <button class="btn btn-danger" data-id="${escHtml(ev.id)}" data-col="events">Delete</button>
+        ${isWebEvent(ev.id)
+          ? `<button class="btn btn-danger" data-id="${escHtml(ev.id)}" data-col="events" title="Hides this website event from the app. The hourly sync keeps it hidden.">Remove</button>`
+          : `<button class="btn btn-danger" data-id="${escHtml(ev.id)}" data-col="events">Delete</button>`}
       </div>
     `;
     ul.appendChild(item);
@@ -1691,8 +1695,9 @@ async function loadLinkableEvents() {
       limit(100),
     ));
     const cur = sel.value;
-    sel.innerHTML = '<option value="">None</option>' + snap.docs.map(d =>
-      `<option value="${escHtml(d.id)}">${escHtml(linkableEventLabel(d.data()))}</option>`).join('');
+    sel.innerHTML = '<option value="">None</option>' + snap.docs
+      .filter(d => d.data().hidden !== true)
+      .map(d => `<option value="${escHtml(d.id)}">${escHtml(linkableEventLabel(d.data()))}</option>`).join('');
     setLinkedEventValue(sel, cur);
   } catch (err) {
     toast('Could not load events to link: ' + err.message, 'error');
@@ -1972,6 +1977,13 @@ function isHttpUrl(value) {
   }
 }
 
+// isHttpUrl accepts `HTTPS://x`; store the scheme lower-cased so the `news`
+// rule and every reader's scheme check agree. Mirrors the app's
+// normaliseAnnouncementLink.
+function normaliseLink(value) {
+  return value.trim().replace(/^[a-z][a-z0-9+.-]*:/i, (scheme) => scheme.toLowerCase());
+}
+
 // Restates, before publishing, where the announcement lands and who sees it.
 // Driven by the same homeVisibility rules as the rows above.
 function updateNewsWherePreview() {
@@ -2059,9 +2071,15 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
   const editId = form.dataset.editId;
-  const linkUrl = document.getElementById('nw-link').value.trim();
+  const linkUrl = normaliseLink(document.getElementById('nw-link').value);
   if (linkUrl && !isHttpUrl(linkUrl)) {
     toast('Button link must be an http:// or https:// address', 'error');
+    return;
+  }
+  // Tapping an event-linked announcement opens the event, so a button link
+  // beside it would never be reachable.
+  if (linkUrl && document.getElementById('nw-event').value) {
+    toast('Choose a linked event or a button link, not both', 'error');
     return;
   }
   const ctaLabel = document.getElementById('nw-cta').value.trim().slice(0, 24);
@@ -2534,14 +2552,25 @@ document.getElementById('daily-form').addEventListener('submit', async (e) => {
 function attachDeleteListeners(root) {
   root.querySelectorAll('[data-col]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Delete this item?')) return;
       const colName = btn.dataset.col;
       const id      = btn.dataset.id;
+      // The hourly sync recreates any missing web_ event, so a website event
+      // is hidden with a tombstone the sync preserves instead of deleted.
+      const tombstone = colName === 'events' && isWebEvent(id);
+      const label = btn.textContent;
+      if (!confirm(tombstone
+        ? 'Remove this website event from the app? It stays hidden after every sync. To cancel it everywhere, remove it on kharis.org.'
+        : 'Delete this item?')) return;
       btn.disabled = true;
       btn.textContent = '…';
       try {
-        await deleteDoc(doc(db, colName, id));
-        toast('Deleted');
+        if (tombstone) {
+          await updateDoc(doc(db, colName, id), { hidden: true, hiddenAt: Timestamp.now() });
+          toast('Removed from the app');
+        } else {
+          await deleteDoc(doc(db, colName, id));
+          toast('Deleted');
+        }
         if (colName === 'events') {
           if (document.getElementById('event-form').dataset.editId === id) resetEventForm();
           loadEvents();
@@ -2553,7 +2582,7 @@ function attachDeleteListeners(root) {
       } catch (err) {
         toast(err.message, 'error');
         btn.disabled = false;
-        btn.textContent = 'Delete';
+        btn.textContent = label;
       }
     });
   });

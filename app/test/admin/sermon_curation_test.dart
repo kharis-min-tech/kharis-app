@@ -39,6 +39,7 @@ final _library = [
 Future<FakeFirebaseFirestore> _pumpScreen(
   WidgetTester tester, {
   Map<String, dynamic>? legacyMotd,
+  List<Sermon>? library,
 }) async {
   final db = FakeFirebaseFirestore();
   if (legacyMotd != null) {
@@ -51,7 +52,7 @@ Future<FakeFirebaseFirestore> _pumpScreen(
           ContentConfigRepository(firestore: db),
         ),
         adminSermonsProvider.overrideWith((ref) => Stream.value(const [])),
-        sermonsProvider.overrideWith((ref) async => _library),
+        sermonsProvider.overrideWith((ref) async => library ?? _library),
       ],
       child: const MaterialApp(home: AdminSermonsScreen()),
     ),
@@ -114,6 +115,36 @@ void main() {
       );
     },
   );
+
+  testWidgets('the offline catalogue (archive_ ids) can never be scheduled', (
+    tester,
+  ) async {
+    await _pumpScreen(
+      tester,
+      library: [
+        ..._library,
+        Sermon(
+          id: 'archive_12',
+          title: 'Bundled archive message',
+          speaker: 'Pastor Ade',
+          audioUrl: 'https://cdn.kharis.org/archive/12.mp3',
+          publishedAt: DateTime(2026, 9, 30),
+          source: 'archive',
+        ),
+      ],
+    );
+
+    await tester.tap(find.text('Choose message'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bundled archive message'), findsNothing);
+    expect(find.text('Newest audio message'), findsOneWidget);
+    expect(
+      find.textContaining('sermon library is offline'),
+      findsOneWidget,
+      reason: 'the admin learns why archive messages are missing',
+    );
+  });
 
   testWidgets('the legacy Message of the Day is moved into today on open', (
     tester,

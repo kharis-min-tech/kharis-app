@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -160,7 +162,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ? const <String>{}
         : ref.watch(dismissedNotificationsProvider);
 
-    _maybeOpenFocused(newsAsync.valueOrNull);
+    _maybeOpenFocused(newsAsync);
 
     final loading =
         (newsAsync.isLoading && !newsAsync.hasValue) ||
@@ -226,14 +228,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   /// Opens the pushed announcement once, after the feed that contains it has
   /// loaded. An id the feed does not hold (expired, other campus) just leaves
   /// the member on the list.
-  void _maybeOpenFocused(List<NewsItem>? news) {
+  ///
+  /// A push invalidates the feed before opening this screen, and while that
+  /// refetch runs the value is still the previous list, which does not hold
+  /// the new item. Only a settled value is searched.
+  void _maybeOpenFocused(AsyncValue<List<NewsItem>> newsAsync) {
     final id = widget.focusId;
-    if (_focusHandled || id == null || news == null) return;
+    if (_focusHandled || id == null) return;
+    final news = newsAsync.valueOrNull;
+    if (newsAsync.isLoading || news == null) return;
     _focusHandled = true;
     final match = news.where((n) => n.id == id).firstOrNull;
     if (match == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) openAnnouncement(context, match);
+      if (mounted) unawaited(openAnnouncement(context, match));
     });
   }
 
@@ -318,7 +326,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
     final news = item.news;
-    if (news != null) openAnnouncement(context, news);
+    if (news != null) unawaited(openAnnouncement(context, news));
   }
 
   void _dismiss(_NotifItem item) {

@@ -19,6 +19,10 @@ import 'package:just_audio_platform_interface/just_audio_platform_interface.dart
 class FakeJustAudioPlatform extends JustAudioPlatform {
   FakeAudioPlatformPlayer? player;
 
+  /// When set, the next load stays in [ProcessingStateMessage.loading] until
+  /// this completes: a slow network. Consumed by that one load.
+  Future<void>? holdNextLoad;
+
   /// Installs the fake platform and silences the audio_session channel.
   static FakeJustAudioPlatform install() {
     final platform = FakeJustAudioPlatform();
@@ -33,7 +37,7 @@ class FakeJustAudioPlatform extends JustAudioPlatform {
 
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
-    final created = FakeAudioPlatformPlayer(request.id);
+    final created = FakeAudioPlatformPlayer(request.id, this);
     player = created;
     return created;
   }
@@ -55,7 +59,13 @@ class FakeJustAudioPlatform extends JustAudioPlatform {
 }
 
 class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
-  FakeAudioPlatformPlayer(super.id);
+  FakeAudioPlatformPlayer(super.id, [this._platform]);
+
+  final FakeJustAudioPlatform? _platform;
+
+  /// Bumped per load, so a held load that a newer one replaced resolves
+  /// without touching the newer load's state (as the native players do).
+  int _loadSerial = 0;
 
   /// Length every loaded item reports.
   static const Duration itemDuration = Duration(minutes: 30);
@@ -111,6 +121,7 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
+    final serial = ++_loadSerial;
     loads.add(request);
     final source = request.audioSourceMessage;
     _length = source is ConcatenatingAudioSourceMessage
@@ -118,7 +129,11 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
         : 1;
     _state = ProcessingStateMessage.loading;
     _broadcast();
+    final hold = _platform?.holdNextLoad;
+    _platform?.holdNextLoad = null;
+    if (hold != null) await hold;
     await Future<void>.delayed(Duration.zero);
+    if (serial != _loadSerial) return LoadResponse(duration: itemDuration);
     _index = request.initialIndex ?? 0;
     _position = request.initialPosition ?? Duration.zero;
     _state = ProcessingStateMessage.ready;

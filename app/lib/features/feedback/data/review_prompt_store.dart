@@ -20,6 +20,7 @@ class ReviewPromptStore {
   static const _kSheetShows = 'review_sheet_auto_shows';
   static const _kNativeAt = 'review_native_last_ms';
   static const _kNativeCount = 'review_native_requests';
+  static const _kOptedOut = 'review_sheet_opted_out';
 
   /// Written by the retired quarterly launch nudge (KA-012). A member it
   /// already asked keeps that date, so the cutover never re-prompts early.
@@ -42,6 +43,7 @@ class ReviewPromptStore {
       sheetAutoShows: _prefs.getInt(_kSheetShows) ?? 0,
       lastNativeAt: _time(_kNativeAt),
       nativeRequests: _prefs.getInt(_kNativeCount) ?? 0,
+      optedOut: _prefs.getBool(_kOptedOut) ?? false,
     );
   }
 
@@ -65,12 +67,16 @@ class ReviewPromptStore {
 
   /// Records how the sheet was left, from either the automatic prompt or the
   /// Settings entry, so a member who just sent feedback is not asked again.
+  /// An opt-out is also stored on its own key so no later outcome undoes it.
   Future<void> recordSheetOutcome(
     FeedbackSheetOutcome outcome,
     DateTime now,
   ) async {
     await _prefs.setInt(_kSheetAt, now.millisecondsSinceEpoch);
     await _prefs.setString(_kSheetOutcome, outcome.name);
+    if (outcome == FeedbackSheetOutcome.optOut) {
+      await _prefs.setBool(_kOptedOut, true);
+    }
   }
 
   Future<void> recordNativeRequested(DateTime now) async {

@@ -4,10 +4,13 @@ import { Timestamp } from 'firebase-admin/firestore';
 import {
   campusesFor,
   changedFields,
+  eventCampuses,
+  getAllPages,
   monthRequestBody,
   parseCalendarConfig,
   parseEventonResponse,
   webEventDocId,
+  webEventWrite,
 } from '../src/sync-website-events';
 
 // Shapes copied from kharis.org (EventON Lite 2.5.9), trimmed.
@@ -99,4 +102,61 @@ test('re-sync writes only the site fields that changed', () => {
   const fields = { title: 'Sunday Service', startTime: Timestamp.fromMillis(1000), location: 'New Hall' };
   assert.deepEqual(changedFields(stored, fields), { location: 'New Hall' });
   assert.deepEqual(changedFields(stored, { title: 'Sunday Service' }), {});
+});
+
+test('an occurrence whose post or campus terms did not resolve is skipped, not all-campus', () => {
+  const terms = { 7: 'Kharis London' };
+  const branches = ['London'];
+  // The post is missing from the include= response.
+  assert.deepEqual(eventCampuses(undefined, terms, branches), {
+    campuses: [],
+    skip: 'post not returned by the REST API',
+  });
+  // A term id the event_type listing did not name.
+  assert.deepEqual(eventCampuses({ id: 1, event_type: [7, 99] }, terms, branches), {
+    campuses: [],
+    skip: 'unresolved event_type 99',
+  });
+  assert.deepEqual(eventCampuses({ id: 1, event_type: [7] }, terms, branches), {
+    campuses: ['London'],
+    skip: null,
+  });
+  // A post with genuinely no campus term is still all-campus.
+  assert.deepEqual(eventCampuses({ id: 1, event_type: [] }, terms, branches), {
+    campuses: [null],
+    skip: null,
+  });
+});
+
+test('a hidden tombstone survives the sync; missing docs are created', () => {
+  const fields = { title: 'Sunday Service', location: 'New Hall' };
+  assert.deepEqual(webEventWrite(undefined, fields), { kind: 'create' });
+  assert.deepEqual(
+    webEventWrite({ title: 'Sunday Service', location: 'Hall', hidden: true }, fields),
+    { kind: 'keep' },
+  );
+  assert.deepEqual(webEventWrite({ title: 'Sunday Service', location: 'Hall' }, fields), {
+    kind: 'update',
+    changed: { location: 'New Hall' },
+  });
+  assert.deepEqual(webEventWrite({ ...fields }, fields), { kind: 'keep' });
+});
+
+test('REST collections are read to the last page', async () => {
+  const asked: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => {
+    asked.push(url);
+    const page = Number(new URL(url).searchParams.get('page'));
+    return new Response(JSON.stringify([{ id: page }]), {
+      headers: { 'X-WP-TotalPages': '3' },
+    });
+  }) as typeof fetch;
+  try {
+    const items = await getAllPages<{ id: number }>('https://kharis.org/wp-json/wp/v2/event_type?per_page=100');
+    assert.deepEqual(items.map((i) => i.id), [1, 2, 3]);
+    assert.equal(asked.length, 3);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

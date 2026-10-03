@@ -7,6 +7,8 @@ import 'package:kharis_app/features/admin/presentation/widgets/studio_form_kit.d
 import 'package:kharis_app/features/admin/providers/content_config_providers.dart';
 import 'package:kharis_app/features/home/data/reading_plan.dart'
     show dateOnly, parseReadingDate;
+import 'package:kharis_app/features/messages/data/curation_repository.dart'
+    show FeaturedMode;
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
@@ -314,6 +316,10 @@ class _MotdScheduleCardState extends ConsumerState<MotdScheduleCard> {
 
 /// Searchable list of playable messages (non-empty audio), newest first.
 /// Pops the chosen [Sermon].
+///
+/// The bundled offline catalogue (`archive_*` ids, shown while the API is
+/// unreachable) is never offered: members online cannot resolve those ids,
+/// so the day would silently fall back to the automatic pick.
 class MotdSermonPickerSheet extends ConsumerStatefulWidget {
   const MotdSermonPickerSheet({super.key});
 
@@ -337,6 +343,7 @@ class _MotdSermonPickerSheetState extends ConsumerState<MotdSermonPickerSheet> {
     final playable =
         sermons
             .where((s) => s.audioUrl.trim().isNotEmpty)
+            .where((s) => s.source != 'archive')
             .where(
               (s) =>
                   q.isEmpty ||
@@ -358,6 +365,9 @@ class _MotdSermonPickerSheetState extends ConsumerState<MotdSermonPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final sermons = ref.watch(sermonsProvider);
+    // The library is serving its bundled offline catalogue.
+    final offline =
+        sermons.valueOrNull?.any((s) => s.source == 'archive') ?? false;
     final dateFmt = DateFormat('d MMM y');
 
     // A Material surface (not a coloured box) so the ListTiles' ink shows.
@@ -406,6 +416,11 @@ class _MotdSermonPickerSheetState extends ConsumerState<MotdSermonPickerSheet> {
                   ),
               onChanged: (value) => setState(() => _query = value),
             ),
+            if (offline)
+              _muted(
+                'The sermon library is offline, so only Studio messages can '
+                'be chosen. Try again once it reconnects.',
+              ),
             const SizedBox(height: AppSpacing.sm),
             Expanded(
               child: sermons.when(

@@ -114,12 +114,19 @@ jobs:
 
       - name: Build App Bundle
         working-directory: app
+        # The input reaches the shell as data, never as script text.
+        env:
+          BUILD_NUMBER: ${{ github.event.inputs.build_number }}
         run: |
-          EXTRA=""
-          if [ -n "${{ github.event.inputs.build_number }}" ]; then
-            EXTRA="--build-number=${{ github.event.inputs.build_number }}"
+          EXTRA=()
+          if [ -n "$BUILD_NUMBER" ]; then
+            if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+              echo "::error::build_number must be digits only"
+              exit 1
+            fi
+            EXTRA=(--build-number="$BUILD_NUMBER")
           fi
-          flutter build appbundle --release --dart-define-from-file=env.json $EXTRA
+          flutter build appbundle --release --dart-define-from-file=env.json "${EXTRA[@]}"
 
       - name: Upload .aab artifact
         uses: actions/upload-artifact@v4
