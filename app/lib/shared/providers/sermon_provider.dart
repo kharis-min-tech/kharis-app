@@ -52,6 +52,7 @@ class SermonLibrary {
     this.offline = false,
     this.hydrating = false,
     this.hydrationFailed = false,
+    this.incomplete = false,
     this.fetchedAt,
   });
 
@@ -84,10 +85,20 @@ class SermonLibrary {
   /// until the member retries.
   final bool hydrationFailed;
 
+  /// Every page was walked, and so were the extra gap-fill walks, yet the
+  /// library still does not hold [totalCount] sermons. The UI shows the
+  /// honest count with a manual retry instead of an end marker.
+  final bool incomplete;
+
   /// When the whole archive was last walked; null before the first walk.
   final DateTime? fetchedAt;
 
   bool get hasMore => nextUrl != null;
+
+  /// The library holds a different number of sermons than the server
+  /// reports. Dedupe is by id, so this is never inflated by a record seen
+  /// twice; it means a walk skipped (or kept) something.
+  bool get countMismatch => totalCount > 0 && sermons.length != totalCount;
 
   /// More sermons are still expected to arrive on their own: the library has
   /// not loaded yet, or older pages are being drained and have not failed.
@@ -104,6 +115,7 @@ class SermonLibrary {
     bool? offline,
     bool? hydrating,
     bool? hydrationFailed,
+    bool? incomplete,
     DateTime? fetchedAt,
   }) => SermonLibrary(
     sermons: sermons ?? this.sermons,
@@ -115,6 +127,7 @@ class SermonLibrary {
     offline: offline ?? this.offline,
     hydrating: hydrating ?? this.hydrating,
     hydrationFailed: hydrationFailed ?? this.hydrationFailed,
+    incomplete: incomplete ?? this.incomplete,
     fetchedAt: fetchedAt ?? this.fetchedAt,
   );
 }
@@ -138,6 +151,12 @@ Duration defaultArchiveBackoff(int attempt) {
 /// Failures retry with [backoff] (page 1 and the archive walk alike) instead
 /// of waiting for the member to scroll; after [maxAttempts] the walk stops
 /// and [SermonLibrary.hydrationFailed] lets the UI offer a manual retry.
+///
+/// The API pages by offset, so a record that moves up a page while a walk is
+/// in flight is never served to it. A walk that ends short of the server's
+/// count therefore re-walks every page from page 1 and merges by id, at most
+/// [maxGapFillWalks] times a session (the second after [backoff]); still
+/// short, the library is marked [SermonLibrary.incomplete].
 class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   SermonLibraryNotifier(
     this._repo, {
@@ -146,6 +165,7 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
     Duration Function(int attempt)? backoff,
     this.maxAge = const Duration(hours: 24),
     this.maxAttempts = 5,
+    this.maxGapFillWalks = 2,
     DateTime Function()? clock,
   }) : _backoff = backoff ?? defaultArchiveBackoff,
        _clock = clock ?? DateTime.now,
@@ -167,12 +187,19 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   /// Automatic retries before the walk gives up.
   final int maxAttempts;
 
+  /// Extra whole-archive walks a session may spend recovering records a walk
+  /// skipped.
+  final int maxGapFillWalks;
+
   final Duration Function(int attempt) _backoff;
   final DateTime Function() _clock;
 
   bool _hydrating = false;
   int _attempt = 0;
   Timer? _retryTimer;
+
+  /// Gap-fill walks started this session, against [maxGapFillWalks].
+  int _gapFillWalks = 0;
 
   /// Page 1 as last fetched: the head of a revalidating walk.
   SermonPage? _firstPage;
@@ -233,9 +260,11 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
         ...tail.where((s) => seen.add(s.id)),
       ];
       final hasArchive = state.fetchedAt != null && !state.usedFallback;
+      // A held count that differs from the server's either way (a skipped
+      // record, or one deleted upstream) is walked again, never trusted.
       final complete =
           page.nextUrl == null ||
-          (hasArchive && merged.length >= page.totalCount);
+          (hasArchive && merged.length == page.totalCount);
       // Page 1 only adds new arrivals at the head. A walk already past it
       // (running, or paused between retries) keeps its cursor: pointing it
       // back at page 2 would re-fetch every page the library already holds.
@@ -250,7 +279,10 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
         usedFallback: false,
         offline: false,
       );
-      if (page.nextUrl == null) _markWalked();
+      if (page.nextUrl == null) {
+        _markWalked();
+        unawaited(_afterWalk());
+      }
       return true;
     } catch (_) {
       if (!mounted) return false;
@@ -294,29 +326,77 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
       _persist();
       return;
     }
+    await _walk(
+      fetchedAt == null ? _drain : _rewalk,
+      retry: () => hydrateArchive(revalidate: revalidate),
+    );
+  }
+
+  /// Re-walks every page from page 1 and merges by id, to recover records a
+  /// walk skipped. Automatic gap fills spend the session's
+  /// [maxGapFillWalks]; a [manual] one (the footer's Retry) does not.
+  Future<void> _fillGap({bool manual = false}) async {
+    if (_hydrating || !mounted || !state.loaded || state.usedFallback) return;
+    if (state.hasMore || !state.countMismatch) return;
+    if (!manual) {
+      if (_gapFillWalks >= maxGapFillWalks) {
+        state = state.copyWith(incomplete: true);
+        return;
+      }
+      _gapFillWalks++;
+    }
+    await _walk(() => _rewalk(gapFill: true), retry: _fillGap);
+  }
+
+  /// Runs one walk with the shared hydrating flag, failure retries and the
+  /// gap check once it lands.
+  Future<void> _walk(
+    Future<void> Function() walk, {
+    required Future<void> Function() retry,
+  }) async {
     _hydrating = true;
     state = state.copyWith(hydrating: true, hydrationFailed: false);
+    var walked = false;
     try {
-      if (fetchedAt == null) {
-        await _drain();
-      } else {
-        await _rewalk();
-      }
+      await walk();
       _attempt = 0;
+      walked = true;
     } catch (_) {
       if (!mounted) return;
       if (_attempt + 1 >= maxAttempts) {
         _attempt = 0;
         // Out of automatic retries. A complete cached archive is still
         // good, so only an incomplete library reports the failure.
-        state = state.copyWith(hydrationFailed: state.hasMore);
+        state = state.copyWith(
+          hydrationFailed: state.hasMore,
+          incomplete: !state.hasMore && state.countMismatch,
+        );
       } else {
-        _scheduleRetry(() => hydrateArchive(revalidate: revalidate));
+        _scheduleRetry(retry);
       }
     } finally {
       _hydrating = false;
       if (mounted) state = state.copyWith(hydrating: false);
     }
+    if (walked) await _afterWalk();
+  }
+
+  /// A walk reached the last page. A library that holds what the server
+  /// reports is finished; one that does not gets a gap fill (the first at
+  /// once, the next after [backoff]) until the session's extra walks run
+  /// out, and is then marked [SermonLibrary.incomplete].
+  Future<void> _afterWalk() async {
+    if (!mounted || _hydrating || state.hasMore) return;
+    if (!state.countMismatch) {
+      if (state.incomplete) state = state.copyWith(incomplete: false);
+      return;
+    }
+    if (!autoHydrate || _gapFillWalks >= maxGapFillWalks) {
+      state = state.copyWith(incomplete: true);
+      return;
+    }
+    if (_gapFillWalks == 0) return _fillGap();
+    _scheduleRetry(_fillGap);
   }
 
   /// Appends pages in place, so the list fills as they land.
@@ -331,8 +411,14 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
 
   /// Walks every page into a fresh list, then swaps it in whole. The cached
   /// archive stays on screen meanwhile; a failure mid-walk leaves it intact.
-  Future<void> _rewalk() async {
-    final head = _firstPage!;
+  ///
+  /// A [gapFill] walk refetches page 1 too (a skipped record may have moved
+  /// up onto it) and, when the walk itself comes up short, keeps what the
+  /// library already holds, merged by id.
+  Future<void> _rewalk({bool gapFill = false}) async {
+    final head = gapFill ? await _repo.fetchPage() : _firstPage!;
+    if (!mounted) return;
+    if (gapFill) _firstPage = head;
     final older = <Sermon>[];
     var url = head.nextUrl;
     var total = head.totalCount;
@@ -352,8 +438,17 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
       ...head.sermons.where((s) => seen.add(s.id)),
       ...older.where((s) => seen.add(s.id)),
     ];
+    var sermons = fresh;
+    if (gapFill && total > 0 && fresh.length < total) {
+      // Each walk can skip a different record; together they cover them.
+      // A union past the server's count means something held was deleted
+      // upstream, so the walk just made is kept instead: never more than
+      // the server lists.
+      final union = _mergeById(fresh, state.sermons);
+      if (union.length <= total) sermons = union;
+    }
     state = state.copyWith(
-      sermons: fresh,
+      sermons: sermons,
       clearNextUrl: true,
       totalCount: total,
     );
@@ -418,17 +513,24 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
       if (!mounted) return;
       _append(page);
       state = state.copyWith(isLoadingMore: false);
-      if (!state.hasMore) _markWalked();
     } catch (_) {
-      if (!mounted) return;
-      state = state.copyWith(isLoadingMore: false);
+      if (mounted) state = state.copyWith(isLoadingMore: false);
+      return;
+    }
+    if (!state.hasMore) {
+      _markWalked();
+      await _afterWalk();
     }
   }
 
-  /// Retries a walk that gave up ([SermonLibrary.hydrationFailed]).
+  /// Retries a walk that gave up ([SermonLibrary.hydrationFailed]), or
+  /// re-walks a library that came up short ([SermonLibrary.incomplete]).
   Future<void> retryHydration() {
     _retryTimer?.cancel();
     _attempt = 0;
+    if (state.fetchedAt != null && !state.hasMore && state.countMismatch) {
+      return _fillGap(manual: true);
+    }
     return hydrateArchive();
   }
 
@@ -449,6 +551,29 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
     _retryTimer?.cancel();
     super.dispose();
   }
+}
+
+/// [primary] with every sermon of [secondary] it lacks, each slotted in
+/// after the sermon that preceded it in [secondary], so archive order holds.
+/// One entry per id.
+List<Sermon> _mergeById(List<Sermon> primary, List<Sermon> secondary) {
+  final ids = {for (final s in primary) s.id};
+  final added = <String>{};
+  final head = <Sermon>[];
+  final after = <String, List<Sermon>>{};
+  String? anchor;
+  for (final s in secondary) {
+    if (ids.contains(s.id)) {
+      anchor = s.id;
+    } else if (added.add(s.id)) {
+      (anchor == null ? head : after.putIfAbsent(anchor, () => [])).add(s);
+    }
+  }
+  if (head.isEmpty && after.isEmpty) return primary;
+  return [
+    ...head,
+    for (final s in primary) ...[s, ...?after[s.id]],
+  ];
 }
 
 /// Disk cache for the hydrated archive. Overridden in `main.dart`; stays null

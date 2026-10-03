@@ -81,6 +81,13 @@ class _ArchiveAdapter implements HttpClientAdapter {
   /// Pages that wait for their completer before answering (once).
   final hold = <int, Completer<void>>{};
 
+  /// Runs once, just before the page is served: lets a test reorder the
+  /// archive between two requests of a walk.
+  final beforeServe = <int, void Function()>{};
+
+  /// Record ids the server counts but never serves.
+  final hidden = <int>{};
+
   int get pageCount => (records.length / _pageSize).ceil();
 
   @override
@@ -95,6 +102,7 @@ class _ArchiveAdapter implements HttpClientAdapter {
       return ResponseBody.fromString('{}', 500);
     }
     await hold.remove(page)?.future;
+    beforeServe.remove(page)?.call();
     final start = (page - 1) * _pageSize;
     final end = (start + _pageSize).clamp(0, records.length);
     final body = {
@@ -103,7 +111,10 @@ class _ArchiveAdapter implements HttpClientAdapter {
           ? 'https://x.test/api/sermons/?page=${page + 1}'
           : null,
       'previous': null,
-      'results': records.sublist(start, end),
+      'results': [
+        for (final r in records.sublist(start, end))
+          if (!hidden.contains(r['id'])) r,
+      ],
     };
     return ResponseBody.fromString(
       jsonEncode(body),
@@ -173,12 +184,15 @@ void main() {
     expect(done(), isTrue, reason: 'library never settled');
   }
 
+  /// The walk, and any gap fill it set off, is over: the library holds what
+  /// the server lists, or has been marked incomplete.
   bool complete(ProviderContainer c) {
     final lib = c.read(sermonLibraryProvider);
     return lib.loaded &&
         !lib.hasMore &&
         !lib.hydrating &&
-        lib.fetchedAt != null;
+        lib.fetchedAt != null &&
+        (!lib.countMismatch || lib.incomplete);
   }
 
   test('hydrates all 1,489 sermons across 30 pages back to 2013', () async {
@@ -362,5 +376,138 @@ void main() {
     final lib = container.read(sermonLibraryProvider);
     expect(lib.sermons.first.title, 'Brand new message');
     expect(lib.sermons.length, 1490);
+  });
+
+  group('gap fill (offset pages shift mid-walk)', () {
+    /// Moves the record at [from] to [to] in the live archive, the way an
+    /// upstream date edit reorders an offset-paged listing.
+    void move(_ArchiveAdapter adapter, int from, int to) {
+      final live = [...adapter.records];
+      live.insert(to, live.removeAt(from));
+      adapter.records = live;
+    }
+
+    List<String> ids(ProviderContainer c) => [
+      for (final s in c.read(sermonLibraryProvider).sermons) s.id,
+    ];
+
+    test('a record that moves from page 2 to page 1 during the first walk '
+        'is recovered by one automatic gap-fill walk', () async {
+      final (container, adapter) = harness();
+      final movedId = '${adapter.records[60]['id']}';
+      // Page 1 has been served; before page 2 is, the record moves up onto
+      // page 1, so the first walk never sees it (1,488 of 1,489).
+      adapter.beforeServe[2] = () => move(adapter, 60, 10);
+      await settle(container, () => complete(container));
+
+      final lib = container.read(sermonLibraryProvider);
+      expect(lib.totalCount, 1489);
+      expect(lib.sermons.length, 1489);
+      expect(ids(container).toSet(), hasLength(1489), reason: 'no doubles');
+      expect(ids(container), contains(movedId));
+      expect(lib.incomplete, isFalse);
+      expect(lib.hydrationFailed, isFalse);
+      expect(
+        adapter.requestedPages,
+        [for (var p = 1; p <= 30; p++) p, for (var p = 1; p <= 30; p++) p],
+        reason: 'the first walk, then one gap-fill walk from page 1',
+      );
+      expect(ids(container), [
+        for (final r in adapter.records) '${r['id']}',
+      ], reason: 'a full gap-fill walk takes the server order');
+    });
+
+    test('a gap-fill walk that skips a different record merges by id with '
+        'what is held', () async {
+      final (container, adapter) = harness();
+      final first = '${adapter.records[60]['id']}';
+      final second = '${adapter.records[120]['id']}';
+      adapter.beforeServe[2] = () {
+        move(adapter, 60, 10);
+        // The gap-fill walk is caught out the same way, by another record.
+        adapter.beforeServe[2] = () => move(adapter, 120, 20);
+      };
+      await settle(container, () => complete(container));
+
+      final lib = container.read(sermonLibraryProvider);
+      expect(lib.sermons.length, 1489);
+      expect(ids(container).toSet(), hasLength(1489), reason: 'no doubles');
+      expect(ids(container), containsAll([first, second]));
+      expect(lib.incomplete, isFalse);
+      expect(
+        adapter.requestedPages,
+        hasLength(60),
+        reason: 'the merge completes it; no second gap-fill walk',
+      );
+    });
+
+    test('a record the server counts but never serves ends incomplete after '
+        'two gap-fill walks; a manual retry recovers it', () async {
+      final (container, adapter) = harness();
+      final missing = adapter.records[700]['id'] as int;
+      adapter.hidden.add(missing);
+      await settle(container, () => complete(container));
+
+      var lib = container.read(sermonLibraryProvider);
+      expect(lib.sermons.length, 1488);
+      expect(lib.totalCount, 1489);
+      expect(lib.incomplete, isTrue);
+      expect(lib.hydrationFailed, isFalse);
+      expect(adapter.requestedPages, hasLength(90));
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(
+        adapter.requestedPages,
+        hasLength(90),
+        reason: 'the first walk plus at most two gap-fill walks a session',
+      );
+
+      adapter.hidden.clear();
+      await container.read(sermonLibraryProvider.notifier).retryHydration();
+      lib = container.read(sermonLibraryProvider);
+      expect(lib.sermons.length, 1489);
+      expect(ids(container), contains('$missing'));
+      expect(lib.incomplete, isFalse);
+      expect(adapter.requestedPages, hasLength(120));
+    });
+
+    test(
+      'a walk that matches the server count spends no gap-fill walk',
+      () async {
+        final (container, adapter) = harness();
+        await settle(container, () => complete(container));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(adapter.requestedPages, hasLength(30));
+        expect(container.read(sermonLibraryProvider).incomplete, isFalse);
+      },
+    );
+
+    test('a fresh cached archive holding a record deleted upstream is '
+        're-walked, not trusted', () async {
+      final records = _archive();
+      final store = _MemoryStore(
+        SermonArchiveSnapshot(
+          sermons: [for (final r in records) mapApiSermon(r)],
+          fetchedAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        ),
+      );
+      final live = [...records];
+      final removedId = '${live.removeAt(900)['id']}';
+      final before = DateTime.now();
+      final (container, adapter) = harness(store: store, records: live);
+      await settle(
+        container,
+        () =>
+            complete(container) &&
+            container.read(sermonLibraryProvider).fetchedAt!.isAfter(before),
+      );
+
+      final lib = container.read(sermonLibraryProvider);
+      expect(lib.sermons.length, 1488);
+      expect(lib.totalCount, 1488);
+      expect(ids(container), isNot(contains(removedId)));
+      expect(adapter.requestedPages, hasLength(30));
+    });
   });
 }
