@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kharis Church — Admin</title>
+  <title>Kharis Church · Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Maven+Pro:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
@@ -118,6 +118,8 @@
     input[type="url"],
     input[type="date"],
     input[type="datetime-local"],
+    input[type="time"],
+    input[type="search"],
     input[type="number"],
     select,
     textarea {
@@ -466,6 +468,21 @@
 
     .meta-chip.motd { background: rgba(255, 209, 102, 0.18); color: #FFD166; }
 
+    .meta-chip.warn { background: rgba(253, 127, 32, 0.18); color: var(--orange); }
+
+    /* Inline form problems: unloaded branch list, reading plan out of bounds. */
+    .inline-error {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--danger);
+      font-size: 12px;
+      margin: -8px 0 14px;
+    }
+
+    .muted-line { color: var(--muted); font-size: 12px; margin: -8px 0 14px; }
+
     /* Home-screen verdict for an announcement: is it actually showing, and
        to whom. Loud on purpose — it is the first thing to read on the row. */
     .home-chip {
@@ -479,6 +496,7 @@
     }
     .home-chip.live   { background: rgba(34, 197, 94, 0.16);  color: var(--success); }
     .home-chip.hidden { background: rgba(255, 87, 87, 0.16);  color: var(--danger); }
+    .home-chip.scheduled { background: rgba(253, 127, 32, 0.16); color: var(--orange); }
 
     /* "Where this shows" panel under the compose form's branch/expiry fields. */
     .where-panel {
@@ -709,17 +727,17 @@
     <button class="tab-btn" data-tab="sermons">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
       Sermons
-      <span class="count-badge" id="sermons-count">—</span>
+      <span class="count-badge" id="sermons-count">…</span>
     </button>
     <button class="tab-btn active" data-tab="events">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Events
-      <span class="count-badge" id="events-count">—</span>
+      <span class="count-badge" id="events-count">…</span>
     </button>
     <button class="tab-btn" data-tab="news">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8a4 4 0 0 1 0 8"/><path d="M17.5 5a8 8 0 0 1 0 14"/></svg>
       Announcements
-      <span class="count-badge" id="news-count">—</span>
+      <span class="count-badge" id="news-count">…</span>
     </button>
     <button class="tab-btn" data-tab="daily">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -733,12 +751,12 @@
     <button class="tab-btn" data-tab="submissions">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Submissions
-      <span class="count-badge" id="subs-count">—</span>
+      <span class="count-badge" id="subs-count">…</span>
     </button>
     <button class="tab-btn" data-tab="branches">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
       Branches
-      <span class="count-badge" id="branches-count">—</span>
+      <span class="count-badge" id="branches-count">…</span>
     </button>
     </nav>
 
@@ -753,13 +771,39 @@
     <!-- ── Sermons Tab ──────────────────────────────────────────────────────── -->
     <div class="tab-pane" id="tab-sermons">
       <div>
+        <div class="card" id="motd-card" style="max-width:100%;margin-bottom:20px;">
+          <div class="card-title"><span class="dot"></span> Message of the Day</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Pick a date, then schedule a sermon from the archive search below or with the sun on any library sermon.</p>
+          <div class="field-row">
+            <div class="field">
+              <label for="motd-date">Date</label>
+              <input type="date" id="motd-date" />
+            </div>
+            <div class="field">
+              <label for="motd-search">Search the sermon archive</label>
+              <input type="search" id="motd-search" placeholder="Title, preacher or series" autocomplete="off" />
+            </div>
+          </div>
+          <div class="where-panel" id="motd-selected"></div>
+          <div class="item-list" id="motd-results" style="max-height:360px;overflow-y:auto;margin-bottom:20px;"></div>
+          <div class="list-header" style="margin-bottom:8px;">
+            <span class="list-section-title">Upcoming</span>
+          </div>
+          <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">Days without a scheduled message use an automatic pick from the last 90 days.</p>
+          <div id="motd-upcoming"></div>
+        </div>
         <div class="card" style="max-width:100%">
           <div class="card-title"><span class="dot"></span> Sermon Library</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Library holds synced sermons (auto-synced hourly). Switch to YouTube Channel to search everything on the Kharis Church / David Antwi channel and feature any video on the app's Messages page.</p>
-          <div id="motd-banner" style="display:none;align-items:center;gap:10px;background:rgba(255,209,102,0.08);border:1px solid rgba(255,209,102,0.3);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;">
-            <span style="color:#FFD166;display:inline-flex;flex-shrink:0;" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5" fill="currentColor"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
-            <span id="motd-banner-text" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-            <button class="btn btn-secondary" id="motd-clear-btn" style="font-size:12px;padding:5px 12px;flex-shrink:0;">Clear</button>
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="font-size:12px;font-weight:600;color:var(--muted);">Featured:</span>
+              <div class="seg" role="radiogroup" aria-label="Featured sermons" style="margin-bottom:0;">
+                <button type="button" class="seg-btn" role="radio" data-featured-mode="auto" disabled>Auto (latest uploads)</button>
+                <button type="button" class="seg-btn" role="radio" data-featured-mode="pinned" disabled>Pinned</button>
+              </div>
+            </div>
+            <p id="featured-auto-hint" style="display:none;color:var(--muted);font-size:12px;margin-top:6px;">Stars only take effect in Pinned mode. Auto shows the newest YouTube uploads.</p>
           </div>
           <div class="seg" role="tablist" aria-label="Sermon source">
             <button type="button" class="seg-btn active" id="src-library">Library</button>
@@ -783,7 +827,11 @@
 
         <!-- Form -->
         <div class="card">
-          <div class="card-title"><span class="dot"></span> Create Event</div>
+          <div class="card-title"><span class="dot"></span> <span id="event-form-title">Create Event</span></div>
+          <div class="where-panel" id="ev-sync-warning" style="display:none;">
+            <span class="where-title">From website</span>
+            This event is imported from kharis.org. Branch, featured and image edits stay, but title, time and venue edits may be overwritten by the next sync.
+          </div>
           <form id="event-form">
             <div class="field">
               <label for="ev-title">Title *</label>
@@ -794,23 +842,24 @@
               <textarea id="ev-desc" placeholder="Brief description of the event…" style="min-height:80px;"></textarea>
             </div>
             <div class="field">
-              <label for="ev-location">Location</label>
+              <label for="ev-location">Venue name</label>
               <input type="text" id="ev-location" placeholder="e.g. Main Auditorium" />
             </div>
             <div class="field">
+              <label for="ev-address">Address</label>
+              <input type="text" id="ev-address" placeholder="e.g. 12 High Street, Chatham ME4 4AA" />
+            </div>
+            <div class="field">
+              <label for="ev-image">Image URL</label>
+              <input type="url" id="ev-image" placeholder="https://…" />
+            </div>
+            <div class="field">
               <label for="ev-branch">Branch</label>
-              <select id="ev-branch">
-                <option value="">All Branches</option>
-                <option value="London">London</option>
-                <option value="Birmingham">Birmingham</option>
-                <option value="Reading">Reading</option>
-                <option value="Chatham">Chatham</option>
-                <option value="Croydon">Croydon</option>
-                <option value="Medway">Medway</option>
-                <option value="Accra">Accra</option>
-                <option value="Freetown">Freetown</option>
+              <select id="ev-branch" disabled>
+                <option value="">All campuses</option>
               </select>
             </div>
+            <div class="inline-error" id="ev-branch-error" style="display:none;"></div>
             <div class="field-row">
               <div class="field">
                 <label for="ev-start">Start Date &amp; Time *</label>
@@ -825,9 +874,10 @@
               <input type="checkbox" id="ev-featured" />
               <label for="ev-featured">Mark as Featured</label>
             </div>
-            <button type="submit" class="btn btn-primary btn-full" id="event-submit-btn">
-              Create Event
-            </button>
+            <div style="display:flex;gap:8px;">
+              <button type="submit" class="btn btn-primary" id="event-submit-btn" style="flex:1;" disabled>Create Event</button>
+              <button type="button" class="btn btn-secondary" id="ev-cancel-btn" style="display:none;">Cancel</button>
+            </div>
           </form>
         </div>
 
@@ -853,9 +903,9 @@
 
         <!-- Form -->
         <div class="card">
-          <div class="card-title"><span class="dot"></span> Publish Announcement</div>
+          <div class="card-title"><span class="dot"></span> <span id="news-form-title">Publish Announcement</span></div>
           <p style="font-size:12px;color:var(--muted);margin:-4px 0 14px;">
-            An announcement is a message to the church — headline, body, optional image, optional expiry.
+            An announcement is a message to the church: headline, body, optional image, optional expiry.
             It shows in the announcements carousel on the <strong>app home screen</strong>.
             Anything with a date and a venue that people RSVP to belongs in the <strong>Events</strong> tab.
           </p>
@@ -884,18 +934,26 @@
               </div>
               <div class="field">
                 <label for="nw-branch">Branch</label>
-                <select id="nw-branch">
-                  <option value="">All Branches</option>
-                  <option value="London">London</option>
-                  <option value="Manchester">Manchester</option>
-                  <option value="Birmingham">Birmingham</option>
-                  <option value="Reading">Reading</option>
-                  <option value="Chatham">Chatham</option>
-                  <option value="Croydon">Croydon</option>
-                  <option value="Medway">Medway</option>
-                  <option value="Accra">Accra</option>
-                  <option value="Freetown">Freetown</option>
+                <select id="nw-branch" disabled>
+                  <option value="">All campuses</option>
                 </select>
+              </div>
+            </div>
+            <div class="inline-error" id="nw-branch-error" style="display:none;"></div>
+            <div class="field">
+              <label for="nw-event">Linked event</label>
+              <select id="nw-event">
+                <option value="">None</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="nw-link">Button link</label>
+                <input type="url" id="nw-link" placeholder="https://…" />
+              </div>
+              <div class="field">
+                <label for="nw-cta">Button label</label>
+                <input type="text" id="nw-cta" maxlength="24" placeholder="Learn more" />
               </div>
             </div>
             <div class="field-row">
@@ -904,14 +962,20 @@
                 <input type="date" id="nw-publish" required />
               </div>
               <div class="field">
-                <label for="nw-expiry">Expiry Date</label>
-                <input type="date" id="nw-expiry" />
+                <label for="nw-publish-time">Publish Time (UK)</label>
+                <input type="time" id="nw-publish-time" />
               </div>
             </div>
+            <p class="muted-line">Leave the time blank to publish now when the date is today, or at 09:00 UK time on a later date.</p>
+            <div class="field">
+              <label for="nw-expiry">Last Day Shown</label>
+              <input type="date" id="nw-expiry" />
+            </div>
             <div class="where-panel" id="nw-where"></div>
-            <button type="submit" class="btn btn-primary btn-full" id="news-submit-btn">
-              Publish
-            </button>
+            <div style="display:flex;gap:8px;">
+              <button type="submit" class="btn btn-primary" id="news-submit-btn" style="flex:1;" disabled>Publish</button>
+              <button type="button" class="btn btn-secondary" id="nw-cancel-btn" style="display:none;">Cancel</button>
+            </div>
           </form>
         </div>
 
@@ -926,8 +990,8 @@
           </div>
           <p style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">
             A member sees an announcement on the app home screen when it is set to
-            their branch or to All Branches, and it has not expired. Each row says
-            exactly where it stands.
+            their branch or to All campuses, its publish time has arrived, and it
+            has not expired. Each row says exactly where it stands.
           </p>
           <div id="news-list">
             <div class="loading-row"><span class="spinner"></span> Loading announcements…</div>
@@ -1021,7 +1085,7 @@
         <div class="card">
           <div class="card-title"><span class="dot"></span> Reading Plan</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:18px;line-height:1.5;">
-            A plan covers a range of dates and advances on its own — Proverbs 1
+            A plan covers a range of dates and advances on its own: Proverbs 1
             on day 1, Proverbs 2 on day 2. A saved day above always overrides
             the plan for that one date, and when a plan ends with no successor
             members keep seeing its last day.
@@ -1035,7 +1099,8 @@
             <div class="field-row">
               <div class="field">
                 <label for="pl-book">Book *</label>
-                <input type="text" id="pl-book" placeholder="Proverbs" required />
+                <input type="text" id="pl-book" list="bible-books" placeholder="Proverbs" autocomplete="off" required />
+                <datalist id="bible-books"></datalist>
               </div>
               <div class="field">
                 <label for="pl-start">Start Date *</label>
@@ -1065,6 +1130,8 @@
                 <input type="text" id="pl-verses" placeholder="Whole chapter" />
               </div>
             </div>
+            <div class="inline-error" id="pl-bounds-error" style="display:none;"></div>
+            <p class="muted-line" id="pl-last-reading" style="display:none;"></p>
             <div class="field-row" id="pl-verse-fields" style="display:none;">
               <div class="field">
                 <label for="pl-start-verse">First Verse</label>
@@ -1366,6 +1433,8 @@ import {
   query,
   orderBy,
   limit,
+  where,
+  documentId,
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -1461,18 +1530,28 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  EVENTS
 // ════════════════════════════════════════════════════════════════════════════
+let eventsById = new Map();
+
 async function loadEvents() {
   const listEl = document.getElementById('events-list');
   listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading events…</div>';
+  loadLinkableEvents();
   try {
     const q      = query(collection(db, 'events'), orderBy('startTime', 'asc'));
     const snap   = await getDocs(q);
     const events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    eventsById = new Map(events.map(ev => [ev.id, ev]));
     document.getElementById('events-count').textContent = events.length;
     renderEventList(events);
   } catch (err) {
     listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${err.message}</div>`;
   }
+}
+
+// Docs with this id prefix are imported from kharis.org by the sync job, which
+// rewrites their title, time and venue on every run.
+function isWebEvent(id) {
+  return id.startsWith('web_');
 }
 
 function renderEventList(events) {
@@ -1488,58 +1567,152 @@ function renderEventList(events) {
   const ul = document.createElement('div');
   ul.className = 'item-list';
   events.forEach(ev => {
-    const start = ev.startTime?.toDate ? ev.startTime.toDate() : new Date(ev.startTime);
+    const start = toJsDate(ev.startTime);
+    const address = (ev.address || '').trim();
     const item  = document.createElement('div');
     item.className = 'item-card';
     item.innerHTML = `
       <div class="item-card-body">
-        <div class="item-card-title">${escHtml(ev.title)}</div>
+        <div class="item-card-title">${escHtml(ev.title || 'Untitled')}</div>
         <div class="item-card-meta">
-          <span>${formatDateTime(start)}</span>
+          <span>${start ? formatDateTime(start) : 'No start time'}</span>
           ${ev.branch ? `<span class="meta-chip">${escHtml(ev.branch)}</span>` : ''}
           ${ev.location ? `<span class="meta-chip">${escHtml(ev.location)}</span>` : ''}
+          ${address ? `<span>${escHtml(address)}</span>` : ''}
+          ${isWebEvent(ev.id) ? '<span class="meta-chip">From website</span>' : ''}
           ${ev.isFeatured ? `<span class="meta-chip featured" style="display:inline-flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>Featured</span>` : ''}
         </div>
       </div>
-      <button class="btn btn-danger" data-id="${ev.id}" data-col="events">Delete</button>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn btn-secondary event-edit-btn" data-id="${escHtml(ev.id)}" style="font-size:12px;padding:6px 12px;">Edit</button>
+        <button class="btn btn-danger" data-id="${escHtml(ev.id)}" data-col="events">Delete</button>
+      </div>
     `;
     ul.appendChild(item);
   });
   listEl.appendChild(ul);
-  attachDeleteListeners();
+  ul.querySelectorAll('.event-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => startEventEdit(btn.dataset.id));
+  });
+  attachDeleteListeners(ul);
 }
+
+// datetime-local value in the browser's zone, matching how the form reads it.
+function toDateTimeLocalValue(date) {
+  if (!date) return '';
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${toDateKey(date)}T${hh}:${mm}`;
+}
+
+function startEventEdit(id) {
+  const ev = eventsById.get(id);
+  if (!ev) return;
+  const form = document.getElementById('event-form');
+  form.reset();
+  form.dataset.editId = id;
+  document.getElementById('ev-title').value    = ev.title || '';
+  document.getElementById('ev-desc').value     = ev.description || '';
+  document.getElementById('ev-location').value = ev.location || '';
+  document.getElementById('ev-address').value  = ev.address || '';
+  document.getElementById('ev-image').value    = ev.imageUrl || '';
+  setBranchValue(document.getElementById('ev-branch'), ev.branch);
+  document.getElementById('ev-start').value    = toDateTimeLocalValue(toJsDate(ev.startTime));
+  document.getElementById('ev-end').value      = toDateTimeLocalValue(toJsDate(ev.endTime));
+  document.getElementById('ev-featured').checked = ev.isFeatured === true;
+  document.getElementById('event-form-title').textContent = 'Edit Event';
+  document.getElementById('event-submit-btn').textContent = 'Save changes';
+  document.getElementById('ev-cancel-btn').style.display = '';
+  document.getElementById('ev-sync-warning').style.display = isWebEvent(id) ? '' : 'none';
+  form.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetEventForm() {
+  const form = document.getElementById('event-form');
+  form.reset();
+  delete form.dataset.editId;
+  document.getElementById('event-form-title').textContent = 'Create Event';
+  document.getElementById('event-submit-btn').textContent = 'Create Event';
+  document.getElementById('ev-cancel-btn').style.display = 'none';
+  document.getElementById('ev-sync-warning').style.display = 'none';
+}
+
+document.getElementById('ev-cancel-btn').addEventListener('click', resetEventForm);
 
 document.getElementById('event-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const form = e.target;
+  const editId = form.dataset.editId;
   const btn = document.getElementById('event-submit-btn');
   btn.disabled = true;
-  btn.textContent = 'Creating…';
+  btn.textContent = editId ? 'Saving…' : 'Creating…';
   try {
     const startVal = document.getElementById('ev-start').value;
     const endVal   = document.getElementById('ev-end').value;
-    const payload  = {
+    // Exactly the fields this form owns; createdAt is written once on create.
+    const fields = {
       title:       document.getElementById('ev-title').value.trim(),
       description: document.getElementById('ev-desc').value.trim() || null,
       location:    document.getElementById('ev-location').value.trim() || null,
-      branch:      document.getElementById('ev-branch').value || null,
+      address:     document.getElementById('ev-address').value.trim() || null,
+      branch:      document.getElementById('ev-branch').value.trim() || null,
       startTime:   Timestamp.fromDate(new Date(startVal)),
       endTime:     Timestamp.fromDate(new Date(endVal)),
+      imageUrl:    document.getElementById('ev-image').value.trim() || null,
       isFeatured:  document.getElementById('ev-featured').checked,
-      createdAt:   Timestamp.now(),
     };
-    await addDoc(collection(db, 'events'), payload);
-    document.getElementById('event-form').reset();
-    toast('Event created successfully');
+    if (editId) {
+      await updateDoc(doc(db, 'events', editId), fields);
+    } else {
+      await addDoc(collection(db, 'events'), { ...fields, createdAt: Timestamp.now() });
+    }
+    resetEventForm();
+    toast(editId ? 'Event updated' : 'Event created successfully');
     loadEvents();
   } catch (err) {
     toast(err.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Create Event';
+    btn.disabled = !branchesLoaded;
+    btn.textContent = form.dataset.editId ? 'Save changes' : 'Create Event';
   }
 });
 
 document.getElementById('refresh-events').addEventListener('click', loadEvents);
+
+// Events an announcement can link to: anything starting from two days ago on.
+async function loadLinkableEvents() {
+  const sel = document.getElementById('nw-event');
+  try {
+    const since = Timestamp.fromDate(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
+    const snap = await getDocs(query(
+      collection(db, 'events'),
+      where('startTime', '>=', since),
+      orderBy('startTime'),
+      limit(100),
+    ));
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">None</option>' + snap.docs.map(d =>
+      `<option value="${escHtml(d.id)}">${escHtml(linkableEventLabel(d.data()))}</option>`).join('');
+    setLinkedEventValue(sel, cur);
+  } catch (err) {
+    toast('Could not load events to link: ' + err.message, 'error');
+  }
+}
+
+function linkableEventLabel(ev) {
+  const start = toJsDate(ev.startTime);
+  const day = start
+    ? start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: LONDON_TZ })
+    : 'No date';
+  return `${ev.title || 'Untitled'} · ${day} · ${ev.branch || 'All campuses'}`;
+}
+
+// Keeps a link to an event that has dropped out of the upcoming list.
+function setLinkedEventValue(sel, eventId) {
+  const title = eventsById.get(eventId)?.title;
+  ensureSelectOption(sel, eventId, `${title || 'Linked event'} (no longer upcoming)`);
+  sel.value = eventId || '';
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  NEWS
@@ -1645,6 +1818,8 @@ async function loadSubmissions() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+let newsById = new Map();
+
 async function loadNews() {
   const listEl = document.getElementById('news-list');
   listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading announcements…</div>';
@@ -1652,6 +1827,7 @@ async function loadNews() {
     const q    = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
     const snap = await getDocs(q);
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    newsById = new Map(items.map(nw => [nw.id, nw]));
     document.getElementById('news-count').textContent = items.length;
     renderNewsList(items);
   } catch (err) {
@@ -1662,10 +1838,10 @@ async function loadNews() {
 // ── Home-screen visibility ──────────────────────────────────────────────────
 // The app home screen renders announcements through AnnouncementsCarousel ->
 // newsProvider(activeBranch) -> getAnnouncements (selectAnnouncements in
-// backend/functions/src/index.ts). Exactly two rules decide what a member
-// sees, and these are them — do not add a third here:
-//   1. hidden once expiresAt has passed;
-//   2. reaches a member when its branch is theirs, or it is all-campus.
+// backend/functions/src/index.ts). These rules decide what a member sees:
+//   1. nothing shows (or is pushed) until publishedAt has arrived;
+//   2. hidden once expiresAt has passed;
+//   3. reaches a member when its branch is theirs, or it is all-campus.
 // A blank or absent branch is all-campus, which is how the API reads it.
 // Both the published rows and the compose preview below read from here, so
 // they can never disagree with each other or with the app.
@@ -1676,29 +1852,37 @@ function toJsDate(value) {
 }
 
 function homeAudience(branch) {
-  return (branch || '').trim() || 'All Branches';
+  return (branch || '').trim() || 'All campuses';
 }
 
-function homeVisibility(branch, expiresAt) {
+function homeVisibility(branch, expiresAt, publishedAt) {
+  const now = Date.now();
   const expiry = toJsDate(expiresAt);
-  const expired = !!expiry && expiry.getTime() <= Date.now();
+  const publish = toJsDate(publishedAt);
+  const expired = !!expiry && expiry.getTime() <= now;
+  const scheduled = !expired && !!publish && publish.getTime() > now;
   const audience = homeAudience(branch);
   return {
-    live: !expired,
+    live: !expired && !scheduled,
+    scheduled,
     audience,
     expiry,
+    publish,
     label: expired
-      ? 'Expired — hidden from home'
-      : `Live on home — ${audience}`,
+      ? 'Expired · hidden from home'
+      : scheduled
+        ? `Scheduled for ${formatLondonDateTime(publish)}`
+        : `Live on home · ${audience}`,
   };
 }
 
 const HOME_ICON_LIVE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>';
 const HOME_ICON_HIDDEN = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+const HOME_ICON_SCHEDULED = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
 
 function homeChip(visibility) {
-  const cls = visibility.live ? 'live' : 'hidden';
-  const icon = visibility.live ? HOME_ICON_LIVE : HOME_ICON_HIDDEN;
+  const cls = visibility.live ? 'live' : visibility.scheduled ? 'scheduled' : 'hidden';
+  const icon = visibility.live ? HOME_ICON_LIVE : visibility.scheduled ? HOME_ICON_SCHEDULED : HOME_ICON_HIDDEN;
   return `<span class="home-chip ${cls}">${icon}${escHtml(visibility.label)}</span>`;
 }
 
@@ -1716,29 +1900,76 @@ function renderNewsList(items) {
   ul.className = 'item-list';
   items.forEach(nw => {
     const published = toJsDate(nw.publishedAt) || new Date();
-    const visibility = homeVisibility(nw.branch, nw.expiresAt);
+    const visibility = homeVisibility(nw.branch, nw.expiresAt, nw.publishedAt);
+    const linkedEvent = nw.eventId ? (eventsById.get(nw.eventId)?.title || 'Linked event') : '';
     const item = document.createElement('div');
     item.className = 'item-card';
     const preview = nw.body ? nw.body.slice(0, 80) + (nw.body.length > 80 ? '…' : '') : '';
     item.innerHTML = `
       <div class="item-card-body">
         <div style="margin-bottom:6px;">${homeChip(visibility)}</div>
-        <div class="item-card-title">${escHtml(nw.title)}</div>
+        <div class="item-card-title">${escHtml(nw.title || 'Untitled')}</div>
         <div class="item-card-meta">
-          <span>Published ${formatDate(published)}</span>
+          <span>${visibility.scheduled ? 'Publishes' : 'Published'} ${formatLondonDate(published)}</span>
           ${nw.type ? `<span class="meta-chip">${escHtml(nw.type)}</span>` : ''}
           <span class="meta-chip">${visibility.expiry
-            ? `${visibility.live ? 'Expires' : 'Expired'} ${formatDate(visibility.expiry)}`
+            ? `${visibility.expiry.getTime() > Date.now() ? 'Expires' : 'Expired'} ${formatLondonDateTime(visibility.expiry)}`
             : 'No expiry'}</span>
+          ${linkedEvent ? `<span class="meta-chip">Event: ${escHtml(linkedEvent)}</span>` : ''}
+          ${nw.linkUrl ? `<span class="meta-chip">Button: ${escHtml(nw.ctaLabel || 'Learn more')}</span>` : ''}
         </div>
         ${preview ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">${escHtml(preview)}</div>` : ''}
       </div>
-      <button class="btn btn-danger" data-id="${nw.id}" data-col="news">Delete</button>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn btn-secondary news-edit-btn" data-id="${escHtml(nw.id)}" style="font-size:12px;padding:6px 12px;">Edit</button>
+        <button class="btn btn-danger" data-id="${escHtml(nw.id)}" data-col="news">Delete</button>
+      </div>
     `;
     ul.appendChild(item);
   });
   listEl.appendChild(ul);
-  attachDeleteListeners();
+  ul.querySelectorAll('.news-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => startNewsEdit(btn.dataset.id));
+  });
+  attachDeleteListeners(ul);
+}
+
+// The publishedAt the form would save. Editing with the publish inputs left
+// as loaded keeps the stored instant. Otherwise a blank date, today without a
+// time, or any moment already past means now; anything later is that UK
+// wall-clock time (09:00 when the time is blank).
+function newsPublishDate() {
+  const form = document.getElementById('news-form');
+  const dateVal = document.getElementById('nw-publish').value;
+  const timeVal = document.getElementById('nw-publish-time').value;
+  const original = form.dataset.editId ? newsById.get(form.dataset.editId) : null;
+  if (original && dateVal === form.dataset.publishDate && timeVal === form.dataset.publishTime) {
+    return toJsDate(original.publishedAt) || new Date();
+  }
+  if (!dateVal || (!timeVal && dateVal === londonDateKey(new Date()))) return new Date();
+  const [hh, mm] = (timeVal || '09:00').split(':').map(Number);
+  const at = londonWallTimeToDate(dateVal, hh, mm);
+  return at.getTime() <= Date.now() ? new Date() : at;
+}
+
+// The expiresAt the form would save: the end of the chosen day in UK time, or
+// the stored instant when editing with the date left as loaded.
+function newsExpiryDate() {
+  const form = document.getElementById('news-form');
+  const dateVal = document.getElementById('nw-expiry').value;
+  if (!dateVal) return null;
+  const original = form.dataset.editId ? newsById.get(form.dataset.editId) : null;
+  if (original && dateVal === form.dataset.expiryDate) return toJsDate(original.expiresAt);
+  return londonWallTimeToDate(dateVal, 23, 59, 59, 999);
+}
+
+function isHttpUrl(value) {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 // Restates, before publishing, where the announcement lands and who sees it.
@@ -1747,21 +1978,24 @@ function updateNewsWherePreview() {
   const el = document.getElementById('nw-where');
   if (!el) return;
   const branch = document.getElementById('nw-branch').value;
-  const expiryVal = document.getElementById('nw-expiry').value;
-  const visibility = homeVisibility(branch, expiryVal ? new Date(expiryVal) : null);
-  const audienceLine = visibility.audience === 'All Branches'
+  const visibility = homeVisibility(branch, newsExpiryDate(), newsPublishDate());
+  const audienceLine = visibility.audience === 'All campuses'
     ? 'Seen by <strong>everyone, at every branch</strong>.'
     : `Seen <strong>only by members whose campus is ${escHtml(visibility.audience)}</strong>.`;
+  const publishLine = visibility.scheduled
+    ? `Appears, and its notification goes out, at <strong>${escHtml(formatLondonDateTime(visibility.publish))}</strong> UK time.`
+    : 'Shows on the home screen as soon as it is saved.';
   const expiryLine = !visibility.expiry
     ? 'No expiry, so it stays on the home screen until you delete it.'
-    : visibility.live
-      ? `Drops off the home screen at the start of <strong>${formatDate(visibility.expiry)}</strong>.`
-      : `<span class="warn">That expiry has already passed — it would be hidden from the home screen immediately.</span>`;
+    : visibility.expiry.getTime() > Date.now()
+      ? `Drops off the home screen at <strong>${escHtml(formatLondonDateTime(visibility.expiry))}</strong> UK time.`
+      : '<span class="warn">That expiry has already passed, so it would be hidden from the home screen immediately.</span>';
   el.innerHTML = `
     <span class="where-title">Where this shows</span>
     <ul>
-      <li>In the announcements carousel on the <strong>app home screen</strong> — not in Events.</li>
+      <li>In the announcements carousel on the <strong>app home screen</strong>, not in Events.</li>
       <li>${audienceLine}</li>
+      <li>${publishLine}</li>
       <li>${expiryLine}</li>
       <li>Members see it when they next open the app, or pull to refresh the home screen.</li>
     </ul>
@@ -1769,46 +2003,107 @@ function updateNewsWherePreview() {
 }
 
 document.getElementById('nw-branch').addEventListener('change', updateNewsWherePreview);
-document.getElementById('nw-expiry').addEventListener('change', updateNewsWherePreview);
-document.getElementById('nw-expiry').addEventListener('input', updateNewsWherePreview);
+['nw-publish', 'nw-publish-time', 'nw-expiry'].forEach((id) => {
+  document.getElementById(id).addEventListener('change', updateNewsWherePreview);
+  document.getElementById(id).addEventListener('input', updateNewsWherePreview);
+});
+
+function startNewsEdit(id) {
+  const nw = newsById.get(id);
+  if (!nw) return;
+  const form = document.getElementById('news-form');
+  form.reset();
+  form.dataset.editId = id;
+  document.getElementById('nw-title').value = nw.title || '';
+  document.getElementById('nw-body').value  = nw.body || '';
+  document.getElementById('nw-image').value = nw.imageUrl || '';
+  const typeSel = document.getElementById('nw-type');
+  ensureSelectOption(typeSel, nw.type, nw.type);
+  typeSel.value = nw.type || 'Announcement';
+  setBranchValue(document.getElementById('nw-branch'), nw.branch);
+  setLinkedEventValue(document.getElementById('nw-event'), nw.eventId);
+  document.getElementById('nw-link').value = nw.linkUrl || '';
+  document.getElementById('nw-cta').value  = nw.ctaLabel || '';
+  // Dates are shown as UK wall time, the zone they are authored in.
+  const published = toJsDate(nw.publishedAt);
+  const expiry = toJsDate(nw.expiresAt);
+  form.dataset.publishDate = published ? londonDateKey(published) : '';
+  form.dataset.publishTime = published ? londonTimeValue(published) : '';
+  form.dataset.expiryDate  = expiry ? londonDateKey(expiry) : '';
+  document.getElementById('nw-publish').value      = form.dataset.publishDate;
+  document.getElementById('nw-publish-time').value = form.dataset.publishTime;
+  document.getElementById('nw-expiry').value       = form.dataset.expiryDate;
+  document.getElementById('news-form-title').textContent = 'Edit Announcement';
+  document.getElementById('news-submit-btn').textContent = 'Save changes';
+  document.getElementById('nw-cancel-btn').style.display = '';
+  updateNewsWherePreview();
+  form.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetNewsForm() {
+  const form = document.getElementById('news-form');
+  form.reset();
+  delete form.dataset.editId;
+  delete form.dataset.publishDate;
+  delete form.dataset.publishTime;
+  delete form.dataset.expiryDate;
+  document.getElementById('news-form-title').textContent = 'Publish Announcement';
+  document.getElementById('news-submit-btn').textContent = 'Publish';
+  document.getElementById('nw-cancel-btn').style.display = 'none';
+  setDefaultNewsDate();
+}
+
+document.getElementById('nw-cancel-btn').addEventListener('click', resetNewsForm);
 
 document.getElementById('news-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const form = e.target;
+  const editId = form.dataset.editId;
+  const linkUrl = document.getElementById('nw-link').value.trim();
+  if (linkUrl && !isHttpUrl(linkUrl)) {
+    toast('Button link must be an http:// or https:// address', 'error');
+    return;
+  }
+  const ctaLabel = document.getElementById('nw-cta').value.trim().slice(0, 24);
   const btn = document.getElementById('news-submit-btn');
   btn.disabled = true;
-  btn.textContent = 'Publishing…';
+  btn.textContent = editId ? 'Saving…' : 'Publishing…';
   try {
-    const publishVal = document.getElementById('nw-publish').value;
-    const expiryVal  = document.getElementById('nw-expiry').value;
-    const payload = {
+    const publishedAt = newsPublishDate();
+    const expiresAt = newsExpiryDate();
+    // Exactly the fields this form owns; createdAt and pushedAt are never
+    // touched by an edit.
+    const fields = {
       title:       document.getElementById('nw-title').value.trim(),
       body:        document.getElementById('nw-body').value.trim(),
-      imageUrl:    document.getElementById('nw-image').value.trim() || null,
       type:        document.getElementById('nw-type').value,
       // Empty select = church-wide. Written as an explicit null (never left
-      // absent) so getAnnouncements' branch-scoped query can see it.
-      branch:      document.getElementById('nw-branch').value || null,
-      // A date input yields UTC midnight of the chosen day. Publishing "today"
-      // that way is already hours in the past, so pushPendingAnnouncements —
-      // which only considers the last 15 minutes — never picked it up and a
-      // portal announcement silently never notified anyone. Publish-today now
-      // means now; a future date still schedules for that date.
-      publishedAt: isPublishToday(publishVal)
-        ? Timestamp.now()
-        : Timestamp.fromDate(new Date(publishVal)),
-      expiresAt:   expiryVal ? Timestamp.fromDate(new Date(expiryVal)) : null,
-      createdAt:   Timestamp.now(),
+      // absent or blank) so getAnnouncements' branch-scoped query can see it.
+      branch:      document.getElementById('nw-branch').value.trim() || null,
+      imageUrl:    document.getElementById('nw-image').value.trim() || null,
+      publishedAt: Timestamp.fromDate(publishedAt),
+      expiresAt:   expiresAt ? Timestamp.fromDate(expiresAt) : null,
+      eventId:     document.getElementById('nw-event').value || null,
+      linkUrl:     linkUrl || null,
+      ctaLabel:    ctaLabel || (linkUrl ? 'Learn more' : null),
     };
-    await addDoc(collection(db, 'news'), payload);
-    document.getElementById('news-form').reset();
-    setDefaultNewsDate();
-    toast('Announcement published');
+    if (editId) {
+      await updateDoc(doc(db, 'news', editId), fields);
+    } else {
+      await addDoc(collection(db, 'news'), { ...fields, createdAt: Timestamp.now() });
+    }
+    resetNewsForm();
+    toast(editId
+      ? 'Announcement updated'
+      : publishedAt.getTime() > Date.now()
+        ? `Announcement scheduled for ${formatLondonDateTime(publishedAt)}`
+        : 'Announcement published');
     loadNews();
   } catch (err) {
     toast(err.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Publish';
+    btn.disabled = !branchesLoaded;
+    btn.textContent = form.dataset.editId ? 'Save changes' : 'Publish';
   }
 });
 
@@ -1828,15 +2123,8 @@ function setDefaultDailyDate() {
 // without firing an input event.
 function setDefaultNewsDate() {
   const el = document.getElementById('nw-publish');
-  if (!el.value) el.value = toDateKey(new Date());
+  if (!el.value) el.value = londonDateKey(new Date());
   updateNewsWherePreview();
-}
-
-// True when the chosen publish date is today, compared on the same local
-// YYYY-MM-DD key the picker produces so a timezone offset cannot make "today"
-// read as yesterday.
-function isPublishToday(publishVal) {
-  return !publishVal || publishVal === toDateKey(new Date());
 }
 
 document.getElementById('dc-date').addEventListener('change', (e) => {
@@ -1891,10 +2179,10 @@ const DAILY_READING_URL =
   'https://us-central1-kharis-app-47c49.cloudfunctions.net/getDailyReading';
 
 const READING_SOURCE_LABEL = {
-  'day': 'Written by hand for this date — overrides any plan.',
+  'day': 'Written by hand for this date. Overrides any plan.',
   'plan': 'From a reading plan.',
   'plan-last-day':
-    'That plan has finished — held on its last day until a new plan starts.',
+    'That plan has finished. Held on its last day until a new plan starts.',
 };
 
 async function loadResolvedReading(dateKey) {
@@ -1914,7 +2202,7 @@ async function loadResolvedReading(dateKey) {
     const ref = (!r.verse || r.verse === '1-end')
       ? `${r.book} ${r.chapter}`
       : `${r.book} ${r.chapter}:${r.verse}`;
-    const plan = entry.planTitle ? ` — ${escHtml(entry.planTitle)}` : '';
+    const plan = entry.planTitle ? ` · ${escHtml(entry.planTitle)}` : '';
     el.innerHTML = `
       <div class="card" style="background:var(--surface2);">
         <div style="font-size:18px;font-weight:700;">${escHtml(ref)}</div>
@@ -1937,14 +2225,93 @@ function syncPlanModeFields() {
 
 document.getElementById('pl-mode').addEventListener('change', syncPlanModeFields);
 
+// Chapters per book. Must equal the backend and app tables exactly: a
+// chapter-mode plan resolves day N to min(startChapter + N, chapters), so a
+// plan longer than the chapters left would hold on the final chapter.
+const BIBLE_CHAPTERS = {
+  'Genesis': 50, 'Exodus': 40, 'Leviticus': 27, 'Numbers': 36, 'Deuteronomy': 34,
+  'Joshua': 24, 'Judges': 21, 'Ruth': 4, '1 Samuel': 31, '2 Samuel': 24,
+  '1 Kings': 22, '2 Kings': 25, '1 Chronicles': 29, '2 Chronicles': 36, 'Ezra': 10,
+  'Nehemiah': 13, 'Esther': 10, 'Job': 42, 'Psalms': 150, 'Proverbs': 31,
+  'Ecclesiastes': 12, 'Song of Solomon': 8, 'Isaiah': 66, 'Jeremiah': 52, 'Lamentations': 5,
+  'Ezekiel': 48, 'Daniel': 12, 'Hosea': 14, 'Joel': 3, 'Amos': 9,
+  'Obadiah': 1, 'Jonah': 4, 'Micah': 7, 'Nahum': 3, 'Habakkuk': 3,
+  'Zephaniah': 3, 'Haggai': 2, 'Zechariah': 14, 'Malachi': 4,
+  'Matthew': 28, 'Mark': 16, 'Luke': 24, 'John': 21, 'Acts': 28,
+  'Romans': 16, '1 Corinthians': 16, '2 Corinthians': 13, 'Galatians': 6, 'Ephesians': 6,
+  'Philippians': 4, 'Colossians': 4, '1 Thessalonians': 5, '2 Thessalonians': 3, '1 Timothy': 6,
+  '2 Timothy': 4, 'Titus': 3, 'Philemon': 1, 'Hebrews': 13, 'James': 5,
+  '1 Peter': 5, '2 Peter': 3, '1 John': 5, '2 John': 1, '3 John': 1,
+  'Jude': 1, 'Revelation': 22,
+};
+const BIBLE_BOOK_BY_KEY = new Map(Object.keys(BIBLE_CHAPTERS).map(b => [b.toLowerCase(), b]));
+
+document.getElementById('bible-books').innerHTML =
+  Object.keys(BIBLE_CHAPTERS).map(b => `<option value="${b}"></option>`).join('');
+
+// The table's spelling of a typed book name, or null when it is not a book.
+function canonicalBook(name) {
+  return BIBLE_BOOK_BY_KEY.get((name || '').trim().replace(/\s+/g, ' ').toLowerCase()) || null;
+}
+
+function planFormBounds() {
+  const byVerse = document.getElementById('pl-mode').value === 'verse';
+  const rawBook = document.getElementById('pl-book').value.trim();
+  const book = canonicalBook(rawBook);
+  const chapters = book ? BIBLE_CHAPTERS[book] : null;
+  const startChapter = Math.max(1, parseInt(document.getElementById('pl-chapter').value, 10) || 1);
+  const days = parseInt(document.getElementById('pl-days').value, 10);
+  const remaining = chapters ? chapters - startChapter + 1 : null;
+  let error = '';
+  if (!byVerse) {
+    if (rawBook && !book) {
+      error = 'Pick a book from the list so the plan can be checked against its chapters.';
+    } else if (chapters && startChapter > chapters) {
+      error = `${book} has ${chapters} chapter${chapters === 1 ? '' : 's'}.`;
+    } else if (chapters && days > remaining) {
+      error = `${book} ${startChapter} to ${chapters} covers ${remaining} day${remaining === 1 ? '' : 's'} at most. Shorten the plan or start from an earlier chapter.`;
+    }
+  }
+  return { byVerse, book, chapters, startChapter, days, remaining, error };
+}
+
+// Keeps the chapter/length limits, the inline error and the last-reading line
+// in step with the form. Verse mode has no chapter bounds.
+function updatePlanBounds() {
+  const b = planFormBounds();
+  const chapterEl = document.getElementById('pl-chapter');
+  const daysEl = document.getElementById('pl-days');
+  if (!b.byVerse && b.chapters) {
+    chapterEl.max = b.chapters;
+    daysEl.max = Math.max(1, b.remaining);
+  } else {
+    chapterEl.removeAttribute('max');
+    daysEl.max = 400;
+  }
+  const errEl = document.getElementById('pl-bounds-error');
+  errEl.textContent = b.error;
+  errEl.style.display = b.error ? '' : 'none';
+  const lastEl = document.getElementById('pl-last-reading');
+  const startKey = document.getElementById('pl-start').value;
+  if (!b.byVerse && b.chapters && !b.error && b.days >= 1 && /^\d{4}-\d{2}-\d{2}$/.test(startKey)) {
+    const lastChapter = Math.min(b.startChapter + b.days - 1, b.chapters);
+    lastEl.textContent = `Last reading: ${b.book} ${lastChapter} on ${formatDateKey(addDaysToKey(startKey, b.days - 1), { year: 'numeric' })}`;
+    lastEl.style.display = '';
+  } else {
+    lastEl.style.display = 'none';
+  }
+  return b;
+}
+
 // Live day-by-day preview of the plan being authored. The chapter/verse
 // arithmetic mirrors planReading() in backend/functions/src/reading-plans.ts
 // exactly, so what the admin sees here is what getDailyReading serves.
 function updatePlanPreview() {
+  const bounds = updatePlanBounds();
   const el = document.getElementById('pl-preview');
   const startKey = document.getElementById('pl-start').value;
   const days = parseInt(document.getElementById('pl-days').value, 10);
-  const book = document.getElementById('pl-book').value.trim();
+  const book = bounds.book || document.getElementById('pl-book').value.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startKey) || !book || !(days >= 1)) {
     el.innerHTML = '<span class="where-title">Day-by-day preview</span>' +
       'Fill in book, start date and length to see what each date resolves to.';
@@ -1962,7 +2329,9 @@ function updatePlanPreview() {
       chapter = startChapter;
       verse = perDay === 1 ? `${first}` : `${first}-${first + perDay - 1}`;
     } else {
-      chapter = startChapter + offset;
+      chapter = bounds.chapters
+        ? Math.min(startChapter + offset, bounds.chapters)
+        : startChapter + offset;
       verse = constantVerses || '1-end';
     }
     return verse === '1-end' ? `${book} ${chapter}` : `${book} ${chapter}:${verse}`;
@@ -1989,8 +2358,7 @@ updatePlanPreview();
 // Inclusive last date of a plan. Pure calendar arithmetic in UTC so a BST
 // switch cannot shift it; the readings themselves are resolved server-side.
 function planEndDateKey(startKey, days) {
-  const [y, m, d] = startKey.split('-').map(Number);
-  return toDateKey(new Date(Date.UTC(y, m - 1, d + days - 1)));
+  return addDaysToKey(startKey, days - 1);
 }
 
 async function loadPlans() {
@@ -2012,12 +2380,22 @@ async function loadPlans() {
       const rule = p.mode === 'verse'
         ? `${escHtml(p.book || '')} ${p.startChapter || 1}, ${Number(p.versesPerDay) || 1} verse(s) a day`
         : `one chapter a day from ${escHtml(p.book || '')} ${p.startChapter || 1}`;
+      const book = canonicalBook(p.book);
+      const chapters = book ? BIBLE_CHAPTERS[book] : 0;
+      const startChapter = Number(p.startChapter) || 1;
+      // Over-long chapter plans hold on the last chapter from the day after
+      // it is first read.
+      const overrun = p.mode !== 'verse' && chapters && startChapter + days - 1 > chapters &&
+        /^\d{4}-\d{2}-\d{2}$/.test(p.startDate || '')
+        ? `<div style="margin-top:6px;"><span class="meta-chip warn">Runs past ${escHtml(book)} ${chapters}: holds on chapter ${chapters} from ${escHtml(formatDateKey(addDaysToKey(p.startDate, Math.max(0, chapters - startChapter + 1)), { year: 'numeric' }))}</span></div>`
+        : '';
       return `<div class="item-card" data-id="${d.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <div>
             <strong>${escHtml(p.title || p.book || 'Untitled plan')}</strong>
             <div class="item-card-meta">${escHtml(p.startDate || '')} → ${escHtml(planEndDateKey(p.startDate || '', days))} · ${days} days</div>
             <div style="color:var(--muted);font-size:12px;margin-top:4px;">${rule}</div>
+            ${overrun}
           </div>
           <div style="display:flex;gap:6px;">
             <button class="btn btn-secondary plan-edit-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;">Edit</button>
@@ -2073,6 +2451,11 @@ document.getElementById('plan-form').addEventListener('submit', async (e) => {
   const form = e.target;
   const btn = document.getElementById('plan-submit-btn');
   const editId = form.dataset.editId;
+  const bounds = updatePlanBounds();
+  if (bounds.error) {
+    document.getElementById('pl-bounds-error').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   btn.disabled = true;
   btn.textContent = 'Saving…';
   try {
@@ -2080,7 +2463,7 @@ document.getElementById('plan-form').addEventListener('submit', async (e) => {
     const verses = document.getElementById('pl-verses').value.trim();
     const payload = {
       title: document.getElementById('pl-title').value.trim(),
-      book: document.getElementById('pl-book').value.trim(),
+      book: bounds.book || document.getElementById('pl-book').value.trim(),
       startDate: document.getElementById('pl-start').value,
       days: parseInt(document.getElementById('pl-days').value, 10),
       mode: byVerse ? 'verse' : 'chapter',
@@ -2146,8 +2529,10 @@ document.getElementById('daily-form').addEventListener('submit', async (e) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  DELETE (shared)
 // ════════════════════════════════════════════════════════════════════════════
-function attachDeleteListeners() {
-  document.querySelectorAll('[data-col]').forEach(btn => {
+// Scoped to one rendered list so a re-render never stacks a second listener
+// on another list's buttons.
+function attachDeleteListeners(root) {
+  root.querySelectorAll('[data-col]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!confirm('Delete this item?')) return;
       const colName = btn.dataset.col;
@@ -2157,8 +2542,14 @@ function attachDeleteListeners() {
       try {
         await deleteDoc(doc(db, colName, id));
         toast('Deleted');
-        if (colName === 'events') loadEvents();
-        if (colName === 'news')   loadNews();
+        if (colName === 'events') {
+          if (document.getElementById('event-form').dataset.editId === id) resetEventForm();
+          loadEvents();
+        }
+        if (colName === 'news') {
+          if (document.getElementById('news-form').dataset.editId === id) resetNewsForm();
+          loadNews();
+        }
       } catch (err) {
         toast(err.message, 'error');
         btn.disabled = false;
@@ -2176,6 +2567,81 @@ function toDateKey(date) {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+// ── Europe/London wall clock ────────────────────────────────────────────
+// Announcements are authored in UK time whatever zone the browser is in, and
+// must land on the right instant on both sides of a BST/GMT change.
+const LONDON_TZ = 'Europe/London';
+const londonPartsFormat = new Intl.DateTimeFormat('en-GB', {
+  timeZone: LONDON_TZ, hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+
+function londonParts(date) {
+  const parts = {};
+  for (const { type, value } of londonPartsFormat.formatToParts(date)) {
+    if (type !== 'literal') parts[type] = Number(value);
+  }
+  return parts;
+}
+
+// How far London clocks are ahead of UTC at an instant: 0 in GMT, 1h in BST.
+function londonOffsetMs(date) {
+  const p = londonParts(date);
+  const wallAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return wallAsUtc - Math.floor(date.getTime() / 1000) * 1000;
+}
+
+// The instant London clocks read dateKey hh:mm:ss.ms. The first guess takes
+// the offset at the wall time read as UTC; the second pass corrects it when
+// that guess sat on the other side of a clock change.
+function londonWallTimeToDate(dateKey, hh, mm, ss = 0, ms = 0) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const wallAsUtc = Date.UTC(y, m - 1, d, hh, mm, ss, ms);
+  const firstGuess = wallAsUtc - londonOffsetMs(new Date(wallAsUtc));
+  return new Date(wallAsUtc - londonOffsetMs(new Date(firstGuess)));
+}
+
+function londonDateKey(date) {
+  const p = londonParts(date);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
+function londonTimeValue(date) {
+  const p = londonParts(date);
+  return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
+}
+
+function formatLondonDateTime(date) {
+  return date.toLocaleString('en-GB', {
+    timeZone: LONDON_TZ, weekday: 'short', day: 'numeric', month: 'short',
+    year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function formatLondonDate(date) {
+  return date.toLocaleDateString('en-GB', {
+    timeZone: LONDON_TZ, day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+
+// Calendar arithmetic on YYYY-MM-DD keys. Runs in UTC so no clock change or
+// browser zone can shift the day.
+function addDaysToKey(dateKey, days) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+function formatDateKey(dateKey, opts = {}) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short', ...opts, timeZone: 'UTC',
+  });
 }
 
 function formatDateTime(date) {
@@ -2208,13 +2674,21 @@ setDefaultNewsDate();
 async function loadSermons() {
   const list = document.getElementById('sermons-list');
   list.innerHTML = '<p style="color:var(--muted);">Loading sermons…</p>';
+  loadFeaturedMode();
+  if (motdSearchState !== 'ok') searchSermonArchive();
+  // The schedule must be current before the suns render; its own failures
+  // are reported inline and never block the library list.
+  const motdReady = migrateLegacyMotd()
+    .catch(err => toast('Could not move the old Message of the Day: ' + err.message, 'error'))
+    .then(refreshMotd);
   try {
     const [snap] = await Promise.all([
       getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50))),
-      loadMotd(),
+      motdReady,
     ]);
     document.getElementById('sermons-count').textContent = snap.size;
     if (snap.empty) {
+      sermonDocsShown = [];
       list.innerHTML = '<p style="color:var(--muted);">No sermons yet. They will appear here automatically once the YouTube/SoundCloud sync runs.</p>';
       return;
     }
@@ -2229,48 +2703,255 @@ async function loadSermons() {
 const _entityScratch = document.createElement('textarea');
 function decodeEntities(s) { _entityScratch.innerHTML = s || ''; return _entityScratch.value; }
 
+// ── Featured sermons mode ───────────────────────────────────────────────
+// config/featured { mode, setAt }. 'auto' (also a missing doc) makes the app
+// show the newest YouTube uploads; 'pinned' shows sermons starred below.
+let featuredMode = null; // 'auto' | 'pinned' once loaded
+
+function renderFeaturedMode() {
+  document.querySelectorAll('[data-featured-mode]').forEach(btn => {
+    const on = btn.dataset.featuredMode === featuredMode;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-checked', String(on));
+    btn.disabled = featuredMode === null;
+  });
+  document.getElementById('featured-auto-hint').style.display = featuredMode === 'auto' ? '' : 'none';
+}
+
+async function loadFeaturedMode() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'featured'));
+    featuredMode = snap.exists() && snap.data().mode === 'pinned' ? 'pinned' : 'auto';
+  } catch (err) {
+    featuredMode = null;
+    toast('Could not load the featured mode: ' + err.message, 'error');
+  }
+  renderFeaturedMode();
+}
+
+document.querySelectorAll('[data-featured-mode]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const mode = btn.dataset.featuredMode;
+    if (featuredMode === null || mode === featuredMode) return;
+    const previous = featuredMode;
+    featuredMode = mode;
+    renderFeaturedMode();
+    try {
+      await setDoc(doc(db, 'config', 'featured'), { mode, setAt: serverTimestamp() });
+      toast(mode === 'auto' ? 'Featured: showing the latest uploads' : 'Featured: showing pinned sermons');
+    } catch (err) {
+      featuredMode = previous;
+      renderFeaturedMode();
+      toast('Could not change the featured mode: ' + err.message, 'error');
+    }
+  });
+});
+
 // ── Message of the Day ──────────────────────────────────────────────────────
-// One pointer doc, config/messageOfTheDay { sermonId, title, setAt }, always
-// written with a plain setDoc overwrite — so exactly one sermon holds MOTD.
+// motdSchedule/{YYYY-MM-DD} { sermonId, title, setAt }, one doc per calendar
+// date keyed by the admin's local date. sermonId is a sermon API id (numeric
+// string) or a Firestore sermons doc id. Unscheduled days get the app's
+// automatic pick.
 const SUN_FILLED = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="currentColor"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
 const SUN_OUTLINE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+const SERMON_API_URL =
+  'https://us-central1-kharis-app-47c49.cloudfunctions.net/sermonApiProxy/sermons/';
 
-let motdSermonId = null;
+let motdSelected = null;      // { sermonId, title } for the selected date, or null
+let motdUpcoming = [];        // [{ dateKey, sermonId, title }] from today on
+let motdResults = [];         // audio-capable sermon API results
+let motdSearchState = 'idle'; // 'idle' | 'loading' | 'ok' | 'error'
+let motdSearchSeq = 0;
+let motdSearchTimer = null;
+let legacyMotdChecked = false;
+let sermonDocsShown = [];
 
-async function loadMotd() {
+document.getElementById('motd-date').value = toDateKey(new Date());
+
+function motdDateKey() {
+  const value = document.getElementById('motd-date').value;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : toDateKey(new Date());
+}
+
+// One-time move of the retired single pointer doc into today's schedule.
+async function migrateLegacyMotd() {
+  if (legacyMotdChecked) return;
+  const legacyRef = doc(db, 'config', 'messageOfTheDay');
+  const legacy = await getDoc(legacyRef);
+  legacyMotdChecked = true;
+  if (!legacy.exists()) return;
+  const { sermonId, title } = legacy.data();
+  const todayRef = doc(db, 'motdSchedule', toDateKey(new Date()));
+  const moved = !!sermonId && !(await getDoc(todayRef)).exists();
+  if (moved) {
+    await setDoc(todayRef, {
+      sermonId: String(sermonId),
+      title: decodeEntities(title || 'Untitled'),
+      setAt: serverTimestamp(),
+    });
+  }
+  await deleteDoc(legacyRef);
+  toast(moved
+    ? "Moved the old Message of the Day into today's schedule"
+    : 'Removed the old Message of the Day: today already had one scheduled');
+}
+
+async function refreshMotd() {
+  const dateKey = motdDateKey();
+  const todayKey = toDateKey(new Date());
   try {
-    const snap = await getDoc(doc(db, 'config', 'messageOfTheDay'));
-    const data = snap.exists() ? snap.data() : null;
-    motdSermonId = data?.sermonId || null;
-    updateMotdBanner(data);
+    const [selectedSnap, upcomingSnap] = await Promise.all([
+      getDoc(doc(db, 'motdSchedule', dateKey)),
+      getDocs(query(
+        collection(db, 'motdSchedule'),
+        where(documentId(), '>=', todayKey),
+        orderBy(documentId()),
+        limit(30),
+      )),
+    ]);
+    motdSelected = selectedSnap.exists() ? selectedSnap.data() : null;
+    motdUpcoming = upcomingSnap.docs.map(d => ({ dateKey: d.id, ...d.data() }));
+    renderMotdSelected();
+    renderMotdUpcoming();
   } catch (err) {
-    motdSermonId = null;
-    updateMotdBanner(null);
-    toast('Could not load Message of the Day: ' + err.message, 'error');
+    motdSelected = null;
+    document.getElementById('motd-selected').innerHTML =
+      `<span class="warn">Could not load the Message of the Day schedule: ${escHtml(err.message)}</span>`;
+    document.getElementById('motd-upcoming').innerHTML = '';
+  }
+  renderMotdResults();
+  if (sermonSource === 'library' && sermonDocsShown.length) renderSermonList(sermonDocsShown);
+}
+
+function renderMotdSelected() {
+  const dateKey = motdDateKey();
+  const heading = `<span class="where-title">${escHtml(formatDateKey(dateKey, { year: 'numeric' }))}</span>`;
+  document.getElementById('motd-selected').innerHTML = motdSelected
+    ? `${heading}<div style="display:flex;align-items:center;gap:10px;">
+        <span style="flex:1;min-width:0;">Scheduled: <strong>${escHtml(decodeEntities(motdSelected.title || 'Untitled'))}</strong></span>
+        <button type="button" class="btn btn-secondary motd-clear-btn" data-date="${dateKey}" style="font-size:12px;padding:5px 12px;">Clear</button>
+      </div>`
+    : `${heading}Nothing scheduled, so the app uses its automatic pick for this date.`;
+}
+
+function renderMotdUpcoming() {
+  const el = document.getElementById('motd-upcoming');
+  if (!motdUpcoming.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Nothing scheduled from today on.</p>';
+    return;
+  }
+  const todayKey = toDateKey(new Date());
+  el.innerHTML = `<div class="item-list">${motdUpcoming.map(e => `
+    <div class="item-card">
+      <div class="item-card-body">
+        <div class="item-card-title">${escHtml(decodeEntities(e.title || 'Untitled'))}</div>
+        <div class="item-card-meta">
+          <span>${escHtml(formatDateKey(e.dateKey, { year: 'numeric' }))}</span>
+          ${e.dateKey === todayKey ? '<span class="meta-chip motd">Today</span>' : ''}
+        </div>
+      </div>
+      <button type="button" class="btn btn-danger motd-clear-btn" data-date="${escHtml(e.dateKey)}">Clear</button>
+    </div>`).join('')}</div>`;
+}
+
+// Searches the public sermon archive through the CORS proxy. An empty query
+// lists the newest page. Only sermons with audio can be a Message of the Day.
+async function searchSermonArchive() {
+  const seq = ++motdSearchSeq;
+  const el = document.getElementById('motd-results');
+  const q = document.getElementById('motd-search').value.trim();
+  motdSearchState = 'loading';
+  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Searching the sermon archive…</div>';
+  try {
+    const res = await fetch(q ? `${SERMON_API_URL}?search=${encodeURIComponent(q)}` : SERMON_API_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (seq !== motdSearchSeq) return;
+    motdResults = (data.results || []).filter(r => r && r.audio_link);
+    motdSearchState = 'ok';
+    renderMotdResults();
+  } catch {
+    if (seq !== motdSearchSeq) return;
+    motdResults = [];
+    motdSearchState = 'error';
+    el.innerHTML = '<p style="color:var(--danger);font-size:13px;">Sermon search is unavailable right now</p>';
   }
 }
 
-function updateMotdBanner(data) {
-  const banner = document.getElementById('motd-banner');
-  if (!data || !data.sermonId) { banner.style.display = 'none'; return; }
-  document.getElementById('motd-banner-text').textContent =
-    `Message of the Day: ${decodeEntities(data.title || 'Untitled')}`;
-  banner.style.display = 'flex';
+function renderMotdResults() {
+  if (motdSearchState !== 'ok') return;
+  const el = document.getElementById('motd-results');
+  if (!motdResults.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">No sermons with audio match that search.</p>';
+    return;
+  }
+  el.innerHTML = motdResults.map((r, i) => {
+    const scheduled = motdSelected?.sermonId === String(r.id);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? formatDateKey(r.date, { year: 'numeric' }) : '';
+    const preachers = (r.preachers || []).map(p => p && p.name).filter(Boolean).join(', ');
+    const meta = [date, preachers, r.series?.name].filter(Boolean)
+      .map(s => `<span>${escHtml(s)}</span>`).join('');
+    return `<div class="item-card">
+      <div class="item-card-body">
+        <div class="item-card-title">${escHtml(decodeEntities(r.title || 'Untitled'))}</div>
+        <div class="item-card-meta">${meta}${scheduled ? '<span class="meta-chip motd">Scheduled for this date</span>' : ''}</div>
+      </div>
+      <button type="button" class="btn btn-secondary motd-schedule-btn" data-i="${i}" style="font-size:12px;padding:6px 12px;flex-shrink:0;" ${scheduled ? 'disabled' : ''}>${scheduled ? 'Scheduled' : 'Schedule'}</button>
+    </div>`;
+  }).join('');
 }
 
-document.getElementById('motd-clear-btn').addEventListener('click', async () => {
+async function scheduleMotd(sermonId, title) {
+  const dateKey = motdDateKey();
   try {
-    await deleteDoc(doc(db, 'config', 'messageOfTheDay'));
-    motdSermonId = null;
-    updateMotdBanner(null);
-    toast('Message of the Day cleared');
-    if (sermonSource === 'library') loadSermons();
+    await setDoc(doc(db, 'motdSchedule', dateKey), {
+      sermonId: String(sermonId),
+      title,
+      setAt: serverTimestamp(),
+    });
+    toast(`Message of the Day for ${formatDateKey(dateKey)}: ${title}`);
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
+  await refreshMotd();
+}
+
+async function clearMotd(dateKey) {
+  try {
+    await deleteDoc(doc(db, 'motdSchedule', dateKey));
+    toast(`Cleared the Message of the Day for ${formatDateKey(dateKey)}`);
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+  await refreshMotd();
+}
+
+document.getElementById('motd-card').addEventListener('click', (e) => {
+  const scheduleBtn = e.target.closest('.motd-schedule-btn');
+  if (scheduleBtn) {
+    const r = motdResults[Number(scheduleBtn.dataset.i)];
+    if (!r) return;
+    scheduleBtn.disabled = true;
+    scheduleMotd(String(r.id), decodeEntities(r.title || 'Untitled'));
+    return;
+  }
+  const clearBtn = e.target.closest('.motd-clear-btn');
+  if (clearBtn) {
+    clearBtn.disabled = true;
+    clearMotd(clearBtn.dataset.date);
+  }
+});
+
+document.getElementById('motd-date').addEventListener('change', refreshMotd);
+
+document.getElementById('motd-search').addEventListener('input', () => {
+  clearTimeout(motdSearchTimer);
+  motdSearchTimer = setTimeout(searchSermonArchive, 350);
 });
 
 function renderSermonList(docs) {
+  sermonDocsShown = docs;
+  const motdDateLabel = formatDateKey(motdDateKey());
   const list = document.getElementById('sermons-list');
   list.innerHTML = docs.map(d => {
     const s = d.data();
@@ -2281,7 +2962,10 @@ function renderSermonList(docs) {
       : '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3z"/></svg>';
     const sourceLabel = s.source === 'youtube' ? 'YouTube' : 'SoundCloud';
     const dur = s.duration ? formatDuration(s.duration) : '';
-    const isMotd = d.id === motdSermonId;
+    const isMotd = d.id === motdSelected?.sermonId;
+    const motdAction = isMotd
+      ? `Clear the Message of the Day for ${motdDateLabel}`
+      : `Make this the Message of the Day for ${motdDateLabel}`;
     return `<div class="item-card" data-id="${d.id}">
       <div style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;">
         ${s.thumbnailUrl ? `<img src="${escHtml(s.thumbnailUrl)}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : `<div style="width:64px;height:64px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0;">${sourceIcon}</div>`}
@@ -2289,9 +2973,9 @@ function renderSermonList(docs) {
           <div style="display:flex;align-items:flex-start;gap:8px;">
             <strong style="font-size:14px;min-width:0;">${escHtml(decodeEntities(s.title || 'Untitled'))}</strong>
             <button class="feature-btn" data-id="${d.id}" data-featured="${featured}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${featured ? 'var(--orange)' : 'var(--muted)'};" title="${featured ? 'Unfeature' : 'Feature'}" aria-label="${featured ? 'Unfeature sermon' : 'Feature sermon'}">${featured ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>'}</button>
-            <button class="motd-btn" data-id="${d.id}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${isMotd ? '#FFD166' : 'var(--muted)'};" title="${isMotd ? 'Clear Message of the Day' : 'Set as Message of the Day'}" aria-label="${isMotd ? 'Clear Message of the Day' : 'Set as Message of the Day'}">${isMotd ? SUN_FILLED : SUN_OUTLINE}</button>
+            <button class="motd-btn" data-id="${d.id}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${isMotd ? '#FFD166' : 'var(--muted)'};" title="${escHtml(motdAction)}" aria-label="${escHtml(motdAction)}">${isMotd ? SUN_FILLED : SUN_OUTLINE}</button>
           </div>
-          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''} ${isMotd ? '<span class="meta-chip motd">Message of the Day</span>' : ''}</div>
+          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''} ${isMotd ? `<span class="meta-chip motd">Message of the Day, ${escHtml(motdDateLabel)}</span>` : ''}</div>
           ${s.description ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(decodeEntities(s.description).substring(0, 100))}</div>` : ''}
         </div>
       </div>
@@ -2313,32 +2997,17 @@ function renderSermonList(docs) {
     });
   });
 
-  // Message of the Day: set on click, clear when the current holder is clicked
-  // again. Re-renders in place so a search-filtered list keeps its filter.
+  // Message of the Day: the sun schedules this sermon for the selected date,
+  // or clears that date when it already holds this sermon.
   list.querySelectorAll('.motd-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', () => {
       const id = btn.dataset.id;
-      try {
-        if (id === motdSermonId) {
-          await deleteDoc(doc(db, 'config', 'messageOfTheDay'));
-          motdSermonId = null;
-          updateMotdBanner(null);
-          toast('Message of the Day cleared');
-        } else {
-          const docSnap = docs.find(x => x.id === id);
-          const payload = {
-            sermonId: id,
-            title: decodeEntities(docSnap?.data().title || 'Untitled'),
-            setAt: Timestamp.now(),
-          };
-          await setDoc(doc(db, 'config', 'messageOfTheDay'), payload);
-          motdSermonId = id;
-          updateMotdBanner(payload);
-          toast('Message of the Day set');
-        }
-        renderSermonList(docs);
-      } catch (err) {
-        toast('Error: ' + err.message, 'error');
+      btn.disabled = true;
+      if (id === motdSelected?.sermonId) {
+        clearMotd(motdDateKey());
+      } else {
+        const docSnap = docs.find(x => x.id === id);
+        scheduleMotd(id, decodeEntities(docSnap?.data().title || 'Untitled'));
       }
     });
   });
@@ -2509,6 +3178,62 @@ document.getElementById('refresh-sermons').addEventListener('click', () => {
   else loadSermons();
 });
 
+// ── Branch pickers (events + announcements) ─────────────────────────────
+// Options come only from Firestore `branches`; the empty value is All
+// campuses and is always saved as null. Create/Save stay disabled until the
+// list has loaded once, so nothing is saved against a guessed branch.
+const BRANCH_PICKERS = [
+  { select: 'ev-branch', error: 'ev-branch-error', submit: 'event-submit-btn' },
+  { select: 'nw-branch', error: 'nw-branch-error', submit: 'news-submit-btn' },
+];
+let branchesLoaded = false;
+
+function ensureSelectOption(sel, value, label) {
+  if (value && ![...sel.options].some(o => o.value === value)) {
+    sel.add(new Option(label, value));
+  }
+}
+
+// Selects a stored branch, keeping one that is no longer in the list so an
+// edit never silently moves the item to All campuses.
+function setBranchValue(sel, branch) {
+  const value = (branch || '').trim();
+  ensureSelectOption(sel, value, `${value} (not a current branch)`);
+  sel.value = value;
+}
+
+function populateBranchPickers(names) {
+  const options = '<option value="">All campuses</option>' +
+    names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  BRANCH_PICKERS.forEach(({ select, error, submit }) => {
+    const sel = document.getElementById(select);
+    const cur = sel.value;
+    sel.innerHTML = options;
+    setBranchValue(sel, cur);
+    sel.disabled = false;
+    document.getElementById(error).style.display = 'none';
+    if (!branchesLoaded) document.getElementById(submit).disabled = false;
+  });
+  branchesLoaded = true;
+}
+
+function showBranchPickerError(message) {
+  BRANCH_PICKERS.forEach(({ error }) => {
+    const el = document.getElementById(error);
+    el.innerHTML = `<span>Could not load branches: ${escHtml(message)}</span>
+      <button type="button" class="btn btn-secondary branch-retry-btn" style="font-size:12px;padding:4px 10px;">Retry</button>`;
+    el.style.display = '';
+  });
+}
+
+BRANCH_PICKERS.forEach(({ error }) => {
+  document.getElementById(error).addEventListener('click', (e) => {
+    if (!e.target.closest('.branch-retry-btn')) return;
+    BRANCH_PICKERS.forEach(p => { document.getElementById(p.error).style.display = 'none'; });
+    loadBranches();
+  });
+});
+
 // ── Branches Tab ────────────────────────────────────────────────────────
 async function loadBranches() {
   const list = document.getElementById('branches-list');
@@ -2516,23 +3241,9 @@ async function loadBranches() {
   try {
     const snap = await getDocs(query(collection(db, 'branches'), orderBy('order', 'asc')));
     document.getElementById('branches-count').textContent = snap.size;
-    // Keep the event and announcement branch pickers in sync with the live
-    // branch list. Both keep "All Branches" (empty value) as the first option:
-    // unset means church-wide.
-    if (!snap.empty) {
-      const names = snap.docs.map(d => (d.data().name || '').trim()).filter(Boolean);
-      const options = '<option value="">All Branches</option>' +
-        names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
-      ['ev-branch', 'nw-branch'].forEach(id => {
-        const sel = document.getElementById(id);
-        if (!sel) return;
-        const cur = sel.value;
-        sel.innerHTML = options;
-        sel.value = names.includes(cur) ? cur : '';
-      });
-      // The announcement picker may have just been reset to All Branches.
-      updateNewsWherePreview();
-    }
+    populateBranchPickers(snap.docs.map(d => (d.data().name || '').trim()).filter(Boolean));
+    // The announcement picker may have just changed.
+    updateNewsWherePreview();
     if (snap.empty) {
       list.innerHTML = '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
       return;
@@ -2571,6 +3282,7 @@ async function loadBranches() {
     });
   } catch (err) {
     list.innerHTML = `<p style="color:var(--danger);">Error: ${escHtml(err.message)}</p>`;
+    if (!branchesLoaded) showBranchPickerError(err.message);
   }
 }
 
@@ -2681,7 +3393,7 @@ function serviceRowHtml(i, sv) {
         <label>Day</label>
         <select data-s="day">
           ${['','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-            .map(d => `<option value="${d}" ${sv.day === d ? 'selected' : ''}>${d || '—'}</option>`)
+            .map(d => `<option value="${d}" ${sv.day === d ? 'selected' : ''}>${d || 'None'}</option>`)
             .join('')}
         </select>
       </div>
@@ -2778,7 +3490,7 @@ function syncServiceVenueOptions() {
   const venues = collectVenues({ silent: true });
   document.querySelectorAll('[data-service-row] select[data-s="venueId"]').forEach(sel => {
     const chosen = sel.value || sel.dataset.selected || '';
-    sel.innerHTML = '<option value="">— No venue —</option>' +
+    sel.innerHTML = '<option value="">No venue</option>' +
       venues.map(v => `<option value="${escAttr(v.id)}" ${v.id === chosen ? 'selected' : ''}>${escHtml(v.name || v.id)}</option>`).join('') +
       // A saved venueId whose row was removed stays visible rather than
       // silently resetting to "no venue".

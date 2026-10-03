@@ -30,6 +30,32 @@ String planRuleSummary(ReadingPlan plan) {
   return 'One chapter a day${range.isEmpty ? '' : ' (verses $range)'}';
 }
 
+/// Most days [plan] may run: one chapter a day to the end of its book. `null`
+/// when uncapped (verse mode, or a book outside the table).
+int? planMaxDays(ReadingPlan plan) =>
+    plan.mode == ReadingPlanMode.chapter ? plan.chaptersRemaining : null;
+
+/// Helper line under the days field explaining [planMaxDays], or `null`.
+String? planDaysCapHint(ReadingPlan plan) {
+  final max = planMaxDays(plan);
+  if (max == null) return null;
+  final chapters = max == 1 ? 'chapter' : 'chapters';
+  return 'Max $max ${max == 1 ? 'day' : 'days'}: ${plan.book} has $max '
+      '$chapters from chapter ${plan.firstChapter}';
+}
+
+/// Validates the raw days input against [plan]'s cap; `null` when valid.
+/// Past the cap the error is the cap line itself, so the max stays on screen
+/// (an error replaces the field's helper text).
+String? validatePlanDays(String? value, ReadingPlan plan) {
+  final parsed = int.tryParse((value ?? '').trim()) ?? 0;
+  if (parsed < 1) return 'At least 1 day';
+  final max = planMaxDays(plan);
+  if (max != null && parsed > max) return planDaysCapHint(plan);
+  if (parsed > 400) return 'At most 400 days';
+  return null;
+}
+
 /// Bottom sheet that creates or edits a [ReadingPlan].
 ///
 /// A plan is authored once and covers a date range; the reading for each day is
@@ -148,6 +174,16 @@ class _ReadingPlanFormSheetState extends State<ReadingPlanFormSheet> {
     if (picked != null) setState(() => _startDate = dateOnly(picked));
   }
 
+  /// Pulls the days down to the chapter-mode cap when a book, start chapter or
+  /// mode change leaves the current value past the end of the book.
+  void _clampDaysToCap() {
+    final max = planMaxDays(_draft);
+    final current = int.tryParse(_daysCtrl.text.trim());
+    if (max != null && current != null && current > max) {
+      _daysCtrl.text = '$max';
+    }
+  }
+
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
@@ -155,7 +191,7 @@ class _ReadingPlanFormSheetState extends State<ReadingPlanFormSheet> {
     try {
       await widget.repo.savePlan(plan);
       widget.onSuccess(
-        '${planLabel(plan)} saved — ${plan.days} days from '
+        '${planLabel(plan)} saved: ${plan.days} days from '
         '${formatPlanDate(plan.startDate)}.',
       );
       if (mounted) Navigator.pop(context);
@@ -204,7 +240,7 @@ class _ReadingPlanFormSheetState extends State<ReadingPlanFormSheet> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Set it once — every date in the range resolves on its own and '
+                'Set it once: every date in the range resolves on its own and '
                 'members are notified each morning.',
                 style:
                     AppTypography.bodySm.copyWith(color: AppColors.textMuted),
@@ -217,15 +253,15 @@ class _ReadingPlanFormSheetState extends State<ReadingPlanFormSheet> {
                 controller: _daysCtrl,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                autovalidateMode: AutovalidateMode.always,
                 style:
                     AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _deco(hint: '31'),
-                validator: (value) {
-                  final parsed = int.tryParse((value ?? '').trim()) ?? 0;
-                  if (parsed < 1) return 'At least 1 day';
-                  if (parsed > 400) return 'At most 400 days';
-                  return null;
-                },
+                decoration: _deco(hint: '31').copyWith(
+                  helperText: planDaysCapHint(_draft),
+                  helperStyle: AppTypography.labelMd
+                      .copyWith(color: AppColors.textMuted),
+                ),
+                validator: (value) => validatePlanDays(value, _draft),
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -377,14 +413,19 @@ class _ReadingPlanFormSheetState extends State<ReadingPlanFormSheet> {
                     ? AppColors.onSecondary
                     : AppColors.onSurfaceVariant),
           ),
-          onSelectionChanged: (selection) =>
-              setState(() => _mode = selection.first),
+          onSelectionChanged: (selection) => setState(() {
+            _mode = selection.first;
+            _clampDaysToCap();
+          }),
         ),
         const SizedBox(height: AppSpacing.sm),
         _label(_mode == ReadingPlanMode.chapter
             ? 'Starting chapter'
             : 'Chapter'),
         DropdownButtonFormField<int>(
+          // Keyed on the book so switching books resets the selection rather
+          // than keeping a chapter the new book does not have.
+          key: ValueKey('start-chapter-$_book'),
           initialValue: _startChapter.clamp(1, _chapterCount),
           dropdownColor: AppColors.surfaceElevated,
           style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
@@ -488,7 +529,8 @@ class _ReadingPlanFormSheetState extends State<ReadingPlanFormSheet> {
 }
 
 /// Live preview: day 1, day 2 (the "it must advance" case the product owner
-/// called out) and the final day, plus what happens after the plan ends.
+/// called out) and the computed last reading, plus what happens after the
+/// plan ends.
 class _DraftPreview extends StatelessWidget {
   const _DraftPreview({required this.plan});
 
@@ -499,14 +541,13 @@ class _DraftPreview extends StatelessWidget {
     final start = plan.startDate;
     final secondDay = DateTime(start.year, start.month, start.day + 1);
     final rows = <String>[
-      'Day 1 · ${formatPlanDate(start)} — ${plan.readingForDay(0).reference}',
+      'Day 1 · ${formatPlanDate(start)}: ${plan.readingForDay(0).reference}',
       if (plan.days > 1)
-        'Day 2 · ${formatPlanDate(secondDay)} — '
+        'Day 2 · ${formatPlanDate(secondDay)}: '
             '${plan.readingForDay(1).reference}',
-      if (plan.days > 2)
-        'Day ${plan.days} · ${formatPlanDate(plan.endDate)} — '
-            '${plan.lastReading.reference}',
     ];
+    final lastLine = 'Last reading: ${plan.lastReading.reference} on '
+        '${formatPlanDate(plan.endDate)}';
 
     return Container(
       width: double.infinity,
@@ -536,6 +577,14 @@ class _DraftPreview extends StatelessWidget {
                     .copyWith(color: AppColors.onSurfaceVariant),
               ),
             ),
+          const SizedBox(height: 2),
+          Text(
+            lastLine,
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.heading,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
           Text(
             'After ${formatPlanDate(plan.endDate)} members keep seeing '

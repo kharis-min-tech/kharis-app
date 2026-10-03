@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/services/firebase_service.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/sermon_categorizer.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/sermon_curation_section.dart';
+import 'package:kharis_app/features/admin/providers/content_config_providers.dart';
 import 'package:kharis_app/features/messages/data/firestore_sermon_repository.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -14,17 +16,47 @@ const _sourceOptions = ['audio', 'youtube'];
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-/// Admin screen: list + CRUD for Firestore-managed sermons.
+/// Admin screen: the Messages tab curation (featured mode, Message of the Day
+/// schedule) plus list + CRUD for Firestore-managed sermons.
 ///
 /// Only sermons stored in the `sermons` Firestore collection are editable
 /// here. The archive/API sermons are read-only (they arrive from the Kharis
 /// sermon API automatically). Admins can add new sermon entries, edit
 /// metadata, feature/unfeature, and delete.
-class AdminSermonsScreen extends ConsumerWidget {
+class AdminSermonsScreen extends ConsumerStatefulWidget {
   const AdminSermonsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminSermonsScreen> createState() =>
+      _AdminSermonsScreenState();
+}
+
+class _AdminSermonsScreenState extends ConsumerState<AdminSermonsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (kUseFirebase) _migrateLegacyMotd();
+  }
+
+  /// One-shot move of the retired `config/messageOfTheDay` pointer into
+  /// today's schedule. Best effort: a failure only means the old pick is not
+  /// carried over, so it is logged rather than shown.
+  Future<void> _migrateLegacyMotd() async {
+    try {
+      final moved =
+          await ref.read(contentConfigRepositoryProvider).migrateLegacyMotd();
+      if (!moved || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Moved the old Message of the Day into today’s schedule'),
+        backgroundColor: AppColors.surfaceElevated,
+      ));
+    } catch (e) {
+      debugPrint('Legacy Message of the Day migration failed: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final sermonsAsync = ref.watch(adminSermonsProvider);
 
     return Scaffold(
@@ -44,57 +76,98 @@ class AdminSermonsScreen extends ConsumerWidget {
           ? FloatingActionButton(
               backgroundColor: AppColors.secondary,
               foregroundColor: AppColors.onSecondary,
-              onPressed: () => _openForm(context, ref),
+              onPressed: _openForm,
               child: const Icon(Icons.add),
             )
           : null,
-      body: sermonsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.secondary),
-        ),
-        error: (e, _) => _EmptyState(
-          icon: Icons.cloud_off_rounded,
-          title: 'Could not load sermons',
-          subtitle: 'Check your connection and try again.',
-        ),
-        data: (sermons) {
-          if (sermons.isEmpty) {
-            return _EmptyState(
-              icon: kUseFirebase
-                  ? Icons.mic_none_rounded
-                  : Icons.cloud_off_rounded,
-              title: kUseFirebase
-                  ? 'No CMS sermons yet'
-                  : 'Sermon CMS unavailable',
-              subtitle: kUseFirebase
-                  ? 'Tap + to add a sermon. RSS episodes appear automatically in the app.'
-                  : 'Firebase is disabled in this build, so sermons cannot be managed here.',
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.gutter,
-              AppSpacing.sm,
-              AppSpacing.gutter,
-              AppSpacing.lg + AppSpacing.lg,
+      body: CustomScrollView(
+        slivers: [
+          if (kUseFirebase)
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                AppSpacing.sm,
+                AppSpacing.gutter,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FeaturedModeCard(),
+                    SizedBox(height: AppSpacing.sm),
+                    MotdScheduleCard(),
+                  ],
+                ),
+              ),
             ),
-            itemCount: sermons.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (_, index) => _SermonAdminCard(
-              sermon: sermons[index],
-              onEdit: () =>
-                  _openForm(context, ref, sermon: sermons[index]),
-              onDelete: () =>
-                  _confirmDelete(context, ref, sermons[index]),
-              onToggleFeature: () => _toggleFeature(context, ref, sermons[index]),
-            ),
-          );
-        },
+          ...sermonsAsync.when(
+            loading: () => const [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.secondary),
+                ),
+              ),
+            ],
+            error: (e, _) => const [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyState(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'Could not load sermons',
+                  subtitle: 'Check your connection and try again.',
+                ),
+              ),
+            ],
+            data: (sermons) {
+              if (sermons.isEmpty) {
+                return [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyState(
+                      icon: kUseFirebase
+                          ? Icons.mic_none_rounded
+                          : Icons.cloud_off_rounded,
+                      title: kUseFirebase
+                          ? 'No CMS sermons yet'
+                          : 'Sermon CMS unavailable',
+                      subtitle: kUseFirebase
+                          ? 'Tap + to add a sermon. RSS episodes appear automatically in the app.'
+                          : 'Firebase is disabled in this build, so sermons cannot be managed here.',
+                    ),
+                  ),
+                ];
+              }
+              return [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.gutter,
+                    AppSpacing.sm,
+                    AppSpacing.gutter,
+                    AppSpacing.lg + AppSpacing.lg,
+                  ),
+                  sliver: SliverList.separated(
+                    itemCount: sermons.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (_, index) => _SermonAdminCard(
+                      sermon: sermons[index],
+                      onEdit: () => _openForm(sermon: sermons[index]),
+                      onDelete: () => _confirmDelete(sermons[index]),
+                      onToggleFeature: () => _toggleFeature(sermons[index]),
+                    ),
+                  ),
+                ),
+              ];
+            },
+          ),
+        ],
       ),
     );
   }
 
-  void _openForm(BuildContext context, WidgetRef ref, {Sermon? sermon}) {
+  void _openForm({Sermon? sermon}) {
     final messenger = ScaffoldMessenger.of(context);
     final repo = ref.read(adminSermonRepositoryProvider);
     showModalBottomSheet(
@@ -120,7 +193,7 @@ class AdminSermonsScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, Sermon sermon) {
+  void _confirmDelete(Sermon sermon) {
     final messenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
@@ -172,7 +245,7 @@ class AdminSermonsScreen extends ConsumerWidget {
     );
   }
 
-  void _toggleFeature(BuildContext context, WidgetRef ref, Sermon sermon) {
+  void _toggleFeature(Sermon sermon) {
     final messenger = ScaffoldMessenger.of(context);
     final repo = ref.read(adminSermonRepositoryProvider);
     () async {
@@ -453,7 +526,7 @@ class _SermonFormSheetState extends State<_SermonFormSheet> {
     _durationCtrl = TextEditingController(
       text: s?.duration != null ? '${s!.duration!.inSeconds}' : '',
     );
-    _category = s?.category ?? kSermonCategories.skip(1).first;
+    _category = s?.category ?? kTopicCategories.first;
     _source = s?.source ?? _sourceOptions.first;
     _isFeatured = s?.isFeatured ?? false;
     _publishedAt = s?.publishedAt;
@@ -541,8 +614,7 @@ class _SermonFormSheetState extends State<_SermonFormSheet> {
                 dropdownColor: AppColors.surfaceContainer,
                 style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
                 decoration: _inputDeco(),
-                items: kSermonCategories
-                    .where((c) => c != 'All')
+                items: kTopicCategories
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
                 onChanged: (v) {

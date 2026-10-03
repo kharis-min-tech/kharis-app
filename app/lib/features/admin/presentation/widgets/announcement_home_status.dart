@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/admin/data/london_time.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 
 /// Whether an announcement is on the app home screen right now, and for whom.
@@ -9,8 +11,9 @@ import 'package:kharis_app/features/home/data/news_repository.dart';
 /// which is served by `getAnnouncements` (`selectAnnouncements` in
 /// `backend/functions/src/index.ts`), so an announcement is on the home screen
 /// when:
-///   1. `expiresAt` is unset or still in the future, and
-///   2. its branch is the member's branch, or it is all-campus.
+///   1. `publishedAt` has passed (a scheduled item is not served yet),
+///   2. `expiresAt` is unset or still in the future, and
+///   3. its branch is the member's branch, or it is all-campus.
 /// A blank or absent `branch` is all-campus, exactly as the API reads it.
 ///
 /// The same derivation backs the Announcements tab of the web Content Studio
@@ -21,12 +24,14 @@ class AnnouncementHomeVisibility {
   const AnnouncementHomeVisibility({
     required this.live,
     required this.audience,
+    this.scheduledFor,
   });
 
   factory AnnouncementHomeVisibility.of(NewsItem item) =>
       AnnouncementHomeVisibility(
-        live: !item.isExpired,
+        live: item.isLive,
         audience: audienceFor(item.branch),
+        scheduledFor: item.isScheduled ? item.publishedAt : null,
       );
 
   /// The label for an all-campus announcement, matching the branch dropdown.
@@ -45,8 +50,18 @@ class AnnouncementHomeVisibility {
   /// The audience it reaches while live.
   final String audience;
 
-  String get label =>
-      live ? 'Live on home — $audience' : 'Expired — hidden from home';
+  /// When a scheduled item goes live; `null` once published.
+  final DateTime? scheduledFor;
+
+  bool get scheduled => scheduledFor != null;
+
+  String get label {
+    final goesLive = scheduledFor;
+    if (goesLive != null) {
+      return 'Scheduled: goes live ${formatLondonDateTime(goesLive)}';
+    }
+    return live ? 'Live on home: $audience' : 'Expired: hidden from home';
+  }
 }
 
 /// Per-row verdict on home-screen visibility. Deliberately the loudest thing
@@ -59,7 +74,10 @@ class AnnouncementHomeStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final live = visibility.live;
-    final tint = live ? AppColors.success : AppColors.error;
+    final scheduled = visibility.scheduled;
+    final tint = scheduled
+        ? AppColors.secondary
+        : (live ? AppColors.success : AppColors.error);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -70,7 +88,11 @@ class AnnouncementHomeStatusChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            live ? Icons.smartphone_rounded : Icons.visibility_off_rounded,
+            scheduled
+                ? Icons.schedule_rounded
+                : (live
+                    ? Icons.smartphone_rounded
+                    : Icons.visibility_off_rounded),
             size: 12,
             color: tint,
           ),
@@ -124,8 +146,9 @@ class AnnouncementHomeRulesBanner extends StatelessWidget {
             child: Text(
               'These are the announcements in the carousel on the app home '
               'screen. A member sees one when it is set to their branch or to '
-              '${AnnouncementHomeVisibility.allBranches}, and it has not '
-              'expired. Every row below says exactly where it stands.',
+              '${AnnouncementHomeVisibility.allBranches}, its publish time has '
+              'passed and it has not expired. Every row below says exactly '
+              'where it stands.',
               style: AppTypography.bodySm.copyWith(
                 color: AppColors.onSurfaceVariant,
               ),
@@ -146,23 +169,27 @@ class AnnouncementWillAppearPanel extends StatelessWidget {
     required this.audience,
     required this.expiresAt,
     required this.isNew,
+    this.publishAt,
   });
 
   /// Already resolved through [AnnouncementHomeVisibility.audienceFor].
   final String audience;
 
-  /// Expiry carried by the announcement being edited; `null` = never expires.
-  /// Expiry itself is only editable in the web Content Studio.
+  /// Expiry the save will write; `null` = never expires.
   final DateTime? expiresAt;
 
-  /// A new announcement is pushed to its audience shortly after publishing
-  /// (`pushPendingAnnouncements` picks up a `publishedAt` inside the last 15
-  /// minutes, which `addNews` always writes). An edit is not pushed again.
+  /// Future go-live instant for a scheduled item; `null` = live on save.
+  final DateTime? publishAt;
+
+  /// A new announcement is pushed to its audience once it goes live (the
+  /// `pushPendingAnnouncements` poller picks up a `publishedAt` that has just
+  /// passed). An edit is not pushed again.
   final bool isNew;
 
   @override
   Widget build(BuildContext context) {
     final expiry = expiresAt;
+    final goesLive = publishAt;
     final expired = expiry != null && expiry.isBefore(DateTime.now());
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
@@ -192,7 +219,7 @@ class AnnouncementWillAppearPanel extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           _line(
-            'In the announcements carousel on the app home screen — not in '
+            'In the announcements carousel on the app home screen, not in '
             'Events.',
           ),
           _line(
@@ -200,21 +227,30 @@ class AnnouncementWillAppearPanel extends StatelessWidget {
                 ? 'Seen by everyone, at every branch.'
                 : 'Seen only by members whose campus is $audience.',
           ),
+          if (goesLive != null)
+            _line(
+              'Hidden until ${formatLondonDateTime(goesLive)} UK time, then '
+              'it goes live.',
+            ),
           _line(
             expiry == null
                 ? 'No expiry set, so it stays on the home screen until you '
-                    'delete it. Expiry dates are set in the web Content Studio.'
+                    'delete it.'
                 : expired
                     ? 'Its expiry (${_formatFullDate(expiry)}) has already '
                         'passed, so it stays hidden on the home screen.'
-                    : 'Drops off the home screen at the start of '
-                        '${_formatFullDate(expiry)}.',
+                    : 'Drops off the home screen at the end of '
+                        '${_formatFullDate(toLondonWallClock(expiry))} '
+                        '(UK time).',
             tint: expired ? AppColors.error : null,
           ),
           if (isNew)
             _line(
-              'That same audience also gets a push notification within a few '
-              'minutes of publishing.',
+              goesLive == null
+                  ? 'That same audience also gets a push notification within '
+                      'a few minutes of publishing.'
+                  : 'That same audience also gets a push notification when '
+                      'it goes live.',
             ),
         ],
       ),
@@ -241,3 +277,7 @@ String _formatFullDate(DateTime dt) {
   ];
   return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
 }
+
+/// `Sat 4 Oct 2026, 09:00` on London's clock, for an instant.
+String formatLondonDateTime(DateTime instant) =>
+    DateFormat('EEE d MMM y, HH:mm').format(toLondonWallClock(instant));

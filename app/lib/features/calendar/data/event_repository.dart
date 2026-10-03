@@ -14,6 +14,7 @@ class Event {
     this.endTime,
     this.description,
     this.location,
+    this.address,
     this.branch,
     this.imageUrl,
     this.isFeatured = false,
@@ -22,11 +23,22 @@ class Event {
   final String id;
   final String title;
   final String? description;
+
+  /// Venue name, e.g. "Kensington Town Hall".
   final String? location;
 
+  /// Street address of [location], for maps and the event detail screen.
+  final String? address;
+
   /// Branch / campus this event belongs to (e.g. "London", "Manchester").
-  /// `null` means the event applies to all branches.
+  /// `null` means the event applies to all branches; a blank stored value is
+  /// read as `null` too, exactly as the API reads it.
   final String? branch;
+
+  /// True when a member whose campus is [memberBranch] should see this event:
+  /// its campus is theirs, it is all-campus, or they follow all campuses.
+  bool isVisibleTo(String? memberBranch) =>
+      memberBranch == null || branch == null || branch == memberBranch;
 
   final DateTime startTime;
 
@@ -63,10 +75,14 @@ class Event {
 /// [Event.effectiveEndTime], not by `startTime`, so an in-progress event does
 /// not vanish from "Upcoming" the moment it begins.
 class EventRepository {
-  EventRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  /// [dio] is the client for the `getEvents` API; tests pass one with a stub
+  /// adapter so the Firestore path is exercised without the network.
+  EventRepository({FirebaseFirestore? firestore, Dio? dio})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _dio = dio ?? _defaultDio;
 
   final FirebaseFirestore _firestore;
+  final Dio _dio;
 
   static const String _apiUrl = ApiConfig.getEvents;
 
@@ -85,7 +101,7 @@ class EventRepository {
   /// `whereIn` accepts at most 30 values per query.
   static const int _whereInChunk = 30;
 
-  static final Dio _dio = Dio(
+  static final Dio _defaultDio = Dio(
     BaseOptions(
       connectTimeout: const Duration(seconds: 12),
       receiveTimeout: const Duration(seconds: 15),
@@ -94,51 +110,19 @@ class EventRepository {
 
   // ── Reads ──────────────────────────────────────────────────────────────────
 
-  /// Returns upcoming (not yet finished) events ordered by [Event.startTime].
-  ///
-  /// [branch] – when provided, returns only events for that branch plus
-  /// events where `branch` is null (all-campus events).
-  Future<List<Event>> getUpcomingEvents({String? branch}) =>
-      _getEvents(branch: branch, past: false);
+  /// How many recent past events a branch-scoped Past view reads before the
+  /// in-memory branch filter, so other campuses' events cannot crowd a
+  /// campus's own history out of the [pastEventLimit] cap.
+  static const int _scopedPastWindow = 60;
 
-  /// Returns the [pastEventLimit] most recent finished events. Mirrors
-  /// [getUpcomingEvents], but capped — see [pastEventLimit].
-  Future<List<Event>> getPastEvents({String? branch}) =>
-      _getEvents(branch: branch, past: true);
-
-  /// Realtime stream of upcoming events, optionally branch-filtered.
+  /// Realtime stream of upcoming events, optionally branch-filtered: that
+  /// campus's events plus all-campus ones (null, blank or absent `branch`).
   Stream<List<Event>> watchUpcomingEvents({String? branch}) =>
       _watchEvents(branch: branch, past: false);
 
   /// Realtime stream of the [pastEventLimit] most recent finished events.
   Stream<List<Event>> watchPastEvents({String? branch}) =>
       _watchEvents(branch: branch, past: true);
-
-  Future<List<Event>> _getEvents({
-    required String? branch,
-    required bool past,
-  }) async {
-    try {
-      final now = DateTime.now();
-      final query = _windowQuery(now: now, past: past);
-      if (branch != null) {
-        // Firestore can't OR-filter in a single query; fetch branch-specific
-        // events and all-campus events separately, then merge.
-        final branchSnap = await query.where('branch', isEqualTo: branch).get();
-        final allSnap = await query.where('branch', isNull: true).get();
-        final merged = <String, Event>{
-          for (final e in _mapDocs(branchSnap.docs, now: now, past: past))
-            e.id: e,
-          for (final e in _mapDocs(allSnap.docs, now: now, past: past)) e.id: e,
-        };
-        return _sorted(merged.values.toList(), past: past);
-      }
-      final snapshot = await query.get();
-      return _sorted(_mapDocs(snapshot.docs, now: now, past: past), past: past);
-    } catch (_) {
-      return const [];
-    }
-  }
 
   Stream<List<Event>> _watchEvents({
     required String? branch,
@@ -150,16 +134,22 @@ class EventRepository {
     final apiEvents = await _fetchFromApi(branch: branch, past: past);
     if (apiEvents != null && apiEvents.isNotEmpty) yield apiEvents;
     try {
-      yield* _windowQuery(now: DateTime.now(), past: past)
-          .snapshots()
-          .map((snap) {
+      // One unfiltered window, scoped in memory: an equality filter on
+      // `branch` can never match a doc with no `branch` key, which is how
+      // all-campus events written before the field existed are stored.
+      yield* _windowQuery(
+        now: DateTime.now(),
+        past: past,
+        pastLimit: branch == null ? pastEventLimit : _scopedPastWindow,
+      ).snapshots().map((snap) {
         // Re-evaluate past-ness against the current clock on every snapshot so
         // an event moves between tabs as it starts and finishes.
         final at = DateTime.now();
-        final events = _mapDocs(snap.docs, now: at, past: past)
-            .where((e) =>
-                branch == null || e.branch == null || e.branch == branch)
-            .toList();
+        final events = _mapDocs(
+          snap.docs,
+          now: at,
+          past: past,
+        ).where((e) => e.isVisibleTo(branch)).toList();
         return _sorted(events, past: past);
       });
     } catch (_) {
@@ -170,7 +160,7 @@ class EventRepository {
   /// The Firestore range window for a view. Client-side filtering on
   /// [Event.isPastAt] narrows this to the exact set.
   ///
-  /// The past window is bounded at [pastEventLimit] documents so the query
+  /// The past window is bounded at [pastLimit] documents so the query
   /// itself — not just the rendered list — stays capped. An event that has
   /// started but not finished falls inside the range yet is filtered out as
   /// not-past, so a running event can leave the Past tab one short; that is
@@ -178,19 +168,21 @@ class EventRepository {
   Query<Map<String, dynamic>> _windowQuery({
     required DateTime now,
     required bool past,
+    int pastLimit = pastEventLimit,
   }) {
     final events = _firestore.collection('events');
     if (past) {
       return events
           .where('startTime', isLessThan: Timestamp.fromDate(now))
           .orderBy('startTime', descending: true)
-          .limit(pastEventLimit);
+          .limit(pastLimit);
     }
     return events
         .where(
           'startTime',
-          isGreaterThanOrEqualTo:
-              Timestamp.fromDate(now.subtract(_inProgressLookback)),
+          isGreaterThanOrEqualTo: Timestamp.fromDate(
+            now.subtract(_inProgressLookback),
+          ),
         )
         .orderBy('startTime');
   }
@@ -209,10 +201,12 @@ class EventRepository {
         );
       }
       final snaps = await Future.wait(
-        chunks.map((chunk) => _firestore
-            .collection('events')
-            .where(FieldPath.documentId, whereIn: chunk)
-            .get()),
+        chunks.map(
+          (chunk) => _firestore
+              .collection('events')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get(),
+        ),
       );
       return [
         for (final snap in snaps)
@@ -266,74 +260,73 @@ class EventRepository {
 
   // ── Admin writes ────────────────────────────────────────────────────────────
 
+  /// Creates an event. Blank optional strings are stored as `null`; a blank
+  /// [branch] means all-campus.
   Future<void> addEvent({
     required String title,
     String? description,
     String? location,
+    String? address,
     String? branch,
     required DateTime startTime,
     required DateTime endTime,
     String? imageUrl,
     bool isFeatured = false,
   }) {
-    return _firestore.collection('events').add(_toData(
-          title: title,
-          description: description,
-          location: location,
-          branch: branch,
-          startTime: startTime,
-          endTime: endTime,
-          imageUrl: imageUrl,
-          isFeatured: isFeatured,
-        ));
+    return _firestore.collection('events').add({
+      'title': title,
+      'description': _blankToNull(description),
+      'location': _blankToNull(location),
+      'address': _blankToNull(address),
+      'branch': _blankToNull(branch),
+      'startTime': Timestamp.fromDate(startTime),
+      'endTime': Timestamp.fromDate(endTime),
+      'imageUrl': _blankToNull(imageUrl),
+      'isFeatured': isFeatured,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 
+  /// Partial update: only the arguments that are passed are written.
+  ///
+  /// `null` means "leave as stored", so a form that does not edit the banner
+  /// or the featured flag can never wipe them, and a campus-scoped screen
+  /// cannot silently re-scope an all-campus event. To CLEAR an optional
+  /// string pass `''`, which is stored as `null` (for [branch]: all-campus).
   Future<void> updateEvent(
     String id, {
-    required String title,
+    String? title,
     String? description,
     String? location,
+    String? address,
     String? branch,
-    required DateTime startTime,
-    required DateTime endTime,
+    DateTime? startTime,
+    DateTime? endTime,
     String? imageUrl,
-    bool isFeatured = false,
+    bool? isFeatured,
   }) {
-    return _firestore.collection('events').doc(id).update(_toData(
-          title: title,
-          description: description,
-          location: location,
-          branch: branch,
-          startTime: startTime,
-          endTime: endTime,
-          imageUrl: imageUrl,
-          isFeatured: isFeatured,
-        ));
+    final data = <String, Object?>{
+      'title': ?title,
+      if (description != null) 'description': _blankToNull(description),
+      if (location != null) 'location': _blankToNull(location),
+      if (address != null) 'address': _blankToNull(address),
+      if (branch != null) 'branch': _blankToNull(branch),
+      if (startTime != null) 'startTime': Timestamp.fromDate(startTime),
+      if (endTime != null) 'endTime': Timestamp.fromDate(endTime),
+      if (imageUrl != null) 'imageUrl': _blankToNull(imageUrl),
+      'isFeatured': ?isFeatured,
+    };
+    if (data.isEmpty) return Future.value();
+    return _firestore.collection('events').doc(id).update(data);
   }
 
   Future<void> deleteEvent(String id) =>
       _firestore.collection('events').doc(id).delete();
 
-  Map<String, Object?> _toData({
-    required String title,
-    String? description,
-    String? location,
-    String? branch,
-    required DateTime startTime,
-    required DateTime endTime,
-    String? imageUrl,
-    bool isFeatured = false,
-  }) =>
-      {
-        'title': title,
-        'description': description,
-        'location': location,
-        'branch': branch,
-        'startTime': Timestamp.fromDate(startTime),
-        'endTime': Timestamp.fromDate(endTime),
-        'imageUrl': imageUrl,
-        'isFeatured': isFeatured,
-      };
+  static String? _blankToNull(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
 
   // ── Mapping ────────────────────────────────────────────────────────────────
 
@@ -342,12 +335,11 @@ class EventRepository {
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, {
     required DateTime now,
     required bool past,
-  }) =>
-      docs
-          .map(_docToEvent)
-          .whereType<Event>()
-          .where((e) => e.isPastAt(now) == past)
-          .toList();
+  }) => docs
+      .map(_docToEvent)
+      .whereType<Event>()
+      .where((e) => e.isPastAt(now) == past)
+      .toList();
 
   /// Orders a page and, for the Past view, applies [pastEventLimit]. Every
   /// read path — Firestore one-shot, Firestore stream and the API fetch —
@@ -372,11 +364,12 @@ class EventRepository {
       id: id,
       title: data['title'] as String? ?? '',
       description: data['description'] as String?,
-      location: data['location'] as String?,
-      branch: data['branch'] as String?,
+      location: _blankToNull(data['location'] as String?),
+      address: _blankToNull(data['address'] as String?),
+      branch: _blankToNull(data['branch'] as String?),
       startTime: start,
       endTime: _toDate(data['endTime']),
-      imageUrl: data['imageUrl'] as String?,
+      imageUrl: _blankToNull(data['imageUrl'] as String?),
       isFeatured: data['isFeatured'] as bool? ?? false,
     );
   }
@@ -391,11 +384,12 @@ class EventRepository {
       id: id,
       title: title,
       description: j['description'] as String?,
-      location: j['location'] as String?,
-      branch: j['branch'] as String?,
+      location: _blankToNull(j['location'] as String?),
+      address: _blankToNull(j['address'] as String?),
+      branch: _blankToNull(j['branch'] as String?),
       startTime: start,
       endTime: _toDate(j['endTime']),
-      imageUrl: j['imageUrl'] as String?,
+      imageUrl: _blankToNull(j['imageUrl'] as String?),
       isFeatured: j['isFeatured'] as bool? ?? false,
     );
   }
@@ -403,7 +397,9 @@ class EventRepository {
   static DateTime? _toDate(Object? value) {
     if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
+    // API instants are ISO-8601 UTC ('...Z'); render them on the device clock
+    // like Firestore Timestamps, or a 19:00 BST event reads as 18:00.
+    if (value is String) return DateTime.tryParse(value)?.toLocal();
     return null;
   }
 }

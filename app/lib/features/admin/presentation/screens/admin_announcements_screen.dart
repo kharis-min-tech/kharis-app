@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/announcement_form_sheet.dart';
 import 'package:kharis_app/features/admin/presentation/widgets/announcement_home_status.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/shared/providers/admin_provider.dart';
 
 // ── News type options ─────────────────────────────────────────────────────────
 //
@@ -12,12 +12,6 @@ import 'package:kharis_app/shared/providers/admin_provider.dart';
 // deliberately no 'Event' category: an announcement is a message, while an
 // event is a dated, located, RSVP-able occurrence managed on the Events
 // screen and stored in the `events` collection.
-
-// Fallback branch list if branchesProvider has not loaded yet.
-const _kFallbackBranches = [
-  'London', 'Manchester', 'Birmingham', 'Reading',
-  'Chatham', 'Croydon', 'Medway', 'Accra', 'Freetown',
-];
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -100,18 +94,13 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
   void _openForm(BuildContext context, WidgetRef ref, {NewsItem? item}) {
     final messenger = ScaffoldMessenger.of(context);
     final repo = ref.read(newsRepositoryProvider);
-    final branches = ref.read(branchesProvider).valueOrNull
-            ?.map((b) => b.name)
-            .toList() ??
-        _kFallbackBranches;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _NewsFormSheet(
+      builder: (_) => AnnouncementFormSheet(
         item: item,
         repo: repo,
-        branches: branches,
         onSuccess: (msg) => messenger.showSnackBar(
           SnackBar(
             content: Text(msg),
@@ -330,306 +319,4 @@ class _TypeChip extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Add / Edit form sheet ─────────────────────────────────────────────────────
-
-class _NewsFormSheet extends StatefulWidget {
-  const _NewsFormSheet({
-    this.item,
-    required this.repo,
-    required this.branches,
-    required this.onSuccess,
-    required this.onError,
-  });
-
-  final NewsItem? item;
-  final NewsRepository repo;
-  final void Function(String) onSuccess;
-  final List<String> branches;
-  final void Function(String) onError;
-
-  @override
-  State<_NewsFormSheet> createState() => _NewsFormSheetState();
-}
-
-class _NewsFormSheetState extends State<_NewsFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _titleCtrl;
-  late final TextEditingController _bodyCtrl;
-  late final TextEditingController _imageUrlCtrl;
-  late String _type;
-  String? _branch;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleCtrl = TextEditingController(text: widget.item?.title ?? '');
-    _bodyCtrl = TextEditingController(text: widget.item?.body ?? '');
-    _imageUrlCtrl = TextEditingController(text: widget.item?.imageUrl ?? '');
-    // normaliseType guards the dropdown: a legacy doc saved as type 'Event'
-    // would otherwise assert on a value outside `items`.
-    _type = NewsItem.normaliseType(widget.item?.type);
-    _branch = widget.item?.branch;
-  }
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _bodyCtrl.dispose();
-    _imageUrlCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isEdit = widget.item != null;
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.md,
-        bottom: AppSpacing.md + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.outlineVariant,
-                    borderRadius: AppRadius.pillBorder,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.campaign_rounded,
-                    size: 20,
-                    color: AppColors.secondary,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    isEdit ? 'Edit Announcement' : 'New Announcement',
-                    style:
-                        AppTypography.titleMd.copyWith(color: AppColors.heading),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'A message to the church — headline, optional body and image. '
-                'For anything with a date and a venue people RSVP to, use '
-                'Events instead.',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Title
-              _inputLabel('Title'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _titleCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(hint: 'Enter a title'),
-                textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Title is required' : null,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Type
-              _inputLabel('Type'),
-              const SizedBox(height: AppSpacing.xs),
-              DropdownButtonFormField<String>(
-                initialValue: _type,
-                dropdownColor: AppColors.surfaceContainer,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(),
-                items: NewsItem.types
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _type = v);
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Branch scope
-              _inputLabel('Branch Scope'),
-              const SizedBox(height: AppSpacing.xs),
-              DropdownButtonFormField<String?>(
-                initialValue: _branch,
-                dropdownColor: AppColors.surfaceContainer,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('All Branches (Church-wide)'),
-                  ),
-                  ...widget.branches.map(
-                    (b) => DropdownMenuItem<String?>(value: b, child: Text(b)),
-                  ),
-                ],
-                onChanged: (v) => setState(() => _branch = v),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              AnnouncementWillAppearPanel(
-                audience: AnnouncementHomeVisibility.audienceFor(_branch),
-                expiresAt: widget.item?.expiresAt,
-                isNew: !isEdit,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Body
-              _inputLabel('Body (optional)'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _bodyCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(hint: 'Optional body text'),
-                maxLines: 4,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Image URL
-              _inputLabel('Image URL (optional)'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _imageUrlCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(hint: 'https://...'),
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.done,
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton(
-                  onPressed: _saving ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: AppColors.onSecondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.buttonBorder,
-                    ),
-                  ),
-                  child: _saving
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.onSecondary,
-                          ),
-                        )
-                      : Text(
-                          isEdit ? 'Save changes' : 'Add announcement',
-                          style: AppTypography.bodyLg.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onSecondary,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
-    try {
-      final title = _titleCtrl.text.trim();
-      final body = _bodyCtrl.text.trim().isEmpty ? null : _bodyCtrl.text.trim();
-      final imageUrl = _imageUrlCtrl.text.trim().isEmpty
-          ? null
-          : _imageUrlCtrl.text.trim();
-
-      if (widget.item == null) {
-        await widget.repo.addNews(
-          title: title,
-          type: _type,
-          body: body,
-          imageUrl: imageUrl,
-          branch: _branch,
-        );
-        widget.onSuccess('Announcement added.');
-      } else {
-        await widget.repo.updateNews(
-          widget.item!.id,
-          title: title,
-          type: _type,
-          body: body,
-          imageUrl: imageUrl,
-          branch: _branch,
-        );
-        widget.onSuccess('Announcement updated.');
-      }
-
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      widget.onError('Save failed: $e');
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Widget _inputLabel(String text) => Text(
-        text,
-        style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant),
-      );
-
-  InputDecoration _inputDeco({String? hint}) => InputDecoration(
-        hintText: hint,
-        hintStyle: AppTypography.bodyLg.copyWith(color: AppColors.textFaint),
-        filled: true,
-        fillColor: AppColors.surfaceSubtle,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.sm,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.error, width: 1),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-        ),
-        errorStyle: AppTypography.labelMd.copyWith(color: AppColors.error),
-      );
 }
