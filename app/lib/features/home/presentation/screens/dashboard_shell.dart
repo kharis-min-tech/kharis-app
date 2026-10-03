@@ -10,6 +10,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -48,6 +49,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   /// guests from older builds) have no saved branch, so events default to the
   /// all-campus mush the testers flagged. Ask exactly once.
   Future<void> _promptBranchOnce() async {
+    // A member who just chose a campus in onboarding (or chose "All
+    // campuses") has already answered. Checked synchronously from local
+    // prefs: the branch stream can still be empty a second later on a slow
+    // device, which used to ask again right after onboarding.
+    if (ref.read(onboardingRepositoryProvider).hasBranchChoice) return;
     // Let the branch stream emit before deciding.
     await Future<void>.delayed(const Duration(seconds: 1));
     if (!mounted) return;

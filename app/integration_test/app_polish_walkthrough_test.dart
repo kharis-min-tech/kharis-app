@@ -80,6 +80,7 @@ import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // ── Run configuration (passed by the runner script) ──────────────────────────
@@ -1848,6 +1849,27 @@ void main() {
         await hostShot(tester, '5-notes-sheet-listed');
         Navigator.of(tester.element(find.byType(SermonNotesSheet))).pop();
         await pumpFor(tester, const Duration(milliseconds: 800));
+
+        // Leave no test data in the live backend: delete this run's note and
+        // any left by earlier runs (iOS keeps the anonymous uid across
+        // reinstalls, so leftovers accumulate under the same account).
+        final notesRepo = c().read(notesRepositoryProvider);
+        final leftovers = (c().read(notesProvider).valueOrNull ?? const [])
+            .where((n) => n.body.startsWith('Walkthrough note '))
+            .toList();
+        for (final note in leftovers) {
+          await notesRepo.delete(note.id);
+        }
+        walk.check(
+          await pumpUntil(
+            tester,
+            () => !(c().read(notesProvider).valueOrNull ?? const []).any(
+              (n) => n.body.startsWith('Walkthrough note '),
+            ),
+            timeout: const Duration(seconds: 15),
+          ),
+          'walkthrough notes cleaned up (${leftovers.length} removed)',
+        );
 
         // Playlist: create, add the message.
         playlistName = 'Walk ${DateTime.now().millisecondsSinceEpoch % 100000}';
