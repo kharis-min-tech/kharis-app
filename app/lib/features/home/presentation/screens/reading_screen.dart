@@ -329,6 +329,7 @@ class _PassageView extends ConsumerWidget {
         child: CircularProgressIndicator(color: AppColors.primary),
       ),
       error: (error, _) {
+        debugPrint('ReadingScreen: passage $usfmId failed: $error');
         final notFound =
             error is DioException && error.response?.statusCode == 404;
         if (notFound) {
