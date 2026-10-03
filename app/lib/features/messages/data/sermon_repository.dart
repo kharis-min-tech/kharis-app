@@ -10,19 +10,19 @@ import 'sermon_repository_base.dart';
 ///
 /// The live library is served by `KharisApiSermonRepository`
 /// (yetanothersermon.host). This repository only provides the bundled archive
-/// at `assets/data/kharis_sermons.json` so the Messages surface is never empty
-/// when the network is unavailable.
-///
-/// (Formerly fetched the Kharis SoundCloud RSS feed — that live SoundCloud
-/// source has been removed in favour of the public sermon API.)
+/// at `assets/data/kharis_sermons.json` (a SoundCloud snapshot), so the
+/// Messages surface is never empty when the network is unavailable.
 class SermonRepository extends AbstractSermonRepository {
   SermonRepository();
 
   static List<Sermon>? _catalogueCache;
 
-  /// No live source here — returns the bundled archive.
+  /// The bundled archive is one terminal page.
   @override
-  Future<List<Sermon>> getSermons() => loadCatalogue();
+  Future<SermonPage> fetchPage({String? url, String? search}) async {
+    final all = await loadCatalogue();
+    return SermonPage(sermons: all, totalCount: all.length);
+  }
 
   /// Loads the bundled archive (one-time, cached for the session).
   @override
@@ -34,7 +34,7 @@ class SermonRepository extends AbstractSermonRepository {
     _catalogueCache = [
       for (final (i, m) in episodes.indexed)
         Sermon(
-          id: 'archive_${i}_${(m['audioUrl'] as String).hashCode.abs()}',
+          id: archiveSermonId(m['audioUrl'] as String),
           title: m['title'] as String,
           speaker: m['speaker'] as String? ?? 'David Antwi',
           audioUrl: m['audioUrl'] as String,
@@ -43,10 +43,25 @@ class SermonRepository extends AbstractSermonRepository {
           publishedAt: DateTime.tryParse(m['publishedAt'] as String? ?? ''),
           description: m['description'] as String?,
           artworkColor: i % 10,
-          category: sermonCategory(m['title'] as String),
+          category: sermonCategory(
+            m['title'] as String,
+            description: m['description'] as String?,
+          ),
           source: 'archive',
         ),
     ];
     return _catalogueCache!;
   }
+}
+
+/// Stable id for a bundled-archive episode, built from its audio URL so it
+/// survives reordering of the asset (a playlist or recently-played entry keeps
+/// resolving). SoundCloud stream paths start with the numeric track id
+/// (`/stream/2339300339-kharismedia-...mp3`); anything else uses the whole
+/// last path segment.
+String archiveSermonId(String audioUrl) {
+  final segments = Uri.tryParse(audioUrl)?.pathSegments ?? const <String>[];
+  final last = segments.where((s) => s.isNotEmpty).lastOrNull ?? audioUrl;
+  final track = RegExp(r'^\d+').firstMatch(last)?.group(0);
+  return 'archive_${track ?? last.replaceAll(RegExp(r'\.mp3$'), '')}';
 }

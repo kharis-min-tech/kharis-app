@@ -1,8 +1,60 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-class CacheService {
+import '../../shared/models/sermon.dart';
+
+/// The hydrated sermon archive as persisted on disk, with the time of the
+/// last complete walk of the API (used to schedule revalidation).
+@immutable
+class SermonArchiveSnapshot {
+  const SermonArchiveSnapshot({required this.sermons, required this.fetchedAt});
+
+  final List<Sermon> sermons;
+  final DateTime fetchedAt;
+}
+
+/// Disk store for the sermon archive. [CacheService] is the app's store;
+/// tests use an in-memory one.
+abstract interface class SermonArchiveStore {
+  /// The last persisted archive, decoded off the UI isolate. Null when none
+  /// has been stored (or it is unreadable).
+  Future<SermonArchiveSnapshot?> readSermonArchive();
+
+  /// Persists a fully hydrated archive.
+  Future<void> writeSermonArchive(SermonArchiveSnapshot snapshot);
+}
+
+/// Encodes [snapshot] for disk. Top-level so it can run under [compute].
+String encodeSermonArchive(SermonArchiveSnapshot snapshot) => jsonEncode({
+  'v': 2,
+  'fetchedAt': snapshot.fetchedAt.toIso8601String(),
+  'sermons': [for (final s in snapshot.sermons) s.toJson()],
+});
+
+/// Decodes a stored archive; null for an unknown schema or corrupt data.
+/// Top-level so it can run under [compute]: the archive is ~1.4 MB of JSON,
+/// which would stall first paint if decoded on the UI isolate.
+SermonArchiveSnapshot? decodeSermonArchive(String raw) {
+  try {
+    final data = jsonDecode(raw);
+    if (data is! Map || data['v'] != 2) return null;
+    final fetchedAt = DateTime.tryParse(data['fetchedAt'] as String? ?? '');
+    if (fetchedAt == null) return null;
+    return SermonArchiveSnapshot(
+      fetchedAt: fetchedAt,
+      sermons: [
+        for (final m in data['sermons'] as List)
+          Sermon.fromJson(Map<String, dynamic>.from(m as Map)),
+      ],
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+class CacheService implements SermonArchiveStore {
   CacheService._({
     required this._sermonsBox,
     required this._eventsBox,
@@ -21,7 +73,10 @@ class CacheService {
   /// Direct access to the raw Hive box for notes storage.
   Box<dynamic> get notesBox => _notesBox;
 
-  static const _sermonsListKey = 'sermons_list';
+  /// Versioned archive key. The unversioned `sermons_list` blob it replaces
+  /// stored series names as categories and had no fetch time.
+  static const _archiveKey = 'sermon_archive_v2';
+  static const _legacyArchiveKey = 'sermons_list';
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -30,8 +85,9 @@ class CacheService {
     final sermonsBox = await Hive.openBox<dynamic>('sermons');
     final eventsBox = await Hive.openBox<dynamic>('events');
     final preferencesBox = await Hive.openBox<dynamic>('preferences');
-    final playbackPositionsBox =
-        await Hive.openBox<dynamic>('playback_positions');
+    final playbackPositionsBox = await Hive.openBox<dynamic>(
+      'playback_positions',
+    );
     final notesBox = await Hive.openBox<dynamic>('notes');
     return CacheService._(
       sermonsBox: sermonsBox,
@@ -44,17 +100,18 @@ class CacheService {
 
   // ── Sermons ───────────────────────────────────────────────────────────────
 
-  void cacheSermons(List<Map<String, dynamic>> sermons) {
-    _sermonsBox.put(_sermonsListKey, jsonEncode(sermons));
+  @override
+  Future<SermonArchiveSnapshot?> readSermonArchive() async {
+    final raw = _sermonsBox.get(_archiveKey);
+    if (raw is! String) return null;
+    return compute(decodeSermonArchive, raw);
   }
 
-  List<Map<String, dynamic>> getCachedSermons() {
-    final raw = _sermonsBox.get(_sermonsListKey);
-    if (raw == null) return [];
-    final decoded = jsonDecode(raw as String) as List<dynamic>;
-    return decoded
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
+  @override
+  Future<void> writeSermonArchive(SermonArchiveSnapshot snapshot) async {
+    final raw = await compute(encodeSermonArchive, snapshot);
+    await _sermonsBox.put(_archiveKey, raw);
+    await _sermonsBox.delete(_legacyArchiveKey);
   }
 
   // ── Playback positions ────────────────────────────────────────────────────

@@ -15,48 +15,53 @@ class Sermon {
     this.artworkColor,
     this.category,
     this.videoId,
+    this.videoStart,
     this.source,
     this.isFeatured = false,
   });
 
   /// Rebuilds a sermon from the on-disk archive cache.
   factory Sermon.fromJson(Map<String, dynamic> j) => Sermon(
-        id: j['id'] as String,
-        title: j['title'] as String? ?? '',
-        speaker: j['speaker'] as String? ?? '',
-        audioUrl: j['audioUrl'] as String? ?? '',
-        artworkUrl: j['artworkUrl'] as String?,
-        duration: j['durationSeconds'] != null
-            ? Duration(seconds: (j['durationSeconds'] as num).toInt())
-            : null,
-        publishedAt: DateTime.tryParse(j['publishedAt'] as String? ?? ''),
-        series: j['series'] as String?,
-        description: j['description'] as String?,
-        artworkColor: (j['artworkColor'] as num?)?.toInt(),
-        category: j['category'] as String?,
-        videoId: j['videoId'] as String?,
-        source: j['source'] as String?,
-        isFeatured: j['isFeatured'] as bool? ?? false,
-      );
+    id: j['id'] as String,
+    title: j['title'] as String? ?? '',
+    speaker: j['speaker'] as String? ?? '',
+    audioUrl: j['audioUrl'] as String? ?? '',
+    artworkUrl: j['artworkUrl'] as String?,
+    duration: j['durationSeconds'] != null
+        ? Duration(seconds: (j['durationSeconds'] as num).toInt())
+        : null,
+    publishedAt: DateTime.tryParse(j['publishedAt'] as String? ?? ''),
+    series: j['series'] as String?,
+    description: j['description'] as String?,
+    artworkColor: (j['artworkColor'] as num?)?.toInt(),
+    category: j['category'] as String?,
+    videoId: j['videoId'] as String?,
+    videoStart: j['videoStartSeconds'] != null
+        ? Duration(seconds: (j['videoStartSeconds'] as num).toInt())
+        : null,
+    source: j['source'] as String?,
+    isFeatured: j['isFeatured'] as bool? ?? false,
+  );
 
-  /// Serialises for [CacheService.cacheSermons]. `Duration`/`DateTime` are not
-  /// JSON types, so they go out as seconds and ISO-8601.
+  /// Serialises for the archive cache and player snapshots. `Duration` and
+  /// `DateTime` are not JSON types, so they go out as seconds and ISO-8601.
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'speaker': speaker,
-        'audioUrl': audioUrl,
-        if (artworkUrl != null) 'artworkUrl': artworkUrl,
-        if (duration != null) 'durationSeconds': duration!.inSeconds,
-        if (publishedAt != null) 'publishedAt': publishedAt!.toIso8601String(),
-        if (series != null) 'series': series,
-        if (description != null) 'description': description,
-        if (artworkColor != null) 'artworkColor': artworkColor,
-        if (category != null) 'category': category,
-        if (videoId != null) 'videoId': videoId,
-        if (source != null) 'source': source,
-        'isFeatured': isFeatured,
-      };
+    'id': id,
+    'title': title,
+    'speaker': speaker,
+    'audioUrl': audioUrl,
+    if (artworkUrl != null) 'artworkUrl': artworkUrl,
+    if (duration != null) 'durationSeconds': duration!.inSeconds,
+    if (publishedAt != null) 'publishedAt': publishedAt!.toIso8601String(),
+    if (series != null) 'series': series,
+    if (description != null) 'description': description,
+    if (artworkColor != null) 'artworkColor': artworkColor,
+    if (category != null) 'category': category,
+    if (videoId != null) 'videoId': videoId,
+    if (videoStart != null) 'videoStartSeconds': videoStart!.inSeconds,
+    if (source != null) 'source': source,
+    'isFeatured': isFeatured,
+  };
 
   /// Whether this sermon has a streamable audio recording.
   ///
@@ -95,6 +100,10 @@ class Sermon {
   /// YouTube video ID (for videos synced from YouTube)
   final String? videoId;
 
+  /// Where the sermon starts inside its YouTube video (the API's `t=`), so a
+  /// recording of the whole service can open at the message itself.
+  final Duration? videoStart;
+
   /// Content source: 'kharis-api', 'youtube', 'archive', etc.
   final String? source;
 
@@ -126,6 +135,7 @@ class Sermon {
     int? artworkColor,
     String? category,
     String? videoId,
+    Duration? videoStart,
     String? source,
     bool? isFeatured,
   }) {
@@ -142,6 +152,7 @@ class Sermon {
       artworkColor: artworkColor ?? this.artworkColor,
       category: category ?? this.category,
       videoId: videoId ?? this.videoId,
+      videoStart: videoStart ?? this.videoStart,
       source: source ?? this.source,
       isFeatured: isFeatured ?? this.isFeatured,
     );
@@ -162,24 +173,30 @@ class Sermon {
         other.description == description &&
         other.artworkColor == artworkColor &&
         other.category == category &&
+        other.videoId == videoId &&
+        other.videoStart == videoStart &&
+        other.source == source &&
         other.isFeatured == isFeatured;
   }
 
   @override
   int get hashCode => Object.hash(
-   id,
-   title,
-   speaker,
-   audioUrl,
-   artworkUrl,
-   duration,
-   publishedAt,
-   series,
-   description,
-   artworkColor,
-   category,
-   isFeatured,
- );
+    id,
+    title,
+    speaker,
+    audioUrl,
+    artworkUrl,
+    duration,
+    publishedAt,
+    series,
+    description,
+    artworkColor,
+    category,
+    videoId,
+    videoStart,
+    source,
+    isFeatured,
+  );
 
   @override
   String toString() =>

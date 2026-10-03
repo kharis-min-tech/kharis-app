@@ -5,12 +5,12 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 Sermon _sermon(String id, String title) => Sermon(
-      id: id,
-      title: title,
-      speaker: 'David Antwi',
-      audioUrl: 'https://x.test/$id.mp3',
-      publishedAt: DateTime(2026, 1, int.parse(id)),
-    );
+  id: id,
+  title: title,
+  speaker: 'David Antwi',
+  audioUrl: 'https://x.test/$id.mp3',
+  publishedAt: DateTime(2026, 1, int.parse(id)),
+);
 
 /// Serves a scripted archive: page N links to page N+1 until [pages] runs out.
 class _FakePagedRepo extends AbstractSermonRepository {
@@ -26,11 +26,9 @@ class _FakePagedRepo extends AbstractSermonRepository {
   bool failNext = false;
 
   @override
-  Future<List<Sermon>> getSermons() async => [for (final p in pages) ...p];
-
-  @override
-  Future<List<Sermon>> loadCatalogue() async =>
-      [_sermon('99', 'Bundled Fallback')];
+  Future<List<Sermon>> loadCatalogue() async => [
+    _sermon('99', 'Bundled Fallback'),
+  ];
 
   @override
   Future<SermonPage> fetchPage({String? url, String? search}) async {
@@ -65,18 +63,22 @@ void main() {
           ],
       failFirstLoad: failFirstLoad,
     );
-    final container = ProviderContainer(overrides: [
-      sermonRepositoryProvider.overrideWithValue(repo),
-      // Manual-paging tests drive loadMore() themselves.
-      sermonArchiveAutoHydrateProvider.overrideWithValue(autoHydrate),
-      // No Firebase in tests: emit an empty CMS layer immediately so the
-      // merged catalogue can settle.
-      adminSermonsProvider.overrideWith((ref) => Stream.value(const <Sermon>[])),
-      // Both read CacheService for their persisted value, which intentionally
-      // throws unless overridden; tests only need plain defaults.
-      selectedCategoryProvider.overrideWith((ref) => 'All'),
-      sermonSortProvider.overrideWith((ref) => SermonSort.newest),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        sermonRepositoryProvider.overrideWithValue(repo),
+        // Manual-paging tests drive loadMore() themselves.
+        sermonArchiveAutoHydrateProvider.overrideWithValue(autoHydrate),
+        // No Firebase in tests: emit an empty CMS layer immediately so the
+        // merged catalogue can settle.
+        cmsSermonsProvider.overrideWith(
+          (ref) => Stream.value(const <Sermon>[]),
+        ),
+        // Both read CacheService for their persisted value, which intentionally
+        // throws unless overridden; tests only need plain defaults.
+        selectedCategoryProvider.overrideWith((ref) => 'All'),
+        sermonSortProvider.overrideWith((ref) => SermonSort.newest),
+      ],
+    );
     addTearDown(container.dispose);
     return (container, repo);
   }
@@ -118,10 +120,15 @@ void main() {
 
     // A fast scroll fires the trigger many times before the page lands.
     await Future.wait([for (var i = 0; i < 8; i++) notifier.loadMore()]);
-    expect(container.read(sermonLibraryProvider).sermons.length, 3,
-        reason: 'only one page-2 request may be in flight');
-    expect(repo.requested.where((u) => u?.contains('page=2') ?? false).length,
-        1);
+    expect(
+      container.read(sermonLibraryProvider).sermons.length,
+      3,
+      reason: 'only one page-2 request may be in flight',
+    );
+    expect(
+      repo.requested.where((u) => u?.contains('page=2') ?? false).length,
+      1,
+    );
   });
 
   test('a failed page keeps nextUrl so the next scroll retries', () async {
@@ -153,19 +160,34 @@ void main() {
     expect(lib.hasMore, isFalse, reason: 'no paging over the bundled asset');
   });
 
-  test('refresh restarts from page 1', () async {
+  test('refresh refetches page 1 without blanking the list', () async {
     final (container, repo) = harness();
     final notifier = container.read(sermonLibraryProvider.notifier);
     await notifier.firstLoad;
     await notifier.loadMore();
     expect(container.read(sermonLibraryProvider).sermons.length, 3);
 
+    final states = <int>[];
+    container.listen(sermonLibraryProvider, (_, next) {
+      states.add(next.sermons.length);
+    });
     await notifier.refresh();
     final lib = container.read(sermonLibraryProvider);
-    expect(lib.sermons.length, 2);
-    expect(lib.hasMore, isTrue);
-    expect(repo.requested.where((u) => u == null).length, 2,
-        reason: 'refresh refetches page 1');
+    expect(
+      lib.sermons.map((s) => s.id),
+      ['1', '2', '3'],
+      reason: 'page 1 is laid over what was already loaded',
+    );
+    expect(
+      states.where((n) => n == 0),
+      isEmpty,
+      reason: 'pull-to-refresh must never blank the Messages list',
+    );
+    expect(
+      repo.requested.where((u) => u == null).length,
+      2,
+      reason: 'refresh refetches page 1',
+    );
   });
 
   // ── Full-archive hydration ─────────────────────────────────────────────────
@@ -195,30 +217,35 @@ void main() {
     }
   }
 
-  test('hydrates the whole archive in the background, no scrolling needed',
-      () async {
-    final (container, repo) = harness(autoHydrate: true);
-    await container.read(sermonLibraryProvider.notifier).firstLoad;
-    await settleHydration(container);
+  test(
+    'hydrates the whole archive in the background, no scrolling needed',
+    () async {
+      final (container, repo) = harness(autoHydrate: true);
+      await container.read(sermonLibraryProvider.notifier).firstLoad;
+      await settleHydration(container);
 
-    final lib = container.read(sermonLibraryProvider);
-    expect(lib.sermons.map((s) => s.id), ['1', '2', '3', '4'],
-        reason: 'every page must land without a single loadMore() call');
-    expect(lib.hasMore, isFalse);
-    expect(lib.sermons.length, lib.totalCount);
-    // Each page fetched exactly once.
-    expect(repo.requested.length, 3);
-  });
+      final lib = container.read(sermonLibraryProvider);
+      expect(
+        lib.sermons.map((s) => s.id),
+        ['1', '2', '3', '4'],
+        reason: 'every page must land without a single loadMore() call',
+      );
+      expect(lib.hasMore, isFalse);
+      expect(lib.sermons.length, lib.totalCount);
+      // Each page fetched exactly once.
+      expect(repo.requested.length, 3);
+    },
+  );
 
   test('oldest-first sort spans the decade, not just page 1', () async {
     // Mirrors the real archive: newest page first, 2013 on the last page.
     Sermon dated(String id, String title, DateTime when) => Sermon(
-          id: id,
-          title: title,
-          speaker: 'David Antwi',
-          audioUrl: 'https://x.test/$id.mp3',
-          publishedAt: when,
-        );
+      id: id,
+      title: title,
+      speaker: 'David Antwi',
+      audioUrl: 'https://x.test/$id.mp3',
+      publishedAt: when,
+    );
     final (container, _) = harness(
       autoHydrate: true,
       pages: [
@@ -231,10 +258,16 @@ void main() {
     await settleHydration(container);
 
     final sermons = container.read(sermonLibraryProvider).sermons.toList()
-      ..sort((a, b) => (a.publishedAt ?? DateTime(0))
-          .compareTo(b.publishedAt ?? DateTime(0)));
-    expect(sermons.first.title, 'Who You Are In Christ - 3',
-        reason: 'oldest-first must reach the end of the archive');
+      ..sort(
+        (a, b) => (a.publishedAt ?? DateTime(0)).compareTo(
+          b.publishedAt ?? DateTime(0),
+        ),
+      );
+    expect(
+      sermons.first.title,
+      'Who You Are In Christ - 3',
+      reason: 'oldest-first must reach the end of the archive',
+    );
     expect(sermons.first.publishedAt!.year, 2013);
     expect(sermons.length, 3);
   });
@@ -273,12 +306,12 @@ void main() {
 
   test('archive years are derived newest-first with per-year counts', () async {
     Sermon dated(String id, DateTime when) => Sermon(
-          id: id,
-          title: 'Message $id',
-          speaker: 'David Antwi',
-          audioUrl: 'https://x.test/$id.mp3',
-          publishedAt: when,
-        );
+      id: id,
+      title: 'Message $id',
+      speaker: 'David Antwi',
+      audioUrl: 'https://x.test/$id.mp3',
+      publishedAt: when,
+    );
     final (container, _) = harness(
       autoHydrate: true,
       pages: [
@@ -292,45 +325,53 @@ void main() {
     // The year rails derive from the merged catalogue.
     await settleCatalogue(container);
 
-    expect(container.read(archiveYearsProvider), [2026, 2019, 2013],
-        reason: 'newest year first, one entry per year');
-    expect(container.read(archiveYearCountsProvider),
-        {2026: 2, 2019: 1, 2013: 2});
-  });
-
-  test('selecting a year narrows the library and clearing restores it',
-      () async {
-    Sermon dated(String id, String title, DateTime when) => Sermon(
-          id: id,
-          title: title,
-          speaker: 'David Antwi',
-          audioUrl: 'https://x.test/$id.mp3',
-          publishedAt: when,
-        );
-    final (container, _) = harness(
-      autoHydrate: true,
-      pages: [
-        [dated('1', 'From Acts To Us', DateTime(2026, 8, 23))],
-        [dated('2', 'Question Time - Pt 1', DateTime(2013, 11, 20))],
-        [dated('3', 'Who You Are In Christ - 3', DateTime(2013, 9, 18))],
-      ],
-    );
-    await container.read(sermonLibraryProvider.notifier).firstLoad;
-    await settleHydration(container);
-    await settleCatalogue(container);
-
-    expect(container.read(librarySermonsProvider).length, 3);
-
-    container.read(selectedArchiveYearProvider.notifier).state = 2013;
-    final only2013 = container.read(librarySermonsProvider);
-    expect(only2013.length, 2);
-    expect(only2013.every((s) => s.publishedAt!.year == 2013), isTrue);
     expect(
-      only2013.map((s) => s.title),
-      containsAll(['Question Time - Pt 1', 'Who You Are In Christ - 3']),
+      container.read(archiveYearsProvider),
+      [2026, 2019, 2013],
+      reason: 'newest year first, one entry per year',
     );
-
-    container.read(selectedArchiveYearProvider.notifier).state = null;
-    expect(container.read(librarySermonsProvider).length, 3);
+    expect(container.read(archiveYearCountsProvider), {
+      2026: 2,
+      2019: 1,
+      2013: 2,
+    });
   });
+
+  test(
+    'selecting a year narrows the library and clearing restores it',
+    () async {
+      Sermon dated(String id, String title, DateTime when) => Sermon(
+        id: id,
+        title: title,
+        speaker: 'David Antwi',
+        audioUrl: 'https://x.test/$id.mp3',
+        publishedAt: when,
+      );
+      final (container, _) = harness(
+        autoHydrate: true,
+        pages: [
+          [dated('1', 'From Acts To Us', DateTime(2026, 8, 23))],
+          [dated('2', 'Question Time - Pt 1', DateTime(2013, 11, 20))],
+          [dated('3', 'Who You Are In Christ - 3', DateTime(2013, 9, 18))],
+        ],
+      );
+      await container.read(sermonLibraryProvider.notifier).firstLoad;
+      await settleHydration(container);
+      await settleCatalogue(container);
+
+      expect(container.read(librarySermonsProvider).length, 3);
+
+      container.read(selectedArchiveYearProvider.notifier).state = 2013;
+      final only2013 = container.read(librarySermonsProvider);
+      expect(only2013.length, 2);
+      expect(only2013.every((s) => s.publishedAt!.year == 2013), isTrue);
+      expect(
+        only2013.map((s) => s.title),
+        containsAll(['Question Time - Pt 1', 'Who You Are In Christ - 3']),
+      );
+
+      container.read(selectedArchiveYearProvider.notifier).state = null;
+      expect(container.read(librarySermonsProvider).length, 3);
+    },
+  );
 }

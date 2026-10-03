@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
+import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
@@ -12,8 +12,16 @@ const Color _heroEyebrow = Color(0xFFE6DDFF);
 
 /// Featured hero sermon card. Shows the latest message artwork with a
 /// LIVE/Latest state pill, gold EQ mark, and a gold "Watch full" CTA.
+///
+/// The message is the newest YouTube upload, played as its API audio twin
+/// when the archive has one: the player then offers Audio alongside Video,
+/// and the speaker comes from the archive rather than a guess.
 class LatestMessageCard extends ConsumerWidget {
   const LatestMessageCard({super.key});
+
+  /// How many of the newest uploads may be skipped in favour of one that has
+  /// an audio twin. Small, so a fresh service is never buried.
+  static const int _twinLookahead = 3;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,38 +31,43 @@ class LatestMessageCard extends ConsumerWidget {
     final isLive = liveAsync.valueOrNull?.isLive == true;
     final liveStatus = liveAsync.valueOrNull;
 
-    return videosAsync.when(
-      loading: () => const _HeroSkeleton(),
-      error: (_, _) => const _HeroSkeleton(),
-      data: (videos) {
-        if (videos.isEmpty) return const _HeroSkeleton();
-        final video = videos.first;
-        return _VideoHeroCard(
-          video: video,
-          isLive: isLive,
-          liveTitle: liveStatus?.title,
-          liveVideoId: liveStatus?.videoId,
+    final videos = videosAsync.valueOrNull;
+    if (videos == null || videos.isEmpty) {
+      if (videosAsync.isLoading) return const _HeroSkeleton();
+      return _HeroError(onRetry: () => ref.invalidate(videosProvider));
+    }
+    final twins = ref.watch(audioTwinByVideoIdProvider);
+    final video = videos
+        .take(_twinLookahead)
+        .firstWhere(
+          (v) => twins.containsKey(v.videoId),
+          orElse: () => videos.first,
         );
-      },
+    return _VideoHeroCard(
+      sermon: withAudioTwin(video, twins),
+      isLive: isLive,
+      liveTitle: liveStatus?.title,
+      liveVideoId: liveStatus?.videoId,
     );
   }
 }
 
-class _VideoHeroCard extends StatelessWidget {
+class _VideoHeroCard extends ConsumerWidget {
   const _VideoHeroCard({
-    required this.video,
+    required this.sermon,
     required this.isLive,
     this.liveTitle,
     this.liveVideoId,
   });
 
-  final Sermon video;
+  /// The hero message: its audio twin when one exists, else the upload.
+  final Sermon sermon;
   final bool isLive;
   final String? liveTitle;
   final String? liveVideoId;
 
-  void _onTap(BuildContext context) {
-    final targetSermon = isLive && liveVideoId != null
+  void _onTap(BuildContext context, WidgetRef ref) {
+    final target = isLive && liveVideoId != null
         ? Sermon(
             id: 'live',
             title: liveTitle ?? 'Live Stream',
@@ -63,26 +76,21 @@ class _VideoHeroCard extends StatelessWidget {
             videoId: liveVideoId,
             source: 'youtube',
           )
-        : video;
-
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        // The Home hero is the YouTube feed: always the video player.
-        builder: (_) => MediaPlayerScreen(
-          sermon: targetSermon,
-          mode: MediaMode.video,
-        ),
-      ),
-    );
+        : sermon;
+    // The hero is the video feed: open in video, with Audio a tap away when
+    // the message has a twin.
+    startPlayback(context, ref, target, mode: MediaMode.video);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final video = sermon;
     final title = isLive ? (liveTitle ?? 'Live Stream') : video.title;
     final speaker = video.speaker;
     final duration = video.duration != null ? video.formattedDuration : '';
-    final speakerDuration =
-        duration.isNotEmpty ? '$speaker  \u00b7  $duration' : speaker;
+    final speakerDuration = duration.isNotEmpty
+        ? '$speaker  \u00b7  $duration'
+        : speaker;
 
     // Real YouTube thumbnail (maxres, falling back to hq) fills the frame.
     final vid = isLive ? liveVideoId : video.videoId;
@@ -94,7 +102,7 @@ class _VideoHeroCard extends StatelessWidget {
         : null;
 
     return GestureDetector(
-      onTap: () => _onTap(context),
+      onTap: () => _onTap(context, ref),
       child: AspectRatio(
         aspectRatio: 16 / 9,
         child: Container(
@@ -104,11 +112,7 @@ class _VideoHeroCard extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment(-.8, -1),
               end: Alignment(.6, 1),
-              colors: [
-                Color(0xFF4A1D8F),
-                Color(0xFF23104A),
-                Color(0xFF0C0A12),
-              ],
+              colors: [Color(0xFF4A1D8F), Color(0xFF23104A), Color(0xFF0C0A12)],
             ),
           ),
           clipBehavior: Clip.antiAlias,
@@ -134,9 +138,7 @@ class _VideoHeroCard extends StatelessWidget {
 
               // Veil so text stays legible over the image.
               Positioned.fill(
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.16),
-                ),
+                child: ColoredBox(color: Colors.black.withValues(alpha: 0.16)),
               ),
 
               // Bottom scrim
@@ -242,8 +244,7 @@ class _VideoHeroCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: context.kc.accent,
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.pill),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -256,13 +257,14 @@ class _VideoHeroCard extends StatelessWidget {
                               const SizedBox(width: 5),
                               Text(
                                 'Watch full',
-                                style: AppTypography.ui(
-                                  size: 13,
-                                  weight: FontWeight.w800,
-                                ).copyWith(
-                                  color: context.kc.onAccent,
-                                  height: 1,
-                                ),
+                                style:
+                                    AppTypography.ui(
+                                      size: 13,
+                                      weight: FontWeight.w800,
+                                    ).copyWith(
+                                      color: context.kc.onAccent,
+                                      height: 1,
+                                    ),
                               ),
                             ],
                           ),
@@ -272,13 +274,14 @@ class _VideoHeroCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             speakerDuration,
-                            style: AppTypography.ui(
-                              size: 12,
-                              weight: FontWeight.w500,
-                            ).copyWith(
-                              color: Colors.white.withValues(alpha: .78),
-                              height: 1,
-                            ),
+                            style:
+                                AppTypography.ui(
+                                  size: 12,
+                                  weight: FontWeight.w500,
+                                ).copyWith(
+                                  color: Colors.white.withValues(alpha: .78),
+                                  height: 1,
+                                ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.right,
@@ -315,9 +318,10 @@ class _LivePillState extends State<_LivePill>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _fade = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _fade = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -391,6 +395,55 @@ class _HeroSkeleton extends StatelessWidget {
               color: Color(0x55FFFFFF),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when the video feed failed or came back empty, instead of a
+/// skeleton that never resolves.
+class _HeroError extends StatelessWidget {
+  const _HeroError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          boxShadow: AppShadows.card,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4A1D8F), Color(0xFF0C0A12)],
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.wifi_off_rounded,
+              color: Color(0xCCFFFFFF),
+              size: 28,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'The latest message could not be loaded.',
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyLg.copyWith(color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              child: const Text('Retry'),
+            ),
+          ],
         ),
       ),
     );

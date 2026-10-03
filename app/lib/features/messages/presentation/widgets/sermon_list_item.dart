@@ -95,11 +95,13 @@ class _SermonListItemState extends State<SermonListItem>
   @override
   Widget build(BuildContext context) {
     final cat = widget.category ?? '';
-    final speakerLine =
-        cat.isNotEmpty ? '${widget.speaker} · $cat' : widget.speaker;
-    final metaLine = [widget.dateLabel, widget.durationLabel]
-        .where((s) => s.isNotEmpty)
-        .join(' · ');
+    final speakerLine = cat.isNotEmpty
+        ? '${widget.speaker} · $cat'
+        : widget.speaker;
+    final metaLine = [
+      widget.dateLabel,
+      widget.durationLabel,
+    ].where((s) => s.isNotEmpty).join(' · ');
 
     return InkWell(
       onTap: widget.onTap,

@@ -12,8 +12,11 @@ class _FixtureAdapter implements HttpClientAdapter {
   final String body;
 
   @override
-  Future<ResponseBody> fetch(RequestOptions options,
-      Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
     return ResponseBody.fromString(
       body,
       200,
@@ -48,7 +51,7 @@ const _fixture = {
           'id': 1880,
           'name': 'David Antwi',
           'url': 'yetanothersermon.host/_/kc/preachers/1880/david-antwi/',
-        }
+        },
       ],
       'audio_link': {
         'id': 95676,
@@ -60,18 +63,19 @@ const _fixture = {
       'video_link': 'https://www.youtube.com/watch?v=6Y15Ja9E2hw&t=860s',
       'image': 'https://yash.b-cdn.net/media/images/Kharis.jpeg?width=256',
       'description': 'Feeling overwhelmed by life\'s storms?',
-    }
+    },
   ],
 };
 
 void main() {
   KharisApiSermonRepository repo() {
-    final dio = Dio()..httpClientAdapter = _FixtureAdapter(jsonEncode(_fixture));
+    final dio = Dio()
+      ..httpClientAdapter = _FixtureAdapter(jsonEncode(_fixture));
     return KharisApiSermonRepository(dio: dio);
   }
 
   test('maps API JSON into the Sermon model', () async {
-    final sermons = await repo().getSermons();
+    final sermons = (await repo().fetchPage()).sermons;
     expect(sermons, isNotEmpty);
     final s = sermons.first;
     expect(s.title, 'Riding On Divine Assignment');
@@ -81,17 +85,20 @@ void main() {
   });
 
   test('prepends https:// to the scheme-less audio download_url', () async {
-    final s = (await repo().getSermons()).first;
-    expect(s.audioUrl, 'https://yetanothersermon.host/_/kc/media/mp3/95676.mp3');
+    final s = ((await repo().fetchPage()).sermons).first;
+    expect(
+      s.audioUrl,
+      'https://yetanothersermon.host/_/kc/media/mp3/95676.mp3',
+    );
   });
 
   test('extracts the YouTube id from video_link (ignoring &t=)', () async {
-    final s = (await repo().getSermons()).first;
+    final s = ((await repo().fetchPage()).sermons).first;
     expect(s.videoId, '6Y15Ja9E2hw');
   });
 
   test('requests a larger artwork width than the default 256', () async {
-    final s = (await repo().getSermons()).first;
+    final s = ((await repo().fetchPage()).sermons).first;
     expect(s.artworkUrl, contains('width=512'));
   });
 
@@ -107,7 +114,12 @@ void main() {
         Map<String, dynamic>.from((_fixture['results']! as List).first as Map)
           ..['id'] = id
           ..['title'] = title;
-    return {'count': count, 'next': next, 'previous': null, 'results': [item]};
+    return {
+      'count': count,
+      'next': next,
+      'previous': null,
+      'results': [item],
+    };
   }
 
   KharisApiSermonRepository routedRepo(Map<String, String> routes) {
@@ -118,11 +130,13 @@ void main() {
 
   test('fetchPage surfaces next link and total count', () async {
     final repo = routedRepo({
-      'sermons/': jsonEncode(pagedFixture(
-        id: 1,
-        title: 'Page One',
-        next: 'https://x.test/api/sermons/?page=2',
-      )),
+      'sermons/': jsonEncode(
+        pagedFixture(
+          id: 1,
+          title: 'Page One',
+          next: 'https://x.test/api/sermons/?page=2',
+        ),
+      ),
     });
     final page = await repo.fetchPage();
     expect(page.sermons.single.title, 'Page One');
@@ -133,11 +147,13 @@ void main() {
 
   test('fetchPage follows an absolute next URL to the second page', () async {
     final repo = routedRepo({
-      'sermons/': jsonEncode(pagedFixture(
-        id: 1,
-        title: 'Page One',
-        next: 'https://x.test/api/sermons/?page=2',
-      )),
+      'sermons/': jsonEncode(
+        pagedFixture(
+          id: 1,
+          title: 'Page One',
+          next: 'https://x.test/api/sermons/?page=2',
+        ),
+      ),
       'sermons/?page=2': jsonEncode(pagedFixture(id: 2, title: 'Page Two')),
     });
     final first = await repo.fetchPage();
@@ -147,27 +163,119 @@ void main() {
     expect(second.hasMore, isFalse);
   });
 
-  test('getSermons concatenates pages by following next until it ends',
-      () async {
-    final repo = routedRepo({
-      'sermons/': jsonEncode(pagedFixture(
-        id: 1,
-        title: 'Page One',
-        next: 'https://x.test/api/sermons/?page=2',
-      )),
-      'sermons/?page=2': jsonEncode(pagedFixture(id: 2, title: 'Page Two')),
-    });
-    final sermons = await repo.getSermons();
-    expect(sermons.map((s) => s.title), ['Page One', 'Page Two']);
-  });
-
   test('fetchPage passes the search query to the server', () async {
     final repo = routedRepo({
-      'sermons/?search=grace':
-          jsonEncode(pagedFixture(id: 3, title: 'Grace Hit', count: 1)),
+      'sermons/?search=grace': jsonEncode(
+        pagedFixture(id: 3, title: 'Grace Hit', count: 1),
+      ),
     });
     final page = await repo.fetchPage(search: 'grace');
     expect(page.sermons.single.title, 'Grace Hit');
+  });
+
+  // ── Mapping ────────────────────────────────────────────────────────────────
+
+  Map<String, dynamic> record({
+    Object? audio = const {'download_url': 'yetanothersermon.host/a.mp3'},
+    String? video,
+    String title = 'Grace To Continue',
+    String? series,
+  }) => {
+    'id': 7,
+    'title': title,
+    'date': '2025-06-25',
+    'time': null,
+    'series': series == null ? null : {'name': series},
+    'preachers': const [],
+    'audio_link': audio,
+    'video_link': video,
+    'image': null,
+    'description': null,
+  };
+
+  test('category is the topic, never the series name', () {
+    final s = mapApiSermon(record(series: 'June Fast 2025'));
+    expect(s.series, 'June Fast 2025');
+    expect(s.category, 'Grace & Salvation');
+  });
+
+  test('video-only and media-less records are kept, not dropped', () {
+    final videoOnly = mapApiSermon(
+      record(audio: null, video: 'https://www.youtube.com/watch?v=Htl4RmpLSCI'),
+    );
+    expect(videoOnly.hasAudio, isFalse);
+    expect(videoOnly.videoId, 'Htl4RmpLSCI');
+
+    final none = mapApiSermon(record(audio: null, video: ''));
+    expect(none.hasAudio || none.hasVideo, isFalse);
+    expect(none.id, '7');
+  });
+
+  test('t= on the video link becomes videoStart', () {
+    final s = mapApiSermon(
+      record(video: 'https://www.youtube.com/watch?v=6Y15Ja9E2hw&t=860s'),
+    );
+    expect(s.videoStart, const Duration(seconds: 860));
+  });
+
+  group('youTubeVideoId', () {
+    const id = 'L2Ji3skMKV0';
+    for (final link in [
+      'https://www.youtube.com/watch?v=$id',
+      'https://www.youtube.com/watch?v=$id&t=487s',
+      'https://m.youtube.com/watch?feature=share&v=$id',
+      'https://youtu.be/$id',
+      'https://youtu.be/$id?si=abc&t=30',
+      'https://www.youtube.com/live/$id?si=x',
+      'https://www.youtube.com/shorts/$id',
+      'https://www.youtube.com/embed/$id?start=12',
+      'https://www.youtube-nocookie.com/embed/$id',
+      'https://www.youtube.com/$id?si=WOcnaYH4LKM9kWf9',
+      'youtube.com/watch?v=$id',
+    ]) {
+      test(link, () => expect(youTubeVideoId(link), id));
+    }
+
+    for (final bad in [
+      null,
+      '',
+      'https://vimeo.com/12345678901',
+      'https://www.youtube.com/watch?v=short',
+      'https://www.youtube.com/channel/UC4l8WmdF9ivMDQHHVOdYKqQ',
+      'https://www.youtube.com/',
+    ]) {
+      test('rejects $bad', () => expect(youTubeVideoId(bad), isNull));
+    }
+  });
+
+  group('youTubeStart', () {
+    test('seconds forms', () {
+      expect(
+        youTubeStart('https://youtu.be/x?t=860s'),
+        const Duration(seconds: 860),
+      );
+      expect(
+        youTubeStart('https://youtu.be/x?t=860'),
+        const Duration(seconds: 860),
+      );
+      expect(
+        youTubeStart('https://www.youtube.com/embed/x?start=12'),
+        const Duration(seconds: 12),
+      );
+    });
+
+    test('h/m/s form', () {
+      expect(
+        youTubeStart('https://www.youtube.com/watch?v=x&t=1h2m3s'),
+        const Duration(hours: 1, minutes: 2, seconds: 3),
+      );
+    });
+
+    test('absent or zero is null', () {
+      expect(youTubeStart('https://youtu.be/x'), isNull);
+      expect(youTubeStart('https://youtu.be/x?t=0'), isNull);
+      expect(youTubeStart(null), isNull);
+    });
   });
 }
 
@@ -179,11 +287,16 @@ class _RoutingAdapter implements HttpClientAdapter {
   final Map<String, String> routes;
 
   @override
-  Future<ResponseBody> fetch(RequestOptions options,
-      Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
     final uri = options.uri.toString();
-    final key = routes.keys.firstWhere(uri.endsWith,
-        orElse: () => throw StateError('no route for $uri'));
+    final key = routes.keys.firstWhere(
+      uri.endsWith,
+      orElse: () => throw StateError('no route for $uri'),
+    );
     return ResponseBody.fromString(
       routes[key]!,
       200,
