@@ -30,7 +30,12 @@ class BranchTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isHq ? AppColors.hqTint : context.kc.surface,
+          // The cream HQ tint is a light-surface colour; on dark surfaces it
+          // swallowed the white name text, so dark mode keeps the card
+          // surface and lets the gold stroke mark HQ.
+          color: isHq && Theme.of(context).brightness == Brightness.light
+              ? AppColors.hqTint
+              : context.kc.surface,
           borderRadius: AppRadius.cardBorder,
           border: isHq
               ? Border.all(color: AppColors.hqStroke.withValues(alpha: 0.5))

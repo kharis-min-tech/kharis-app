@@ -152,13 +152,17 @@ class RouterNotifier extends ChangeNotifier {
       return isAdmin ? null : '/home';
     }
 
-    // One-time welcome: once onboarding is complete (or the user is signed in),
-    // the '/' splash entry routes straight to Home. Only '/' is gated, so
-    // "Switch Branch" (/branch-selection) and re-onboarding still work.
+    // One-time welcome: once onboarding is complete (or a member has signed
+    // in), the '/' splash entry routes straight to Home. Only '/' is gated,
+    // so "Switch Branch" (/branch-selection) and re-onboarding still work.
+    // The automatic anonymous guest session every launch creates does NOT
+    // count: a fresh install must still see Welcome and role selection.
     if (location == '/') {
       final completed = _ref.read(onboardingCompletedProvider);
-      final authed = _ref.read(isAuthenticatedProvider);
-      if (completed || authed) {
+      final user = _ref.read(currentUserProvider).valueOrNull;
+      final member =
+          user != null && user.role != 'guest' && user.email.isNotEmpty;
+      if (completed || member) {
         const tabs = ['/home', '/messages', '/giving', '/calendar', '/more'];
         final i = _ref
             .read(cacheServiceProvider)

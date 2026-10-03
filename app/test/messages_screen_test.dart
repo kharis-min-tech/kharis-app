@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -80,6 +81,33 @@ void main() {
     await tester.pumpAndSettle();
     expect(repo.requested.where((u) => u == null), hasLength(2));
     expect(find.text('Live message 3'), findsWidgets);
+  });
+
+  testWidgets('the search field stays a pill when idle and focused (KA-014)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app(FakePagedSermonRepository([live])));
+    await tester.pumpAndSettle();
+
+    final field = find.byWidgetPredicate(
+      (w) =>
+          w is TextField &&
+          (w.decoration?.hintText ?? '').startsWith('Search titles'),
+    );
+    final decoration = tester.widget<TextField>(field).decoration!;
+    // The fill is painted in the border's shape: a non-pill idle border
+    // paints a rectangle behind the rounded search bar.
+    for (final border in [
+      decoration.border,
+      decoration.enabledBorder,
+      decoration.focusedBorder,
+    ]) {
+      expect(border, isA<OutlineInputBorder>());
+      expect(
+        (border! as OutlineInputBorder).borderRadius,
+        BorderRadius.circular(AppRadius.pill),
+      );
+    }
   });
 
   testWidgets('search shows a spinner while loading, never "no results"', (

@@ -33,6 +33,9 @@ import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
+
+import 'support/fake_cache_service.dart';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -1006,6 +1009,72 @@ void main() {
       router.go('/admin');
       await tester.pumpAndSettle();
       expect(find.text('admin'), findsOneWidget);
+    });
+  });
+
+  group('welcome redirect on a fresh install', () {
+    Future<void> launchAt(
+      WidgetTester tester, {
+      required User? user,
+      bool onboardingDone = false,
+    }) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        if (onboardingDone) 'onboarding_completed': true,
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            cacheServiceProvider.overrideWithValue(FakeCacheService()),
+            currentUserProvider.overrideWith((ref) => Stream.value(user)),
+            isAdminProvider.overrideWith((ref) async => false),
+          ],
+          child: Consumer(
+            builder: (context, ref, _) {
+              final router = GoRouter(
+                initialLocation: '/',
+                refreshListenable: ref.read(routerNotifierProvider),
+                redirect: ref.read(routerNotifierProvider).redirect,
+                routes: [
+                  GoRoute(path: '/', builder: (_, _) => const Text('welcome')),
+                  GoRoute(path: '/home', builder: (_, _) => const Text('home')),
+                ],
+              );
+              return MaterialApp.router(routerConfig: router);
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    User account(String role, {String email = ''}) => User(
+      id: 'u1',
+      email: email,
+      displayName: role,
+      role: role,
+      createdAt: DateTime(2024),
+    );
+
+    testWidgets('the automatic anonymous guest still sees Welcome', (
+      tester,
+    ) async {
+      await launchAt(tester, user: account('guest'));
+      expect(find.text('welcome'), findsOneWidget);
+      expect(find.text('home'), findsNothing);
+    });
+
+    testWidgets('a signed-in member skips Welcome', (tester) async {
+      await launchAt(tester, user: account('member', email: 'm@kharis.org'));
+      expect(find.text('home'), findsOneWidget);
+    });
+
+    testWidgets('a guest who finished onboarding skips Welcome', (
+      tester,
+    ) async {
+      await launchAt(tester, user: account('guest'), onboardingDone: true);
+      expect(find.text('home'), findsOneWidget);
     });
   });
 }

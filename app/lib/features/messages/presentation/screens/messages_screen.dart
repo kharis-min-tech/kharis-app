@@ -1044,15 +1044,17 @@ class _SearchBar extends StatelessWidget {
                       ),
                     )
                   : null,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                borderSide: BorderSide(color: context.kc.accentInk, width: 1.5),
+              // The fill takes the border's shape, so every state uses a
+              // pill outline (invisible unless focused) instead of
+              // InputBorder.none, which fills a rectangle (KA-014).
+              border: _pillBorder(BorderSide.none),
+              enabledBorder: _pillBorder(BorderSide.none),
+              focusedBorder: _pillBorder(
+                BorderSide(color: context.kc.accentInk, width: 1.5),
               ),
-              focusedErrorBorder: InputBorder.none,
-              errorBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
+              focusedErrorBorder: _pillBorder(BorderSide.none),
+              errorBorder: _pillBorder(BorderSide.none),
+              disabledBorder: _pillBorder(BorderSide.none),
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
               filled: true,
               fillColor: context.kc.surfaceAlt,
@@ -1062,6 +1064,11 @@ class _SearchBar extends StatelessWidget {
       },
     );
   }
+
+  static OutlineInputBorder _pillBorder(BorderSide side) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(AppRadius.pill),
+    borderSide: side,
+  );
 }
 
 // ── Featured hero carousel ─────────────────────────────────────────────────────
