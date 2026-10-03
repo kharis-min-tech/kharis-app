@@ -3,7 +3,14 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/sermon.dart';
 import '../../features/player/data/audio_player_service.dart';
+import '../../features/player/data/playback_history.dart';
 import 'cache_provider.dart';
+
+/// Resume points, recently played and sermon snapshots, shared by the audio
+/// and video engines.
+final playbackHistoryProvider = Provider<PlaybackHistory>((ref) {
+  return PlaybackHistory(ref.watch(cacheServiceProvider));
+});
 
 /// Singleton [AudioPlayerService] scoped to the widget tree root.
 /// Disposed automatically when the provider scope is destroyed.
@@ -50,4 +57,25 @@ final playbackFailureProvider = StreamProvider<PlaybackFailure?>((ref) async* {
   final service = ref.watch(audioPlayerServiceProvider);
   yield service.failure;
   yield* service.failureStream;
+});
+
+/// The queue the audio engine is playing from; null when nothing is loaded.
+final playbackQueueProvider = StreamProvider<PlaybackQueue?>((ref) async* {
+  final service = ref.watch(audioPlayerServiceProvider);
+  yield service.queue;
+  yield* service.queueStream;
+});
+
+/// The persisted playback rate.
+final playbackSpeedProvider = StreamProvider<double>((ref) async* {
+  final service = ref.watch(audioPlayerServiceProvider);
+  yield service.speed;
+  yield* service.speedStream;
+});
+
+/// Whether the current message repeats when it ends.
+final repeatOneProvider = StreamProvider<bool>((ref) async* {
+  final service = ref.watch(audioPlayerServiceProvider);
+  yield service.repeatOne;
+  yield* service.repeatOneStream;
 });

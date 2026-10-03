@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -42,7 +43,14 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     if (sermon.id == _dismissedSermonId) return const SizedBox.shrink();
 
     final playerState = ref.watch(playerStateProvider).valueOrNull;
-    final isPlaying = playerState?.playing ?? false;
+    final processing = playerState?.processingState;
+    // A finished message offers Play (which restarts it), not Pause.
+    final isPlaying =
+        (playerState?.playing ?? false) &&
+        processing != ProcessingState.completed;
+    final isBuffering =
+        processing == ProcessingState.loading ||
+        processing == ProcessingState.buffering;
     final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
     final rawDuration =
         ref.watch(durationProvider).valueOrNull ?? Duration.zero;
@@ -150,6 +158,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                           button: true,
                           label: failed
                               ? 'Retry'
+                              : isBuffering
+                              ? 'Loading'
                               : (isPlaying ? 'Pause' : 'Play'),
                           excludeSemantics: true,
                           child: GestureDetector(
@@ -166,17 +176,29 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                             },
                             child: Padding(
                               padding: const EdgeInsets.all(8),
-                              child: Icon(
-                                failed
-                                    ? Icons.refresh_rounded
-                                    : (isPlaying
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded),
-                                color: failed
-                                    ? AppColors.danger
-                                    : context.kc.onBg,
-                                size: 26,
-                              ),
+                              child: isBuffering && !failed
+                                  ? SizedBox(
+                                      width: 26,
+                                      height: 26,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.2,
+                                          color: context.kc.onBg,
+                                        ),
+                                      ),
+                                    )
+                                  : Icon(
+                                      failed
+                                          ? Icons.refresh_rounded
+                                          : (isPlaying
+                                                ? Icons.pause_rounded
+                                                : Icons.play_arrow_rounded),
+                                      color: failed
+                                          ? AppColors.danger
+                                          : context.kc.onBg,
+                                      size: 26,
+                                    ),
                             ),
                           ),
                         ),

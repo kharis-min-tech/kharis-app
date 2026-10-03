@@ -17,20 +17,32 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 /// already written against it, in timeline order, plus a "add a note at
 /// MM:SS" action stamped with the live playback position. Playlist opens
 /// [AddToPlaylistSheet], filing the message into the member's persisted
-/// playlists. Both are only rendered when a message is actually resolvable;
-/// Share confirms with a lightweight toast.
+/// playlists. Share opens the OS share sheet with the right link for the
+/// medium on screen (see [sermonShareLink]).
 class PlayerActions extends ConsumerWidget {
-  const PlayerActions({super.key, this.sermon, this.timeline});
+  const PlayerActions({
+    super.key,
+    this.sermon,
+    this.timeline,
+    this.asVideo = false,
+    this.positionOf,
+  });
 
-  /// The message on screen. Supplied by the video player, whose sermon is not
-  /// the one loaded into the audio service. Falls back to whatever the audio
-  /// service is playing.
+  /// The message on screen. Falls back to whatever the audio service is
+  /// playing.
   final Sermon? sermon;
 
   /// The engine that owns playback on the hosting screen, handed through to
   /// [SermonNotesSheet] so note capture and anchor seeks drive the ACTIVE
   /// engine. Null means the audio service (the sheet's default).
   final NoteTimelineBinding? timeline;
+
+  /// Whether the message is being watched, so Share hands out the video link.
+  final bool asVideo;
+
+  /// The active engine's position, read when Share is tapped so a video link
+  /// starts where the member is.
+  final Duration Function()? positionOf;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,12 +72,17 @@ class PlayerActions extends ConsumerWidget {
           _ActionButton(
             icon: Icons.ios_share_rounded,
             label: 'Share',
-            onTap: () => unawaited(shareSermon(target)),
+            onTap: () => unawaited(
+              shareSermon(
+                target,
+                asVideo: asVideo,
+                position: positionOf?.call(),
+              ),
+            ),
           ),
       ],
     );
   }
-
 }
 
 // ── Private icon + label button ───────────────────────────────────────────────

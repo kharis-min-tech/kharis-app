@@ -26,7 +26,7 @@ class PlaylistsScreen extends ConsumerWidget {
       ref.read(anonymousSignInProvider).ensure();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hold on — still signing you in. Try again shortly.'),
+          content: Text('Still signing you in. Try again in a moment.'),
         ),
       );
       return;
@@ -101,8 +101,8 @@ class PlaylistsScreen extends ConsumerWidget {
                 icon: Icons.queue_music_rounded,
                 headline: 'Build your first playlist',
                 body:
-                    'Gather the messages that speak to you — '
-                    'they save to your account and are waiting after '
+                    'Gather the messages that speak to you. '
+                    'They save to your account and are waiting after '
                     'every relaunch.',
                 onCreate: () => _createPlaylist(context, ref),
               )

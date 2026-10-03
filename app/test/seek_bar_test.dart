@@ -62,7 +62,19 @@ void main() {
     expect(find.text('-1:15:00'), findsOneWidget);
   });
 
-  testWidgets('unknown duration never shows a negative remainder', (
+  testWidgets(
+    'unknown duration shows placeholders, never a negative remainder',
+    (tester) async {
+      await tester.pumpWidget(
+        _host(position: Duration.zero, duration: Duration.zero, onSeek: (_) {}),
+      );
+
+      expect(find.text('--:--'), findsNWidgets(2));
+      expect(find.text('-0:00'), findsNothing);
+    },
+  );
+
+  testWidgets('unknown duration keeps a live elapsed time readable', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -74,7 +86,30 @@ void main() {
     );
 
     expect(find.text('0:12'), findsOneWidget);
-    expect(find.text('-0:00'), findsOneWidget);
+    expect(find.text('--:--'), findsOneWidget);
+  });
+
+  testWidgets('taps and drags are ignored until the duration is known', (
+    tester,
+  ) async {
+    final seeks = <Duration>[];
+    await tester.pumpWidget(
+      _host(
+        position: const Duration(minutes: 3),
+        duration: Duration.zero,
+        onSeek: seeks.add,
+      ),
+    );
+
+    final rect = tester.getRect(find.byType(SeekBar));
+    await tester.tapAt(Offset(rect.left + rect.width / 4, rect.top + 14));
+    await tester.dragFrom(
+      Offset(rect.left + 10, rect.top + 14),
+      const Offset(200, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(seeks, isEmpty, reason: 'seeking to 0:00 would lose the place');
   });
 
   testWidgets('tapping the track seeks to that point', (tester) async {

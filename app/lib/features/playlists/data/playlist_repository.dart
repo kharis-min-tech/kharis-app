@@ -67,10 +67,8 @@ class Playlist {
 /// `FirebaseAuth` directly: the repository is rebuilt on sign-in / sign-out,
 /// which keeps the streams here dumb and the whole thing testable.
 class PlaylistRepository {
-  PlaylistRepository(
-    this._firestore, {
-    required String? uid,
-  }) : _uid = (uid == null || uid.isEmpty) ? null : uid;
+  PlaylistRepository(this._firestore, {required String? uid})
+    : _uid = (uid == null || uid.isEmpty) ? null : uid;
 
   final String? _uid;
   final FirebaseFirestore _firestore;
@@ -175,6 +173,48 @@ class PlaylistRepository {
         'updatedAt': Timestamp.now(),
       }),
       'removeSermon',
+    );
+  }
+
+  /// Doc id of the member's "Liked messages" playlist, which the player's
+  /// heart fills. A fixed id keeps it one playlist however often the heart
+  /// is tapped, and it is otherwise an ordinary playlist (rename, delete,
+  /// play all).
+  static const String likedPlaylistId = 'liked';
+  static const String likedPlaylistName = 'Liked messages';
+
+  /// Likes or unlikes [sermonId]. [playlistExists] says whether the liked
+  /// playlist is already in the member's library: the first like creates it,
+  /// later ones update it in place.
+  void setLiked(
+    String sermonId, {
+    required bool liked,
+    required bool playlistExists,
+  }) {
+    final uid = _requireUid();
+    final doc = _playlistsOf(uid).doc(likedPlaylistId);
+    final now = Timestamp.now();
+    if (!playlistExists) {
+      if (!liked) return;
+      _commit(
+        doc.set({
+          'name': likedPlaylistName,
+          'sermonIds': [sermonId],
+          'createdAt': now,
+          'updatedAt': now,
+        }),
+        'like',
+      );
+      return;
+    }
+    _commit(
+      doc.update({
+        'sermonIds': liked
+            ? FieldValue.arrayUnion([sermonId])
+            : FieldValue.arrayRemove([sermonId]),
+        'updatedAt': now,
+      }),
+      liked ? 'like' : 'unlike',
     );
   }
 

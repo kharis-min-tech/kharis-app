@@ -28,8 +28,9 @@ class YoutubeWebEmbed extends StatelessWidget {
     _registered.add(_viewType);
 
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
-      final start =
-          startSeconds != null && startSeconds! > 0 ? '&start=$startSeconds' : '';
+      final start = startSeconds != null && startSeconds! > 0
+          ? '&start=$startSeconds'
+          : '';
       final iframe = web.HTMLIFrameElement()
         ..src =
             'https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&playsinline=1&rel=0$start'

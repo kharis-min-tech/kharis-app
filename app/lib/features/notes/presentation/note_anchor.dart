@@ -35,37 +35,51 @@ abstract final class NoteAnchor {
     final audio = ref.read(audioPlayerServiceProvider);
     final target = Duration(milliseconds: positionMs);
 
-    // Already loaded: seek in place rather than reloading the source. Matched
-    // through NoteTimelineKey, because the note may be stored under the
-    // canonical `yt_` key while the loaded variant carries its raw id.
+    // Already loaded: play() attaches to the live source and seeks in place
+    // rather than reloading. Matched through NoteTimelineKey, because the
+    // note may be stored under the canonical `yt_` key while the loaded
+    // variant carries its raw id.
     final playing = audio.currentSermon;
-    if (playing != null && NoteTimelineKey.of(playing).matches(sermonId)) {
-      await audio.seek(target);
-      await audio.resume();
-      return NoteAnchorResult.started;
-    }
-
-    final sermon = await _findSermon(ref, sermonId);
+    final sermon =
+        playing != null &&
+            playing.hasAudio &&
+            NoteTimelineKey.of(playing).matches(sermonId)
+        ? playing
+        : await _findSermon(ref, sermonId);
     if (sermon == null) return NoteAnchorResult.sermonUnavailable;
 
-    // play() restores the saved resume point; seek afterwards so the note's
-    // own timestamp wins. A failed load must not read as started.
-    if (!await audio.play(sermon)) return NoteAnchorResult.playbackFailed;
-    await audio.seek(target);
+    // startAt wins over the saved resume point, and play() returns as soon
+    // as the engine is running, so the caller can close its sheet right away.
+    // A failed load must not read as started.
+    if (!await audio.play(sermon, startAt: target, queue: audio.queue?.items)) {
+      return NoteAnchorResult.playbackFailed;
+    }
     return NoteAnchorResult.started;
   }
 
+  /// The audio recording a note belongs to: the loaded library first, then
+  /// the snapshots of recently played messages, which resolve before the
+  /// archive has hydrated.
   static Future<Sermon?> _findSermon(WidgetRef ref, String sermonId) async {
-    try {
-      final sermons = await ref.read(sermonsProvider.future);
+    Sermon? match(Iterable<Sermon> sermons) {
       for (final sermon in sermons) {
         if (sermon.hasAudio && NoteTimelineKey.of(sermon).matches(sermonId)) {
           return sermon;
         }
       }
-    } catch (_) {
-      // Library unreachable — treated the same as a missing sermon.
+      return null;
     }
-    return null;
+
+    try {
+      final found = match(await ref.read(sermonsProvider.future));
+      if (found != null) return found;
+    } catch (_) {
+      // Library unreachable: fall back to the snapshots below.
+    }
+    try {
+      return match(ref.read(playbackHistoryProvider).snapshots());
+    } catch (_) {
+      return null;
+    }
   }
 }

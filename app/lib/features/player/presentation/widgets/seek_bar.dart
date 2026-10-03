@@ -9,6 +9,10 @@ import 'package:kharis_app/core/theme/theme.dart';
 /// marks the play head. Tap or drag anywhere to seek; the thumb grows while
 /// dragging. Time labels sit below — elapsed on the left, time remaining
 /// (`-m:ss`) on the right.
+///
+/// Until the engine reports a duration the timeline is inert: gestures are
+/// ignored (a tap would otherwise compute 0:00 and throw the member back to
+/// the start) and the unknown times read `--:--`.
 class SeekBar extends StatefulWidget {
   const SeekBar({
     super.key,
@@ -59,6 +63,8 @@ class _SeekBarState extends State<SeekBar> {
   static double _fractionAt(double dx, double width) =>
       width <= 0 ? 0.0 : (dx / width).clamp(0.0, 1.0);
 
+  bool get _known => widget.duration > Duration.zero;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.kc;
@@ -68,61 +74,77 @@ class _SeekBarState extends State<SeekBar> {
       color: colors.muted,
     );
 
+    final known = _known;
     final elapsed = _displayPosition;
     final remaining = widget.duration > elapsed
         ? widget.duration - elapsed
         : Duration.zero;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        LayoutBuilder(
-          builder: (_, constraints) {
-            final width = constraints.maxWidth;
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapUp: (d) => widget.onSeek(
-                _durationAt(_fractionAt(d.localPosition.dx, width)),
-              ),
-              onHorizontalDragStart: (d) => setState(() {
-                _dragFraction = _fractionAt(d.localPosition.dx, width);
-              }),
-              onHorizontalDragUpdate: (d) => setState(() {
-                _dragFraction = _fractionAt(d.localPosition.dx, width);
-              }),
-              onHorizontalDragEnd: (_) {
-                final f = _dragFraction;
-                if (f != null) widget.onSeek(_durationAt(f));
-                setState(() => _dragFraction = null);
-              },
-              onHorizontalDragCancel: () =>
-                  setState(() => _dragFraction = null),
-              child: SizedBox(
-                height: _hitHeight,
-                width: width,
-                child: CustomPaint(
-                  painter: _TimelinePainter(
-                    fraction: _fraction,
-                    dragging: _dragFraction != null,
-                    played: colors.onBg,
-                    rail: colors.onBg.withValues(alpha: 0.22),
-                  ),
-                ),
-              ),
-            );
+    final track = LayoutBuilder(
+      builder: (_, constraints) {
+        final width = constraints.maxWidth;
+        final paint = SizedBox(
+          height: _hitHeight,
+          width: width,
+          child: CustomPaint(
+            painter: _TimelinePainter(
+              fraction: _fraction,
+              dragging: _dragFraction != null,
+              showThumb: known,
+              played: colors.onBg,
+              rail: colors.onBg.withValues(alpha: 0.22),
+            ),
+          ),
+        );
+        if (!known) return paint;
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (d) => widget.onSeek(
+            _durationAt(_fractionAt(d.localPosition.dx, width)),
+          ),
+          onHorizontalDragStart: (d) => setState(() {
+            _dragFraction = _fractionAt(d.localPosition.dx, width);
+          }),
+          onHorizontalDragUpdate: (d) => setState(() {
+            _dragFraction = _fractionAt(d.localPosition.dx, width);
+          }),
+          onHorizontalDragEnd: (_) {
+            final f = _dragFraction;
+            if (f != null) widget.onSeek(_durationAt(f));
+            setState(() => _dragFraction = null);
           },
-        ),
-        const SizedBox(height: 2),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(_fmt(elapsed), style: timeStyle),
-            Text('-${_fmt(remaining)}', style: timeStyle),
-          ],
-        ),
-      ],
+          onHorizontalDragCancel: () => setState(() => _dragFraction = null),
+          child: paint,
+        );
+      },
+    );
+
+    return Semantics(
+      slider: true,
+      enabled: known,
+      label: 'Playback position',
+      value: known ? '${_fmt(elapsed)} of ${_fmt(widget.duration)}' : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          track,
+          const SizedBox(height: 2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                known || elapsed > Duration.zero ? _fmt(elapsed) : _unknown,
+                style: timeStyle,
+              ),
+              Text(known ? '-${_fmt(remaining)}' : _unknown, style: timeStyle),
+            ],
+          ),
+        ],
+      ),
     );
   }
+
+  static const _unknown = '--:--';
 }
 
 /// Thin rounded rail, solid fill up to [fraction], round thumb at the head.
@@ -130,12 +152,17 @@ class _TimelinePainter extends CustomPainter {
   const _TimelinePainter({
     required this.fraction,
     required this.dragging,
+    required this.showThumb,
     required this.played,
     required this.rail,
   });
 
   final double fraction;
   final bool dragging;
+
+  /// Hidden while the duration is unknown, so the inert rail does not look
+  /// draggable.
+  final bool showThumb;
   final Color played;
   final Color rail;
 
@@ -163,6 +190,7 @@ class _TimelinePainter extends CustomPainter {
       );
     }
 
+    if (!showThumb) return;
     canvas.drawCircle(
       Offset(headX, cy),
       dragging ? _thumbRadiusDragging : _thumbRadius,
@@ -174,6 +202,7 @@ class _TimelinePainter extends CustomPainter {
   bool shouldRepaint(_TimelinePainter old) =>
       old.fraction != fraction ||
       old.dragging != dragging ||
+      old.showThumb != showThumb ||
       old.played != played ||
       old.rail != rail;
 }

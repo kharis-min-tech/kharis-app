@@ -9,21 +9,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
-import 'package:kharis_app/features/player/data/audio_player_service.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
+import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
+import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+
+import 'support/fake_audio_player_service.dart';
+import 'support/fake_cache_service.dart';
 
 /// Coverage for the shared note timeline across the audio and video engines:
 ///
@@ -55,22 +59,24 @@ void main() {
   );
 
   Note note(String id, String? sermonId, int? positionMs) => Note(
-        id: id,
-        sermonId: sermonId,
-        sermonTitle: 'Grace Over Guilt',
-        positionMs: positionMs,
-        body: 'note $id',
-        createdAt: DateTime(2026, 3, 1),
-        updatedAt: DateTime(2026, 3, 1),
-      );
+    id: id,
+    sermonId: sermonId,
+    sermonTitle: 'Grace Over Guilt',
+    positionMs: positionMs,
+    body: 'note $id',
+    createdAt: DateTime(2026, 3, 1),
+    updatedAt: DateTime(2026, 3, 1),
+  );
 
   group('NoteTimelineKey', () {
-    test('every variant of a video-bearing message shares one canonical key',
-        () {
-      expect(NoteTimelineKey.of(apiVariant).canonical, 'yt_abc123');
-      expect(NoteTimelineKey.of(cmsVariant).canonical, 'yt_abc123');
-      expect(NoteTimelineKey.of(feedVariant).canonical, 'yt_abc123');
-    });
+    test(
+      'every variant of a video-bearing message shares one canonical key',
+      () {
+        expect(NoteTimelineKey.of(apiVariant).canonical, 'yt_abc123');
+        expect(NoteTimelineKey.of(cmsVariant).canonical, 'yt_abc123');
+        expect(NoteTimelineKey.of(feedVariant).canonical, 'yt_abc123');
+      },
+    );
 
     test('an audio-only message keeps its own id as the canonical key', () {
       expect(NoteTimelineKey.of(audioOnly).canonical, '9004');
@@ -99,29 +105,32 @@ void main() {
 
   group('sermonNotesProvider shared-key resolution', () {
     test('notes stored under any id variant land on one timeline', () async {
-      final container = ProviderContainer(overrides: [
-        notesProvider.overrideWith(
-          (ref) => Stream.value([
-            note('legacy-audio', '2611', 900000),
-            note('legacy-video', 'abc123', 60000),
-            note('canonical', 'yt_abc123', 300000),
-            note('other-message', '9004', 5000),
-          ]),
-        ),
-        // The loaded library, as in production: the API variant is the only
-        // place the numeric id '2611' is linked to the video 'abc123' — the
-        // yt_/feed variants cannot derive it, so sermonNotesProvider resolves
-        // that alias through the catalogue.
-        sermonsProvider.overrideWith((ref) async => [apiVariant, audioOnly]),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          notesProvider.overrideWith(
+            (ref) => Stream.value([
+              note('legacy-audio', '2611', 900000),
+              note('legacy-video', 'abc123', 60000),
+              note('canonical', 'yt_abc123', 300000),
+              note('other-message', '9004', 5000),
+            ]),
+          ),
+          // The loaded library, as in production: the API variant is the only
+          // place the numeric id '2611' is linked to the video 'abc123' — the
+          // yt_/feed variants cannot derive it, so sermonNotesProvider resolves
+          // that alias through the catalogue.
+          sermonsProvider.overrideWith((ref) async => [apiVariant, audioOnly]),
+        ],
+      );
       addTearDown(container.dispose);
       await container.read(notesProvider.future);
       await container.read(sermonsProvider.future);
 
       // Whichever variant opened the player, the timeline is the same.
       for (final variant in [apiVariant, cmsVariant, feedVariant]) {
-        final scoped =
-            container.read(sermonNotesProvider(NoteTimelineKey.of(variant)));
+        final scoped = container.read(
+          sermonNotesProvider(NoteTimelineKey.of(variant)),
+        );
         expect(
           scoped.map((n) => n.id),
           ['legacy-video', 'canonical', 'legacy-audio'],
@@ -129,19 +138,20 @@ void main() {
         );
       }
 
-      final other =
-          container.read(sermonNotesProvider(NoteTimelineKey.of(audioOnly)));
+      final other = container.read(
+        sermonNotesProvider(NoteTimelineKey.of(audioOnly)),
+      );
       expect(other.map((n) => n.id), ['other-message']);
     });
   });
 
   group('unified player note capture and anchor seek', () {
-    late _FakeAudioPlayerService audio;
+    late FakeAudioPlayerService audio;
     late StreamController<Duration> videoPositions;
     late List<Duration> videoSeeks;
 
     setUp(() {
-      audio = _FakeAudioPlayerService();
+      audio = FakeAudioPlayerService();
       videoPositions = StreamController<Duration>.broadcast();
       videoSeeks = [];
       MediaPlayerScreen.debugDisableVideoEngine = true;
@@ -161,10 +171,15 @@ void main() {
       return ProviderScope(
         overrides: [
           audioPlayerServiceProvider.overrideWithValue(audio),
+          cacheServiceProvider.overrideWithValue(FakeCacheService()),
           notesProvider.overrideWith((ref) => Stream.value(notes)),
           // Hermetic: sermonNotesProvider consults the catalogue for legacy
           // aliases — keep it empty so no network/asset load runs here.
           sermonsProvider.overrideWith((ref) async => const <Sermon>[]),
+          // The like button reads the member's playlists; keep it offline.
+          playlistsProvider.overrideWith(
+            (ref) => Stream.value(const <Playlist>[]),
+          ),
         ],
         child: MaterialApp(
           home: MediaPlayerScreen(sermon: sermon, mode: mode),
@@ -172,8 +187,9 @@ void main() {
       );
     }
 
-    testWidgets('video mode stamps a new note with the video engine clock',
-        (tester) async {
+    testWidgets('video mode stamps a new note with the video engine clock', (
+      tester,
+    ) async {
       await tester.pumpWidget(harness(apiVariant, MediaMode.video, const []));
       // PlayerActions sits below the fold of the player's scroll view in the
       // 800x600 test viewport — an un-scrolled tap would silently no-op.
@@ -192,15 +208,20 @@ void main() {
       await tester.tap(find.text('Add a note at 05:15'));
       await tester.pumpAndSettle();
 
-      final editor =
-          tester.widget<NoteEditorScreen>(find.byType(NoteEditorScreen));
-      expect(editor.positionMs, 315000,
-          reason: 'the VIDEO position, though audio is stopped');
+      final editor = tester.widget<NoteEditorScreen>(
+        find.byType(NoteEditorScreen),
+      );
+      expect(
+        editor.positionMs,
+        315000,
+        reason: 'the VIDEO position, though audio is stopped',
+      );
       expect(editor.sermon?.id, apiVariant.id);
     });
 
-    testWidgets('video mode seeks the video engine, never the audio one',
-        (tester) async {
+    testWidgets('video mode seeks the video engine, never the audio one', (
+      tester,
+    ) async {
       final anchored = [note('n1', 'yt_abc123', 750000)];
       await tester.pumpWidget(harness(apiVariant, MediaMode.video, anchored));
       await tester.ensureVisible(find.text('Notes'));
@@ -217,8 +238,9 @@ void main() {
       expect(find.byType(SermonNotesSheet), findsNothing);
     });
 
-    testWidgets('audio mode stamps a new note with the audio engine clock',
-        (tester) async {
+    testWidgets('audio mode stamps a new note with the audio engine clock', (
+      tester,
+    ) async {
       audio.current = apiVariant;
       await tester.pumpWidget(harness(apiVariant, MediaMode.audio, const []));
       await tester.ensureVisible(find.text('Notes'));
@@ -235,24 +257,32 @@ void main() {
     });
 
     testWidgets(
-        'audio mode seeks the audio engine — even for a note stored under '
-        'the canonical yt_ key', (tester) async {
-      audio.current = apiVariant;
-      final anchored = [note('n1', 'yt_abc123', 750000)];
-      await tester.pumpWidget(harness(apiVariant, MediaMode.audio, anchored));
-      await tester.ensureVisible(find.text('Notes'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Notes'));
-      await tester.pumpAndSettle();
+      'audio mode seeks the audio engine — even for a note stored under '
+      'the canonical yt_ key',
+      (tester) async {
+        audio.current = apiVariant;
+        final anchored = [note('n1', 'yt_abc123', 750000)];
+        await tester.pumpWidget(harness(apiVariant, MediaMode.audio, anchored));
+        await tester.ensureVisible(find.text('Notes'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Notes'));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('12:30'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('12:30'));
+        await tester.pumpAndSettle();
 
-      expect(audio.seekCalls, [const Duration(milliseconds: 750000)]);
-      expect(audio.resumed, isTrue);
-      expect(videoSeeks, isEmpty);
-      expect(find.byType(SermonNotesSheet), findsNothing);
-    });
+        // One play request carrying the anchor as its start point: the engine
+        // attaches to the loaded message and seeks there, no trailing seek.
+        expect(audio.calls, hasLength(1));
+        expect(audio.calls.single.sermon.id, apiVariant.id);
+        expect(
+          audio.calls.single.startAt,
+          const Duration(milliseconds: 750000),
+        );
+        expect(videoSeeks, isEmpty);
+        expect(find.byType(SermonNotesSheet), findsNothing);
+      },
+    );
   });
 
   group('note editor writes the canonical key', () {
@@ -275,14 +305,17 @@ void main() {
       hiveDir.deleteSync(recursive: true);
     });
 
-    testWidgets('a note saved against the API mp3 variant lands under yt_',
-        (tester) async {
+    testWidgets('a note saved against the API mp3 variant lands under yt_', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
             localNoteStoreProvider.overrideWithValue(LocalNoteStore(box)),
-            currentUserProvider.overrideWith((ref) => Stream<User?>.value(null)),
+            currentUserProvider.overrideWith(
+              (ref) => Stream<User?>.value(null),
+            ),
           ],
           child: MaterialApp(
             home: Builder(
@@ -311,80 +344,13 @@ void main() {
       final stored = Map<String, dynamic>.from(
         jsonDecode(box.values.single as String) as Map,
       );
-      expect(stored['sermonId'], 'yt_abc123',
-          reason: 'canonical key, not the raw API id 2611');
+      expect(
+        stored['sermonId'],
+        'yt_abc123',
+        reason: 'canonical key, not the raw API id 2611',
+      );
       expect(stored['positionMs'], 315000);
       expect(stored['body'], 'Hold this thought');
     });
   });
-}
-
-// ── Fake audio engine ─────────────────────────────────────────────────────────
-
-/// No just_audio behind it; records what the notes surfaces drive it to do.
-class _FakeAudioPlayerService implements AudioPlayerService {
-  final List<Sermon> playCalls = [];
-  final List<Duration> seekCalls = [];
-  final StreamController<Duration> positions =
-      StreamController<Duration>.broadcast();
-  bool resumed = false;
-  Sermon? current;
-
-  @override
-  Sermon? get currentSermon => current;
-
-  @override
-  Duration get position => Duration.zero;
-
-  @override
-  PlaybackFailure? get failure => null;
-
-  @override
-  Stream<PlaybackFailure?> get failureStream => const Stream.empty();
-
-  @override
-  Stream<PlayerState> get playerStateStream => const Stream.empty();
-
-  @override
-  Stream<Duration> get positionStream => positions.stream;
-
-  @override
-  Stream<Duration?> get durationStream => const Stream.empty();
-
-  @override
-  Future<bool> play(Sermon sermon) async {
-    playCalls.add(sermon);
-    current = sermon;
-    return true;
-  }
-
-  @override
-  Future<bool> retry() async => false;
-
-  @override
-  Future<void> loadPaused(Sermon sermon) async {}
-
-  @override
-  Future<void> pause() async {}
-
-  @override
-  Future<void> resume() async {
-    resumed = true;
-  }
-
-  @override
-  Future<void> stop() async {
-    current = null;
-  }
-
-  @override
-  Future<void> seek(Duration position) async {
-    seekCalls.add(position);
-  }
-
-  @override
-  Future<void> setSpeed(double speed) async {}
-
-  @override
-  Future<void> dispose() async {}
 }

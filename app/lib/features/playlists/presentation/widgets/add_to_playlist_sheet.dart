@@ -112,8 +112,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 child: Text(
-                  'Hold on — we’re still signing you in. '
-                  'Try again in a moment.',
+                  'Still signing you in. Try again in a moment.',
                   style: AppTypography.bodySm.copyWith(
                     fontSize: 13,
                     color: context.kc.muted,
