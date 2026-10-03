@@ -152,16 +152,25 @@ class AudioPlayerService {
           _history.clearPosition(sermon);
           return;
         }
+        // The engine is the ground truth: once this message is ready and
+        // playing, any failure recorded for it (a load that beat its
+        // timeout late, a stream that dropped and recovered) is stale. Left
+        // up, the banner covered the player's actions over working audio.
+        if (state.playing &&
+            state.processingState == ProcessingState.ready &&
+            _loadsInFlight == 0 &&
+            _failure?.sermonId == sermon.id) {
+          _setFailure(null);
+        }
         if (!state.playing) _saveCurrentPosition();
       }, onError: _ignore),
     );
 
     // Errors that surface after a successful load (connection dropped
-    // mid-stream, next item unplayable) used to be swallowed, leaving a
-    // silent player with a Pause button.
-    _subscriptions.add(
-      _player.playbackEventStream.listen((_) {}, onError: _onStreamError),
-    );
+    // mid-stream, next item unplayable). just_audio 0.10 reports these on
+    // errorStream; playbackEventStream no longer carries errors, so listening
+    // there left a silent player with a Pause button.
+    _subscriptions.add(_player.errorStream.listen(_onStreamError));
 
     // The native player moves on its own: a finished message advances, and
     // the lock screen / CarPlay skip buttons seek the window directly.

@@ -100,6 +100,11 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
   LoopModeMessage loopMode = LoopModeMessage.off;
   double speed = 1.0;
 
+  /// Set while the native player reports an error (just_audio 0.10 carries
+  /// errors as fields on the playback event, not as stream errors).
+  int? _errorCode;
+  String? _errorMessage;
+
   void _broadcast() {
     _events.add(
       PlaybackEventMessage(
@@ -111,6 +116,8 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
         duration: _state == ProcessingStateMessage.idle ? null : itemDuration,
         currentIndex: _index,
         androidAudioSessionId: null,
+        errorCode: _errorCode,
+        errorMessage: _errorMessage,
       ),
     );
   }
@@ -122,6 +129,24 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
     _broadcast();
     _playCompleter?.complete();
     _playCompleter = null;
+  }
+
+  /// The stream drops mid-playback: the native player reports an error on
+  /// its playback event, as a lost connection does.
+  void failStream() {
+    _errorCode = 2001;
+    _errorMessage = 'Source error: connection reset';
+    _broadcast();
+  }
+
+  /// The native player recovers on its own (rebuffers and carries on).
+  void recover() {
+    _errorCode = null;
+    _errorMessage = null;
+    _state = ProcessingStateMessage.buffering;
+    _broadcast();
+    _state = ProcessingStateMessage.ready;
+    _broadcast();
   }
 
   @override

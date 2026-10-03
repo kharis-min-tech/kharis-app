@@ -2305,6 +2305,17 @@ void main() {
         }
         walk.check(call.isNotEmpty, 'Share invokes the OS share sheet ($call)');
         if (call.isNotEmpty) walk.note('share payload: ${call.first.args}');
+        final payload = call.isEmpty ? '' : '${call.first.args}';
+        walk.check(
+          payload.contains('https://kharis-app-47c49.web.app/m/'),
+          'shared link opens in the Kharis app (/m/<id>)',
+        );
+        walk.check(
+          !RegExp(
+            r'youtube\.com|youtu\.be|yetanothersermon\.host|kharis\.org',
+          ).hasMatch(payload),
+          'shared text carries no external links',
+        );
         await Future<void>.delayed(const Duration(seconds: 2));
         await hostShotBackground('8-share-sheet');
         debugPrint('KACT:dismiss-share');

@@ -73,6 +73,29 @@ void main() {
     platform.failDispose = false;
   });
 
+  test(
+    'a failure clears itself once the message is actually playing again',
+    () async {
+      await service.play(library[0]);
+      await settle();
+
+      native().failStream();
+      await settle();
+      expect(
+        service.failure?.sermonId,
+        's1',
+        reason: 'the dropped stream is reported',
+      );
+
+      // The native player rebuffers and carries on. Before the fix the
+      // banner stayed up over working audio and covered the player actions.
+      native().recover();
+      await settle();
+      expect(native().playing, isTrue);
+      expect(service.failure, isNull);
+    },
+  );
+
   test('only the load that wins is recorded as recently played', () async {
     final first = service.play(library[0]);
     final second = service.play(library[1]);
