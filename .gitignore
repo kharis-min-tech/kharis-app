@@ -22,7 +22,9 @@
 build/
 .pub-cache/
 .pub/
-pubspec.lock
+# app/pubspec.lock is committed so CI resolves the exact package versions
+# used locally. FVM's per-project SDK cache is not (the pin is app/.fvmrc).
+.fvm/
 
 # IDE
 .idea/

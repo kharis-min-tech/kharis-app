@@ -13,14 +13,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Same Flutter as local development: the single pin is app/.fvmrc.
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version-file: app/.fvmrc
           channel: stable
           cache: true
 
+      # --enforce-lockfile: resolve exactly the committed app/pubspec.lock and
+      # fail if pubspec.yaml changed without the lockfile being updated.
       - name: Install Flutter dependencies
         working-directory: app
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Flutter analyze
         working-directory: app
@@ -30,9 +34,31 @@ jobs:
         working-directory: app
         run: flutter test
 
+      # Local builds pass --dart-define-from-file=env.json; CI must compile the
+      # same way. ENV_JSON is a verbatim copy of app/env.json. Pull requests
+      # from forks cannot read secrets, so they build with the placeholder
+      # values from env.example.json (compiles identically, keys just do not
+      # authenticate).
+      - name: Restore env.json
+        working-directory: app
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: |
+          if [ -n "$ENV_JSON" ]; then
+            printf '%s' "$ENV_JSON" > env.json
+          else
+            echo "::notice::ENV_JSON secret unavailable; building with env.example.json placeholders"
+            cp env.example.json env.json
+          fi
+
+      # Identical to the documented local command (BUILD.md, "Web").
       - name: Flutter build web
         working-directory: app
-        run: flutter build web --release
+        run: ./scripts/build-web.sh --build-only
+
+      - name: Scrub env.json
+        if: always()
+        run: rm -f app/env.json
 
   storybook-test:
     name: Storybook Test

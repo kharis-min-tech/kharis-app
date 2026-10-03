@@ -1,447 +1,265 @@
-# Kharis Church — Build & Release Guide
+# Kharis Church: Build & Release Guide
 
-Everything needed to go from code to App Store and Play Store.
+Everything needed to go from code to App Store, Play Store and the web, with
+local builds that behave exactly like CI and production.
+
+| Thing | Value |
+|---|---|
+| Firebase / GCP project | `kharis-app-47c49` (one project for Firestore, Auth, FCM, Functions, Hosting) |
+| Bundle ID / package name | `com.kharis.church` (iOS and Android) |
+| Apple team | `Z9TTRH45X3` |
+| Web app | https://kharis-app-47c49.web.app (Hosting site `kharis-app-47c49`, config `app/firebase.json`) |
+| Content Studio (admin) | Hosting site `kharis-app-admin` (config `admin/firebase.json`) |
+| Flutter | **3.44.1** stable (Dart 3.12.1), pinned in `app/.fvmrc` |
+| Node (Cloud Functions) | **24** (`engines.node` in `backend/functions/package.json`) |
 
 ---
 
 ## Prerequisites
 
-Before starting, confirm you have:
-
 | Tool | Version | Notes |
 |---|---|---|
 | macOS | 13+ | Required for iOS builds |
-| Xcode | 15+ | Install from the Mac App Store |
-| Flutter | 3.44+ | `flutter --version` to check |
-| Dart SDK | 3.12.1+ | Bundled with Flutter 3.44+; `pubspec.yaml` pins `^3.12.1`. If `flutter run` spews thousands of URI/resolution errors, your Flutter is too old — run `flutter upgrade` |
+| Xcode | 16+ | Install from the Mac App Store |
+| Flutter | 3.44.1 exactly | The pin is `app/.fvmrc`; CI reads the same file. With [FVM](https://fvm.app): `cd app && fvm use` then prefix commands with `fvm`. Without FVM: `flutter --version` must print 3.44.1 |
 | Android Studio / SDK | Latest | Or just Android command-line tools |
 | Java | 17 | `java -version`; use Temurin if unsure |
-| Node.js | 18+ | For Firebase CLI and backend functions |
+| Node.js | 24 | Same as the Functions runtime and the deploy workflow |
 | Firebase CLI | Latest | `npm install -g firebase-tools` |
-| Apple Developer account | — | $99/yr at developer.apple.com |
-| Google Play Console account | — | $25 one-time at play.google.com/console |
-
-Verify Flutter is set up correctly:
 
 ```bash
-flutter doctor -v
+flutter doctor -v   # every item green before building
 ```
-
-All items should be green before proceeding. Fix any ✗ entries — missing Android licenses and Xcode command-line tools are the most common blockers.
 
 ---
 
-## Step 1: Firebase Setup
+## Local builds that mirror CI
 
-### 1.1 Create the project
+CI and local builds use the same Flutter (`app/.fvmrc`), the same package
+versions (the committed `app/pubspec.lock`) and the same build-time keys
+(`app/env.json`). Run these from `app/`.
 
-1. Go to [console.firebase.google.com](https://console.firebase.google.com)
-2. Click **Add project** → name it `kharis-church`
-3. Disable Google Analytics if not needed → **Create project**
+### 1. Keys: `app/env.json`
 
-### 1.2 Enable required services
-
-In the Firebase Console for the project:
-
-**Firestore Database**
-- Build → Firestore Database → **Create database**
-- Choose **Production mode** (rules are deployed via CLI)
-- Region: `europe-west2` (London) — closest to most UK users
-
-**Authentication**
-- Build → Authentication → **Get started**
-- Enable **Email/Password**
-
-**Cloud Messaging**
-- Build → Cloud Messaging is enabled by default once you add the apps below
-
-**Cloud Functions**
-- Build → Functions → **Get started**
-- The project must be on the **Blaze (pay-as-you-go)** plan — free tier does not support outbound network calls in functions
-
-### 1.3 Configure Firebase with FlutterFire CLI
-
-The FlutterFire CLI automatically registers your app with Firebase and generates the configuration file. This is cleaner than manually downloading JSON/plist files.
-
-**Install the CLI (one-time):**
-
-```bash
-dart pub global activate flutterfire_cli
-```
-
-**Run configure:**
+Every build passes `--dart-define-from-file=env.json`. The file is gitignored;
+`env.example.json` lists the keys:
 
 ```bash
 cd app
-flutterfire configure --project=kharis-church
+cp env.example.json env.json   # then fill in YOUVERSION_API_KEY and YOUTUBE_API_KEY
 ```
 
-The CLI will:
-1. Prompt you to select platforms (Android, iOS, Web, macOS)
-2. Register apps in Firebase Console automatically
-3. Generate `lib/firebase_options.dart` with all platform configs
-4. Download `google-services.json` and `GoogleService-Info.plist` to the correct locations
+CI writes the same file from the `ENV_JSON` repository secret (a verbatim copy
+of your `app/env.json`). Pull requests from forks cannot read secrets, so the CI
+web build falls back to `env.example.json`: it compiles identically, but the
+keys do not authenticate.
 
-> **Package name:** When prompted, use `org.kharis.app` for both Android and iOS. The CLI will update `build.gradle.kts` and Xcode project if needed.
-
-### 1.4 Enable Firebase in the Flutter app
-
-Open `app/lib/core/services/firebase_service.dart` and change:
-
-```dart
-const bool kUseFirebase = false;
-```
-
-to:
-
-```dart
-const bool kUseFirebase = true;
-```
-
-This single flag controls whether the app hits real Firebase or mock data.
-
-### 1.5 Verify configuration
+### 2. Dependencies
 
 ```bash
-# Check that firebase_options.dart was generated
-cat app/lib/firebase_options.dart | head -20
+flutter pub get --enforce-lockfile
+```
 
-# Should show your actual project ID, not "PLACEHOLDER"
+`--enforce-lockfile` is what CI runs: it fails if `pubspec.yaml` and
+`pubspec.lock` disagree. After changing dependencies run plain
+`flutter pub get` and commit the updated `pubspec.lock` with `pubspec.yaml`.
+
+### 3. The CI checks (`.github/workflows/ci.yml`)
+
+```bash
+flutter analyze
+flutter test
+./scripts/build-web.sh --build-only
+```
+
+`scripts/build-web.sh` holds the only copy of the web build command
+(`flutter build web --release --pwa-strategy=none --dart-define-from-file=env.json`);
+CI calls the script, so the two cannot drift. Output: `app/build/web`.
+
+### 4. Release builds
+
+| Target | Local command (from `app/`) | CI workflow (manual) |
+|---|---|---|
+| Web, build + deploy | `./scripts/build-web.sh` (deploys Hosting to `kharis-app-47c49`) | build only, in `ci.yml` |
+| Android App Bundle | `./scripts/build-android.sh` (= `flutter build appbundle --release --dart-define-from-file=env.json`) | `build-android.yml` |
+| Android to Play internal track | `./scripts/upload-play-internal.sh` | none |
+| iOS, unsigned archive | `flutter build ipa --release --no-codesign --dart-define-from-file=env.json` | `build-ios.yml` |
+| iOS to TestFlight (signed) | `./scripts/deploy-testflight.sh [build_number]` | none |
+| Backend | `cd backend/functions && npm ci && npm run build && cd .. && firebase deploy --only functions,firestore --project kharis-app-47c49` | `deploy-backend.yml` |
+
+To run the app locally against production data, pass the same keys:
+
+```bash
+flutter run --dart-define-from-file=env.json            # device / simulator
+flutter run -d chrome --dart-define-from-file=env.json  # web
 ```
 
 ---
 
-## Step 2: Backend Deploy
+## Step 1: Firebase
 
-### 2.1 Link the CLI to the project
-
-```bash
-cd backend
-firebase login
-firebase use --add
-# Select the kharis-church project and alias it "default"
-```
-
-### 2.2 Set the YouTube API key
-
-Get a YouTube Data API v3 key from [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials.
-
-For production (recommended — uses Firebase Secrets, not env files):
+The app is already registered in `kharis-app-47c49`. `lib/firebase_options.dart`,
+`android/app/google-services.json` and `ios/Runner/GoogleService-Info.plist` are
+generated by FlutterFire and committed. Regenerate them only when adding a
+platform:
 
 ```bash
-firebase functions:secrets:set YOUTUBE_API_KEY
-# Enter the key when prompted
+dart pub global activate flutterfire_cli
+cd app
+flutterfire configure --project=kharis-app-47c49
 ```
 
-For local development only:
+The project must stay on the **Blaze** plan: Cloud Functions make outbound
+calls (YouTube, the sermon API, SoundCloud).
+
+Firestore rules and indexes live only in `backend/` (`backend/firestore.rules`,
+`backend/firestore.indexes.json`) and are deployed with the backend.
+`app/firebase.json` only configures web Hosting.
+
+### Push notifications
+
+- **iOS:** the Push Notifications capability is `ios/Runner/Runner.entitlements`
+  (`aps-environment`), wired into every Runner build configuration. The App ID
+  needs Push Notifications enabled and an APNs key uploaded in Firebase Console,
+  Project Settings, Cloud Messaging.
+- **Android:** no extra setup; the default channel is created in `MainActivity`.
+- **Web:** `web/firebase-messaging-sw.js` is the FCM service worker. Its
+  Firebase JS SDK version must match `firebase_core_web`'s
+  `supportedFirebaseJsSdkVersion`; update both together when bumping
+  `firebase_core`.
+
+---
+
+## Step 2: Backend deploy
+
+### 2.1 Functions config: `backend/functions/.env`
+
+`YOUTUBE_API_KEY` is a `defineString` param (`sync-youtube.ts`), read from the
+gitignored `backend/functions/.env` at deploy time:
 
 ```bash
 echo "YOUTUBE_API_KEY=YOUR_KEY_HERE" > backend/functions/.env
 ```
 
-### 2.3 Install and build functions
+The deploy workflow writes the same file from the `FUNCTIONS_ENV` secret.
+
+### 2.2 Build and deploy
 
 ```bash
 cd backend/functions
-npm install
+npm ci
 npm run build
-```
-
-### 2.4 Deploy
-
-```bash
-cd backend
-firebase deploy --only functions,firestore
+cd ..
+firebase deploy --only functions,firestore --project kharis-app-47c49
 ```
 
 Deploy subsets when needed:
 
 ```bash
-firebase deploy --only functions
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
+firebase deploy --only functions --project kharis-app-47c49
+firebase deploy --only firestore:rules --project kharis-app-47c49
+firebase deploy --only firestore:indexes --project kharis-app-47c49
 ```
 
-### 2.5 Verify SoundCloud sync
-
-After deploy, the `syncSoundCloud` function runs on a 60-minute schedule. To verify manually:
-
-1. Firebase Console → Functions → `syncSoundCloud` → **Run now** (or wait one hour)
-2. Check Firestore → `sermons` collection — new documents should appear with `source: "soundcloud"`
+Always pass `--project kharis-app-47c49` so a stale `firebase use` alias can
+never send a deploy to another project.
 
 ---
 
-## Step 3: Admin Panel
+## Step 3: Content Studio (admin)
 
-### 3.1 Configure Firebase
-
-Open `admin/index.html` and find the Firebase config block near the top. Replace the placeholder values with your actual project config from Firebase Console → Project Settings → Your apps → Web app:
-
-```javascript
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "kharis-church.firebaseapp.com",
-  projectId: "kharis-church",
-  storageBucket: "kharis-church.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-```
-
-### 3.2 Run locally or deploy
-
-**Local (Docker):**
+`admin/index.html` already carries the `kharis-app-47c49` web config.
 
 ```bash
 cd admin
-docker compose up --build
-# Admin panel at http://localhost:8080
+docker compose up --build                                     # local, http://localhost:8080
+firebase deploy --only hosting --project kharis-app-47c49      # deploys site kharis-app-admin
 ```
 
-**Firebase Hosting (optional):**
-
-```bash
-firebase deploy --only hosting
-```
-
-### 3.3 Create the first admin user
-
-1. Firebase Console → Authentication → **Add user**
-2. Enter the admin email and password
-3. Copy the UID
-
-### 3.4 Set the admin custom claim
-
-The Firestore rules require `admin: true` on the user's token for write access. Set this from the Firebase Console using the Admin SDK script, or run it locally with a service account:
+Admins need the `admin: true` custom claim (Firestore rules check it). Set it
+with the Admin SDK and a service account:
 
 ```typescript
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
 initializeApp({ credential: cert('./serviceAccountKey.json') });
-
-// Replace with the UID from step 3.3
 await getAuth().setCustomUserClaims('USER_UID_HERE', { admin: true });
 ```
 
-After setting the claim, the user must sign out and back in for the token to refresh.
+The user must sign out and back in for the token to refresh.
 
 ---
 
-## Step 4: Android Build
+## Step 4: Android
 
-### 4.1 Confirm the package name
+### 4.1 Signing
 
-The `applicationId` in `app/android/app/build.gradle.kts` is currently:
+The upload keystore is `app/android/keystore/kharis-release.jks` (alias
+`kharis-release`), referenced by `app/android/key.properties`
+(`storeFile=../keystore/kharis-release.jks`). `android/app/build.gradle.kts`
+already signs release builds with it. Neither file is committed: back them up
+in a password manager. Losing the keystore means no more Play updates.
 
-```
-org.kharis.kharis_app
-```
-
-The Play Console registration and Firebase Android app must use the exact same value. If you want `org.kharis.app`, update `build.gradle.kts` before creating the keystore — changing the package name after publishing is not possible.
-
-### 4.2 Generate the release keystore
-
-Run the keystore generator script once. **Do this exactly once — the keystore is permanent. If lost, you cannot publish updates to the Play Store.**
+Only if the keystore does not exist yet:
 
 ```bash
 cd app
-chmod +x scripts/generate-keystore.sh
 ./scripts/generate-keystore.sh
 ```
 
-The script will:
-- Create `android/keystore/kharis-release.jks` (alias: `kharis-release`)
-- Write `android/key.properties` with your passwords
-- Add both to `.gitignore` automatically
-
-> **Critical:** Back up `android/keystore/kharis-release.jks` and both passwords to a secure location (1Password, Bitwarden, etc.) immediately. This file is not committed to git.
-
-### 4.3 Wire signing into the build
-
-The default `build.gradle.kts` signs release builds with the debug key. Replace the `buildTypes` block in `app/android/app/build.gradle.kts`:
-
-```kotlin
-android {
-    // ... existing config above ...
-
-    signingConfigs {
-        create("release") {
-            val props = java.util.Properties()
-            val keyPropsFile = rootProject.file("key.properties")
-            if (keyPropsFile.exists()) {
-                props.load(keyPropsFile.inputStream())
-            }
-            storeFile = file(props["storeFile"] as String)
-            storePassword = props["storePassword"] as String
-            keyAlias = props["keyAlias"] as String
-            keyPassword = props["keyPassword"] as String
-        }
-    }
-
-    buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-        }
-    }
-}
-```
-
-`key.properties` is at `android/key.properties` (one level up from `android/app/`), which is the path written by the keystore script.
-
-### 4.4 Build the App Bundle
+### 4.2 Build and upload
 
 ```bash
 cd app
-flutter pub get
-flutter build appbundle --release
+./scripts/build-android.sh       # app/build/app/outputs/bundle/release/app-release.aab
+./scripts/upload-play-internal.sh
 ```
 
-Output: `app/build/app/outputs/bundle/release/app-release.aab`
-
-To include a specific version:
+Override the version without editing `pubspec.yaml`:
 
 ```bash
-flutter build appbundle --release --build-name=2.0.0 --build-number=1
+flutter build appbundle --release --dart-define-from-file=env.json --build-name=2.0.0 --build-number=2
 ```
 
-### 4.5 Upload to Play Console
-
-1. Go to [play.google.com/console](https://play.google.com/console)
-2. Create the app if this is the first upload: **Create app** → name `Kharis Church`, default language English (UK), app type Application, free
-3. Production → Releases → **Create new release**
-4. Upload `app-release.aab`
-5. Fill in release notes (copy from `APP-STORE-LISTING.md` → What's New)
-6. **Save** → **Review release** → **Start rollout to production**
-
-For first-time internal testing before production, use **Internal testing** track instead.
+For a first upload or a production rollout use Play Console: Production (or
+Internal testing), Releases, Create new release, upload `app-release.aab`, paste
+release notes from `APP-STORE-LISTING.md`.
 
 ---
 
-## Step 5: iOS Build
+## Step 5: iOS
 
-### 5.1 Apple Developer account setup
+### 5.1 One-time Apple setup
 
-Before building, in [developer.apple.com](https://developer.apple.com):
+The App ID `com.kharis.church` (Push Notifications enabled), the App Store
+Connect app and an App Store Connect API key are already set up; see the header
+of `app/scripts/deploy-testflight.sh` for the exact steps to reproduce them.
 
-1. **Register the App ID:** Certificates, Identifiers & Profiles → Identifiers → **+** → App IDs → `org.kharis.app`
-   - Enable: Push Notifications (required for Firebase Messaging)
-2. **Create a Distribution Certificate:** Certificates → **+** → Apple Distribution → follow the CSR steps
-3. **Create an App Store Provisioning Profile:** Profiles → **+** → App Store → select `org.kharis.app` → select the distribution certificate → name it `Kharis App Store`
-
-Install the certificate and provisioning profile on the build machine by double-clicking each downloaded file.
-
-### 5.2 Set the Team ID and provisioning profile
-
-Open `app/ios/exportOptions.plist` and replace the placeholders:
-
-```xml
-<key>teamID</key>
-<string>YOUR_10_CHAR_TEAM_ID</string>   <!-- from developer.apple.com → Membership -->
-
-<key>provisioningProfiles</key>
-<dict>
-    <key>org.kharis.app</key>
-    <string>Kharis App Store</string>   <!-- exact name of the profile created above -->
-</dict>
-```
-
-The Team ID is a 10-character alphanumeric string visible in developer.apple.com → Account → Membership.
-
-### 5.3 Configure Xcode (first time only)
-
-```bash
-open app/ios/Runner.xcworkspace
-```
-
-In Xcode:
-1. Select the **Runner** target → **Signing & Capabilities**
-2. Set **Team** to your Apple Developer team
-3. Confirm **Bundle Identifier** is `org.kharis.app`
-4. Under **Release** build configuration, set signing to **Manual** and select the `Kharis App Store` provisioning profile
-
-Or use the bundle ID script if starting fresh:
+### 5.2 Build, sign and upload to TestFlight
 
 ```bash
 cd app
-chmod +x scripts/set-bundle-id.sh
-./scripts/set-bundle-id.sh org.kharis.app "Kharis Church"
+./scripts/deploy-testflight.sh        # build number = epoch seconds
+./scripts/deploy-testflight.sh 42     # explicit build number
 ```
 
-### 5.4 Build the IPA
+The script archives with `--dart-define-from-file=env.json`, signs with the API
+key (cloud signing) and uploads. Credentials come from `app/.env.deploy`
+(gitignored).
+
+Unsigned local build (what `build-ios.yml` does):
 
 ```bash
-cd app
-flutter pub get
-chmod +x scripts/build-ios.sh
-./scripts/build-ios.sh
+flutter build ipa --release --no-codesign --dart-define-from-file=env.json
 ```
-
-This runs `flutter build ipa --release --export-options-plist=ios/exportOptions.plist`.
-
-Output: `app/build/ios/ipa/kharis_app.ipa` (path may vary — the script prints the exact path)
-
-To build manually without the script:
-
-```bash
-flutter build ipa --release --export-options-plist=ios/exportOptions.plist
-```
-
-### 5.5 Create the app in App Store Connect
-
-Before uploading for the first time:
-
-1. [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → My Apps → **+** → New App
-2. Platform: iOS
-3. Name: `Kharis Church`
-4. Primary language: English (UK)
-5. Bundle ID: `org.kharis.app` (select from list — it appears once you registered the App ID)
-6. SKU: `kharis-church-ios` (internal, not user-facing)
-
-### 5.6 Upload to App Store Connect
-
-**Option A — Xcode Organizer (recommended for first upload):**
-
-```bash
-open app/ios/Runner.xcworkspace
-# Window → Organizer → Archives → select the build → Distribute App → App Store Connect
-```
-
-**Option B — xcrun altool (command line):**
-
-Requires an app-specific password from [appleid.apple.com](https://appleid.apple.com) → App-Specific Passwords.
-
-```bash
-xcrun altool --upload-app \
-  --type ios \
-  --file "path/to/kharis_app.ipa" \
-  --username "YOUR_APPLE_ID_EMAIL" \
-  --password "YOUR_APP_SPECIFIC_PASSWORD"
-```
-
-**Option C — App Store Connect API key (for CI):**
-
-1. App Store Connect → Users and Access → **Integrations** → App Store Connect API → **Generate API Key**
-2. Download the `.p8` file
-3. Note the Key ID and Issuer ID
-
-```bash
-xcrun altool --upload-app \
-  --type ios \
-  --file "path/to/kharis_app.ipa" \
-  --apiKey "YOUR_KEY_ID" \
-  --apiIssuer "YOUR_ISSUER_ID"
-```
-
----
 
 ## Step 6: TestFlight and Internal Testing
 
 ### 6.1 Internal testing (immediate, no review)
 
 1. App Store Connect → your app → **TestFlight**
-2. The build uploaded in Step 5.6 appears under **iOS Builds** once processing completes (5–30 minutes)
+2. The build uploaded in Step 5.2 appears under **iOS Builds** once processing completes (5–30 minutes)
 3. Click the build → **Enable** under Internal Testing
 4. Add internal testers: TestFlight → **Internal Testing** → **+** to add App Store Connect users (up to 100)
 5. Testers install TestFlight from the App Store and accept the email invitation
@@ -459,7 +277,7 @@ Before submitting to the App Store, verify on physical hardware:
 
 - [ ] App launches and splash screen shows correctly
 - [ ] Branch selection screen appears on first launch
-- [ ] Home screen loads sermons from Firestore (requires `kUseFirebase = true` and real config files)
+- [ ] Home screen loads sermons, events and announcements for the selected campus
 - [ ] Audio player plays a sermon in background (lock the phone, confirm audio continues)
 - [ ] Daily prayer card loads
 - [ ] Events tab shows upcoming events
@@ -541,7 +359,7 @@ In Play Console → your app:
 - Data safety: complete the form (the app collects Firebase Analytics and optionally user accounts)
 
 **Production release:**
-- Production → Releases → select the `.aab` uploaded in Step 4.5
+- Production → Releases → select the `.aab` uploaded in Step 4.2
 - Roll out to 100% (or staged rollout starting at 10% if preferred)
 
 Play Store review takes 1–3 days for new apps, typically hours for updates.
@@ -550,35 +368,34 @@ Play Store review takes 1–3 days for new apps, typically hours for updates.
 
 ## Step 8: CI/CD (GitHub Actions)
 
-Four workflow files are in `.github/workflows/`. They run on `workflow_dispatch` (manual trigger from the GitHub Actions tab).
+Workflows live in `.github/workflows/`. All Flutter jobs read the Flutter
+version from `app/.fvmrc`, run `flutter pub get --enforce-lockfile` and build
+with `--dart-define-from-file=env.json`.
 
-### Required GitHub secrets
+### Repository secrets
 
-Set these in the repo: Settings → Secrets and variables → Actions → **New repository secret**:
+Settings, Secrets and variables, Actions, **New repository secret**:
 
-| Secret | Value |
-|---|---|
-| `KEYSTORE_BASE64` | `base64 -i android/keystore/kharis-release.jks` output |
-| `KEY_PROPERTIES` | contents of `android/key.properties` |
-| `FIREBASE_TOKEN` | output of `firebase login:ci` |
-
-To encode the keystore:
-
-```bash
-base64 -i app/android/keystore/kharis-release.jks | pbcopy
-# Paste into the KEYSTORE_BASE64 secret
-```
+| Secret | Value | Used by |
+|---|---|---|
+| `ENV_JSON` | verbatim `app/env.json` | `ci.yml` (optional, falls back to `env.example.json`), `build-android.yml`, `build-ios.yml` |
+| `KEYSTORE_BASE64` | `base64 -i app/android/keystore/kharis-release.jks` | `build-android.yml` |
+| `KEY_PROPERTIES` | verbatim `app/android/key.properties` | `build-android.yml` |
+| `FIREBASE_SERVICE_ACCOUNT` | service-account JSON key (Firebase Admin + Cloud Functions Developer on `kharis-app-47c49`) | `deploy-backend.yml` |
+| `FIREBASE_TOKEN` | legacy `firebase login:ci` token, only if no service account | `deploy-backend.yml` |
+| `FUNCTIONS_ENV` | verbatim `backend/functions/.env` | `deploy-backend.yml` |
 
 ### Workflows
 
-| Workflow | File | Trigger | Output |
+| Workflow | File | Trigger | Does |
 |---|---|---|---|
-| CI | `ci.yml` | Push / PR | Runs `flutter analyze` + `flutter test` |
-| Android build | `build-android.yml` | Manual | `android-release-aab` artifact |
-| iOS build | `build-ios.yml` | Manual (macOS runner) | `ios-release-ipa` artifact |
-| Backend deploy | `deploy-backend.yml` | Manual | Deploys functions + Firestore rules |
+| CI | `ci.yml` | Push / PR to `main` | `flutter analyze`, `flutter test`, `./scripts/build-web.sh --build-only`; Storybook tests |
+| Android build | `build-android.yml` | Manual | Signed `android-release-aab` artifact |
+| iOS build | `build-ios.yml` | Manual (macOS runner) | Unsigned `ios-release-xcarchive` artifact |
+| Backend deploy | `deploy-backend.yml` | Manual | Node 24; deploys functions + Firestore rules/indexes to `kharis-app-47c49` |
 
-> Note: The iOS CI workflow builds without code signing (`--no-codesign`). Final IPA signing for App Store upload is done locally via `scripts/build-ios.sh` until App Store Connect API key signing is configured.
+Signed iOS builds and store uploads are still done locally
+(`deploy-testflight.sh`, `upload-play-internal.sh`).
 
 ---
 
@@ -586,7 +403,7 @@ base64 -i app/android/keystore/kharis-release.jks | pbcopy
 
 ### Firebase
 
-**`kUseFirebase = true` but app crashes on launch**
+**App crashes on launch after changing Firebase config**
 - Confirm both `google-services.json` and `GoogleService-Info.plist` are in the correct directories and committed (or present locally)
 - Run `flutter clean && flutter pub get` then rebuild
 - Check that the bundle ID / package name in the config files matches the app
@@ -610,7 +427,7 @@ base64 -i app/android/keystore/kharis-release.jks | pbcopy
 - Ensure Java 17 is installed and `JAVA_HOME` is set: `export JAVA_HOME=$(/usr/libexec/java_home -v 17)`
 
 **Play Console rejects the AAB — "You uploaded an APK or Android App Bundle that was signed in debug mode"**
-- The `buildTypes.release.signingConfig` is still pointing to `debug`. Double-check the `build.gradle.kts` changes in Step 4.3
+- The `buildTypes.release.signingConfig` is still pointing to `debug`. Confirm `android/key.properties` exists (Step 4.1); without it Gradle falls back to the debug key
 
 **`minSdk` errors**
 - `flutter.minSdkVersion` resolves to 21. If a plugin requires higher, set `minSdk = 23` (or required value) explicitly in `defaultConfig`
@@ -624,7 +441,7 @@ base64 -i app/android/keystore/kharis-release.jks | pbcopy
 - Run `security find-identity -v -p codesigning` to list installed certificates
 
 **`exportOptions.plist` error: provisioning profile not found**
-- The name in `exportOptions.plist → provisioningProfiles → org.kharis.app` must exactly match the profile name in Xcode's Signing & Capabilities and in your local keychain
+- The name in `exportOptions.plist → provisioningProfiles → com.kharis.church` must exactly match the profile name in Xcode's Signing & Capabilities and in your local keychain
 - Download and re-install the provisioning profile from developer.apple.com
 
 **`This app's Info.plist file does not have a NSMicrophoneUsageDescription`**
@@ -671,13 +488,17 @@ flutter pub upgrade --major-versions
 ## Quick Reference
 
 ```
-org.kharis.app          — bundle ID / package name
-kharis-release          — Android keystore alias
-android/keystore/kharis-release.jks  — keystore file (NOT committed)
-android/key.properties  — signing config (NOT committed)
-ios/exportOptions.plist — IPA export config (committed, edit before first build)
-lib/core/services/firebase_service.dart → kUseFirebase  — Firebase toggle
+com.kharis.church                    bundle ID / package name
+kharis-app-47c49                     Firebase project (all services)
+app/.fvmrc                           Flutter version pin (3.44.1), read by CI
+app/pubspec.lock                     committed; CI uses --enforce-lockfile
+app/env.json                         build-time keys (NOT committed; CI: ENV_JSON)
+backend/functions/.env               Functions params (NOT committed; CI: FUNCTIONS_ENV)
+android/keystore/kharis-release.jks  upload keystore (NOT committed)
+android/key.properties               signing config (NOT committed)
+ios/Runner/Runner.entitlements       push (aps-environment)
+web/firebase-messaging-sw.js         web push service worker
 ```
 
-For store listing copy, screenshots specs, and metadata: see `APP-STORE-LISTING.md`.
+For store listing copy, screenshot specs and metadata: see `APP-STORE-LISTING.md`.
 For backend Firebase setup details: see `backend/SETUP.md`.

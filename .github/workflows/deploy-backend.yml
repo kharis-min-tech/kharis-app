@@ -12,6 +12,14 @@ name: Deploy Backend
 #                             account above.
 #
 # Neither is set today, so this workflow has never completed a run.
+#
+# Also required:
+#
+#   FUNCTIONS_ENV             Verbatim copy of backend/functions/.env (the
+#                             gitignored file local deploys read). It supplies
+#                             the defineString params, today YOUTUBE_API_KEY
+#                             (sync-youtube.ts). A non-interactive deploy
+#                             fails when a param has no value.
 
 'on':
   workflow_dispatch:
@@ -32,9 +40,14 @@ jobs:
         env:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
         run: |
           if [ -z "$SA" ] && [ -z "$TOKEN" ]; then
             echo "::error::Set FIREBASE_SERVICE_ACCOUNT (preferred) or FIREBASE_TOKEN — see the header of .github/workflows/deploy-backend.yml"
+            exit 1
+          fi
+          if [ -z "$FUNCTIONS_ENV" ]; then
+            echo "::error::Set FUNCTIONS_ENV (copy of backend/functions/.env) — see the header of .github/workflows/deploy-backend.yml"
             exit 1
           fi
           if [ -z "$SA" ]; then
@@ -44,10 +57,12 @@ jobs:
             echo "HAS_SA=true" >> "$GITHUB_ENV"
           fi
 
-      - name: Set up Node 18
+      # Must match "engines.node" in backend/functions/package.json (the
+      # runtime the functions deploy to).
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           cache: npm
           cache-dependency-path: backend/functions/package-lock.json
 
@@ -58,6 +73,12 @@ jobs:
       - name: Build functions
         working-directory: backend/functions
         run: npm run build --if-present
+
+      - name: Write functions .env
+        working-directory: backend/functions
+        env:
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
+        run: printf '%s\n' "$FUNCTIONS_ENV" > .env
 
       - name: Write service-account key
         if: env.HAS_SA == 'true'
@@ -84,4 +105,4 @@ jobs:
 
       - name: Scrub credentials
         if: always()
-        run: rm -f "$RUNNER_TEMP/gcp-key.json"
+        run: rm -f "$RUNNER_TEMP/gcp-key.json" backend/functions/.env

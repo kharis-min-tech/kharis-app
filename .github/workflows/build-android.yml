@@ -53,15 +53,16 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Project needs Flutter >= 3.44 / Dart >= 3.12.1 (see BUILD.md).
+      # Same Flutter as local development: the single pin is app/.fvmrc.
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version-file: app/.fvmrc
           channel: stable
           cache: true
 
       - name: Install Flutter dependencies
         working-directory: app
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       # Local builds all pass --dart-define-from-file=env.json; without this the
       # CI artifact would differ from what we ship by hand.

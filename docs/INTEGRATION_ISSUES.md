@@ -7,46 +7,77 @@ to the relevant owners. Newest section first.
 
 ## 1. Sermon Public API (`yetanothersermon.host/_/kc/public-api/v1`)
 
-Probed 2026-07-31. A browser `User-Agent` is required on every call (Cloudflare
-returns **403** to non-browser agents — the app already sends one).
+First probed 2026-07-31; re-verified live 2026-10-03 (all numbers below are
+from the 2026-10-03 run).
 
-### Endpoint status (with browser UA)
+### Catalogue shape
 
-| Endpoint | Result | Notes |
-|---|---|---|
-| `GET /sermons` | **301** | Redirects — must use trailing slash `/sermons/` (or follow redirects). |
-| `GET /sermons/` | 200 | `{count: 1481, next, previous, results:[…]}`. |
-| `GET /playlists/` | 200 | `{count: 9, results:[{id, name, description, image_url}]}`. |
-| `GET /series/` | 200 | `{count: 52, results:[{id, name, description, image_url}]}`. |
-| `GET /playlists/{id}/` | 200 | Metadata only: `{id, name, description, image_url}` — **no sermons list**. |
-| `GET /series/{id}/` | 200 | Metadata only — **no sermons list**. |
+- `GET /sermons/` returns `{count, next, previous, results}`, 50 per page.
+  `count` is **1,489**: pages 1 to 30 (page 30 holds 39), `?page=31` is **404**.
+  `?page_size=N` is honoured for the page length but not for `count`.
+- Content spans 2013 to Sep 2026. Per year: 2013:35, 2014:74, 2015:107,
+  2016:52, 2017:50, 2018:54, 2019:64, 2020:161, 2021:234, 2022:165,
+  2023:130, 2024:137, 2025:162, 2026:64.
+- 1,484 have `audio_link`, 179 have `video_link`, 617 belong to a series (49
+  distinct), 872 have no series. No sermon carries a playlist membership.
+- `GET /sermons` (no trailing slash) is a **301** to `/sermons/`.
+- `GET /playlists/{id}/` and `GET /series/{id}/` return metadata only
+  (`{id, name, description, image_url}`), **no sermons list**.
 
-Each sermon in `/sermons/` carries:
+Each sermon carries:
 `audio_link, date, description, id, image, passages, preachers, series {id,name,url}, time, title, video_link, playlist (nullable)`.
 
-### 🔴 P0 — `?series=` / `?playlist=` query filters are ignored server-side
-Both return the **entire** catalogue (count 1481), so the app cannot ask the
-server for "sermons in series X".
+### P0: `?series=` / `?playlist=` query filters are ignored server-side
 
-Evidence:
+Both return the entire catalogue, so the app cannot ask the server for
+"sermons in series X".
+
 ```
-GET /sermons/?series=1829&page_size=3   -> {"count":1481}
-GET /sermons/?playlist=6&page_size=3    -> {"count":1481}
-GET /sermons/?page_size=1               -> {"count":1481}   (unfiltered, same)
+GET /sermons/?page_size=1                -> {"count":1489}
+GET /sermons/?series=1829&page_size=1    -> {"count":1489}   (filter ignored)
+GET /sermons/?playlist=6&page_size=1     -> {"count":1489}   (filter ignored)
 ```
-Impact: playlist/series → sermons linkage must be done **client-side** by
-matching `sermon.series.name`, over only the pages the app has fetched
-(currently ~200 of 1481). A series/playlist detail is therefore **incomplete**
-for older content.
 
-Requested fix (server): make `?series=<id>` and `?playlist=<id>` actually
-filter, **or** include a `sermons` array (or `sermon_ids`) in
-`/series/{id}/` and `/playlists/{id}/`.
+Impact: series and playlist pages must be built client-side by matching
+`sermon.series.id` / name across the **whole** catalogue, which means paging
+all 30 pages. Anything that only looks at the first pages shows incomplete
+series and misses older messages.
 
-### 🟡 P1 — scheme-less URLs
-`audio_link.download_url`, `series.url`, `preachers[].url` are returned without
-`https://` (e.g. `yetanothersermon.host/...`); the app prepends the scheme.
-Consistency would be cleaner (some fields, e.g. `image`, are fully-qualified).
+Requested fix (server): make `?series=<id>` and `?playlist=<id>` filter, or
+include `sermon_ids` in `/series/{id}/` and `/playlists/{id}/`, and populate
+`playlist` on sermons.
+
+### P1: no CORS headers
+
+Neither a `GET` with an `Origin` header nor an `OPTIONS` preflight returns any
+`Access-Control-Allow-*` header:
+
+```
+curl -H 'Origin: https://kharis-app-47c49.web.app' .../sermons/       -> 200, no Access-Control-Allow-Origin
+curl -X OPTIONS -H 'Origin: ...' -H 'Access-Control-Request-Method: GET' .../sermons/ -> 200, no Access-Control-* headers
+```
+
+Impact: browsers block the response, so the web build cannot call the API
+directly. The app routes web reads through the `sermonApiProxy` Cloud Function
+(`ApiConfig.sermonApiBase`), which adds CORS headers and rewrites `next` links.
+Mobile builds call the API directly.
+
+Requested fix (server): send `Access-Control-Allow-Origin: *` (read-only
+public API) so the proxy hop can be dropped.
+
+### P1: scheme-less URLs
+
+`audio_link.download_url`, `series.url` and `preachers[].url` come without a
+scheme, e.g. `yetanothersermon.host/_/kc/media/mp3/99934.mp3`, while `image`
+is fully qualified (`https://yash.b-cdn.net/...`). The app prepends
+`https://`. Requested fix: return absolute `https://` URLs everywhere.
+
+### P2: User-Agent filtering (not reproducible on 2026-10-03)
+
+On 2026-07-31 Cloudflare answered **403** to non-browser User-Agents. On
+2026-10-03 `Dart/3.12 (dart:io)`, `python-requests` and an empty User-Agent
+all got **200**. The app keeps sending a browser User-Agent so a re-enabled
+rule cannot break it.
 
 ---
 
@@ -93,3 +124,7 @@ ayoinc@gmail.com roles on kharis-app-47c49 -> roles/firebase.admin (only)   # no
 **org admin** must link a billing account (Blaze) and grant Owner (or
 Billing + Service Usage Admin) to the deploying account. Stayed on
 `kharis-church` (personal, ayoinc = Owner, already Blaze) for now.
+
+**Resolved since:** everything (Firestore, Auth, FCM, Functions, Hosting) now
+runs in `kharis-app-47c49`; every deploy path (`deploy-backend.yml`,
+`app/scripts/build-web.sh`, BUILD.md) passes `--project kharis-app-47c49`.

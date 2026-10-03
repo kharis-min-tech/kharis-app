@@ -1,11 +1,26 @@
 #!/usr/bin/env bash
+# Builds the Flutter web app and (by default) deploys it to Firebase Hosting.
+#
+#   ./scripts/build-web.sh               build + deploy to kharis-app-47c49
+#   ./scripts/build-web.sh --build-only  build only (exactly what CI runs)
+#
+# The build command lives only here, so CI (.github/workflows/ci.yml) and a
+# local build can never drift apart.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$SCRIPT_DIR/.."
+FIREBASE_PROJECT="kharis-app-47c49"
 
-echo "=== Kharis Web Build + Deploy ==="
-echo ""
+DEPLOY=1
+case "${1:-}" in
+  "") ;;
+  --build-only) DEPLOY=0 ;;
+  *)
+    echo "Usage: $0 [--build-only]" >&2
+    exit 64
+    ;;
+esac
 
 cd "$APP_DIR"
 
@@ -19,17 +34,23 @@ fi
 
 # --pwa-strategy=none: this app is online-first. The deprecated Flutter service
 # worker otherwise caches the app shell and serves a stale build until a later
-# reload, which makes deploys look inconsistent. No service worker = every visit
-# loads the freshly deployed build.
-echo "Step 1/2: Building web (no service worker)..."
-flutter build web --pwa-strategy=none --dart-define-from-file=env.json
+# reload, which makes deploys look inconsistent. No Flutter service worker =
+# every visit loads the freshly deployed build. (web/firebase-messaging-sw.js,
+# the push worker, is a separate file and is unaffected.)
+echo "=== Kharis web build ==="
+flutter build web --release --pwa-strategy=none --dart-define-from-file=env.json
+
+if [[ "$DEPLOY" -eq 0 ]]; then
+  echo "Build only: app/build/web"
+  exit 0
+fi
 
 echo ""
-echo "Step 2/2: Deploying to Firebase Hosting (kharis-church)..."
-firebase deploy --only hosting --project kharis-church
+echo "=== Deploying to Firebase Hosting ($FIREBASE_PROJECT) ==="
+firebase deploy --only hosting --project "$FIREBASE_PROJECT"
 
 echo ""
 echo "=== Done ==="
-echo "Live: https://kharis-church.web.app"
+echo "Live: https://$FIREBASE_PROJECT.web.app"
 echo "Tip: this is the stable URL. Preview channels (firebase hosting:channel)"
 echo "     expire and will show 'page not found' once past their expiry."

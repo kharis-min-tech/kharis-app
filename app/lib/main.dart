@@ -31,15 +31,14 @@ Future<void> main() async {
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
       // Lock-screen / notification / CarPlay media controls (Now Playing).
-      // Must run before any AudioPlayer is created. 15 s skip intervals give
-      // CarPlay + lock screen podcast-style ±15 s buttons (sermons have no
-      // next/previous queue, so skip buttons are the useful transport).
+      // Must run before any AudioPlayer is created. The transport is
+      // Previous / Next message, driven by the queue window the audio
+      // service loads (see AudioPlayerService), so the OS shows the same
+      // controls as the in-app player and no ±seconds skip buttons.
       await JustAudioBackground.init(
         androidNotificationChannelId: 'com.kharis.church.channel.audio',
         androidNotificationChannelName: 'Kharis audio playback',
         androidNotificationOngoing: true,
-        fastForwardInterval: const Duration(seconds: 15),
-        rewindInterval: const Duration(seconds: 15),
       );
       FlutterError.onError = (details) {
         if (kDebugMode) {
@@ -85,6 +84,20 @@ Future<void> main() async {
   );
 }
 
+/// Bounds for the member's system text size. Beyond 1.3x the fixed-height
+/// cards and the mini player clip; below 0.85x text is no longer legible.
+const double kMinTextScale = 0.85;
+const double kMaxTextScale = 1.3;
+
+/// `MaterialApp.builder` that honours the system text size within
+/// [kMinTextScale]..[kMaxTextScale] for every route, dialog and sheet.
+Widget clampTextScaling(BuildContext context, Widget? child) =>
+    MediaQuery.withClampedTextScaling(
+      minScaleFactor: kMinTextScale,
+      maxScaleFactor: kMaxTextScale,
+      child: child ?? const SizedBox.shrink(),
+    );
+
 class KharisApp extends ConsumerWidget {
   const KharisApp({super.key});
 
@@ -109,6 +122,7 @@ class KharisApp extends ConsumerWidget {
         darkTheme: kharisTheme(brightness: Brightness.dark),
         scaffoldMessengerKey: kharisMessengerKey,
         routerConfig: ref.watch(appRouterProvider),
+        builder: clampTextScaling,
       ),
     );
   }

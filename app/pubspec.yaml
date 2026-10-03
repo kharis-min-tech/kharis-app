@@ -66,6 +66,8 @@ dependencies:
   wakelock_plus: ^1.2.10
   share_plus: ^13.3.0
   in_app_review: ^2.0.9
+  # App version + build number shown in More.
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   flutter_test:
