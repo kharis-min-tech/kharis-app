@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
@@ -36,8 +35,8 @@ Widget _harness(
       cacheServiceProvider.overrideWithValue(FakeCacheService()),
       // Hermetic: the default queue reads the library.
       sermonsProvider.overrideWith((ref) async => library),
-      // The like button reads the member's playlists; keep it offline.
-      playlistsProvider.overrideWith((ref) => Stream.value(const <Playlist>[])),
+      // The like button reads the member's Favorites; keep it offline.
+      favoritesProvider.overrideWith((ref) => Stream.value(null)),
     ],
     child: MaterialApp(
       home: Scaffold(

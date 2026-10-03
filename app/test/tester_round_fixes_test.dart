@@ -12,7 +12,6 @@ import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.da
 import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart';
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
-import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
@@ -238,10 +237,8 @@ void main() {
         overrides: [
           audioPlayerServiceProvider.overrideWithValue(audio),
           cacheServiceProvider.overrideWithValue(FakeCacheService()),
-          // The like button reads the member's playlists; keep it offline.
-          playlistsProvider.overrideWith(
-            (ref) => Stream.value(const <Playlist>[]),
-          ),
+          // The like button reads the member's Favorites; keep it offline.
+          favoritesProvider.overrideWith((ref) => Stream.value(null)),
         ],
         child: MaterialApp(
           home: MediaPlayerScreen(sermon: _sermon, mode: MediaMode.audio),

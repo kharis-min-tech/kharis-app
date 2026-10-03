@@ -125,6 +125,11 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () => context.push('/notes'),
                   ),
                   _MoreMenuItem(
+                    icon: Icons.favorite_border_rounded,
+                    label: 'Favorites',
+                    onTap: () => context.push('/favorites'),
+                  ),
+                  _MoreMenuItem(
                     icon: Icons.queue_music_rounded,
                     label: 'My Playlists',
                     onTap: () => context.push('/playlists'),

@@ -67,8 +67,10 @@ class PlaylistCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 1.12,
+            // The artwork takes whatever the grid cell leaves after the
+            // labels, so larger text sizes shrink the art instead of
+            // overflowing the fixed-ratio cell.
+            Expanded(
               child: Stack(
                 fit: StackFit.expand,
                 children: [

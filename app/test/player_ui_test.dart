@@ -59,11 +59,13 @@ void main() {
   List<Override> overrides({
     List<Sermon> library = const [],
     List<Playlist> playlists = const [],
+    Playlist? favorites,
   }) => [
     audioPlayerServiceProvider.overrideWithValue(audio),
     cacheServiceProvider.overrideWithValue(cache),
     sermonsProvider.overrideWith((ref) async => library),
     playlistsProvider.overrideWith((ref) => Stream.value(playlists)),
+    favoritesProvider.overrideWith((ref) => Stream.value(favorites)),
     notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
   ];
 
@@ -633,25 +635,25 @@ void main() {
       expect(audio.queue?.next?.id, 's1', reason: 'Next continues the list');
     });
 
-    test('the heart files messages into one Liked messages playlist', () async {
+    test('the heart files messages into one Favorites doc', () async {
       final db = FakeFirebaseFirestore();
       final repo = PlaylistRepository(db, uid: 'm1');
       final doc = db
           .collection('users')
           .doc('m1')
           .collection('playlists')
-          .doc(PlaylistRepository.likedPlaylistId);
+          .doc(PlaylistRepository.favoritesId);
 
-      repo.setLiked('s1', liked: true, playlistExists: false);
+      repo.setLiked('s1', liked: true, favoritesExist: false);
       await pumpEventQueue();
-      expect((await doc.get()).data()?['name'], 'Liked messages');
+      expect((await doc.get()).data()?['name'], 'Favorites');
       expect((await doc.get()).data()?['sermonIds'], ['s1']);
 
-      repo.setLiked('s2', liked: true, playlistExists: true);
+      repo.setLiked('s2', liked: true, favoritesExist: true);
       await pumpEventQueue();
       expect((await doc.get()).data()?['sermonIds'], ['s1', 's2']);
 
-      repo.setLiked('s1', liked: false, playlistExists: true);
+      repo.setLiked('s1', liked: false, favoritesExist: true);
       await pumpEventQueue();
       expect((await doc.get()).data()?['sermonIds'], ['s2']);
     });
@@ -666,23 +668,23 @@ void main() {
             .collection('users')
             .doc('m1')
             .collection('playlists')
-            .doc(PlaylistRepository.likedPlaylistId);
+            .doc(PlaylistRepository.favoritesId);
         final now = Timestamp.now();
         await doc.set({
-          'name': 'Liked messages',
+          'name': 'Favorites',
           'sermonIds': ['s1', 's2'],
           'createdAt': now,
           'updatedAt': now,
         });
 
-        repo.setLiked('yt_v3', liked: true, playlistExists: false);
+        repo.setLiked('yt_v3', liked: true, favoritesExist: false);
         await pumpEventQueue();
         expect((await doc.get()).data()?['sermonIds'], ['s1', 's2', 'yt_v3']);
 
         repo.setLiked(
           'yt_v1',
           liked: false,
-          playlistExists: true,
+          favoritesExist: true,
           aliases: ['s1'],
         );
         await pumpEventQueue();
@@ -691,7 +693,7 @@ void main() {
     );
 
     testWidgets(
-      'the heart waits for the playlists snapshot, then likes the message '
+      'the heart waits for the Favorites snapshot, then likes the message '
       'under its canonical key',
       (tester) async {
         final db = FakeFirebaseFirestore();
@@ -700,10 +702,10 @@ void main() {
             .collection('users')
             .doc('m1')
             .collection('playlists')
-            .doc(PlaylistRepository.likedPlaylistId);
+            .doc(PlaylistRepository.favoritesId);
         final liked = Playlist(
-          id: PlaylistRepository.likedPlaylistId,
-          name: 'Liked messages',
+          id: PlaylistRepository.favoritesId,
+          name: 'Favorites',
           sermonIds: const ['s1'],
           createdAt: DateTime(2026),
           updatedAt: DateTime(2026),
@@ -717,13 +719,13 @@ void main() {
           }),
         );
         // Cold start: the stream has not delivered its first snapshot.
-        final snapshots = StreamController<List<Playlist>>();
+        final snapshots = StreamController<Playlist?>();
         addTearDown(snapshots.close);
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
               playlistRepositoryProvider.overrideWithValue(repo),
-              playlistsProvider.overrideWith((ref) => snapshots.stream),
+              favoritesProvider.overrideWith((ref) => snapshots.stream),
             ],
             child: MaterialApp(
               home: Scaffold(
@@ -737,13 +739,13 @@ void main() {
         await tester.pump();
         await tester.runAsync(pumpEventQueue);
         expect(
-          find.text('Your playlists are still loading. Try again in a moment.'),
+          find.text('Your Favorites are still loading. Try again in a moment.'),
           findsOneWidget,
         );
         final untouched = await tester.runAsync(doc.get);
         expect(untouched?.data()?['sermonIds'], ['s1']);
 
-        snapshots.add([liked]);
+        snapshots.add(liked);
         await tester.pump();
         await tester.tap(find.byIcon(Icons.favorite_border_rounded));
         await tester.runAsync(pumpEventQueue);
@@ -757,15 +759,15 @@ void main() {
     ) async {
       // Liked while watching the yt_ variant; the toggle swaps in the twin.
       final liked = Playlist(
-        id: PlaylistRepository.likedPlaylistId,
-        name: 'Liked messages',
+        id: PlaylistRepository.favoritesId,
+        name: 'Favorites',
         sermonIds: const ['yt_v2'],
         createdAt: DateTime(2026),
         updatedAt: DateTime(2026),
       );
       await tester.pumpWidget(
         ProviderScope(
-          overrides: overrides(playlists: [liked]),
+          overrides: overrides(favorites: liked),
           child: MaterialApp(
             home: Scaffold(
               body: LikeButton(sermon: _sermon(2, videoId: 'v2')),

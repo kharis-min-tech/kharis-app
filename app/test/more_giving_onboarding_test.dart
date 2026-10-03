@@ -177,6 +177,7 @@ Future<GoRouter> _pumpMore(
       for (final path in [
         '/reading',
         '/notes',
+        '/favorites',
         '/playlists',
         '/branch-selection',
         '/giving',
@@ -232,6 +233,7 @@ void main() {
     for (final (label, route) in [
       ('Daily Reading', '/reading'),
       ('My Notes', '/notes'),
+      ('Favorites', '/favorites'),
       ('My Playlists', '/playlists'),
       ('Switch Branch', '/branch-selection'),
       ('Give', '/giving'),
@@ -242,6 +244,17 @@ void main() {
         expect(find.text('route:$route'), findsOneWidget);
       });
     }
+
+    testWidgets('Favorites sits directly above My Playlists', (tester) async {
+      await _pumpMore(tester, user: _member);
+      final notes = tester.getTopLeft(find.text('My Notes')).dy;
+      final favorites = tester.getTopLeft(find.text('Favorites')).dy;
+      final playlists = tester.getTopLeft(find.text('My Playlists')).dy;
+      expect(favorites, lessThan(playlists));
+      // Adjacent rows: the gap to My Playlists is one row, the same step as
+      // My Notes to Favorites, so nothing sits between them.
+      expect(playlists - favorites, moreOrLessEquals(favorites - notes));
+    });
 
     testWidgets('there is no fake "My Giving History" row', (tester) async {
       await _pumpMore(tester, user: _member);

@@ -15,7 +15,6 @@ import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
-import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
@@ -176,10 +175,8 @@ void main() {
           // Hermetic: sermonNotesProvider consults the catalogue for legacy
           // aliases — keep it empty so no network/asset load runs here.
           sermonsProvider.overrideWith((ref) async => const <Sermon>[]),
-          // The like button reads the member's playlists; keep it offline.
-          playlistsProvider.overrideWith(
-            (ref) => Stream.value(const <Playlist>[]),
-          ),
+          // The like button reads the member's Favorites; keep it offline.
+          favoritesProvider.overrideWith((ref) => Stream.value(null)),
         ],
         child: MaterialApp(
           home: MediaPlayerScreen(sermon: sermon, mode: mode),

@@ -17,6 +17,7 @@ import '../../features/onboarding/presentation/screens/role_selection_screen.dar
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/player/presentation/screens/full_player_screen.dart';
+import '../../features/playlists/presentation/screens/favorites_screen.dart';
 import '../../features/playlists/presentation/screens/playlist_detail_screen.dart';
 import '../../features/playlists/presentation/screens/playlists_screen.dart';
 import '../../features/home/presentation/screens/reading_screen.dart';
@@ -152,6 +153,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 PlaylistDetailScreen(playlistId: state.pathParameters['id']!),
           ),
         ],
+      ),
+
+      // ── Favorites (overlays shell) ────────────────────────────────────────
+      // Hearted messages: the quick go-to, separate from playlists. Pushed
+      // from More and the top of Playlists, so back always exits.
+      GoRoute(
+        path: '/favorites',
+        builder: (context, state) => const FavoritesScreen(),
       ),
 
       // ── Notes (overlays shell) ────────────────────────────────────────────
