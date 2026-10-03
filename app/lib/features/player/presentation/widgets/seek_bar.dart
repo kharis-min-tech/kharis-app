@@ -76,38 +76,42 @@ class _SeekBarState extends State<SeekBar> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LayoutBuilder(builder: (_, constraints) {
-          final width = constraints.maxWidth;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapUp: (d) =>
-                widget.onSeek(_durationAt(_fractionAt(d.localPosition.dx, width))),
-            onHorizontalDragStart: (d) => setState(() {
-              _dragFraction = _fractionAt(d.localPosition.dx, width);
-            }),
-            onHorizontalDragUpdate: (d) => setState(() {
-              _dragFraction = _fractionAt(d.localPosition.dx, width);
-            }),
-            onHorizontalDragEnd: (_) {
-              final f = _dragFraction;
-              if (f != null) widget.onSeek(_durationAt(f));
-              setState(() => _dragFraction = null);
-            },
-            onHorizontalDragCancel: () => setState(() => _dragFraction = null),
-            child: SizedBox(
-              height: _hitHeight,
-              width: width,
-              child: CustomPaint(
-                painter: _TimelinePainter(
-                  fraction: _fraction,
-                  dragging: _dragFraction != null,
-                  played: colors.onBg,
-                  rail: colors.onBg.withValues(alpha: 0.22),
+        LayoutBuilder(
+          builder: (_, constraints) {
+            final width = constraints.maxWidth;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (d) => widget.onSeek(
+                _durationAt(_fractionAt(d.localPosition.dx, width)),
+              ),
+              onHorizontalDragStart: (d) => setState(() {
+                _dragFraction = _fractionAt(d.localPosition.dx, width);
+              }),
+              onHorizontalDragUpdate: (d) => setState(() {
+                _dragFraction = _fractionAt(d.localPosition.dx, width);
+              }),
+              onHorizontalDragEnd: (_) {
+                final f = _dragFraction;
+                if (f != null) widget.onSeek(_durationAt(f));
+                setState(() => _dragFraction = null);
+              },
+              onHorizontalDragCancel: () =>
+                  setState(() => _dragFraction = null),
+              child: SizedBox(
+                height: _hitHeight,
+                width: width,
+                child: CustomPaint(
+                  painter: _TimelinePainter(
+                    fraction: _fraction,
+                    dragging: _dragFraction != null,
+                    played: colors.onBg,
+                    rail: colors.onBg.withValues(alpha: 0.22),
+                  ),
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          },
+        ),
         const SizedBox(height: 2),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

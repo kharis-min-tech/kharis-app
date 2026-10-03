@@ -7,7 +7,7 @@
 // scripts/run_tester_round_fixes.sh can capture a screenshot of the proof:
 //
 //   KA-016          login: "Continue as Guest" is a real (outlined) button
-//   KA-012 (nudge)  a member's first session never shows the ratings sheet
+//   KA-012 (launch) launching the app never shows the ratings sheet
 //   KA-009          Today's Reading is the first Home block, above the fold
 //   KA-020 / 002    Home bell → notifications feed → row opens a detail sheet
 //   KA-004 / 007    Read now → in-app Bible reader with scripture + a way back
@@ -49,7 +49,7 @@ import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/widgets/media_mode_toggle.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
-import 'package:kharis_app/features/settings/presentation/widgets/feedback_sheet.dart';
+import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/main.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
@@ -292,10 +292,11 @@ void main() {
       final prefs = results[0] as SharedPreferences;
       final cacheService = results[1] as CacheService;
 
-      // KA-012 nudge: model a brand-new member so the first-session guard is
-      // what's under test, whatever this simulator saw before.
-      await prefs.setInt(FeedbackNudge.sessionsKey, 0);
-      await prefs.remove(FeedbackNudge.lastShownKey);
+      // KA-012: a launch never prompts; ratings wait for the end of a listen
+      // (ReviewPromptListener). Clear any prompt history from earlier runs.
+      for (final key in prefs.getKeys().where((k) => k.startsWith('review_'))) {
+        await prefs.remove(key);
+      }
 
       await tester.pumpWidget(
         ProviderScope(
@@ -381,18 +382,14 @@ void main() {
         debugPrint('fixes: onboarding already complete, continuing');
       }
 
-      // ── KA-012 (nudge): first session never shows the ratings sheet ──────
-      // The shell's post-frame nudge waits ~4s before deciding; outlast it.
+      // ── KA-012 (launch): opening the app never shows the ratings sheet ────
       await pumpFor(tester, const Duration(seconds: 6));
       expect(
         find.byType(FeedbackSheet),
         findsNothing,
-        reason:
-            'KA-012: a first session must never be interrupted by the nudge',
+        reason: 'KA-012: a launch must never be interrupted by a rating ask',
       );
-      expect(prefs.getInt(FeedbackNudge.sessionsKey), 1);
-      expect(prefs.getInt(FeedbackNudge.lastShownKey), isNull);
-      verified.add('KA-012 nudge stayed silent on session 1');
+      verified.add('KA-012 launch stayed silent');
 
       // ── KA-009: Today's Reading leads Home, above the fold ────────────────
       await tapNav(tester, 'Home');
@@ -653,12 +650,11 @@ void main() {
         find.byType(FeedbackSheet),
         reason: 'KA-012: the More row must open the feedback sheet',
       );
-      expect(find.text('Rate the app'), findsOneWidget);
-      expect(find.text('Send feedback'), findsOneWidget);
-      expect(find.text('Not now'), findsOneWidget);
+      expect(find.text('How is the Kharis app serving you?'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
       verified.add('KA-012 Rate & Feedback row opens the sheet');
       await hostShot(tester, 'ka012-feedback-sheet');
-      await tester.tap(find.text('Not now'), warnIfMissed: false);
+      await tester.tap(find.text('Cancel'), warnIfMissed: false);
       await pumpFor(tester, const Duration(milliseconds: 800));
       expect(find.byType(FeedbackSheet), findsNothing);
 

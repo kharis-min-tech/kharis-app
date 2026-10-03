@@ -6,11 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
+import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/theme_provider.dart';
 
-import '../widgets/feedback_sheet.dart';
 import 'notifications_settings_screen.dart';
 
 /// The profile hub (design-handoff v3): a light "More" screen with the
@@ -23,7 +24,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
     final isAdmin = ref.watch(isAdminProvider).valueOrNull ?? false;
-    final signedIn = user != null && user.role != 'guest' && user.email.isNotEmpty;
+    final signedIn =
+        user != null && user.role != 'guest' && user.email.isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
@@ -34,8 +36,10 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               Text(
                 'More',
-                style: AppTypography.display(size: 30, weight: FontWeight.w700)
-                    .copyWith(color: context.kc.onBg),
+                style: AppTypography.display(
+                  size: 30,
+                  weight: FontWeight.w700,
+                ).copyWith(color: context.kc.onBg),
               ),
               const SizedBox(height: 18),
 
@@ -106,17 +110,24 @@ class SettingsScreen extends ConsumerWidget {
                     icon: Icons.notifications_none,
                     label: 'Notifications',
                     accent: AppColors.accentPink,
-                    onTap: () => Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const NotificationsSettingsScreen(),
-                      ),
-                    ),
+                    onTap: () =>
+                        Navigator.of(context, rootNavigator: true).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const NotificationsSettingsScreen(),
+                          ),
+                        ),
                   ),
                   _MoreMenuItem(
                     icon: Icons.star_border_rounded,
                     label: 'Rate & Feedback',
                     accent: context.kc.accentInk,
-                    onTap: () => FeedbackSheet.show(context),
+                    onTap: () => unawaited(
+                      showFeedbackSheet(
+                        context,
+                        ref,
+                        source: FeedbackSource.settings,
+                      ),
+                    ),
                   ),
                   _MoreMenuItem(
                     icon: Icons.help_outline,
@@ -164,8 +175,9 @@ class SettingsScreen extends ConsumerWidget {
               Center(
                 child: Text(
                   'Kharis Church v2.0.0',
-                  style: AppTypography.ui(size: 11)
-                      .copyWith(color: context.kc.muted),
+                  style: AppTypography.ui(
+                    size: 11,
+                  ).copyWith(color: context.kc.muted),
                 ),
               ),
             ],
@@ -183,29 +195,34 @@ class SettingsScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
         title: Text(
           'Sign Out',
-          style: AppTypography.ui(size: 16, weight: FontWeight.w700)
-              .copyWith(color: context.kc.onBg),
+          style: AppTypography.ui(
+            size: 16,
+            weight: FontWeight.w700,
+          ).copyWith(color: context.kc.onBg),
         ),
         content: Text(
           'Are you sure you want to sign out?',
-          style:
-              AppTypography.ui(size: 14).copyWith(color: context.kc.muted),
+          style: AppTypography.ui(size: 14).copyWith(color: context.kc.muted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
               'Cancel',
-              style: AppTypography.ui(size: 14, weight: FontWeight.w600)
-                  .copyWith(color: context.kc.muted),
+              style: AppTypography.ui(
+                size: 14,
+                weight: FontWeight.w600,
+              ).copyWith(color: context.kc.muted),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               'Sign Out',
-              style: AppTypography.ui(size: 14, weight: FontWeight.w700)
-                  .copyWith(color: AppColors.danger),
+              style: AppTypography.ui(
+                size: 14,
+                weight: FontWeight.w700,
+              ).copyWith(color: AppColors.danger),
             ),
           ),
         ],
@@ -269,16 +286,19 @@ class _ProfileCard extends StatelessWidget {
                   user.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.ui(size: 17, weight: FontWeight.w700)
-                      .copyWith(color: context.kc.onBg),
+                  style: AppTypography.ui(
+                    size: 17,
+                    weight: FontWeight.w700,
+                  ).copyWith(color: context.kc.onBg),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.ui(size: 13)
-                      .copyWith(color: context.kc.muted),
+                  style: AppTypography.ui(
+                    size: 13,
+                  ).copyWith(color: context.kc.muted),
                 ),
               ],
             ),
@@ -309,8 +329,10 @@ class _EditButton extends StatelessWidget {
         ),
         child: Text(
           'Edit',
-          style: AppTypography.ui(size: 13, weight: FontWeight.w700)
-              .copyWith(color: AppColors.primary),
+          style: AppTypography.ui(
+            size: 13,
+            weight: FontWeight.w700,
+          ).copyWith(color: AppColors.primary),
         ),
       ),
     );
@@ -352,12 +374,14 @@ class _Avatar extends StatelessWidget {
   }
 
   Widget _initialText() => Center(
-        child: Text(
-          initial,
-          style: AppTypography.display(size: 22, weight: FontWeight.w700)
-              .copyWith(color: AppColors.onPrimary),
-        ),
-      );
+    child: Text(
+      initial,
+      style: AppTypography.display(
+        size: 22,
+        weight: FontWeight.w700,
+      ).copyWith(color: AppColors.onPrimary),
+    ),
+  );
 }
 
 // ── Signed-out card ───────────────────────────────────────────────────────────
@@ -379,14 +403,18 @@ class _SignedOutCard extends StatelessWidget {
         children: [
           Text(
             'Join the Kharis family',
-            style: AppTypography.display(size: 18, weight: FontWeight.w700)
-                .copyWith(color: context.kc.onBg),
+            style: AppTypography.display(
+              size: 18,
+              weight: FontWeight.w700,
+            ).copyWith(color: context.kc.onBg),
           ),
           const SizedBox(height: 6),
           Text(
             'Sign in to save your branch, follow along, and personalize your experience.',
-            style: AppTypography.ui(size: 13, height: 1.5)
-                .copyWith(color: context.kc.muted),
+            style: AppTypography.ui(
+              size: 13,
+              height: 1.5,
+            ).copyWith(color: context.kc.muted),
           ),
           const SizedBox(height: 16),
           Row(
@@ -441,9 +469,10 @@ class _PillButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: AppTypography.ui(size: 14, weight: FontWeight.w700).copyWith(
-            color: filled ? context.kc.onAccent : context.kc.onBg,
-          ),
+          style: AppTypography.ui(
+            size: 14,
+            weight: FontWeight.w700,
+          ).copyWith(color: filled ? context.kc.onAccent : context.kc.onBg),
         ),
       ),
     );
@@ -462,8 +491,11 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         label.toUpperCase(),
-        style: AppTypography.ui(size: 11, weight: FontWeight.w700, letterSpacing: 1.2)
-            .copyWith(color: context.kc.muted),
+        style: AppTypography.ui(
+          size: 11,
+          weight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ).copyWith(color: context.kc.muted),
       ),
     );
   }
@@ -539,10 +571,10 @@ class _MoreMenuItem extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                    .copyWith(
-                  color: danger ? AppColors.danger : context.kc.onBg,
-                ),
+                style: AppTypography.ui(
+                  size: 15,
+                  weight: FontWeight.w600,
+                ).copyWith(color: danger ? AppColors.danger : context.kc.onBg),
               ),
             ),
             Icon(
@@ -601,8 +633,10 @@ class _ThemeCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   'Theme',
-                  style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                      .copyWith(color: kc.onBg),
+                  style: AppTypography.ui(
+                    size: 15,
+                    weight: FontWeight.w600,
+                  ).copyWith(color: kc.onBg),
                 ),
               ),
             ],
@@ -685,8 +719,10 @@ class _ThemeOption extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppTypography.ui(size: 13, weight: FontWeight.w700)
-                    .copyWith(color: fg),
+                style: AppTypography.ui(
+                  size: 13,
+                  weight: FontWeight.w700,
+                ).copyWith(color: fg),
               ),
             ),
           ],

@@ -169,6 +169,27 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // app_feedback — in-app rating (1-5) + optional comment from the feedback
+    // sheet. Any signed-in member (anonymous included) may create one doc
+    // attributed to themselves; only admins may read or manage. Keys are
+    // closed so a client cannot smuggle extra fields.
+    match /app_feedback/{feedbackId} {
+      allow create: if isAuthenticated()
+                    && request.resource.data.keys().hasOnly(
+                         ['uid', 'rating', 'comment', 'source', 'platform', 'createdAt'])
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.rating is int
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && request.resource.data.comment is string
+                    && request.resource.data.comment.size() <= 2000
+                    && request.resource.data.source in ['prompt', 'settings']
+                    && request.resource.data.platform is string
+                    && request.resource.data.platform.size() <= 20
+                    && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+
     // rsvps — one doc per user+event, ID `{uid}_{eventId}`. Ownership is bound
     // to the document ID as well as the payload, so a member can never create,
     // read or delete another member's RSVP.

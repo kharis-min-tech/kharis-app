@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/feedback/presentation/review_prompt_listener.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
-import 'package:kharis_app/features/settings/presentation/widgets/feedback_sheet.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +26,9 @@ class DashboardShell extends ConsumerStatefulWidget {
   ConsumerState<DashboardShell> createState() => _DashboardShellState();
 }
 
+/// Branch index of the Giving tab (see the tab row below and app_router.dart).
+const _givingTabIndex = 2;
+
 class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void initState() {
@@ -33,7 +36,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreMiniPlayer();
       _promptBranchOnce();
-      FeedbackNudge.maybeShow(context);
+      // Rating/feedback prompts are scheduled by ReviewPromptListener (end
+      // of a listen), never on launch.
     });
   }
 
@@ -82,74 +86,79 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final currentSermon = ref.watch(currentSermonProvider);
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      extendBody: true,
-      body: widget.navigationShell,
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // The bar docks on every tab except Giving: testers couldn't push
-          // it away there and it crowded the bank details mid-gift (KA-001).
-          // Audio keeps playing — only the bar hides; any other tab brings
-          // it back, and swipe-down still dismisses it outright.
-          if (currentSermon != null &&
-              widget.navigationShell.currentIndex != 2)
-            const MiniPlayer(),
-          Container(
-            decoration: BoxDecoration(
-              color: context.kc.surface,
-              border: Border(
-                top: BorderSide(color: context.kc.divider, width: 1),
+    return ReviewPromptListener(
+      // Never interrupt a member mid-gift.
+      canInterrupt: () =>
+          widget.navigationShell.currentIndex != _givingTabIndex,
+      child: Scaffold(
+        extendBody: true,
+        body: widget.navigationShell,
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The bar docks on every tab except Giving: testers couldn't push
+            // it away there and it crowded the bank details mid-gift (KA-001).
+            // Audio keeps playing — only the bar hides; any other tab brings
+            // it back, and swipe-down still dismisses it outright.
+            if (currentSermon != null &&
+                widget.navigationShell.currentIndex != _givingTabIndex)
+              const MiniPlayer(),
+            Container(
+              decoration: BoxDecoration(
+                color: context.kc.surface,
+                border: Border(
+                  top: BorderSide(color: context.kc.divider, width: 1),
+                ),
+              ),
+              padding: EdgeInsets.fromLTRB(6, 10, 6, 12 + safeBottom),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _TabItem(
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home,
+                    label: 'Home',
+                    index: 0,
+                    currentIndex: widget.navigationShell.currentIndex,
+                    onTap: _onTap,
+                  ),
+                  _TabItem(
+                    icon: Icons.play_circle_outline,
+                    activeIcon: Icons.play_circle,
+                    label: 'Messages',
+                    index: 1,
+                    currentIndex: widget.navigationShell.currentIndex,
+                    onTap: _onTap,
+                  ),
+                  _TabItem(
+                    icon: Icons.volunteer_activism_outlined,
+                    activeIcon: Icons.volunteer_activism,
+                    label: 'Giving',
+                    index: 2,
+                    currentIndex: widget.navigationShell.currentIndex,
+                    onTap: _onTap,
+                  ),
+                  _TabItem(
+                    icon: Icons.calendar_today_outlined,
+                    activeIcon: Icons.calendar_today,
+                    label: 'Events',
+                    index: 3,
+                    currentIndex: widget.navigationShell.currentIndex,
+                    onTap: _onTap,
+                  ),
+                  _TabItem(
+                    icon: Icons.more_horiz,
+                    activeIcon: Icons.more_horiz,
+                    label: 'More',
+                    index: 4,
+                    currentIndex: widget.navigationShell.currentIndex,
+                    onTap: _onTap,
+                  ),
+                ],
               ),
             ),
-            padding: EdgeInsets.fromLTRB(6, 10, 6, 12 + safeBottom),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _TabItem(
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home,
-                  label: 'Home',
-                  index: 0,
-                  currentIndex: widget.navigationShell.currentIndex,
-                  onTap: _onTap,
-                ),
-                _TabItem(
-                  icon: Icons.play_circle_outline,
-                  activeIcon: Icons.play_circle,
-                  label: 'Messages',
-                  index: 1,
-                  currentIndex: widget.navigationShell.currentIndex,
-                  onTap: _onTap,
-                ),
-                _TabItem(
-                  icon: Icons.volunteer_activism_outlined,
-                  activeIcon: Icons.volunteer_activism,
-                  label: 'Giving',
-                  index: 2,
-                  currentIndex: widget.navigationShell.currentIndex,
-                  onTap: _onTap,
-                ),
-                _TabItem(
-                  icon: Icons.calendar_today_outlined,
-                  activeIcon: Icons.calendar_today,
-                  label: 'Events',
-                  index: 3,
-                  currentIndex: widget.navigationShell.currentIndex,
-                  onTap: _onTap,
-                ),
-                _TabItem(
-                  icon: Icons.more_horiz,
-                  activeIcon: Icons.more_horiz,
-                  label: 'More',
-                  index: 4,
-                  currentIndex: widget.navigationShell.currentIndex,
-                  onTap: _onTap,
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -192,11 +201,7 @@ class _TabItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isActive ? activeIcon : icon,
-                size: 24,
-                color: color,
-              ),
+              Icon(isActive ? activeIcon : icon, size: 24, color: color),
               const SizedBox(height: 3),
               Text(
                 label,

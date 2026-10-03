@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,7 +15,7 @@ import 'package:kharis_app/features/player/data/audio_player_service.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
-import 'package:kharis_app/features/settings/presentation/widgets/feedback_sheet.dart';
+import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -110,136 +111,15 @@ final _member = User(
   createdAt: DateTime(2024),
 );
 
-/// Drives [FeedbackNudge.maybeShow] through the same timing the shell uses
-/// (prefs read → 4s settle → route check → sheet) under the test clock.
-Future<void> _runNudge(
-  WidgetTester tester, {
-  bool withPromptOnTop = false,
-}) async {
-  await tester.pumpWidget(
-    MaterialApp(
-      home: Builder(
-        builder: (context) => Scaffold(
-          body: Center(
-            child: TextButton(
-              onPressed: () {
-                unawaited(FeedbackNudge.maybeShow(context));
-                if (withPromptOnTop) {
-                  // Another launch prompt (e.g. branch selection) takes the
-                  // screen before the nudge's settle window elapses.
-                  unawaited(
-                    showDialog<void>(
-                      context: context,
-                      builder: (_) =>
-                          const AlertDialog(title: Text('branch prompt')),
-                    ),
-                  );
-                }
-              },
-              child: const Text('launch'),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-  await tester.tap(find.text('launch'));
-  await tester.pump(); // prefs resolve
-  await tester.pump(const Duration(seconds: 5)); // past the 4s settle
-  await tester.pump(); // lastShown write
-  await tester.pump(const Duration(seconds: 1)); // sheet animation
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
-
-  group('KA-012 quarterly nudge cadence', () {
-    testWidgets('never fires in a member\'s first sessions', (tester) async {
-      SharedPreferences.setMockInitialValues({FeedbackNudge.sessionsKey: 0});
-      await _runNudge(tester);
-      expect(find.byType(FeedbackSheet), findsNothing);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getInt(FeedbackNudge.sessionsKey), 1);
-      expect(prefs.getInt(FeedbackNudge.lastShownKey), isNull);
-    });
-
-    testWidgets(
-      'fires once the member has ${FeedbackNudge.minSessions} sessions',
-      (tester) async {
-        SharedPreferences.setMockInitialValues({
-          FeedbackNudge.sessionsKey: FeedbackNudge.minSessions - 1,
-        });
-        await _runNudge(tester);
-        expect(find.byType(FeedbackSheet), findsOneWidget);
-        expect(find.text('Rate the app'), findsOneWidget);
-        expect(find.text('Send feedback'), findsOneWidget);
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getInt(FeedbackNudge.lastShownKey), isNotNull);
-      },
-    );
-
-    testWidgets('stays quiet inside the quarter after a showing', (
-      tester,
-    ) async {
-      final tenDaysAgo = DateTime.now()
-          .subtract(const Duration(days: 10))
-          .millisecondsSinceEpoch;
-      SharedPreferences.setMockInitialValues({
-        FeedbackNudge.sessionsKey: 12,
-        FeedbackNudge.lastShownKey: tenDaysAgo,
-      });
-      await _runNudge(tester);
-      expect(find.byType(FeedbackSheet), findsNothing);
-      final prefs = await SharedPreferences.getInstance();
-      expect(
-        prefs.getInt(FeedbackNudge.lastShownKey),
-        tenDaysAgo,
-        reason: 'a skipped nudge must not reset the quarter',
-      );
-    });
-
-    testWidgets('fires again once a quarter has passed', (tester) async {
-      final lastQuarter = DateTime.now()
-          .subtract(FeedbackNudge.cadence + const Duration(days: 1))
-          .millisecondsSinceEpoch;
-      SharedPreferences.setMockInitialValues({
-        FeedbackNudge.sessionsKey: 12,
-        FeedbackNudge.lastShownKey: lastQuarter,
-      });
-      await _runNudge(tester);
-      expect(find.byType(FeedbackSheet), findsOneWidget);
-    });
-
-    testWidgets('yields to another prompt already on screen', (tester) async {
-      SharedPreferences.setMockInitialValues({FeedbackNudge.sessionsKey: 12});
-      await _runNudge(tester, withPromptOnTop: true);
-      expect(find.text('branch prompt'), findsOneWidget);
-      expect(
-        find.byType(FeedbackSheet),
-        findsNothing,
-        reason: 'the nudge must never stack on top of another prompt',
-      );
-      final prefs = await SharedPreferences.getInstance();
-      expect(
-        prefs.getInt(FeedbackNudge.lastShownKey),
-        isNull,
-        reason: 'a yielded nudge is not "shown" — it retries next launch',
-      );
-      // Close the dialog so no route is left mid-transition.
-      Navigator.of(tester.element(find.text('branch prompt'))).pop();
-      await tester.pumpAndSettle();
-    });
-  });
 
   testWidgets(
     'KA-001: the mini-player hides on Giving and returns on Home without '
     'stopping the message',
     (tester) async {
-      SharedPreferences.setMockInitialValues({
-        'branch_prompt_shown': true,
-        FeedbackNudge.sessionsKey: 0,
-      });
+      SharedPreferences.setMockInitialValues({'branch_prompt_shown': true});
       final prefs = await SharedPreferences.getInstance();
       final audio = _FakeAudio();
       await audio.play(_sermon);
@@ -440,6 +320,7 @@ void main() {
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
             currentUserProvider.overrideWith((ref) => Stream.value(_member)),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
             isAdminProvider.overrideWith((ref) => false),
@@ -463,11 +344,13 @@ void main() {
       await tester.tap(find.text('Rate & Feedback'));
       await tester.pumpAndSettle();
 
+      // KA-012 now opens the in-app feedback sheet (stars + comment saved to
+      // the church backend); store ratings come from the OS card at the end
+      // of a listen, never from a button (review_prompt_flow_test).
       expect(find.byType(FeedbackSheet), findsOneWidget);
-      expect(find.text('Rate the app'), findsOneWidget);
-      expect(find.text('Send feedback'), findsOneWidget);
+      expect(find.text('How is the Kharis app serving you?'), findsOneWidget);
 
-      await tester.tap(find.text('Not now'));
+      await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(find.byType(FeedbackSheet), findsNothing);
     },
