@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 
-/// Player scrubber — dark design-handoff (v3).
+/// Player timeline scrubber.
 ///
-/// Paints a row of uniform, evenly-spaced bars. The played portion (up to the
-/// exact `position / duration` fraction) is gold; the rest is muted, with a
-/// full-height gold cursor marking the current position. Tap or drag anywhere
-/// to seek. Time labels sit below — elapsed left, total right.
+/// A thin rounded track: the played portion is filled solid up to the exact
+/// `position / duration` fraction, the rest is a faint rail, and a round thumb
+/// marks the play head. Tap or drag anywhere to seek; the thumb grows while
+/// dragging. Time labels sit below — elapsed on the left, time remaining
+/// (`-m:ss`) on the right.
 class SeekBar extends StatefulWidget {
   const SeekBar({
     super.key,
@@ -25,24 +26,26 @@ class SeekBar extends StatefulWidget {
 }
 
 class _SeekBarState extends State<SeekBar> {
+  /// Touch target height; the painted track is much thinner and centred.
+  static const _hitHeight = 28.0;
+
   double? _dragFraction;
 
   /// Fraction (0.0–1.0) to display, accounting for a live drag.
   double get _fraction {
-    if (_dragFraction != null) return _dragFraction!.clamp(0.0, 1.0);
+    if (_dragFraction != null) return _dragFraction!;
     final total = widget.duration.inMilliseconds;
     if (total <= 0) return 0.0;
     return (widget.position.inMilliseconds / total).clamp(0.0, 1.0);
   }
 
   Duration get _displayPosition {
-    if (_dragFraction != null) {
-      return Duration(
-        milliseconds: (_dragFraction! * widget.duration.inMilliseconds).round(),
-      );
-    }
+    if (_dragFraction != null) return _durationAt(_dragFraction!);
     return widget.position;
   }
+
+  Duration _durationAt(double f) =>
+      Duration(milliseconds: (f * widget.duration.inMilliseconds).round());
 
   static String _fmt(Duration d) {
     final h = d.inHours;
@@ -53,61 +56,64 @@ class _SeekBarState extends State<SeekBar> {
     return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
   }
 
-  void _seekToFraction(double f) {
-    widget.onSeek(Duration(
-      milliseconds: (f * widget.duration.inMilliseconds).round(),
-    ));
-  }
+  static double _fractionAt(double dx, double width) =>
+      width <= 0 ? 0.0 : (dx / width).clamp(0.0, 1.0);
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.kc;
     final timeStyle = AppTypography.ui(
       size: 11.5,
       weight: FontWeight.w600,
-      color: context.kc.muted,
+      color: colors.muted,
     );
 
-    const waveH = 40.0;
+    final elapsed = _displayPosition;
+    final remaining = widget.duration > elapsed
+        ? widget.duration - elapsed
+        : Duration.zero;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         LayoutBuilder(builder: (_, constraints) {
-          final trackWidth = constraints.maxWidth;
+          final width = constraints.maxWidth;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTapDown: (d) => _seekToFraction(
-                (d.localPosition.dx / trackWidth).clamp(0.0, 1.0)),
-            onHorizontalDragUpdate: (d) {
-              setState(() {
-                _dragFraction =
-                    ((_dragFraction ?? _fraction) + d.delta.dx / trackWidth)
-                        .clamp(0.0, 1.0);
-              });
-            },
+            onTapUp: (d) =>
+                widget.onSeek(_durationAt(_fractionAt(d.localPosition.dx, width))),
+            onHorizontalDragStart: (d) => setState(() {
+              _dragFraction = _fractionAt(d.localPosition.dx, width);
+            }),
+            onHorizontalDragUpdate: (d) => setState(() {
+              _dragFraction = _fractionAt(d.localPosition.dx, width);
+            }),
             onHorizontalDragEnd: (_) {
-              if (_dragFraction != null) _seekToFraction(_dragFraction!);
+              final f = _dragFraction;
+              if (f != null) widget.onSeek(_durationAt(f));
               setState(() => _dragFraction = null);
             },
+            onHorizontalDragCancel: () => setState(() => _dragFraction = null),
             child: SizedBox(
-              height: waveH,
-              width: trackWidth,
+              height: _hitHeight,
+              width: width,
               child: CustomPaint(
-                painter: _WaveformPainter(
+                painter: _TimelinePainter(
                   fraction: _fraction,
-                  played: context.kc.accent,
-                  unplayed: context.kc.muted.withValues(alpha: 0.35),
+                  dragging: _dragFraction != null,
+                  played: colors.onBg,
+                  rail: colors.onBg.withValues(alpha: 0.22),
                 ),
               ),
             ),
           );
         }),
-        const SizedBox(height: 6),
+        const SizedBox(height: 2),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(_fmt(_displayPosition), style: timeStyle),
-            Text(_fmt(widget.duration), style: timeStyle),
+            Text(_fmt(elapsed), style: timeStyle),
+            Text('-${_fmt(remaining)}', style: timeStyle),
           ],
         ),
       ],
@@ -115,59 +121,55 @@ class _SeekBarState extends State<SeekBar> {
   }
 }
 
-/// Uniform bar scrubber: equal-height rounded bars split at [fraction], with a
-/// full-height gold cursor at the play head.
-class _WaveformPainter extends CustomPainter {
-  const _WaveformPainter({
+/// Thin rounded rail, solid fill up to [fraction], round thumb at the head.
+class _TimelinePainter extends CustomPainter {
+  const _TimelinePainter({
     required this.fraction,
+    required this.dragging,
     required this.played,
-    required this.unplayed,
+    required this.rail,
   });
 
   final double fraction;
+  final bool dragging;
   final Color played;
-  final Color unplayed;
+  final Color rail;
+
+  static const _trackHeight = 4.0;
+  static const _thumbRadius = 6.0;
+  static const _thumbRadiusDragging = 8.0;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const barW = 3.0;
-    const gap = 3.0;
-    final step = barW + gap;
-    final count = (size.width / step).floor().clamp(1, 2000);
-    final splitX = (fraction * size.width).clamp(0.0, size.width);
     final cy = size.height / 2;
-    final barH = size.height * 0.55;
+    final top = cy - _trackHeight / 2;
+    const radius = Radius.circular(_trackHeight / 2);
+    final headX = fraction * size.width;
 
-    final playedPaint = Paint()
-      ..color = played
-      ..strokeWidth = barW
-      ..strokeCap = StrokeCap.round;
-    final unplayedPaint = Paint()
-      ..color = unplayed
-      ..strokeWidth = barW
-      ..strokeCap = StrokeCap.round;
+    canvas.drawRRect(
+      RRect.fromLTRBR(0, top, size.width, top + _trackHeight, radius),
+      Paint()..color = rail,
+    );
 
-    for (var i = 0; i < count; i++) {
-      final x = i * step + barW / 2;
-      canvas.drawLine(
-        Offset(x, cy - barH / 2),
-        Offset(x, cy + barH / 2),
-        x <= splitX ? playedPaint : unplayedPaint,
+    final fill = Paint()..color = played;
+    if (headX > 0) {
+      canvas.drawRRect(
+        RRect.fromLTRBR(0, top, headX, top + _trackHeight, radius),
+        fill,
       );
     }
 
-    // Full-height play head.
-    final cursorX = splitX.clamp(barW / 2, size.width - barW / 2);
-    canvas.drawLine(
-      Offset(cursorX, cy - size.height / 2),
-      Offset(cursorX, cy + size.height / 2),
-      playedPaint,
+    canvas.drawCircle(
+      Offset(headX, cy),
+      dragging ? _thumbRadiusDragging : _thumbRadius,
+      fill,
     );
   }
 
   @override
-  bool shouldRepaint(_WaveformPainter old) =>
+  bool shouldRepaint(_TimelinePainter old) =>
       old.fraction != fraction ||
+      old.dragging != dragging ||
       old.played != played ||
-      old.unplayed != unplayed;
+      old.rail != rail;
 }
