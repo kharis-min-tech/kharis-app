@@ -3,7 +3,7 @@
 # captures a host-side screenshot every time the test prints `KSHOT:<name>`
 # (the test holds each marked frame for ~3s so the capture lands on it).
 #
-# Usage: scripts/run_release_walkthrough.sh [udid]
+# Usage: scripts/run_tester_round_fixes.sh [udid]
 set -uo pipefail
 
 UDID="${1:-F7F25682-5CB9-4E69-B116-46F898FF044D}"

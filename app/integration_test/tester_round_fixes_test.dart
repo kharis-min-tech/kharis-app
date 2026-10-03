@@ -12,7 +12,7 @@
 //   KA-020 / 002    Home bell → notifications feed → row opens a detail sheet
 //   KA-004 / 007    Read now → in-app Bible reader with scripture + a way back
 //   KA-014          Messages search bar keeps its pill shape idle and focused
-//   KA-013 / 017    player has exactly one Share; skip buttons are real buttons
+//   KA-013 / 017    player has exactly one Share; Previous/Next are real buttons
 //   KA-001          mini-player hidden on Giving, audio still loaded, back on Home
 //   KA-003 / 007    More → My Notes (with a way back), My Playlists
 //   KA-012 (row)    More → Rate & Feedback opens the sheet
@@ -53,6 +53,7 @@ import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/main.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 
@@ -281,8 +282,6 @@ void main() {
         androidNotificationChannelId: 'com.kharis.church.channel.audio',
         androidNotificationChannelName: 'Kharis audio playback',
         androidNotificationOngoing: true,
-        fastForwardInterval: const Duration(seconds: 15),
-        rewindInterval: const Duration(seconds: 15),
       );
       final results = await Future.wait([
         SharedPreferences.getInstance(),
@@ -303,6 +302,7 @@ void main() {
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
             cacheServiceProvider.overrideWithValue(cacheService),
+            sermonArchiveCacheProvider.overrideWithValue(cacheService),
           ],
           child: const KharisApp(),
         ),
@@ -504,6 +504,35 @@ void main() {
         reason:
             'KA-004: "Bible failed to load" — the reader showed its error view',
       );
+      // A plan that runs past the end of its book used to ask for a chapter
+      // that does not exist; the reader then shows an error view with no
+      // Retry. Real scripture is the only pass.
+      final readerTexts = [
+        for (final e
+            in find
+                .descendant(
+                  of: find.byType(ReadingScreen),
+                  matching: find.byType(RichText),
+                )
+                .evaluate())
+          (e.widget as RichText).text.toPlainText(),
+      ];
+      expect(
+        readerTexts.where(
+          (t) =>
+              t.contains('isn\u2019t available') ||
+              t.contains('Couldn\u2019t load'),
+        ),
+        isEmpty,
+        reason: 'KA-004: the reader showed an error view: $readerTexts',
+      );
+      expect(
+        readerTexts
+            .where((t) => t.length > 40)
+            .fold<int>(0, (n, t) => n + t.length),
+        greaterThan(300),
+        reason: 'KA-004: the reader must show the passage text',
+      );
       verified.add('KA-004 Read now opens scripture in-app');
       await hostShot(tester, 'ka004-reading-in-app');
       await tapBack(tester, reason: 'KA-007: the reader needs a way back');
@@ -558,20 +587,20 @@ void main() {
       expect(find.text('Notes'), findsOneWidget);
       expect(find.text('Playlist'), findsOneWidget);
       verified.add('KA-013 single Share on the audio player');
-      final rewind = find.byIcon(Icons.replay_rounded);
-      final forward = find.byIcon(Icons.forward_rounded);
-      expect(rewind, findsOneWidget);
-      expect(forward, findsOneWidget);
+      final previous = find.byIcon(Icons.skip_previous_rounded);
+      final next = find.byIcon(Icons.skip_next_rounded);
+      expect(previous, findsOneWidget);
+      expect(next, findsOneWidget);
       expect(
-        find.ancestor(of: rewind, matching: find.byType(InkWell)),
+        find.ancestor(of: previous, matching: find.byType(InkWell)),
         findsWidgets,
-        reason: 'KA-017: skip buttons must be real (ripple) buttons',
+        reason: 'KA-017: Previous/Next must be real (ripple) buttons',
       );
       expect(
-        find.ancestor(of: forward, matching: find.byType(InkWell)),
+        find.ancestor(of: next, matching: find.byType(InkWell)),
         findsWidgets,
       );
-      verified.add('KA-017 skip buttons are tonal ripple buttons');
+      verified.add('KA-017 Previous/Next are tonal ripple buttons');
       await hostShot(tester, 'ka013-017-audio-player');
 
       // ── KA-007: close the player; the bar docks ───────────────────────────

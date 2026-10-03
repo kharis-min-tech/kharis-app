@@ -45,7 +45,7 @@ class PlaybackFailure {
 ///
 /// Queue: every [play] carries the list the member launched from as a
 /// [PlaybackQueue]. The native player holds a window of that queue (the
-/// current message and its neighbours) in a [ConcatenatingAudioSource], so
+/// current message and its neighbours) as the player's playlist, so
 /// the lock screen, notification and CarPlay show the same Previous / Next
 /// as the app, and a finished message advances on its own. The window grows
 /// at its edges as the member moves, never reloading the message on air.
@@ -94,9 +94,10 @@ class AudioPlayerService {
   /// The list playback was launched from, positioned on [_currentSermon].
   PlaybackQueue? _queue;
 
-  /// The native source and the queue index of its first child. The children
-  /// are always the contiguous slice `_queue.items[_windowStart ..]`.
-  ConcatenatingAudioSource? _source;
+  /// Whether the native playlist holds a window of [_queue], and the queue
+  /// index of its first item. The playlist is always the contiguous slice
+  /// `_queue.items[_windowStart ..]`.
+  bool _hasWindow = false;
   int _windowStart = 0;
 
   /// Queue index an app-initiated skip is moving to, so the index listener
@@ -293,7 +294,7 @@ class AudioPlayerService {
   Sermon? _sermonAtNative(int? nativeIndex) {
     final queue = _queue;
     final sequence = _player.sequence;
-    if (queue == null || nativeIndex == null || sequence == null) return null;
+    if (queue == null || nativeIndex == null) return null;
     if (nativeIndex < 0 || nativeIndex >= sequence.length) return null;
     final tag = sequence[nativeIndex].tag;
     if (tag is! MediaItem) return null;
@@ -307,7 +308,7 @@ class AudioPlayerService {
     final queue = _queue;
     // Mid-load the sequence already shows the new window while the index
     // still points into the old one; the load itself positions the queue.
-    if (queue == null || _source == null || _loadsInFlight > 0) return;
+    if (queue == null || !_hasWindow || _loadsInFlight > 0) return;
     final sermon = _sermonAtNative(nativeIndex);
     if (sermon == null) return;
     final index = queue.items.indexWhere((s) => s.id == sermon.id);
@@ -335,18 +336,17 @@ class AudioPlayerService {
   /// window, so the lock screen always offers Previous / Next when the queue
   /// has them. Only appends or prepends: the message on air is never touched.
   Future<void> _extendWindow() async {
-    final source = _source;
     final queue = _queue;
-    if (source == null || queue == null) return;
-    final end = _windowStart + source.length;
+    if (!_hasWindow || queue == null) return;
+    final end = _windowStart + _player.audioSources.length;
     if (queue.hasNext && queue.index + 1 >= end && end < queue.items.length) {
-      await source.add(_child(queue.items[end]));
+      await _player.addAudioSource(_child(queue.items[end]));
     }
     if (queue.hasPrevious && queue.index <= _windowStart && _windowStart > 0) {
       // Shift first: the native index bump this insert causes must resolve
       // against the new start.
       _windowStart -= 1;
-      await source.insert(0, _child(queue.items[_windowStart]));
+      await _player.insertAudioSource(0, _child(queue.items[_windowStart]));
     }
   }
 
@@ -354,14 +354,14 @@ class AudioPlayerService {
   /// queue, without reloading it. Used when the member re-taps the playing
   /// message from a different list.
   Future<void> _rebuildWindow() async {
-    final source = _source;
     final queue = _queue;
     final nativeIndex = _player.currentIndex;
-    if (source == null || queue == null || nativeIndex == null) return;
-    if (nativeIndex + 1 < source.length) {
-      await source.removeRange(nativeIndex + 1, source.length);
+    if (!_hasWindow || queue == null || nativeIndex == null) return;
+    final length = _player.audioSources.length;
+    if (nativeIndex + 1 < length) {
+      await _player.removeAudioSourceRange(nativeIndex + 1, length);
     }
-    if (nativeIndex > 0) await source.removeRange(0, nativeIndex);
+    if (nativeIndex > 0) await _player.removeAudioSourceRange(0, nativeIndex);
     _windowStart = queue.index;
     await _extendWindow();
   }
@@ -390,15 +390,12 @@ class AudioPlayerService {
   }) async {
     final start = math.max(0, queue.index - 1);
     final end = math.min(queue.items.length, queue.index + 2);
-    final source = ConcatenatingAudioSource(
-      children: [for (var i = start; i < end; i++) _child(queue.items[i])],
-    );
-    _source = source;
+    _hasWindow = true;
     _windowStart = start;
 
     _loadsInFlight++;
-    final load = _player.setAudioSource(
-      source,
+    final load = _player.setAudioSources(
+      [for (var i = start; i < end; i++) _child(queue.items[i])],
       initialIndex: queue.index - start,
       initialPosition: initialPosition,
     );
@@ -447,7 +444,7 @@ class AudioPlayerService {
     } catch (_) {
       // Already torn down; nothing left to release.
     }
-    _source = null;
+    _hasWindow = false;
   }
 
   /// Starts the engine WITHOUT waiting on it: just_audio's `play()` future
@@ -472,7 +469,7 @@ class AudioPlayerService {
   bool _isLive(Sermon sermon) =>
       _currentSermon?.id == sermon.id &&
       _failure == null &&
-      _source != null &&
+      _hasWindow &&
       _loadsInFlight == 0 &&
       _player.processingState != ProcessingState.idle;
 
@@ -526,7 +523,7 @@ class AudioPlayerService {
       // Nothing to stream. Loading an empty URL wedges the player rather than
       // failing, so refuse it up front.
       // The previous message must not keep playing under this failure.
-      if (_source != null) await _release();
+      if (_hasWindow) await _release();
       _setFailure(
         PlaybackFailure(
           sermonId: sermon.id,
@@ -641,10 +638,11 @@ class AudioPlayerService {
   Future<void> _moveTo(int index) async {
     final queue = _queue!;
     final target = queue.items[index];
-    final source = _source;
     final nativeIndex = index - _windowStart;
     final inWindow =
-        source != null && nativeIndex >= 0 && nativeIndex < source.length;
+        _hasWindow &&
+        nativeIndex >= 0 &&
+        nativeIndex < _player.audioSources.length;
     if (!inWindow || !_isLive(queue.current)) {
       // Nothing live to move within (failed or released): load the target
       // fresh, keeping the queue.
@@ -672,7 +670,7 @@ class AudioPlayerService {
     final sermon = _currentSermon;
     if (sermon == null) return;
     if (_failure != null ||
-        _source == null ||
+        !_hasWindow ||
         _player.processingState == ProcessingState.idle) {
       await play(sermon, queue: _queue?.items);
       return;
@@ -691,11 +689,21 @@ class AudioPlayerService {
     _loadToken++;
     _saveCurrentPosition();
     _setFailure(null);
-    _source = null;
-    await _player.stop();
-    _currentSermon = null;
-    _queue = null;
-    _emitQueue();
+    _hasWindow = false;
+    try {
+      await _player.stop();
+    } catch (e) {
+      // just_audio_background 0.0.1-beta.17 has no AudioPlayerPlatform
+      // dispose(), so when its native disposePlayer call fails (the player is
+      // already released) just_audio's fallback throws UnimplementedError.
+      // The engine is stopped either way; never let it escape the caller
+      // (an audio-to-video switch).
+      debugPrint('AudioPlayerService.stop: $e');
+    } finally {
+      _currentSermon = null;
+      _queue = null;
+      _emitQueue();
+    }
   }
 
   Future<void> seek(Duration position) => _player.seek(position);

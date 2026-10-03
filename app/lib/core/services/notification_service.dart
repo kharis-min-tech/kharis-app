@@ -174,6 +174,10 @@ class NotificationService {
   /// the screen the member lands on shows the item they were told about.
   final void Function(String? type)? onContentPush;
 
+  /// How long [init] waits for the launch notification before moving on.
+  @visibleForTesting
+  static Duration initialMessageTimeout = const Duration(seconds: 3);
+
   /// One-time FCM wiring that needs no user consent: message handlers, the
   /// mandatory `all` topic and token persistence.
   ///
@@ -190,7 +194,13 @@ class NotificationService {
       FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
-      final initial = await messaging.getInitialMessage();
+      // iOS with the implicit Flutter engine never answers this call (the
+      // plugin misses the launch notification it waits on), which used to
+      // stall topics, token sync and the permission gate forever.
+      final initial = await messaging.getInitialMessage().timeout(
+        initialMessageTimeout,
+        onTimeout: () => null,
+      );
       if (initial != null) _handleNotificationTap(initial);
     } catch (e) {
       debugPrint('[FCM] handler setup error: $e');

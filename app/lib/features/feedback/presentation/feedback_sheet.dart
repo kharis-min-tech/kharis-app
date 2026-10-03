@@ -123,39 +123,41 @@ class _FeedbackSheetState extends ConsumerState<FeedbackSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          decoration: BoxDecoration(
+        // Material, not a decorated Container: the star and text-button ink
+        // must paint on the sheet surface to be visible.
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          child: Material(
             color: kc.surface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: AnimatedSize(
-            duration: reduceMotion
-                ? Duration.zero
-                : const Duration(milliseconds: 200),
-            curve: Curves.easeOutQuart,
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 10),
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: kc.outline,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
+            clipBehavior: Clip.antiAlias,
+            child: AnimatedSize(
+              duration: reduceMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 200),
+              curve: Curves.easeOutQuart,
+              alignment: Alignment.topCenter,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: kc.outline,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                  child: _sent ? _thanks(context) : _form(context),
-                ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                    child: _sent ? _thanks(context) : _form(context),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

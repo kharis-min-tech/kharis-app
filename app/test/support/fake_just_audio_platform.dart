@@ -23,6 +23,11 @@ class FakeJustAudioPlatform extends JustAudioPlatform {
   /// this completes: a slow network. Consumed by that one load.
   Future<void>? holdNextLoad;
 
+  /// Mirrors just_audio_background 0.0.1-beta.17 on Android: the native
+  /// disposePlayer call fails and the player has no dispose() fallback, so
+  /// just_audio surfaces an UnimplementedError from stop().
+  bool failDispose = false;
+
   /// Installs the fake platform and silences the audio_session channel.
   static FakeJustAudioPlatform install() {
     final platform = FakeJustAudioPlatform();
@@ -46,6 +51,9 @@ class FakeJustAudioPlatform extends JustAudioPlatform {
   Future<DisposePlayerResponse> disposePlayer(
     DisposePlayerRequest request,
   ) async {
+    if (failDispose) {
+      throw PlatformException(code: 'dispose', message: 'already released');
+    }
     await player?.dispose(DisposeRequest());
     return DisposePlayerResponse();
   }
@@ -205,6 +213,9 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
 
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
+    if (_platform?.failDispose ?? false) {
+      throw UnimplementedError('dispose() has not been implemented.');
+    }
     _playing = false;
     _state = ProcessingStateMessage.idle;
     _playCompleter?.complete();

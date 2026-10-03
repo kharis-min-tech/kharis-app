@@ -60,6 +60,19 @@ void main() {
     },
   );
 
+  test('stop() survives the background plugin failing to dispose (Android '
+      'audio-to-video switch) and still clears playback state', () async {
+    await service.play(library[0]);
+    await settle();
+    platform.failDispose = true;
+
+    // Before the guard, just_audio's UnimplementedError escaped stop() and
+    // left currentSermon set on an engine that had already stopped.
+    await expectLater(service.stop(), completes);
+    expect(service.currentSermon, isNull);
+    platform.failDispose = false;
+  });
+
   test('only the load that wins is recorded as recently played', () async {
     final first = service.play(library[0]);
     final second = service.play(library[1]);
