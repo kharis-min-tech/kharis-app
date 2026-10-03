@@ -82,9 +82,12 @@ shot() {
   fi
 }
 
+# True only when our window has input focus. mFocusedApp keeps naming the app
+# while the launcher is on screen (after Back closes the browser task), which
+# made the runner skip the relaunch.
 android_app_focused() {
   "$ADB" -s "$DEVICE" shell dumpsys window 2>/dev/null |
-    grep -E 'mCurrentFocus|mFocusedApp' | grep -q "$BUNDLE"
+    grep -E 'mCurrentFocus' | grep -q "$BUNDLE"
 }
 
 host_action() {
