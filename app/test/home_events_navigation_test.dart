@@ -179,8 +179,8 @@ Future<void> _pump(
   await _frames(tester);
 }
 
-/// Home hosts endlessly pulsing skeletons (the hero with no videos), so it
-/// never "settles"; advance enough fake time for streams, futures and a page
+/// Home may host pulsing skeletons (a loading block), so it never reliably
+/// "settles"; advance enough fake time for streams, futures and a page
 /// transition instead.
 Future<void> _frames(WidgetTester tester) async {
   for (var i = 0; i < 6; i++) {

@@ -1,11 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart'
-    show
-        AppLifecycleState,
-        VoidCallback,
-        WidgetsBinding,
-        WidgetsBindingObserver;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -829,7 +823,7 @@ final videosProvider = FutureProvider<List<Sermon>>((ref) async {
 
 /// Library sermons that carry both an mp3 and a YouTube link, keyed by the
 /// YouTube id. A YouTube upload maps to its "audio twin" here, so a video
-/// entry point (Home hero, featured, Message of the Day) can offer Audio.
+/// entry point (featured, the live stream) can offer Audio.
 /// Newest wins when the API links one video from two records.
 final audioTwinByVideoIdProvider = Provider<Map<String, Sermon>>((ref) {
   final cms = ref.watch(cmsSermonsProvider).valueOrNull ?? const <Sermon>[];
@@ -885,7 +879,7 @@ final cmsSermonsProvider = StreamProvider<List<Sermon>>((ref) {
   }
 });
 
-// ── Featured + Message of the Day (Studio-controlled) ────────────────────────
+// ── Featured (Studio-controlled) ──────────────────────────────────────────────
 
 final curationRepositoryProvider = Provider<CurationRepository>(
   (ref) => CurationRepository(firestore: ref.watch(firestoreProvider)),
@@ -919,13 +913,16 @@ const int kFeaturedLimit = 5;
 /// - auto (default): the newest YouTube uploads, each as its audio twin when
 ///   the archive has one;
 /// - pinned: the Studio-starred docs, newest first, as audio twins where
-///   possible; falls back to auto when nothing is starred.
+///   possible; falls back to auto when nothing is starred;
+/// - off: nothing, so the carousel is hidden and the tab leads with its
+///   latest messages.
 ///
 /// Empty while the mode (or, in pinned mode, the starred docs) is still
 /// loading, so pinned picks never flash auto content first.
 final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
   final mode = ref.watch(featuredModeProvider);
   if (mode.isLoading && !mode.hasValue) return const [];
+  if (mode.valueOrNull == FeaturedMode.off) return const [];
   final twins = ref.watch(audioTwinByVideoIdProvider);
 
   if (mode.valueOrNull == FeaturedMode.pinned) {
@@ -958,125 +955,20 @@ List<Sermon> _distinct(List<Sermon> sermons) {
   ];
 }
 
-/// Wall clock behind [todayProvider]; tests override it.
-final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+/// How many messages lead the Messages tab when the featured carousel is off.
+const int kLatestLimit = 3;
 
-/// The member's local calendar date, at midnight.
-///
-/// Rolls over at local midnight while the app is alive, and is re-evaluated
-/// whenever the app returns to the foreground: a suspended app's timers do
-/// not fire on time. Dependents only rebuild when the date actually changes.
-final todayProvider = Provider<DateTime>((ref) {
-  final now = ref.watch(clockProvider)();
-  final midnight = Timer(
-    DateTime(now.year, now.month, now.day + 1).difference(now),
-    ref.invalidateSelf,
-  );
-  final resume = _OnResume(ref.invalidateSelf);
-  WidgetsBinding.instance.addObserver(resume);
-  ref.onDispose(() {
-    midnight.cancel();
-    WidgetsBinding.instance.removeObserver(resume);
-  });
-  return DateTime(now.year, now.month, now.day);
+/// The newest messages in the library, newest first, at most [kLatestLimit].
+/// What the Messages tab leads with when Studio turns featured off.
+final latestSermonsProvider = Provider<List<Sermon>>((ref) {
+  final library = [...?ref.watch(sermonsProvider).valueOrNull]
+    ..sort(
+      (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
+        a.publishedAt ?? DateTime(0),
+      ),
+    );
+  return library.take(kLatestLimit).toList();
 });
-
-class _OnResume with WidgetsBindingObserver {
-  _OnResume(this.onResume);
-
-  final VoidCallback onResume;
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) onResume();
-  }
-}
-
-/// `YYYY-MM-DD` key of a local calendar date (the `motdSchedule` doc id).
-String motdDateKey(DateTime date) =>
-    '${date.year.toString().padLeft(4, '0')}-'
-    '${date.month.toString().padLeft(2, '0')}-'
-    '${date.day.toString().padLeft(2, '0')}';
-
-/// The sermon id the Studio scheduled for today, or null. Read errors count
-/// as "nothing scheduled".
-final motdScheduledIdProvider = StreamProvider<String?>((ref) {
-  if (!kUseFirebase) return Stream.value(null);
-  final key = motdDateKey(ref.watch(todayProvider));
-  try {
-    return ref.watch(curationRepositoryProvider).watchScheduledMotd(key);
-  } catch (_) {
-    return Stream.value(null);
-  }
-});
-
-/// How far back the automatic Message of the Day looks.
-const Duration kMotdWindow = Duration(days: 90);
-
-/// Message of the Day.
-///
-/// Today's `motdSchedule` doc when it resolves to a sermon (as its audio twin
-/// where possible). Otherwise [dailyMotdPick]. Null while today's schedule
-/// or a scheduled sermon is still loading, so the card never swaps.
-final motdSermonProvider = Provider<Sermon?>((ref) {
-  final schedule = ref.watch(motdScheduledIdProvider);
-  if (schedule.isLoading && !schedule.hasValue) return null;
-  final scheduledId = schedule.hasError ? null : schedule.valueOrNull;
-  if (scheduledId != null) {
-    final hit = ref.watch(sermonByIdProvider(scheduledId));
-    if (hit.isLoading) return null;
-    final sermon = hit.valueOrNull;
-    if (sermon != null) {
-      return withAudioTwin(sermon, ref.watch(audioTwinByVideoIdProvider));
-    }
-  }
-  final library = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
-  return dailyMotdPick(library, ref.watch(todayProvider));
-});
-
-/// The automatic Message of the Day for [today] from [library].
-///
-/// A deterministic pick among audio sermons published in the [kMotdWindow]
-/// before [today], excluding [today] itself, so a same-day upload cannot
-/// reshuffle the pick mid-day. The pool is ordered by id before hashing the
-/// date, so the pick does not depend on load order and is the same on every
-/// device that holds the same messages. With nothing that recent, the newest
-/// audio sermon from before [today] (or, failing that, from [today]).
-Sermon? dailyMotdPick(List<Sermon> library, DateTime today) {
-  final day = DateTime(today.year, today.month, today.day);
-  final start = DateTime(day.year, day.month, day.day - kMotdWindow.inDays);
-  final end = DateTime(day.year, day.month, day.day + 1);
-  final audio = [
-    for (final s in library)
-      if (s.hasAudio && s.publishedAt != null && s.publishedAt!.isBefore(end))
-        s,
-  ];
-  final pool = [
-    for (final s in audio)
-      if (!s.publishedAt!.isBefore(start) && s.publishedAt!.isBefore(day)) s,
-  ]..sort((a, b) => a.id.compareTo(b.id));
-  if (pool.isNotEmpty) return pool[_fnv1a(motdDateKey(day)) % pool.length];
-  if (audio.isEmpty) return null;
-  audio.sort((a, b) {
-    final byDate = b.publishedAt!.compareTo(a.publishedAt!);
-    return byDate != 0 ? byDate : a.id.compareTo(b.id);
-  });
-  return audio.firstWhere(
-    (s) => s.publishedAt!.isBefore(day),
-    orElse: () => audio.first,
-  );
-}
-
-/// 32-bit FNV-1a. Unlike [String.hashCode] it is identical on every platform,
-/// which the "same pick for everyone" rule depends on.
-int _fnv1a(String input) {
-  var hash = 0x811c9dc5;
-  for (final unit in input.codeUnits) {
-    hash ^= unit;
-    hash = (hash * 0x01000193) & 0xffffffff;
-  }
-  return hash;
-}
 
 // ── Lookup by id ──────────────────────────────────────────────────────────────
 

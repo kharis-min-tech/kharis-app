@@ -12,14 +12,12 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_sermon_repository.dart';
 
-/// Contracts 1 (featured) and 2 (Message of the Day), read side.
+/// Contract 1 (the Messages featured carousel), read side.
 ///
 /// Firestore is a [FakeFirebaseFirestore] holding the Studio's documents;
 /// the API archive and the YouTube feed are scripted.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  final today = DateTime(2026, 10, 3);
 
   /// YouTube uploads, deliberately out of order.
   List<Sermon> feed() => [
@@ -58,7 +56,6 @@ void main() {
     required FakeFirebaseFirestore db,
     List<Sermon>? library,
     List<Sermon>? videos,
-    DateTime? date,
   }) async {
     final container = ProviderContainer(
       overrides: [
@@ -71,12 +68,10 @@ void main() {
           (ref) => Stream.value(const <Sermon>[]),
         ),
         videosProvider.overrideWith((ref) async => videos ?? feed()),
-        todayProvider.overrideWithValue(date ?? today),
       ],
     );
     addTearDown(container.dispose);
     container.listen(featuredSermonsProvider, (_, _) {});
-    container.listen(motdSermonProvider, (_, _) {});
     container.listen(sermonsProvider, (_, _) {});
     await container.read(sermonLibraryProvider.notifier).firstLoad;
     await container.read(videosProvider.future);
@@ -227,126 +222,24 @@ void main() {
         reason: 'only the pinned card may ever be shown: $shown',
       );
     });
-  });
 
-  group('Message of the Day (contract 2)', () {
-    test("today's scheduled sermon wins", () async {
+    test('off: no featured carousel, whatever is starred', () async {
       final db = FakeFirebaseFirestore();
-      await db.collection('motdSchedule').doc('2026-10-03').set({
-        'sermonId': 'old',
-        'title': 'Message old',
-      });
+      await db.collection('config').doc('featured').set({'mode': 'off'});
+      await star(db, 'doc0', DateTime(2026, 9, 1));
       final c = await settled(db: db);
-      expect(c.read(motdSermonProvider)?.id, 'old');
+      expect(c.read(featuredModeProvider).valueOrNull, FeaturedMode.off);
+      expect(c.read(featuredSermonsProvider), isEmpty);
     });
 
-    test('a scheduled yt_ mirror resolves to its audio twin', () async {
-      final db = FakeFirebaseFirestore();
-      await db.collection('motdSchedule').doc('2026-10-03').set({
-        'sermonId': 'yt_vid0-xxxxx',
-      });
-      final c = await settled(db: db);
-      final motd = c.read(motdSermonProvider);
-      expect(motd?.id, '101');
-      expect(motd?.hasAudio, isTrue);
-    });
-
-    test('no schedule: deterministic pick from the last 90 days', () async {
-      final a = await settled(db: FakeFirebaseFirestore());
-      final b = await settled(
-        db: FakeFirebaseFirestore(),
-        library: archive().reversed.toList(),
-      );
-      final pick = a.read(motdSermonProvider);
-      expect(pick, isNotNull);
-      expect(
-        pick!.id,
-        b.read(motdSermonProvider)?.id,
-        reason: 'same for everyone on a date, whatever the load order',
-      );
-      expect(today.difference(pick.publishedAt!).inDays, lessThanOrEqualTo(90));
-      expect(pick.hasAudio, isTrue);
-      expect(pick.id, isNot('old'));
-    });
-
-    test('a schedule for another day or a dangling id is ignored', () async {
-      final db = FakeFirebaseFirestore();
-      await db.collection('motdSchedule').doc('2026-10-02').set({
-        'sermonId': 'old',
-      });
-      final c = await settled(db: db);
-      expect(c.read(motdSermonProvider)?.id, isNot('old'));
-
-      final db2 = FakeFirebaseFirestore();
-      await db2.collection('motdSchedule').doc('2026-10-03').set({
-        'sermonId': 'gone',
-      });
-      final c2 = await settled(db: db2);
-      expect(c2.read(motdSermonProvider), isNotNull);
-      expect(c2.read(motdSermonProvider)!.id, isNot('gone'));
-    });
-
-    test('nothing in 90 days: the newest audio sermon', () async {
-      final c = await settled(
-        db: FakeFirebaseFirestore(),
-        library: [
-          testSermon('a', publishedAt: DateTime(2025, 1, 1)),
-          testSermon('b', publishedAt: DateTime(2025, 3, 1)),
-          testSermon(
-            'v',
-            audioUrl: '',
-            videoId: 'v0000000000',
-            publishedAt: DateTime(2025, 4, 1),
-          ),
-        ],
-      );
-      expect(c.read(motdSermonProvider)?.id, 'b');
-    });
-
-    test('dailyMotdPick varies with the date but not with list order', () {
-      final library = archive();
-      final picks = {
-        for (var d = 1; d <= 20; d++)
-          dailyMotdPick(library, DateTime(2026, 9, d))!.id,
-      };
-      expect(picks.length, greaterThan(1));
-      expect(
-        dailyMotdPick(library.reversed.toList(), today)!.id,
-        dailyMotdPick(library, today)!.id,
-      );
-    });
-
-    test('a same-day upload does not change the automatic pick', () {
-      final library = archive();
-      for (var d = 1; d <= 31; d++) {
-        final date = DateTime(2026, 10, d);
-        final upload = testSermon(
-          'new$d',
-          publishedAt: DateTime(2026, 10, d, 9, 30),
-        );
-        expect(
-          dailyMotdPick([...library, upload], date)!.id,
-          dailyMotdPick(library, date)!.id,
-          reason: 'pick for ${motdDateKey(date)} must hold all day',
-        );
-      }
-    });
-
-    test('the automatic pick hashes over ids, not publish order', () {
-      // The same messages with their dates shuffled: only the set of ids in
-      // the window decides the pick.
-      final a = [
-        for (var i = 0; i < 12; i++)
-          testSermon('m$i', publishedAt: DateTime(2026, 9, 1 + i)),
-      ];
-      final b = [
-        for (var i = 0; i < 12; i++)
-          testSermon('m$i', publishedAt: DateTime(2026, 9, 25 - i)),
-      ];
-      for (var d = 1; d <= 10; d++) {
-        final date = DateTime(2026, 10, d);
-        expect(dailyMotdPick(b, date)!.id, dailyMotdPick(a, date)!.id);
-      }
+    test('latest: the newest library messages, newest first', () async {
+      final c = await settled(db: FakeFirebaseFirestore());
+      c.listen(latestSermonsProvider, (_, _) {});
+      expect(c.read(latestSermonsProvider).map((s) => s.id), [
+        '101',
+        '102',
+        '29',
+      ]);
     });
   });
 }

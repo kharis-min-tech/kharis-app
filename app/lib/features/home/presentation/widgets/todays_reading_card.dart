@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
@@ -16,8 +17,10 @@ String? readingPlanDayLabel(DailyContent content) {
   return total == null ? 'Day $day' : 'Day $day of $total';
 }
 
-/// Solid purple card showing today's Bible reading with a serif scripture
-/// line and Read now / Daily prayer actions (design-handoff v3, light screen).
+/// Today's Bible reading on the brand ink card: the reference as the
+/// headline, the plan position when the reading comes from a plan, the
+/// daily prayer beneath, and one Read now action. The whole card opens the
+/// reader.
 ///
 /// Loading shows a skeleton of the card; a failure says so and offers Retry.
 /// It never paints a made-up reading in place of the real one.
@@ -33,8 +36,10 @@ class TodaysReadingCard extends ConsumerWidget {
       return _ReadingCard(
         reference: content.reading.reference,
         dayLabel: readingPlanDayLabel(content),
-        theme: content.prayerReference,
-        verse: content.prayer,
+        planDay: content.planDay,
+        planDays: content.planDays,
+        prayerReference: content.prayerReference,
+        prayer: content.prayer,
       );
     }
     if (contentAsync.hasError) {
@@ -63,7 +68,6 @@ class TodaysReadingCard extends ConsumerWidget {
             _Pill(
               label: 'Retry',
               icon: Icons.refresh_rounded,
-              filled: true,
               onTap: () => ref.invalidate(dailyContentProvider),
             ),
           ],
@@ -77,19 +81,15 @@ class TodaysReadingCard extends ConsumerWidget {
         children: [
           _GlassBar(width: 140, height: 11),
           SizedBox(height: 14),
-          _GlassBar(width: 190, height: 26),
-          SizedBox(height: 14),
+          _GlassBar(width: 190, height: 28),
+          SizedBox(height: 30),
+          _GlassBar(width: 150, height: 10),
+          SizedBox(height: 10),
           _GlassBar(width: double.infinity, height: 14),
           SizedBox(height: 8),
           _GlassBar(width: 220, height: 14),
           SizedBox(height: 20),
-          Row(
-            children: [
-              _GlassBar(width: 112, height: 38, radius: AppRadius.pill),
-              SizedBox(width: 10),
-              _GlassBar(width: 112, height: 38, radius: AppRadius.pill),
-            ],
-          ),
+          _GlassBar(width: 120, height: 38, radius: AppRadius.pill),
         ],
       ),
     );
@@ -137,23 +137,17 @@ class _Eyebrow extends StatelessWidget {
   }
 }
 
+/// The card's gold action pill.
 class _Pill extends StatelessWidget {
-  const _Pill({
-    required this.label,
-    required this.onTap,
-    this.icon,
-    this.filled = false,
-  });
+  const _Pill({required this.label, required this.icon, required this.onTap});
 
   final String label;
+  final IconData icon;
   final VoidCallback onTap;
-  final IconData? icon;
-  final bool filled;
 
   @override
   Widget build(BuildContext context) {
-    final ink = filled ? AppColors.onSecondary : Colors.white;
-    final icon = this.icon;
+    const ink = AppColors.onSecondary;
     return Semantics(
       button: true,
       child: GestureDetector(
@@ -161,13 +155,8 @@ class _Pill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
           decoration: BoxDecoration(
-            color: filled
-                ? AppColors.secondary
-                : Colors.white.withValues(alpha: .14),
+            color: AppColors.secondary,
             borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: filled
-                ? null
-                : Border.all(color: Colors.white.withValues(alpha: .18)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -176,13 +165,11 @@ class _Pill extends StatelessWidget {
                 label,
                 style: AppTypography.ui(
                   size: 13.5,
-                  weight: filled ? FontWeight.w800 : FontWeight.w700,
+                  weight: FontWeight.w800,
                 ).copyWith(color: ink, height: 1),
               ),
-              if (icon != null) ...[
-                const SizedBox(width: 6),
-                Icon(icon, color: ink, size: 15),
-              ],
+              const SizedBox(width: 6),
+              Icon(icon, color: ink, size: 15),
             ],
           ),
         ),
@@ -235,77 +222,161 @@ class _ReadingCard extends StatelessWidget {
   const _ReadingCard({
     required this.reference,
     required this.dayLabel,
-    required this.theme,
-    required this.verse,
+    required this.planDay,
+    required this.planDays,
+    required this.prayerReference,
+    required this.prayer,
   });
 
   final String reference;
   final String? dayLabel;
-  final String theme;
-  final String verse;
+  final int? planDay;
+  final int? planDays;
+  final String prayerReference;
+  final String prayer;
 
   @override
   Widget build(BuildContext context) {
-    final scripture = verse.isNotEmpty ? verse : theme;
     final day = dayLabel;
+    final prayer = this.prayer.trim();
+    final prayerRef = prayerReference.trim();
+    final planDay = this.planDay;
+    final planDays = this.planDays;
+    void open() => context.push('/reading');
 
     // Brand fill (via _CardShell), identical in both themes, so its text
     // stays light regardless of the active brightness.
-    return _CardShell(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Eyebrow: TODAY'S READING · DAY N OF M (plan readings only)
-          _Eyebrow(
-            text: day == null
-                ? "TODAY'S READING"
-                : "TODAY'S READING \u00b7 ${day.toUpperCase()}",
-          ),
-
-          const SizedBox(height: 12),
-
-          // Reference (big display heading)
-          Text(
-            reference,
-            style: AppTypography.display(
-              size: 27,
-              weight: FontWeight.w700,
-            ).copyWith(color: Colors.white, height: 1.1),
-          ),
-
-          // Scripture / prayer line (serif italic)
-          if (scripture.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              scripture,
-              style: AppTypography.serif(size: 15.5, italic: true).copyWith(
-                color: Colors.white.withValues(alpha: .88),
-                height: 1.5,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-
-          const SizedBox(height: 18),
-
-          // Action buttons
-          Row(
+    return Semantics(
+      button: true,
+      label: "Today's reading: $reference. Read now",
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: open,
+        child: _CardShell(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // TODAY'S READING · DAY N OF M (plan readings only), and the
+              // date the reading is for.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _Eyebrow(
+                      text: day == null
+                          ? "TODAY'S READING"
+                          : "TODAY'S READING \u00b7 ${day.toUpperCase()}",
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Clear of the dove watermark in the corner.
+                  Padding(
+                    padding: const EdgeInsets.only(right: 44),
+                    child: Text(
+                      DateFormat('EEE d MMM').format(DateTime.now()),
+                      style:
+                          AppTypography.ui(
+                            size: 11.5,
+                            weight: FontWeight.w600,
+                          ).copyWith(
+                            color: Colors.white.withValues(alpha: .85),
+                            height: 1,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // Reference (the headline)
+              Text(
+                reference,
+                style: AppTypography.display(
+                  size: 28,
+                  weight: FontWeight.w700,
+                ).copyWith(color: Colors.white, height: 1.1),
+              ),
+
+              // How far through the plan: real plan position only.
+              if (planDay != null && planDays != null && planDays > 0) ...[
+                const SizedBox(height: 12),
+                _PlanProgress(fraction: (planDay / planDays).clamp(0.0, 1.0)),
+              ],
+
+              // Daily prayer (serif italic) under a hairline.
+              if (prayer.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  height: 1,
+                  color: Colors.white.withValues(alpha: .14),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  prayerRef.isEmpty
+                      ? 'DAILY PRAYER'
+                      : 'DAILY PRAYER \u00b7 ${prayerRef.toUpperCase()}',
+                  style:
+                      AppTypography.ui(
+                        size: 10.5,
+                        weight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                      ).copyWith(
+                        color: Colors.white.withValues(alpha: .85),
+                        height: 1,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  prayer,
+                  style: AppTypography.serif(size: 16, italic: true).copyWith(
+                    color: Colors.white.withValues(alpha: .88),
+                    height: 1.45,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+
+              const SizedBox(height: 18),
+
               _Pill(
                 label: 'Read now',
                 icon: Icons.arrow_forward_rounded,
-                filled: true,
-                onTap: () => context.push('/reading'),
-              ),
-              const SizedBox(width: 10),
-              _Pill(
-                label: 'Daily prayer',
-                onTap: () => context.push('/reading'),
+                onTap: open,
               ),
             ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Plan position as a slim gold bar on a faint track (day N of M).
+class _PlanProgress extends StatelessWidget {
+  const _PlanProgress({required this.fraction});
+
+  final double fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: AppRadius.pillBorder,
+      child: SizedBox(
+        height: 3,
+        width: double.infinity,
+        child: ColoredBox(
+          color: Colors.white.withValues(alpha: .14),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: fraction,
+              heightFactor: 1,
+              child: const ColoredBox(color: AppColors.secondary),
+            ),
+          ),
+        ),
       ),
     );
   }

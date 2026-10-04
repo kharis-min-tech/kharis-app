@@ -113,7 +113,11 @@ class _AnnouncementFormSheetState extends ConsumerState<AnnouncementFormSheet> {
     // normaliseType guards the dropdown: a legacy doc saved as type 'Event'
     // would otherwise assert on a value outside `items`.
     _type = NewsItem.normaliseType(item?.type);
-    _branch = item?.branch;
+    // A campus admin may not post church-wide, so a new Studio item starts
+    // on one of their campuses.
+    _branch = item == null && !_isBranchPage
+        ? studioDefaultCampus(ref)
+        : item?.branch;
     _eventId = item?.eventId;
     if (item != null) {
       _publishWall = toLondonWallClock(item.publishedAt);

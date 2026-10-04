@@ -5,41 +5,51 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_webview_screen.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
-/// The secure Kharis giving page (verified 200). It lists every campus and
-/// fund, each opening its own Tithe.ly form, so it is org-wide: the branch
-/// model carries no giving URL and there is nothing branch-specific to
-/// substitute here.
-const String kGivingUrl = 'https://kharis.org/giving/';
-
-/// Bank transfer details exactly as published on kharis.org/giving. The card
-/// renders these rows and "Copy bank details" copies the same rows, so what
-/// the member sees is what lands on the clipboard.
-const List<(String, String)> kBankTransferRows = [
-  ('Account name', 'Kharis Ministries'),
-  ('Account number', '80608335'),
-  ('Sort code', '20-71-82'),
-  ('SWIFT/BIC', 'BUKBGB22'),
-  ('IBAN', 'GB88BUKB20718280608335'),
+/// The bank-transfer rows of [giving], in display order. The card renders
+/// these rows and "Copy bank details" copies the same rows, so what the
+/// member sees is what lands on the clipboard.
+List<(String, String)> givingBankRows(GivingDetails giving) => [
+  if (giving.bankName case final v?) ('Bank', v),
+  if (giving.accountName case final v?) ('Account name', v),
+  if (giving.accountNumber case final v?) ('Account number', v),
+  if (giving.sortCode case final v?) ('Sort code', v),
+  if (giving.swiftBic case final v?) ('SWIFT/BIC', v),
+  if (giving.iban case final v?) ('IBAN', v),
+  if (giving.reference case final v?) ('Reference', v),
 ];
 
-/// Clipboard text for [kBankTransferRows], one `Label: value` per line.
-String get bankTransferClipboardText =>
-    kBankTransferRows.map((r) => '${r.$1}: ${r.$2}').join('\n');
+/// Clipboard text for [givingBankRows], one `Label: value` per line.
+String givingClipboardText(GivingDetails giving) =>
+    _rowsText(givingBankRows(giving));
+
+String _rowsText(List<(String, String)> rows) =>
+    rows.map((r) => '${r.$1}: ${r.$2}').join('\n');
 
 /// Giving tab.
 ///
 /// A calm, single-column giving landing: a scripture card, the campus the
 /// gift is directed to, a full-width gold **Give securely** call to action
 /// that opens the secure giving page, and the bank-transfer details below.
+///
+/// The details are [effectiveGivingProvider]: the campus account when the
+/// campus has one, else the church-wide account. "Give securely" only shows
+/// when there is a giving page to open.
 class GivingScreen extends ConsumerWidget {
   const GivingScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final branch = ref.watch(currentBranchProvider).valueOrNull;
+    final giving = ref.watch(effectiveGivingProvider);
+    final recipient = ref.watch(givingRecipientProvider);
+    final url = giving.url;
+    final rows = givingBankRows(giving);
+    final note = giving.note;
 
     return Scaffold(
       body: SafeArea(
@@ -69,16 +79,36 @@ class GivingScreen extends ConsumerWidget {
                     const SizedBox(height: 9),
                     _BranchSelector(
                       branch: branch ?? kAllCampusesLabel,
+                      recipient: recipient,
                       onTap: () => pickActiveBranch(context, ref),
                     ),
-                    const SizedBox(height: 14),
-                    _GiveSecurelyButton(
-                      onTap: () => openGivingFlow(context, kGivingUrl),
-                    ),
-                    const SizedBox(height: 9),
-                    const _SecureNote(),
-                    const SizedBox(height: 22),
-                    const _BankTransferCard(),
+                    if (url != null) ...[
+                      const SizedBox(height: 14),
+                      _GiveSecurelyButton(
+                        onTap: () => openGivingFlow(context, url),
+                      ),
+                      const SizedBox(height: 9),
+                      _SecureNote(recipient: recipient),
+                    ],
+                    if (rows.isNotEmpty) ...[
+                      const SizedBox(height: 22),
+                      _BankTransferCard(rows: rows, recipient: recipient),
+                    ],
+                    if (note != null) ...[
+                      const SizedBox(height: 14),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          note,
+                          key: const ValueKey('giving-note'),
+                          style: AppTypography.ui(
+                            size: 13.5,
+                            height: 1.45,
+                            color: context.kc.muted,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -150,9 +180,17 @@ class _ScriptureCard extends StatelessWidget {
 // ── Branch selector ─────────────────────────────────────────────────────────
 
 class _BranchSelector extends StatelessWidget {
-  const _BranchSelector({required this.branch, required this.onTap});
+  const _BranchSelector({
+    required this.branch,
+    required this.recipient,
+    required this.onTap,
+  });
 
+  /// The member's campus choice (or "All campuses").
   final String branch;
+
+  /// Whose account receives the gift: the campus, or the church.
+  final String recipient;
   final VoidCallback onTap;
 
   @override
@@ -160,7 +198,7 @@ class _BranchSelector extends StatelessWidget {
     final kc = context.kc;
     return Semantics(
       button: true,
-      label: 'Giving to $branch. Change campus',
+      label: 'Giving to $recipient from $branch. Change campus',
       excludeSemantics: true,
       child: GestureDetector(
         key: const ValueKey('giving-branch-selector'),
@@ -190,13 +228,24 @@ class _BranchSelector extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  branch,
-                  style: AppTypography.ui(
-                    size: 15,
-                    weight: FontWeight.w700,
-                    color: kc.onBg,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      branch,
+                      style: AppTypography.ui(
+                        size: 15,
+                        weight: FontWeight.w700,
+                        color: kc.onBg,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$recipient account',
+                      key: const ValueKey('giving-recipient'),
+                      style: AppTypography.ui(size: 12.5, color: kc.muted),
+                    ),
+                  ],
                 ),
               ),
               Text(
@@ -259,7 +308,9 @@ class _GiveSecurelyButton extends StatelessWidget {
 // ── Secure note ───────────────────────────────────────────────────────────────
 
 class _SecureNote extends StatelessWidget {
-  const _SecureNote();
+  const _SecureNote({required this.recipient});
+
+  final String recipient;
 
   @override
   Widget build(BuildContext context) {
@@ -268,9 +319,11 @@ class _SecureNote extends StatelessWidget {
       children: [
         Icon(Icons.lock_outline_rounded, size: 13, color: context.kc.muted),
         const SizedBox(width: 6),
-        Text(
-          'Opens the secure Kharis giving page',
-          style: AppTypography.ui(size: 12, color: context.kc.muted),
+        Flexible(
+          child: Text(
+            'Opens the secure $recipient giving page',
+            style: AppTypography.ui(size: 12, color: context.kc.muted),
+          ),
         ),
       ],
     );
@@ -280,11 +333,14 @@ class _SecureNote extends StatelessWidget {
 // ── Bank transfer card ──────────────────────────────────────────────────────
 
 class _BankTransferCard extends StatelessWidget {
-  const _BankTransferCard();
+  const _BankTransferCard({required this.rows, required this.recipient});
+
+  final List<(String, String)> rows;
+  final String recipient;
 
   Future<void> _copy(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
-    await Clipboard.setData(ClipboardData(text: bankTransferClipboardText));
+    await Clipboard.setData(ClipboardData(text: _rowsText(rows)));
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -339,7 +395,7 @@ class _BankTransferCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'UK bank account',
+                      'To $recipient',
                       style: AppTypography.ui(size: 12.5, color: kc.muted),
                     ),
                   ],
@@ -348,7 +404,7 @@ class _BankTransferCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          for (final (label, value) in kBankTransferRows)
+          for (final (label, value) in rows)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(

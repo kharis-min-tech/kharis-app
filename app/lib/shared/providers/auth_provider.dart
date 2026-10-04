@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/onboarding/data/auth_repository.dart';
 import '../../features/onboarding/data/firebase_auth_repository.dart';
+import '../models/campus_config.dart';
 import '../models/user.dart';
+import 'branch_provider.dart' show firestoreProvider;
 import 'onboarding_provider.dart';
 import 'cache_provider.dart';
 
@@ -82,13 +84,54 @@ class AnonymousSignIn {
   }
 }
 
-/// True when the signed-in user is an admin (profile role or `admin` claim).
-final isAdminProvider = FutureProvider<bool>((ref) async {
+/// What the signed-in user may manage in Content Studio, from their live
+/// `users/{uid}` doc (role + campus lists) and the `admin` custom claim.
+///
+/// A profile read error falls back to the role already hydrated on the
+/// session, so a super admin keeps Studio while a campus admin (whose
+/// campuses only live on the doc) does not.
+final adminScopeProvider = StreamProvider<AdminScope>((ref) async* {
   final user = ref.watch(currentUserProvider).valueOrNull;
-  if (user == null) return false;
-  if (user.role == 'admin') return true;
-  return ref.read(firebaseAuthRepositoryProvider).isCurrentUserAdmin();
+  if (user == null) {
+    yield const AdminScope.none();
+    return;
+  }
+  // True for the profile role 'admin' or the custom claim; either makes a
+  // super admin, so it stands in for the claim in [AdminScope.fromProfile].
+  final adminClaim = await ref
+      .read(firebaseAuthRepositoryProvider)
+      .isCurrentUserAdmin();
+  try {
+    await for (final snap
+        in ref
+            .watch(firestoreProvider)
+            .collection('users')
+            .doc(user.id)
+            .snapshots()) {
+      yield AdminScope.fromProfile(snap.data(), adminClaim: adminClaim);
+    }
+  } catch (_) {
+    yield AdminScope.fromProfile({'role': user.role}, adminClaim: adminClaim);
+  }
 });
+
+/// True when the signed-in user may open Content Studio: a super admin
+/// (profile role or `admin` claim) or a campus admin with 1+ campuses.
+/// Screens use [adminScopeProvider] for what they may manage inside it.
+final isAdminProvider = FutureProvider<bool>((ref) async {
+  final scope = await ref.watch(adminScopeProvider.future);
+  return scope.canUseStudio;
+});
+
+/// Studio routes only a super admin may open; campus admins are sent back
+/// to the Studio hub. `/admin/branches/:id` is checked per campus.
+const _superAdminRoutes = [
+  '/admin/users',
+  '/admin/sermons',
+  '/admin/reading-plans',
+  '/admin/bible-reading',
+  '/admin/settings',
+];
 
 // ── Notification preferences ──────────────────────────────────────────────────
 
@@ -130,9 +173,13 @@ class RouterNotifier extends ChangeNotifier {
     _ref.listen<AsyncValue<User?>>(currentUserProvider, (_, _) {
       notifyListeners();
     });
-    // Keeps the admin check alive and re-runs the guard when it resolves, so
-    // a member who loses the role is moved off an admin screen.
+    // Keeps the Studio access check alive and re-runs the guard when it
+    // resolves or changes, so a member who loses the role (or a campus admin
+    // who loses a campus) is moved off a screen they may no longer open.
     _ref.listen<AsyncValue<bool>>(isAdminProvider, (_, _) {
+      notifyListeners();
+    });
+    _ref.listen<AsyncValue<AdminScope>>(adminScopeProvider, (_, _) {
       notifyListeners();
     });
   }
@@ -143,13 +190,27 @@ class RouterNotifier extends ChangeNotifier {
   String? redirect(BuildContext context, GoRouterState state) {
     final location = state.matchedLocation;
 
-    // Admin console: only a confirmed admin gets in. The More entry is only
-    // rendered once [isAdminProvider] has resolved true, so an admin never
-    // hits the unresolved case through the UI; a deep link that arrives
-    // before the check resolves is bounced rather than shown.
+    // Content Studio: only a confirmed super or campus admin gets in. The
+    // More entry is only rendered once [isAdminProvider] has resolved true,
+    // so an admin never hits the unresolved case through the UI; a deep link
+    // that arrives before the check resolves is bounced rather than shown.
+    // Campus admins are kept to their campuses' screens: super-admin-only
+    // areas and other campuses' branch pages return them to the hub.
     if (location == '/admin' || location.startsWith('/admin/')) {
       final isAdmin = _ref.read(isAdminProvider).valueOrNull ?? false;
-      return isAdmin ? null : '/home';
+      if (!isAdmin) return '/home';
+      final scope = _ref.read(adminScopeProvider).valueOrNull;
+      if (scope == null || scope.isSuperAdmin) return null;
+      final superOnly = _superAdminRoutes.any(
+        (r) => location == r || location.startsWith('$r/'),
+      );
+      if (superOnly) return '/admin';
+      const branchPrefix = '/admin/branches/';
+      if (location.startsWith(branchPrefix)) {
+        final id = location.substring(branchPrefix.length).split('/').first;
+        if (!scope.canManageBranchId(id)) return '/admin';
+      }
+      return null;
     }
 
     // One-time welcome: once onboarding is complete (or a member has signed

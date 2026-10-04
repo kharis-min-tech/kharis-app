@@ -99,7 +99,11 @@ class _EventFormSheetState extends ConsumerState<EventFormSheet> {
     _locationCtrl = TextEditingController(text: ev?.location ?? '');
     _addressCtrl = TextEditingController(text: ev?.address ?? '');
     _imageUrlCtrl = TextEditingController(text: ev?.imageUrl ?? '');
-    _branch = ev?.branch;
+    // A campus admin may not post church-wide, so a new Studio event starts
+    // on one of their campuses.
+    _branch = ev == null && !_isBranchPage
+        ? studioDefaultCampus(ref)
+        : ev?.branch;
     _startTime = ev?.startTime;
     _endTime = ev?.endTime;
     _isFeatured = ev?.isFeatured ?? false;

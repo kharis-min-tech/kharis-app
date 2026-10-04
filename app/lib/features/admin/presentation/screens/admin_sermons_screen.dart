@@ -4,7 +4,6 @@ import 'package:kharis_app/core/services/firebase_service.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/sermon_categorizer.dart';
 import 'package:kharis_app/features/admin/presentation/widgets/sermon_curation_section.dart';
-import 'package:kharis_app/features/admin/providers/content_config_providers.dart';
 import 'package:kharis_app/features/messages/data/firestore_sermon_repository.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -16,8 +15,8 @@ const _sourceOptions = ['audio', 'youtube'];
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-/// Admin screen: the Messages tab curation (featured mode, Message of the Day
-/// schedule) plus list + CRUD for Firestore-managed sermons.
+/// Admin screen: the Messages tab curation (featured mode: auto, pinned or
+/// off) plus list + CRUD for Firestore-managed sermons.
 ///
 /// Only sermons stored in the `sermons` Firestore collection are editable
 /// here. The archive/API sermons are read-only (they arrive from the Kharis
@@ -32,29 +31,6 @@ class AdminSermonsScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminSermonsScreenState extends ConsumerState<AdminSermonsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    if (kUseFirebase) _migrateLegacyMotd();
-  }
-
-  /// One-shot move of the retired `config/messageOfTheDay` pointer into
-  /// today's schedule. Best effort: a failure only means the old pick is not
-  /// carried over, so it is logged rather than shown.
-  Future<void> _migrateLegacyMotd() async {
-    try {
-      final moved =
-          await ref.read(contentConfigRepositoryProvider).migrateLegacyMotd();
-      if (!moved || !mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Moved the old Message of the Day into today’s schedule'),
-        backgroundColor: AppColors.surfaceElevated,
-      ));
-    } catch (e) {
-      debugPrint('Legacy Message of the Day migration failed: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final sermonsAsync = ref.watch(adminSermonsProvider);
@@ -90,16 +66,7 @@ class _AdminSermonsScreenState extends ConsumerState<AdminSermonsScreen> {
                 AppSpacing.gutter,
                 0,
               ),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    FeaturedModeCard(),
-                    SizedBox(height: AppSpacing.sm),
-                    MotdScheduleCard(),
-                  ],
-                ),
-              ),
+              sliver: SliverToBoxAdapter(child: FeaturedModeCard()),
             ),
           ...sermonsAsync.when(
             loading: () => const [

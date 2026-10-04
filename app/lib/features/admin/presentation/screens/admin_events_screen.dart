@@ -4,17 +4,20 @@ import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/admin/presentation/widgets/event_form_sheet.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-/// Admin screen: list + CRUD for [Event].
+/// Admin screen: list + CRUD for [Event]. A campus admin sees (and may only
+/// manage) their own campuses' events.
 class AdminEventsScreen extends ConsumerWidget {
   const AdminEventsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final eventsAsync = ref.watch(upcomingEventsProvider(null));
+    final scope = ref.watch(adminScopeProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -45,7 +48,11 @@ class AdminEventsScreen extends ConsumerWidget {
             ),
           ),
         ),
-        data: (events) {
+        data: (all) {
+          final events = [
+            for (final e in all)
+              if (scope?.canManageCampusNamed(e.branch) ?? false) e,
+          ];
           if (events.isEmpty) {
             return Center(
               child: Text(

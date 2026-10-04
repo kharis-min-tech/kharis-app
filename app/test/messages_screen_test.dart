@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/messages/data/curation_repository.dart';
 import 'package:kharis_app/features/messages/data/sermon_repository_base.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -33,13 +34,14 @@ void main() {
   Widget app(
     FakePagedSermonRepository repo, {
     Duration? debounce,
+    List<Sermon> videos = const [],
     List<Override> extra = const [],
   }) => ProviderScope(
     overrides: [
       sermonRepositoryProvider.overrideWithValue(repo),
       sermonArchiveAutoHydrateProvider.overrideWithValue(false),
       cmsSermonsProvider.overrideWith((ref) => Stream.value(const <Sermon>[])),
-      videosProvider.overrideWith((ref) async => const <Sermon>[]),
+      videosProvider.overrideWith((ref) async => videos),
       firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
       cacheServiceProvider.overrideWithValue(FakeCacheService()),
       audioPlayerServiceProvider.overrideWithValue(FakeAudioPlayerService()),
@@ -237,6 +239,66 @@ void main() {
       find.text('You\'ve reached the beginning \u2022 25 messages'),
       findsOneWidget,
     );
+  });
+
+  group('featured mode', () {
+    final videos = [
+      testSermon(
+        'v1',
+        title: 'Featured upload',
+        audioUrl: '',
+        videoId: 'v1',
+        publishedAt: DateTime(2026, 9, 20),
+        source: 'youtube',
+      ),
+    ];
+
+    testWidgets('auto leads with the featured carousel', (tester) async {
+      await tester.pumpWidget(
+        app(
+          FakePagedSermonRepository([live]),
+          videos: videos,
+          extra: [
+            featuredModeProvider.overrideWith(
+              (ref) => Stream.value(FeaturedMode.auto),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('FEATURED'), findsWidgets);
+      expect(find.byKey(const ValueKey('messages-latest')), findsNothing);
+    });
+
+    testWidgets('off hides the carousel and leads with the latest messages', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        app(
+          FakePagedSermonRepository([live]),
+          videos: videos,
+          extra: [
+            featuredModeProvider.overrideWith(
+              (ref) => Stream.value(FeaturedMode.off),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('FEATURED'), findsNothing);
+      expect(find.text('Featured upload'), findsNothing);
+      expect(find.text('Latest messages'), findsOneWidget);
+      // Newest first, ahead of the topics and the full list.
+      final latest = tester.getTopLeft(find.text('Latest messages'));
+      final newest = find.text('Live message 3').first;
+      expect(tester.getTopLeft(newest).dy, greaterThan(latest.dy));
+      expect(
+        tester.getTopLeft(newest).dy,
+        lessThan(tester.getTopLeft(find.text('Find encouragement')).dy),
+      );
+    });
   });
 }
 

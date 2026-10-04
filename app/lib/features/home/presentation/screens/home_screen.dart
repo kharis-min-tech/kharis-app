@@ -3,35 +3,47 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import '../widgets/continue_listening_card.dart';
-import '../widgets/latest_message_card.dart';
+import '../widgets/giving_shortcut_card.dart';
+import '../widgets/live_now_card.dart';
 import '../widgets/todays_reading_card.dart';
 import '../widgets/campus_card.dart';
 import '../widgets/profile_completion_card.dart';
 import '../widgets/news_section.dart';
 import '../widgets/upcoming_events_strip.dart';
 
+/// Space under a full-width Home block.
+const EdgeInsets _blockPadding = EdgeInsets.fromLTRB(20, 0, 20, 24);
+
+/// Home tab: the greeting header, then the blocks Content Studio chose for
+/// the member's campus ([effectiveHomeLayoutProvider]), in that order.
+///
+/// Conditional blocks (profile nudge, live, continue listening, campus)
+/// render nothing, padding included, when they have nothing to show.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   /// Pull-to-refresh reloads everything Home shows and holds the spinner
-  /// until it has all answered: the sermon library and hero video, today's
-  /// reading, and the campus announcements and events.
+  /// until it has all answered: today's reading, the campus announcements and
+  /// events, and the campus settings (branches, `config/home`,
+  /// `config/giving`) behind the layout and the campus card.
   Future<void> _refresh(WidgetRef ref) {
     ref.invalidate(dailyContentProvider);
     return Future.wait<void>([
-      settleRefresh(ref.read(sermonLibraryProvider.notifier).refresh()),
-      settleRefresh(ref.refresh(videosProvider.future)),
       settleRefresh(ref.refresh(dailyContentProvider.future)),
       refreshCampusContent(ref),
+      refreshCampusConfig(ref),
     ]);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sections = ref.watch(effectiveHomeLayoutProvider).visible;
     return Scaffold(
       body: RefreshIndicator(
         color: context.kc.accentInk,
@@ -53,74 +65,11 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
 
-            // Pick up where you left off. Collapses to nothing (padding
-            // included) when there is nothing to resume.
-            const SliverToBoxAdapter(
-              child: ContinueListeningCard(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+            for (final id in sections)
+              SliverToBoxAdapter(
+                key: ValueKey('home-section-${id.id}'),
+                child: _HomeSection(id),
               ),
-            ),
-
-            // Today's reading leads the page: it is one of the key reasons
-            // members open the app daily (product ask, 19 Aug — KA-009).
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 24),
-                child: TodaysReadingCard(),
-              ),
-            ),
-
-            // Featured hero sermon
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
-                child: LatestMessageCard(),
-              ),
-            ),
-
-            // Your campus: venue + service times for the member's branch.
-            // Owns its own padding so it collapses to zero height when the
-            // member has no branch or the branch has no venue details.
-            // Post-signup nudge: collapses once birthday + phone are set.
-            const SliverToBoxAdapter(child: ProfileCompletionCard()),
-
-            const SliverToBoxAdapter(child: CampusCard()),
-
-            // "Announcements" section header
-            SliverToBoxAdapter(
-              child: _SectionHeader(
-                title: 'Announcements',
-                actionKey: const Key('home-announcements-see-all'),
-                // The full announcements list, pushed so Back returns here.
-                // (It used to jump to the Events tab, which is not where
-                // announcements live.)
-                onSeeAll: () => context.push('/announcements'),
-              ),
-            ),
-
-            // Announcements carousel (edge-to-edge with left pad)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(left: 20, bottom: 28),
-                child: AnnouncementsCarousel(),
-              ),
-            ),
-
-            // "Upcoming events" for the member's campus.
-            SliverToBoxAdapter(
-              child: _SectionHeader(
-                title: 'Upcoming events',
-                actionKey: const Key('home-events-see-all'),
-                // Events is a tab: switch to it rather than stacking it.
-                onSeeAll: () => context.go('/calendar'),
-              ),
-            ),
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(left: 20),
-                child: UpcomingEventsStrip(),
-              ),
-            ),
 
             // Bottom safe area: 150 clears mini player + tab bar
             const SliverToBoxAdapter(child: SizedBox(height: 150)),
@@ -128,6 +77,68 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// One Home block by its Studio id.
+class _HomeSection extends StatelessWidget {
+  const _HomeSection(this.id);
+
+  final HomeSectionId id;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (id) {
+      // Post-signup nudge: owns its padding and collapses once birthday +
+      // phone are set.
+      HomeSectionId.profileCompletion => const ProfileCompletionCard(),
+      HomeSectionId.live => const LiveNowCard(padding: _blockPadding),
+      HomeSectionId.reading => const Padding(
+        padding: _blockPadding,
+        child: TodaysReadingCard(),
+      ),
+      HomeSectionId.announcements => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SectionHeader(
+            title: 'Announcements',
+            actionKey: const Key('home-announcements-see-all'),
+            // The full announcements list, pushed so Back returns here.
+            onSeeAll: () => context.push('/announcements'),
+          ),
+          // Edge-to-edge carousel with a left pad.
+          const Padding(
+            padding: EdgeInsets.only(left: 20, bottom: 28),
+            child: AnnouncementsCarousel(),
+          ),
+        ],
+      ),
+      HomeSectionId.events => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SectionHeader(
+            title: 'Upcoming events',
+            actionKey: const Key('home-events-see-all'),
+            // Events is a tab: switch to it rather than stacking it.
+            onSeeAll: () => context.go('/calendar'),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(left: 20, bottom: 28),
+            child: UpcomingEventsStrip(),
+          ),
+        ],
+      ),
+      HomeSectionId.campus => const CampusCard(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
+      ),
+      HomeSectionId.continueListening => const ContinueListeningCard(
+        padding: _blockPadding,
+      ),
+      HomeSectionId.giving => const Padding(
+        padding: _blockPadding,
+        child: GivingShortcutCard(),
+      ),
+    };
   }
 }
 

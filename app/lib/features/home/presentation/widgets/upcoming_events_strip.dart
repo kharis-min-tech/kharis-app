@@ -12,8 +12,28 @@ import 'package:kharis_app/shared/widgets/skeleton.dart';
 /// How many upcoming events Home previews; the Events tab has the rest.
 const int kHomeEventPreviewCount = 5;
 
-const double _kTileWidth = 250;
-const double _kTileHeight = 96;
+const double _kTileWidth = 264;
+const double _kTileHeight = 104;
+
+/// "Today", "Tomorrow", else "Sat 11 Oct", then the start (and end, when
+/// set) time: `Tomorrow · 7:00 PM – 9:00 PM`.
+@visibleForTesting
+String eventWhenLabel(Event event, {DateTime? now}) {
+  final today = DateUtils.dateOnly(now ?? DateTime.now());
+  final day = DateUtils.dateOnly(event.startTime);
+  final diff = day.difference(today).inDays;
+  final dayLabel = switch (diff) {
+    0 => 'Today',
+    1 => 'Tomorrow',
+    _ => DateFormat('EEE d MMM').format(event.startTime),
+  };
+  final time = DateFormat('h:mm a');
+  final end = event.endTime;
+  final range = end != null && DateUtils.isSameDay(end, event.startTime)
+      ? '${time.format(event.startTime)} \u2013 ${time.format(end)}'
+      : time.format(event.startTime);
+  return '$dayLabel \u00b7 $range';
+}
 
 /// Home's "Upcoming events" strip: the next few events Content Studio has
 /// published for the member's campus plus all-campus events, each showing
@@ -81,17 +101,15 @@ class _EventTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kc = context.kc;
     final place = eventPlaceLabel(event);
-    final when =
-        '${DateFormat('EEE').format(event.startTime)} \u00b7 '
-        '${DateFormat('h:mm a').format(event.startTime)}';
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: AppRadius.cardBorder,
         boxShadow: AppShadows.card,
       ),
       child: Material(
-        color: context.kc.surface,
+        color: kc.surface,
         borderRadius: AppRadius.cardBorder,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -102,25 +120,36 @@ class _EventTile extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
+                  // Calendar leaf: weekday, day, month.
                   Container(
-                    width: 52,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    width: 54,
+                    height: double.infinity,
                     decoration: BoxDecoration(
-                      color: context.kc.chipBg,
+                      color: kc.chipBg,
                       borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          DateFormat('d').format(event.startTime),
+                          DateFormat(
+                            'EEE',
+                          ).format(event.startTime).toUpperCase(),
                           style: AppTypography.ui(
-                            size: 19,
-                            weight: FontWeight.w800,
-                            height: 1,
-                          ).copyWith(color: context.kc.onChip),
+                            size: 10,
+                            weight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                          ).copyWith(color: kc.onChip, height: 1),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 4),
+                        Text(
+                          DateFormat('d').format(event.startTime),
+                          style: AppTypography.display(
+                            size: 22,
+                            weight: FontWeight.w700,
+                          ).copyWith(color: kc.onChip, height: 1),
+                        ),
+                        const SizedBox(height: 4),
                         Text(
                           DateFormat(
                             'MMM',
@@ -128,8 +157,8 @@ class _EventTile extends StatelessWidget {
                           style: AppTypography.ui(
                             size: 10,
                             weight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ).copyWith(color: context.kc.onChip),
+                            letterSpacing: 0.6,
+                          ).copyWith(color: kc.onChip, height: 1),
                         ),
                       ],
                     ),
@@ -142,15 +171,18 @@ class _EventTile extends StatelessWidget {
                       children: [
                         Text(
                           event.title,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.ui(
                             size: 14.5,
                             weight: FontWeight.w700,
-                          ).copyWith(color: context.kc.onBg),
+                          ).copyWith(color: kc.onBg, height: 1.25),
                         ),
                         const SizedBox(height: 4),
-                        _Line(icon: Icons.schedule_rounded, text: when),
+                        _Line(
+                          icon: Icons.schedule_rounded,
+                          text: eventWhenLabel(event),
+                        ),
                         if (place != null) ...[
                           const SizedBox(height: 2),
                           _Line(icon: Icons.place_outlined, text: place),

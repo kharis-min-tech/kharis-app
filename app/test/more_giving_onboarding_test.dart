@@ -24,9 +24,11 @@ import 'package:kharis_app/features/onboarding/presentation/screens/role_selecti
 import 'package:kharis_app/features/settings/presentation/screens/edit_profile_screen.dart';
 import 'package:kharis_app/features/settings/presentation/screens/notifications_settings_screen.dart';
 import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
@@ -147,12 +149,13 @@ List<Override> _baseOverrides({
   required FakeFirebaseFirestore db,
   User? user,
   AuthRepository? auth,
+  List<Branch> branches = _branches,
 }) => [
   sharedPreferencesProvider.overrideWithValue(prefs),
   firestoreProvider.overrideWithValue(db),
   currentUserProvider.overrideWith((ref) => Stream.value(user)),
   isAdminProvider.overrideWith((ref) => false),
-  branchesProvider.overrideWith((ref) => Stream.value(_branches)),
+  branchesProvider.overrideWith((ref) => Stream.value(branches)),
   notificationServiceProvider.overrideWithValue(_QuietNotifications()),
   notificationPrefsProvider.overrideWith(
     (ref) => Stream.value(const <String, bool>{}),
@@ -372,7 +375,7 @@ void main() {
             'IBAN: GB88BUKB20718280608335',
       ]);
       // Every copied value is on screen.
-      for (final (_, value) in kBankTransferRows) {
+      for (final (_, value) in givingBankRows(kBuiltInGiving)) {
         expect(find.text(value), findsOneWidget);
       }
       expect(find.text('Bank details copied'), findsOneWidget);
@@ -394,6 +397,105 @@ void main() {
 
     test('the secure giving URL is the live giving page', () {
       expect(kGivingUrl, 'https://kharis.org/giving/');
+      expect(kBuiltInGiving.url, kGivingUrl);
+    });
+
+    testWidgets('a campus with no account of its own gives church-wide', (
+      tester,
+    ) async {
+      await pumpGiving(tester);
+      expect(find.text('London'), findsOneWidget);
+      expect(find.text('Kharis Church account'), findsOneWidget);
+      expect(find.text('To Kharis Church'), findsOneWidget);
+    });
+
+    testWidgets('a campus account names the campus and replaces every row', (
+      tester,
+    ) async {
+      final prefs = await _prefs({'onboarding_branch': 'London'});
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _baseOverrides(
+            prefs: prefs,
+            db: FakeFirebaseFirestore(),
+            branches: const [
+              Branch(
+                id: 'london',
+                name: 'London',
+                subtitle: 'England · Main campus',
+                gradientStart: Color(0xFF5D3FD3),
+                gradientEnd: Color(0xFF451EBB),
+                giving: GivingDetails(
+                  accountName: 'Kharis London',
+                  sortCode: '11-22-33',
+                  accountNumber: '12345678',
+                  reference: 'LONDON TITHE',
+                  note: 'Gift Aid forms are at the welcome desk.',
+                ),
+              ),
+            ],
+          ),
+          child: const MaterialApp(home: GivingScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('London account'), findsOneWidget);
+      expect(find.text('To London'), findsOneWidget);
+      // No campus giving page: nothing to open securely.
+      expect(find.text('Give securely'), findsNothing);
+      expect(
+        find.text('Gift Aid forms are at the welcome desk.'),
+        findsOneWidget,
+      );
+      expect(find.text('Kharis Ministries'), findsNothing);
+
+      final button = find.text('Copy bank details');
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(
+        _clipboard.last,
+        [
+          'Account name: Kharis London',
+          'Account number: 12345678',
+          'Sort code: 11-22-33',
+          'Reference: LONDON TITHE',
+        ].join('\n'),
+      );
+    });
+
+    testWidgets('config/giving is the church-wide account when set', (
+      tester,
+    ) async {
+      final prefs = await _prefs({'onboarding_branch': 'London'});
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ..._baseOverrides(prefs: prefs, db: FakeFirebaseFirestore()),
+            churchGivingProvider.overrideWith(
+              (ref) => Stream.value(
+                const GivingDetails(
+                  url: 'https://give.example.org',
+                  accountName: 'Kharis Church UK',
+                  accountNumber: '87654321',
+                ),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: GivingScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kharis Church UK'), findsOneWidget);
+      expect(find.text('Kharis Ministries'), findsNothing);
+      expect(find.text('Kharis Church account'), findsOneWidget);
+      expect(find.text('Give securely'), findsOneWidget);
+      expect(
+        find.text('Opens the secure Kharis Church giving page'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the giving page error state retries', (tester) async {

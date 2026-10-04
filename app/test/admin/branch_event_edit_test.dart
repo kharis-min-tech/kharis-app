@@ -11,7 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kharis_app/features/admin/presentation/widgets/event_form_sheet.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 final _start = DateTime(2026, 10, 12, 18);
 final _end = DateTime(2026, 10, 12, 20);
@@ -133,7 +135,12 @@ void main() {
         onSuccess: (_) {},
         onError: (_) {},
       ),
-      overrides: [branchesProvider.overrideWith((ref) => campuses.stream)],
+      overrides: [
+        branchesProvider.overrideWith((ref) => campuses.stream),
+        adminScopeProvider.overrideWith(
+          (ref) => Stream.value(const AdminScope.superAdmin()),
+        ),
+      ],
       settle: false,
     );
 

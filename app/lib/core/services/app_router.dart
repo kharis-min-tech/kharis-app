@@ -33,6 +33,7 @@ import '../../features/admin/presentation/screens/admin_bible_reading_screen.dar
 import '../../features/admin/presentation/screens/admin_reading_plans_screen.dart';
 import '../../features/admin/presentation/screens/admin_sermons_screen.dart';
 import '../../features/admin/presentation/screens/admin_branch_detail_screen.dart';
+import '../../features/admin/presentation/screens/admin_app_settings_screen.dart';
 import '../../features/shared_links/presentation/shared_link_screens.dart';
 import '../../shared/providers/auth_provider.dart';
 
@@ -234,6 +235,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/sermons',
         builder: (context, state) => const AdminSermonsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/settings',
+        builder: (context, state) => const AdminAppSettingsScreen(),
       ),
       GoRoute(
         path: '/admin/branches/:id',

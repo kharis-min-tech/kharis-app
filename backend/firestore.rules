@@ -8,15 +8,55 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper: admin via custom claim OR a profile role of 'admin'.
-    function isAdmin() {
+    // Roles (see backend/SETUP.md "Admins"):
+    //   - super admin: custom claim `admin == true` OR `users/{uid}.role ==
+    //     'admin'`. Manages everything below that admins may write.
+    //   - campus admin: `users/{uid}.role == 'campus_admin'` with
+    //     `adminBranchIds` (branch doc ids) and `adminBranchNames` (the
+    //     matching branch names — news/events `branch` holds the NAME, branch
+    //     docs are keyed by id, hence both lists). Manages only the news and
+    //     events of those campuses and the non-identity fields of those branch
+    //     docs. Never all-campus content, config, or other collections.
+    // Only super admins assign roles and campus lists (see users below).
+
+    // Helper: the caller's own profile doc.
+    function callerProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Helper: super admin via custom claim OR a profile role of 'admin'.
+    function isSuperAdmin() {
       return isAuthenticated() && (
         request.auth.token.admin == true ||
         (
           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+          callerProfile().data.role == 'admin'
         )
       );
+    }
+
+    // Helper: campus admin — a profile role of 'campus_admin'. What they may
+    // touch is bounded by their adminBranchIds / adminBranchNames lists.
+    function isCampusAdmin() {
+      return isAuthenticated()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && callerProfile().data.role == 'campus_admin';
+    }
+
+    // Helper: the caller is a campus admin of the campus NAMED `name` (the
+    // `branch` value of a news/events doc). A null or blank name is
+    // all-campus content, which no campus admin manages.
+    function managesCampusNamed(name) {
+      return isCampusAdmin()
+             && name is string
+             && name.trim().size() > 0
+             && name in callerProfile().data.get('adminBranchNames', []);
+    }
+
+    // Helper: the caller is a campus admin of the branch doc `branchId`.
+    function managesBranchId(branchId) {
+      return isCampusAdmin()
+             && branchId in callerProfile().data.get('adminBranchIds', []);
     }
 
     // Helper: does `rsvpId` belong to the caller? RSVP document IDs are
@@ -37,22 +77,69 @@ service cloud.firestore {
       return !('branch' in data) || data.branch == null || data.branch is string;
     }
 
+    // Helper: the caller is a campus admin of the campus a news/events doc
+    // (`data`) is scoped to.
+    function managesCampusOf(data) {
+      return managesCampusNamed(data.get('branch', null));
+    }
+
     // Helper: optional `field` is absent, null, or a string of at most `max`.
     function optionalText(data, field, max) {
       return !(field in data) || data[field] == null
              || (data[field] is string && data[field].size() <= max);
     }
 
-    // users — each user manages their own profile; admins manage all profiles
-    // and are the only ones who may change a role (no self-promotion).
+    // Helper: optional `field` is absent, null, or an http/https URL string.
+    function optionalHttpUrl(data, field) {
+      return !(field in data) || data[field] == null
+             || (data[field] is string
+                 && data[field].matches('[Hh][Tt][Tt][Pp][Ss]?://.+'));
+    }
+
+    // Helper: giving details — `config/giving` and `branches.giving` share
+    // {url?, bankName?, accountName?, sortCode?, accountNumber?, swiftBic?,
+    // iban?, reference?, note?}. Every field optional; `url` must be http/https.
+    function givingShape(giving) {
+      return giving is map
+             && optionalHttpUrl(giving, 'url')
+             && optionalText(giving, 'bankName', 200)
+             && optionalText(giving, 'accountName', 200)
+             && optionalText(giving, 'sortCode', 50)
+             && optionalText(giving, 'accountNumber', 50)
+             && optionalText(giving, 'reference', 200)
+             && optionalText(giving, 'swiftBic', 50)
+             && optionalText(giving, 'iban', 50)
+             && optionalText(giving, 'note', 2000);
+    }
+
+    // Helper: a Home layout — `config/home` and `branches.home` share
+    // {sections: [{id, enabled}]} (ordered Home blocks).
+    function homeShape(home) {
+      return home is map && 'sections' in home && home.sections is list;
+    }
+
+    // Helper: a branch doc's optional `giving` / `home` are well-formed.
+    // Absent or null means the campus falls back to the church-wide
+    // `config/giving` / `config/home`.
+    function branchShape(data) {
+      return (!('giving' in data) || data.giving == null || givingShape(data.giving))
+             && (!('home' in data) || data.home == null || homeShape(data.home));
+    }
+
+    // users — each user manages their own profile; super admins manage all
+    // profiles and are the only ones who may set `role`, `adminBranchIds` or
+    // `adminBranchNames` (no self-promotion, no self-assigned campuses). A
+    // self-created profile starts as a plain member role with no campus lists.
     match /users/{uid} {
-      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
       allow create: if isAuthenticated() && request.auth.uid == uid
-                    && request.resource.data.role in ['member', 'guest', 'new_here'];
-      allow update: if isAdmin()
+                    && request.resource.data.role in ['member', 'guest', 'new_here']
+                    && !request.resource.data.keys().hasAny(['adminBranchIds', 'adminBranchNames']);
+      allow update: if isSuperAdmin()
                     || (isAuthenticated() && request.auth.uid == uid
-                        && request.resource.data.role == resource.data.role);
-      allow delete: if isAdmin();
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                              .hasAny(['role', 'adminBranchIds', 'adminBranchNames']));
+      allow delete: if isSuperAdmin();
 
       // notes — the member's private notebook. Owner-only: nobody else, not
       // even an admin, may read what a member wrote. Anchored notes also
@@ -92,46 +179,66 @@ service cloud.firestore {
       }
     }
 
-    // branches — publicly readable, writable only by admin
+    // branches — publicly readable. Super admins create, update and delete.
+    // A campus admin may update only their own branch docs (id in
+    // adminBranchIds) and never its identity/visibility fields — `name`,
+    // `order`, `group`, `isActive` — so they edit contact, services, venues,
+    // giving, home layout and the like, nothing that renames, reorders or
+    // hides a campus. Optional `giving` and `home` are shape-checked for
+    // every writer.
     match /branches/{branchId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isSuperAdmin() && branchShape(request.resource.data);
+      allow update: if branchShape(request.resource.data)
+                    && (isSuperAdmin()
+                        || (managesBranchId(branchId)
+                            && !request.resource.data.diff(resource.data).affectedKeys()
+                                  .hasAny(['name', 'order', 'group', 'isActive'])));
+      allow delete: if isSuperAdmin();
     }
 
-    // sermons — publicly readable, writable only by admin
+    // sermons — publicly readable, writable only by super admin
     match /sermons/{sermonId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isSuperAdmin();
     }
 
-    // events — publicly readable, writable only by admin. `branch` scopes an
-    // event to one campus; absent, null or blank means all-campus (every
-    // reader treats the three alike).
+    // events — publicly readable, writable by super admins and by a campus
+    // admin for their own campuses. `branch` scopes an event to one campus;
+    // absent, null or blank means all-campus (every reader treats the three
+    // alike) and is super-admin only. A campus admin's write must leave the
+    // event on one of their campuses — both the stored and the new `branch`
+    // are checked, so they cannot move one onto another campus.
     // `events/web_*` docs are imported from kharis.org by syncWebsiteEvents
     // through the Admin SDK (which bypasses these rules).
     match /events/{eventId} {
       allow read: if true;
-      allow create, update: if isAdmin()
+      allow create: if (isSuperAdmin() || managesCampusOf(request.resource.data))
                     && optionalCampus(request.resource.data)
                     && optionalText(request.resource.data, 'address', 300);
-      allow delete: if isAdmin();
+      allow update: if (isSuperAdmin()
+                        || (managesCampusOf(resource.data)
+                            && managesCampusOf(request.resource.data)))
+                    && optionalCampus(request.resource.data)
+                    && optionalText(request.resource.data, 'address', 300);
+      allow delete: if isSuperAdmin() || managesCampusOf(resource.data);
     }
 
-    // dailyContent — publicly readable, writable only by admin
+    // dailyContent — publicly readable, writable only by super admin
     match /dailyContent/{dateId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isSuperAdmin();
     }
 
     // readingPlans — a plan authored once that spans a date range and resolves a
     // reading for every date inside it (see functions/src/reading-plans.ts).
     // Publicly readable because the app resolves the day's reading from the plan
-    // itself whenever the API is unreachable. Writes are admin-only AND shape-
-    // checked: a plan missing `startDate`/`book`/`days` silently drops out of
+    // itself whenever the API is unreachable. Writes are super-admin-only AND
+    // shape-checked: a plan missing `startDate`/`book`/`days` silently drops out of
     // resolution, so it is rejected at write time rather than lost at read time.
     match /readingPlans/{planId} {
       allow read: if true;
-      allow create, update: if isAdmin()
+      allow create, update: if isSuperAdmin()
                     && request.resource.data.startDate is string
                     && request.resource.data.startDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
                     && request.resource.data.book is string
@@ -139,7 +246,7 @@ service cloud.firestore {
                     && request.resource.data.days is number
                     && request.resource.data.days >= 1
                     && request.resource.data.days <= 400;
-      allow delete: if isAdmin();
+      allow delete: if isSuperAdmin();
     }
 
     // dailyReadingPushes — one document per date the daily reading notification
@@ -150,7 +257,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // news (announcements) — publicly readable, writable only by admin.
+    // news (announcements) — publicly readable, writable by super admins and
+    // by a campus admin for their own campuses (same campus rule as events:
+    // stored and new `branch` both theirs; all-campus is super-admin only).
     // `branch` scopes an announcement to one campus; absent or null means
     // all-campus. Anything else would silently drop out of the branch-scoped
     // getAnnouncements query, so writes are rejected rather than lost.
@@ -158,62 +267,60 @@ service cloud.firestore {
     // (http/https) and `ctaLabel` (its button text) are shape-checked too.
     match /news/{newsId} {
       allow read: if true;
-      allow create, update: if isAdmin()
+      allow create: if (isSuperAdmin() || managesCampusOf(request.resource.data))
                     && optionalCampus(request.resource.data)
                     && optionalText(request.resource.data, 'eventId', 200)
                     && optionalText(request.resource.data, 'ctaLabel', 24)
-                    && (!('linkUrl' in request.resource.data)
-                        || request.resource.data.linkUrl == null
-                        || (request.resource.data.linkUrl is string
-                            && request.resource.data.linkUrl.matches('[Hh][Tt][Tt][Pp][Ss]?://.+')));
-      allow delete: if isAdmin();
+                    && optionalHttpUrl(request.resource.data, 'linkUrl');
+      allow update: if (isSuperAdmin()
+                        || (managesCampusOf(resource.data)
+                            && managesCampusOf(request.resource.data)))
+                    && optionalCampus(request.resource.data)
+                    && optionalText(request.resource.data, 'eventId', 200)
+                    && optionalText(request.resource.data, 'ctaLabel', 24)
+                    && optionalHttpUrl(request.resource.data, 'linkUrl');
+      allow delete: if isSuperAdmin() || managesCampusOf(resource.data);
     }
 
-    // config — publicly readable, admin writable. Docs: `live` (live status),
-    // `featured` ({mode: 'auto'|'pinned', setAt}: how the Messages tab picks
-    // its featured carousel; missing means 'auto').
+    // config — publicly readable, super-admin writable. Docs:
+    //   - `live`: live status.
+    //   - `featured`: {mode: 'auto'|'pinned'|'off', setAt} — how the Messages
+    //     tab picks its featured carousel ('off' hides it; missing = 'auto').
+    //   - `giving`: church-wide giving details, same shape as
+    //     `branches.giving` (missing = the app's built-in details).
+    //   - `home`: church-wide default Home layout {sections: [{id, enabled}]},
+    //     same shape as `branches.home` (missing = the app's built-in order).
     match /config/{docId} {
       allow read: if true;
-      allow write: if isAdmin()
-                   && (docId != 'featured'
-                       || request.resource == null
-                       || request.resource.data.mode in ['auto', 'pinned']);
+      allow write: if isSuperAdmin()
+                   && (request.resource == null
+                       || ((docId != 'featured'
+                            || request.resource.data.mode in ['auto', 'pinned', 'off'])
+                           && (docId != 'giving' || givingShape(request.resource.data))
+                           && (docId != 'home' || homeShape(request.resource.data))));
     }
 
-    // motdSchedule — Message of the Day per calendar date, keyed `YYYY-MM-DD`
-    // = {sermonId, title, setAt}. Days without a doc get the app's automatic
-    // daily pick. Publicly readable, admin writable.
-    match /motdSchedule/{dateKey} {
-      allow read: if true;
-      allow create, update: if isAdmin()
-                    && dateKey.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
-                    && request.resource.data.sermonId is string
-                    && request.resource.data.sermonId.size() > 0
-                    && request.resource.data.title is string;
-      allow delete: if isAdmin();
-    }
-
-    // visitors — anyone may submit (create), only admins may read/manage
+    // visitors — anyone may submit (create), only super admins may read/manage
     match /visitors/{visitorId} {
       allow create: if request.resource.data.keys().hasAll(['name', 'createdAt'])
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() < 200;
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if isSuperAdmin();
     }
 
-    // testimonies — anyone may submit (create), only admins may read/manage
+    // testimonies — anyone may submit (create), only super admins may read/manage
     match /testimonies/{testimonyId} {
       allow create: if request.resource.data.keys().hasAll(['text', 'createdAt'])
                     && request.resource.data.text is string
                     && request.resource.data.text.size() > 0
                     && request.resource.data.text.size() <= 2000;
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if isSuperAdmin();
     }
 
     // app_feedback — in-app rating (1-5) + optional comment from the feedback
     // sheet. Any signed-in member (anonymous included) may create one doc
-    // attributed to themselves; only admins may read or manage. Keys are
+    // attributed to themselves; only super admins may read or manage. Keys are
     // closed so a client cannot smuggle extra fields.
     match /app_feedback/{feedbackId} {
       allow create: if isAuthenticated()
@@ -229,17 +336,17 @@ service cloud.firestore {
                     && request.resource.data.platform is string
                     && request.resource.data.platform.size() <= 20
                     && request.resource.data.createdAt == request.time;
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if isSuperAdmin();
     }
 
     // rsvps — one doc per user+event, ID `{uid}_{eventId}`. Ownership is bound
     // to the document ID as well as the payload, so a member can never create,
     // read or delete another member's RSVP.
     match /rsvps/{rsvpId} {
-      allow get: if ownsRsvpId(rsvpId) || isAdmin();
+      allow get: if ownsRsvpId(rsvpId) || isSuperAdmin();
       // Listing is only ever allowed for a query already narrowed to the
-      // caller's own RSVPs; admins may list everything.
-      allow list: if isAdmin()
+      // caller's own RSVPs; super admins may list everything.
+      allow list: if isSuperAdmin()
                   || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated()
                     && request.resource.data.userId == request.auth.uid
@@ -248,7 +355,7 @@ service cloud.firestore {
                     && rsvpId == request.auth.uid + '_' + request.resource.data.eventId;
       // RSVPs are create-or-delete only; there is nothing to mutate in place.
       allow update: if false;
-      allow delete: if ownsRsvpId(rsvpId) || isAdmin();
+      allow delete: if ownsRsvpId(rsvpId) || isSuperAdmin();
     }
 
     // pushLog — one document per FCM notification the Firestore triggers in

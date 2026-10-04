@@ -8,7 +8,7 @@
 //
 //   KA-016          login: "Continue as Guest" is a real (outlined) button
 //   KA-012 (launch) launching the app never shows the ratings sheet
-//   KA-009          Today's Reading is the first Home block, above the fold
+//   KA-009          Today's Reading is on Home, above the fold
 //   KA-020 / 002    Home bell → notifications feed → row opens a detail sheet
 //   KA-004 / 007    Read now → in-app Bible reader with scripture + a way back
 //   KA-014          Messages search bar keeps its pill shape idle and focused
@@ -17,7 +17,7 @@
 //   KA-003 / 007    More → My Notes (with a way back), My Playlists
 //   KA-012 (row)    More → Rate & Feedback opens the sheet
 //   KA-001 (swipe)  swipe-down on the bar stops playback and removes it
-//   KA-015 / 018    video-only MOTD: YouTube surface pinned outside the scroll
+//   KA-015 / 018    featured message video: YouTube surface pinned outside the scroll
 //
 // Run (from app/):
 //   scripts/run_tester_round_fixes.sh
@@ -41,7 +41,6 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
-import 'package:kharis_app/features/home/presentation/widgets/latest_message_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
 import 'package:kharis_app/features/notes/presentation/screens/notes_screen.dart';
@@ -394,25 +393,17 @@ void main() {
       // ── KA-009: Today's Reading leads Home, above the fold ────────────────
       await tapNav(tester, 'Home');
       final readingCard = find.byType(TodaysReadingCard);
-      final heroCard = find.byType(LatestMessageCard);
       await pumpUntilFound(tester, readingCard, reason: 'reading card on Home');
-      await pumpUntilFound(tester, heroCard, reason: 'hero message on Home');
       final readingRect = tester.getRect(readingCard);
-      final heroTop = tester.getTopLeft(heroCard).dy;
       final screenHeight =
           tester.view.physicalSize.height / tester.view.devicePixelRatio;
-      expect(
-        readingRect.top,
-        lessThan(heroTop),
-        reason: "KA-009: Today's Reading must sit above the hero message",
-      );
       expect(
         readingRect.bottom,
         lessThanOrEqualTo(screenHeight),
         reason:
             'KA-009: the reading card must be fully visible without scrolling',
       );
-      verified.add('KA-009 reading card first on Home, above the fold');
+      verified.add('KA-009 reading card on Home, above the fold');
       await hostShot(tester, 'ka009-home-reading-first');
 
       // ── KA-020 / KA-002: bell → feed → detail sheet ───────────────────────
@@ -707,16 +698,19 @@ void main() {
 
       // ── KA-015 / KA-018: video surface pinned outside the scroll ──────────
       await tapNav(tester, 'Messages');
-      final motdLabel = find.text('MESSAGE OF THE DAY');
+      final featuredLabel = find.text('FEATURED');
       if (await waitFor(
         tester,
-        motdLabel,
+        featuredLabel,
         timeout: const Duration(seconds: 60),
       )) {
-        final motdCard = find
-            .ancestor(of: motdLabel, matching: find.byType(PressEffect))
+        final featuredCard = find
+            .ancestor(
+              of: featuredLabel.first,
+              matching: find.byType(PressEffect),
+            )
             .first;
-        await tester.tap(motdCard, warnIfMissed: false);
+        await tester.tap(featuredCard, warnIfMissed: false);
         await pumpUntilFound(tester, find.byType(MediaModeToggle));
         var toggle = tester.widget<MediaModeToggle>(
           find.byType(MediaModeToggle),
@@ -748,14 +742,12 @@ void main() {
           await hostShot(tester, 'ka015-018-video-pinned');
         } else {
           debugPrint(
-            'fixes: MOTD has no video today — KA-015/018 not exercised',
+            'fixes: featured message has no video — KA-015/018 not exercised',
           );
         }
-        await closePlayer(tester, motdLabel);
+        await closePlayer(tester, featuredLabel);
       } else {
-        debugPrint(
-          'fixes: no Message of the Day card — KA-015/018 not exercised',
-        );
+        debugPrint('fixes: no featured carousel — KA-015/018 not exercised');
       }
 
       debugPrint('FIXES-VERIFIED (${verified.length}):');

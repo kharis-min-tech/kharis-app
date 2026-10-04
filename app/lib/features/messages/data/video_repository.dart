@@ -10,7 +10,7 @@ import 'kharis_content.dart';
 /// Primary source is the YouTube Data API v3. Unlike the Atom feed, the API
 /// sends permissive CORS headers, so the list is genuinely live on web and
 /// mobile alike. It also exposes durations, letting us drop Shorts reliably
-/// (the home hero must always be a full sermon, never a 30s clip).
+/// (a featured message must always be a full sermon, never a 30s clip).
 ///
 /// Falls back to the public Atom feed, then to the embedded [kharisVideos]
 /// dataset, when the API is unreachable or no key is configured.

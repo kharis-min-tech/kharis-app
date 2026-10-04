@@ -11,7 +11,7 @@
 //                  "See all" destinations open and have a way back
 //   4 messages     archive hydrates to the full count; year rail reaches 2014
 //                  and 2013; topic counts add up; series filter; search hits
-//                  and empty state; featured + Message of the Day (<= 90 days)
+//                  and empty state; featured carousel (or latest when off)
 //   5 player       timeline (elapsed / -remaining); Next / Previous; audio ->
 //                  video -> audio within 3 s; stop and reopen resumes; note at
 //                  the current time; playlist create / add / open from More /
@@ -57,6 +57,7 @@ import 'package:kharis_app/features/giving/presentation/screens/giving_webview_s
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
+import 'package:kharis_app/features/messages/data/curation_repository.dart';
 import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
 import 'package:kharis_app/features/home/presentation/widgets/upcoming_events_strip.dart';
 import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
@@ -77,6 +78,7 @@ import 'package:kharis_app/main.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
@@ -1129,47 +1131,26 @@ void main() {
         final merged = c().read(sermonsProvider).valueOrNull ?? const [];
         walk.note('merged library (CMS + API): ${merged.length}');
 
-        // Featured + Message of the Day (top of the page).
+        // Featured (top of the page), unless the Studio turned it off.
         await tester.drag(scroll, const Offset(0, 4000), warnIfMissed: false);
         await pumpFor(tester, const Duration(seconds: 1));
-        final featured = c().read(featuredSermonsProvider);
-        walk.check(featured.isNotEmpty, 'featured carousel has items');
-        walk.check(
-          find.text('FEATURED').evaluate().isNotEmpty ||
-              find.text('NOW PLAYING').evaluate().isNotEmpty,
-          'featured carousel painted',
-        );
-        final motdLabel = find.text('MESSAGE OF THE DAY');
-        await pumpUntil(
-          tester,
-          () => motdLabel.evaluate().isNotEmpty,
-          timeout: const Duration(seconds: 30),
-        );
-        walk.check(motdLabel.evaluate().isNotEmpty, 'Message of the Day card');
-        final motd = c().read(motdSermonProvider);
-        final scheduled = c().read(motdScheduledIdProvider).valueOrNull;
-        if (motd != null) {
-          final age = motd.publishedAt == null
-              ? null
-              : DateTime.now().difference(motd.publishedAt!).inDays;
-          walk.note(
-            'MOTD "${motd.title}" ${motd.publishedAt} age=${age}d '
-            'scheduled=$scheduled',
-          );
-          if (scheduled == null) {
-            walk.check(
-              age != null && age <= 90,
-              'MOTD dated within the last 90 days (age $age d)',
-            );
-          }
+        final mode = c().read(featuredModeProvider).valueOrNull;
+        walk.note('featured mode: $mode');
+        if (mode == FeaturedMode.off) {
           walk.check(
-            find.text(motd.title).evaluate().isNotEmpty,
-            'MOTD card shows "${motd.title}"',
+            find.text('Latest messages').evaluate().isNotEmpty,
+            'featured off: the tab leads with the latest messages',
           );
         } else {
-          walk.check(false, 'MOTD provider resolved a sermon');
+          final featured = c().read(featuredSermonsProvider);
+          walk.check(featured.isNotEmpty, 'featured carousel has items');
+          walk.check(
+            find.text('FEATURED').evaluate().isNotEmpty ||
+                find.text('NOW PLAYING').evaluate().isNotEmpty,
+            'featured carousel painted',
+          );
         }
-        await hostShot(tester, '4-messages-featured-motd');
+        await hostShot(tester, '4-messages-featured');
 
         // Search: hits come fast; nonsense gets a real empty state.
         final searchField = find.byType(TextField).first;
@@ -2233,7 +2214,7 @@ void main() {
         await hostShot(tester, '7-giving-copied');
         final clip = await Clipboard.getData(Clipboard.kTextPlain);
         walk.check(
-          clip?.text == bankTransferClipboardText,
+          clip?.text == givingClipboardText(c().read(effectiveGivingProvider)),
           'clipboard holds the bank details (${clip?.text?.replaceAll('\n', ' / ')})',
         );
         final give = find.text('Give securely');

@@ -4,6 +4,7 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/admin/presentation/widgets/announcement_form_sheet.dart';
 import 'package:kharis_app/features/admin/presentation/widgets/announcement_home_status.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // ── News type options ─────────────────────────────────────────────────────────
@@ -15,13 +16,15 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-/// Admin screen: list + CRUD for [NewsItem].
+/// Admin screen: list + CRUD for [NewsItem]. A campus admin sees (and may
+/// only manage) their own campuses' announcements.
 class AdminAnnouncementsScreen extends ConsumerWidget {
   const AdminAnnouncementsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final newsAsync = ref.watch(adminNewsProvider);
+    final scope = ref.watch(adminScopeProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -52,7 +55,11 @@ class AdminAnnouncementsScreen extends ConsumerWidget {
             ),
           ),
         ),
-        data: (items) {
+        data: (all) {
+          final items = [
+            for (final n in all)
+              if (scope?.canManageCampusNamed(n.branch) ?? false) n,
+          ];
           if (items.isEmpty) {
             return Center(
               child: Text(

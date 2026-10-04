@@ -33,14 +33,17 @@ class _DeniedDoc extends Fake
 }
 
 void main() {
-  test(
-    'a failed listen degrades to auto featured and no scheduled message',
-    () async {
-      final repo = CurationRepository(firestore: _DeniedFirestore());
-      expect(await repo.watchFeaturedMode().toList(), [FeaturedMode.auto]);
-      expect(await repo.watchScheduledMotd('2026-10-03').toList(), [null]);
-    },
-  );
+  test('a failed listen degrades to auto featured', () async {
+    final repo = CurationRepository(firestore: _DeniedFirestore());
+    expect(await repo.watchFeaturedMode().toList(), [FeaturedMode.auto]);
+  });
+
+  test("'off' is read as off; anything unknown stays auto", () async {
+    final db = FakeFirebaseFirestore();
+    final member = CurationRepository(firestore: db);
+    await db.collection('config').doc('featured').set({'mode': 'off'});
+    expect(await member.watchFeaturedMode().first, FeaturedMode.off);
+  });
 
   test(
     'the Studio writer and the member reader share one FeaturedMode',

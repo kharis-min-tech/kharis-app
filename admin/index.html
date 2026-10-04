@@ -466,8 +466,6 @@
 
     .meta-chip.featured { background: rgba(107, 52, 250, 0.25); color: #a47cff; }
 
-    .meta-chip.motd { background: rgba(255, 209, 102, 0.18); color: #FFD166; }
-
     .meta-chip.warn { background: rgba(253, 127, 32, 0.18); color: var(--orange); }
 
     /* Inline form problems: unloaded branch list, reading plan out of bounds. */
@@ -680,6 +678,70 @@
     .field-inline { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
     .field-inline input[type="checkbox"] { width: auto; margin: 0; }
     .field-inline label { margin: 0; }
+
+    /* ── Access scope + Home layout editor ─────────────────────────────── */
+    [hidden] { display: none !important; }
+    .scope-chip {
+      align-self: flex-start;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--purple-soft);
+      background: var(--surface2);
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .home-list {
+      list-style: none;
+      margin: 0 0 16px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .home-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      background: var(--surface2);
+    }
+    .home-row label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text);
+    }
+    .home-row input[type="checkbox"] { width: auto; margin: 0; }
+    .home-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .home-move { font-size: 12px; padding: 4px 9px; }
+    .home-list.locked .home-row { opacity: 0.6; }
+    .team-row .field-row { margin-top: 10px; }
+    .team-campuses { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 4px; }
+    .team-campuses label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text);
+    }
+    .team-campuses input[type="checkbox"] { width: auto; margin: 0; }
   </style>
 </head>
 <body>
@@ -724,7 +786,7 @@
     </div>
 
     <nav class="tab-nav">
-    <button class="tab-btn" data-tab="sermons">
+    <button class="tab-btn" data-tab="sermons" data-scope="super">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
       Sermons
       <span class="count-badge" id="sermons-count">…</span>
@@ -739,16 +801,16 @@
       Announcements
       <span class="count-badge" id="news-count">…</span>
     </button>
-    <button class="tab-btn" data-tab="daily">
+    <button class="tab-btn" data-tab="daily" data-scope="super">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       Daily Content
     </button>
-    <button class="tab-btn" data-tab="live">
+    <button class="tab-btn" data-tab="live" data-scope="super">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
       Live
       <span class="count-badge" id="live-indicator">OFF</span>
     </button>
-    <button class="tab-btn" data-tab="submissions">
+    <button class="tab-btn" data-tab="submissions" data-scope="super">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Submissions
       <span class="count-badge" id="subs-count">…</span>
@@ -758,10 +820,19 @@
       Branches
       <span class="count-badge" id="branches-count">…</span>
     </button>
+    <button class="tab-btn" data-tab="settings" data-scope="super">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      App settings
+    </button>
+    <button class="tab-btn" data-tab="team" data-scope="super">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Team access
+    </button>
     </nav>
 
     <div class="sidebar-foot">
       <span id="user-email"></span>
+      <span class="scope-chip" id="scope-chip" hidden></span>
       <button class="btn btn-secondary" id="signout-btn" style="font-size:13px;padding:8px 14px;">Sign Out</button>
     </div>
   </aside>
@@ -771,27 +842,6 @@
     <!-- ── Sermons Tab ──────────────────────────────────────────────────────── -->
     <div class="tab-pane" id="tab-sermons">
       <div>
-        <div class="card" id="motd-card" style="max-width:100%;margin-bottom:20px;">
-          <div class="card-title"><span class="dot"></span> Message of the Day</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Pick a date, then schedule a sermon from the archive search below or with the sun on any library sermon.</p>
-          <div class="field-row">
-            <div class="field">
-              <label for="motd-date">Date</label>
-              <input type="date" id="motd-date" />
-            </div>
-            <div class="field">
-              <label for="motd-search">Search the sermon archive</label>
-              <input type="search" id="motd-search" placeholder="Title, preacher or series" autocomplete="off" />
-            </div>
-          </div>
-          <div class="where-panel" id="motd-selected"></div>
-          <div class="item-list" id="motd-results" style="max-height:360px;overflow-y:auto;margin-bottom:20px;"></div>
-          <div class="list-header" style="margin-bottom:8px;">
-            <span class="list-section-title">Upcoming</span>
-          </div>
-          <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">Days without a scheduled message use an automatic pick from the last 90 days.</p>
-          <div id="motd-upcoming"></div>
-        </div>
         <div class="card" style="max-width:100%">
           <div class="card-title"><span class="dot"></span> Sermon Library</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Library holds synced sermons (auto-synced hourly). Switch to YouTube Channel to search everything on the Kharis Church / David Antwi channel and feature any video on the app's Messages page.</p>
@@ -801,9 +851,10 @@
               <div class="seg" role="radiogroup" aria-label="Featured sermons" style="margin-bottom:0;">
                 <button type="button" class="seg-btn" role="radio" data-featured-mode="auto" disabled>Auto (latest uploads)</button>
                 <button type="button" class="seg-btn" role="radio" data-featured-mode="pinned" disabled>Pinned</button>
+                <button type="button" class="seg-btn" role="radio" data-featured-mode="off" disabled>Off</button>
               </div>
             </div>
-            <p id="featured-auto-hint" style="display:none;color:var(--muted);font-size:12px;margin-top:6px;">Stars only take effect in Pinned mode. Auto shows the newest YouTube uploads.</p>
+            <p id="featured-hint" style="display:none;color:var(--muted);font-size:12px;margin-top:6px;"></p>
           </div>
           <div class="seg" role="tablist" aria-label="Sermon source">
             <button type="button" class="seg-btn active" id="src-library">Library</button>
@@ -1232,7 +1283,8 @@
     <div class="tab-pane" id="tab-branches">
       <div class="pane-layout">
         <div class="card">
-          <div class="card-title"><span class="dot"></span> Add / Edit Branch</div>
+          <div class="card-title"><span class="dot"></span> <span id="branch-form-title">Add / Edit Branch</span></div>
+          <p class="repeat-empty" id="br-scope-note" hidden>Choose Edit on your campus to update its details. Name, order, group and visibility are managed by the church office.</p>
           <form id="branch-form">
             <div class="section-label">Basic information</div>
             <div class="field">
@@ -1243,19 +1295,21 @@
               <label for="br-subtitle">Subtitle / Country</label>
               <input type="text" id="br-subtitle" placeholder="United Kingdom" />
             </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="br-group">Group</label>
-                <input type="text" id="br-group" placeholder="Kharis" />
+            <div data-scope="super">
+              <div class="field-row">
+                <div class="field">
+                  <label for="br-group">Group</label>
+                  <input type="text" id="br-group" placeholder="Kharis" />
+                </div>
+                <div class="field">
+                  <label for="br-order">Display Order</label>
+                  <input type="number" id="br-order" placeholder="2" min="0" />
+                </div>
               </div>
-              <div class="field">
-                <label for="br-order">Display Order</label>
-                <input type="number" id="br-order" placeholder="2" min="0" />
+              <div class="field-inline">
+                <input type="checkbox" id="br-active" checked />
+                <label for="br-active">Active (visible in the app)</label>
               </div>
-            </div>
-            <div class="field-inline">
-              <input type="checkbox" id="br-active" checked />
-              <label for="br-active">Active (visible in the app)</label>
             </div>
 
             <div class="section-label">Branding</div>
@@ -1367,6 +1421,14 @@
             <div id="br-gallery"></div>
             <button type="button" class="btn btn-secondary" id="br-add-gallery" style="font-size:12px;padding:6px 12px;">+ Add image</button>
 
+            <div class="section-label">Giving</div>
+            <p class="repeat-empty">Leave every field blank to use the church-wide giving details (App settings).</p>
+            <div id="br-giving"></div>
+
+            <div class="section-label">Home layout</div>
+            <p class="repeat-empty">Order of the blocks on the app Home screen for members of this campus.</p>
+            <div id="br-home"></div>
+
             <button type="submit" class="btn btn-primary btn-full" id="branch-submit-btn" style="margin-top:22px;">Save Branch</button>
           </form>
         </div>
@@ -1376,6 +1438,66 @@
             <button class="btn btn-secondary" id="refresh-branches" style="font-size:12px;padding:6px 12px;">Refresh</button>
           </div>
           <div id="branches-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── App Settings Tab ──────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-settings">
+      <div class="pane-layout">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Church-wide giving</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
+            Shown on the Giving screen for every campus without its own giving
+            details. Leave every field blank to fall back to the church details
+            built into the app.
+          </p>
+          <form id="settings-giving-form">
+            <div class="where-panel" id="st-giving-status"></div>
+            <div id="st-giving"></div>
+            <button type="submit" class="btn btn-primary btn-full" id="st-giving-submit">Save giving</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Church-wide Home layout</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
+            Order of the blocks on the app Home screen for every campus without
+            its own layout. Live now, Complete your profile and Continue
+            listening only appear when they apply to the member.
+          </p>
+          <form id="settings-home-form">
+            <div id="st-home"></div>
+            <button type="submit" class="btn btn-primary btn-full" id="st-home-submit">Save Home layout</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Team Access Tab ───────────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-team">
+      <div class="pane-layout">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> Team access</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
+            Find someone by the email they signed up with, then choose what they
+            can manage. Admins manage everything. Campus admins manage only their
+            campuses' announcements, events and branch details.
+          </p>
+          <form id="team-search-form">
+            <div class="field">
+              <label for="tm-email">Email address</label>
+              <input type="email" id="tm-email" placeholder="name@example.com" autocomplete="off" required />
+            </div>
+            <button type="submit" class="btn btn-secondary btn-full" id="tm-search-btn">Find</button>
+          </form>
+          <div id="team-results" style="margin-top:16px;"></div>
+        </div>
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Current admins</span>
+            <button class="btn btn-secondary" id="refresh-team" style="font-size:12px;padding:6px 12px;">Refresh</button>
+          </div>
+          <div id="team-admins"></div>
         </div>
       </div>
     </div>
@@ -1434,7 +1556,7 @@ import {
   orderBy,
   limit,
   where,
-  documentId,
+  deleteField,
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -1459,20 +1581,101 @@ function toast(msg, type = 'success') {
 const loginScreen = document.getElementById('login-screen');
 const adminPanel  = document.getElementById('admin-panel');
 
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    loginScreen.style.display = 'none';
-    adminPanel.style.display  = 'grid';
-    document.getElementById('user-email').textContent = user.email;
-    loadEvents();
-    loadNews();
+// ── Access scope ────────────────────────────────────────────────────────────
+// Mirrors AdminScope.fromProfile (app/lib/shared/models/campus_config.dart):
+// super admin = `admin` claim or users/{uid}.role 'admin'; campus admin =
+// role 'campus_admin' with at least one id in adminBranchIds. Anyone else is
+// signed straight back out. Firestore rules are the real enforcement; the UI
+// only hides what those rules would reject.
+let adminScope = null; // { superAdmin, branchIds: Set, branchNames: Set } once signed in
+
+async function resolveAdminScope(user) {
+  const [token, profileSnap] = await Promise.all([
+    user.getIdTokenResult(),
+    getDoc(doc(db, 'users', user.uid)),
+  ]);
+  const profile = profileSnap.exists() ? profileSnap.data() : {};
+  if (token.claims.admin === true || profile.role === 'admin') {
+    return { superAdmin: true, branchIds: new Set(), branchNames: new Set() };
+  }
+  if (profile.role !== 'campus_admin') return null;
+  const strings = (v) => new Set(Array.isArray(v)
+    ? v.filter(s => typeof s === 'string' && s.trim())
+    : []);
+  const branchIds = strings(profile.adminBranchIds);
+  if (!branchIds.size) return null;
+  return { superAdmin: false, branchIds, branchNames: strings(profile.adminBranchNames) };
+}
+
+function isCampusScope() {
+  return !!adminScope && !adminScope.superAdmin;
+}
+
+// Null/blank branch is all-campus content, which only a super admin may touch.
+function canManageCampusNamed(name) {
+  if (adminScope?.superAdmin) return true;
+  const value = (name || '').trim();
+  return !!value && !!adminScope?.branchNames.has(value);
+}
+
+function canManageBranchId(id) {
+  return !!adminScope && (adminScope.superAdmin || adminScope.branchIds.has(id));
+}
+
+function applyScope() {
+  const superAdmin = !!adminScope?.superAdmin;
+  document.querySelectorAll('[data-scope="super"]').forEach(el => { el.hidden = !superAdmin; });
+  const chip = document.getElementById('scope-chip');
+  const names = [...(adminScope?.branchNames || [])];
+  chip.textContent = superAdmin
+    ? 'Super admin · all campuses'
+    : `Campus admin · ${names.join(', ') || 'your campus'}`;
+  chip.title = chip.textContent;
+  chip.hidden = !adminScope;
+  const active = document.querySelector('.tab-btn.active');
+  if (!active || active.hidden) selectTab('events');
+  syncBranchFormScope();
+}
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    adminScope = null;
+    loginScreen.style.display = 'flex';
+    adminPanel.style.display  = 'none';
+    return;
+  }
+  let scope = null;
+  let problem = 'This account does not have Content Studio access.';
+  try {
+    scope = await resolveAdminScope(user);
+  } catch (err) {
+    problem = `Could not check your access: ${err.message}`;
+  }
+  if (!scope) {
+    adminScope = null;
+    await signOut(auth);
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = problem;
+    errEl.style.display = 'block';
+    return;
+  }
+  adminScope = scope;
+  // A previous session's half-edited item may be outside this scope.
+  resetEventForm();
+  resetNewsForm();
+  resetBranchForm();
+  applyScope();
+  loginScreen.style.display = 'none';
+  adminPanel.style.display  = 'grid';
+  document.getElementById('user-email').textContent = user.email;
+  loadEvents();
+  loadNews();
+  loadBranches();
+  loadChurchHome();
+  if (scope.superAdmin) {
     loadLiveStatus();
     loadSubmissions();
     setDefaultDailyDate();
-    loadBranches();
-  } else {
-    loginScreen.style.display = 'flex';
-    adminPanel.style.display  = 'none';
   }
 });
 
@@ -1514,17 +1717,24 @@ function friendlyAuthError(code) {
 // ════════════════════════════════════════════════════════════════════════════
 //  TAB NAVIGATION
 // ════════════════════════════════════════════════════════════════════════════
+// Super-admin tabs are hidden for campus admins and can never be selected.
+function selectTab(name) {
+  const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  if (!btn || btn.hidden) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+  // Lazy-load data for the tab
+  if (name === 'sermons') loadSermons();
+  if (name === 'branches') loadBranches();
+  if (name === 'daily') loadPlans();
+  if (name === 'settings') loadAppSettings();
+  if (name === 'team') loadTeam();
+}
+
 document.querySelectorAll('.tab-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    // Lazy-load data for the tab
-    if (btn.dataset.tab === 'sermons') loadSermons();
-    if (btn.dataset.tab === 'branches') loadBranches();
-    if (btn.dataset.tab === 'daily') loadPlans();
-  });
+  btn.addEventListener('click', () => selectTab(btn.dataset.tab));
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1540,8 +1750,9 @@ async function loadEvents() {
     const q      = query(collection(db, 'events'), orderBy('startTime', 'asc'));
     const snap   = await getDocs(q);
     // Hidden docs are removed website events, kept only so the sync does not
-    // re-import them.
-    const events = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(ev => ev.hidden !== true);
+    // re-import them. Campus admins see only their campuses' events.
+    const events = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(ev => ev.hidden !== true && canManageCampusNamed(ev.branch));
     eventsById = new Map(events.map(ev => [ev.id, ev]));
     document.getElementById('events-count').textContent = events.length;
     renderEventList(events);
@@ -1647,6 +1858,10 @@ document.getElementById('event-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
   const editId = form.dataset.editId;
+  if (!canManageCampusNamed(document.getElementById('ev-branch').value)) {
+    toast('Choose one of your campuses for this event', 'error');
+    return;
+  }
   const btn = document.getElementById('event-submit-btn');
   btn.disabled = true;
   btn.textContent = editId ? 'Saving…' : 'Creating…';
@@ -1831,7 +2046,9 @@ async function loadNews() {
   try {
     const q    = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
     const snap = await getDocs(q);
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Campus admins see only their campuses' announcements.
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(nw => canManageCampusNamed(nw.branch));
     newsById = new Map(items.map(nw => [nw.id, nw]));
     document.getElementById('news-count').textContent = items.length;
     renderNewsList(items);
@@ -2071,6 +2288,10 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
   const editId = form.dataset.editId;
+  if (!canManageCampusNamed(document.getElementById('nw-branch').value)) {
+    toast('Choose one of your campuses for this announcement', 'error');
+    return;
+  }
   const linkUrl = normaliseLink(document.getElementById('nw-link').value);
   if (linkUrl && !isHttpUrl(linkUrl)) {
     toast('Button link must be an http:// or https:// address', 'error');
@@ -2704,20 +2925,10 @@ async function loadSermons() {
   const list = document.getElementById('sermons-list');
   list.innerHTML = '<p style="color:var(--muted);">Loading sermons…</p>';
   loadFeaturedMode();
-  if (motdSearchState !== 'ok') searchSermonArchive();
-  // The schedule must be current before the suns render; its own failures
-  // are reported inline and never block the library list.
-  const motdReady = migrateLegacyMotd()
-    .catch(err => toast('Could not move the old Message of the Day: ' + err.message, 'error'))
-    .then(refreshMotd);
   try {
-    const [snap] = await Promise.all([
-      getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50))),
-      motdReady,
-    ]);
+    const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
     document.getElementById('sermons-count').textContent = snap.size;
     if (snap.empty) {
-      sermonDocsShown = [];
       list.innerHTML = '<p style="color:var(--muted);">No sermons yet. They will appear here automatically once the YouTube/SoundCloud sync runs.</p>';
       return;
     }
@@ -2734,8 +2945,19 @@ function decodeEntities(s) { _entityScratch.innerHTML = s || ''; return _entityS
 
 // ── Featured sermons mode ───────────────────────────────────────────────
 // config/featured { mode, setAt }. 'auto' (also a missing doc) makes the app
-// show the newest YouTube uploads; 'pinned' shows sermons starred below.
-let featuredMode = null; // 'auto' | 'pinned' once loaded
+// show the newest YouTube uploads; 'pinned' shows sermons starred below;
+// 'off' hides the featured carousel so Messages leads with the latest.
+let featuredMode = null; // 'auto' | 'pinned' | 'off' once loaded
+
+const FEATURED_HINTS = {
+  auto: 'Stars only take effect in Pinned mode. Auto shows the newest YouTube uploads.',
+  off: 'No featured carousel: Messages leads with the latest messages. Stars are kept for when you switch back.',
+};
+const FEATURED_TOASTS = {
+  auto: 'Featured: showing the latest uploads',
+  pinned: 'Featured: showing pinned sermons',
+  off: 'Featured off: Messages leads with the latest messages',
+};
 
 function renderFeaturedMode() {
   document.querySelectorAll('[data-featured-mode]').forEach(btn => {
@@ -2744,13 +2966,16 @@ function renderFeaturedMode() {
     btn.setAttribute('aria-checked', String(on));
     btn.disabled = featuredMode === null;
   });
-  document.getElementById('featured-auto-hint').style.display = featuredMode === 'auto' ? '' : 'none';
+  const hint = document.getElementById('featured-hint');
+  hint.textContent = FEATURED_HINTS[featuredMode] || '';
+  hint.style.display = hint.textContent ? '' : 'none';
 }
 
 async function loadFeaturedMode() {
   try {
     const snap = await getDoc(doc(db, 'config', 'featured'));
-    featuredMode = snap.exists() && snap.data().mode === 'pinned' ? 'pinned' : 'auto';
+    const mode = snap.exists() ? snap.data().mode : 'auto';
+    featuredMode = mode === 'pinned' || mode === 'off' ? mode : 'auto';
   } catch (err) {
     featuredMode = null;
     toast('Could not load the featured mode: ' + err.message, 'error');
@@ -2767,7 +2992,7 @@ document.querySelectorAll('[data-featured-mode]').forEach(btn => {
     renderFeaturedMode();
     try {
       await setDoc(doc(db, 'config', 'featured'), { mode, setAt: serverTimestamp() });
-      toast(mode === 'auto' ? 'Featured: showing the latest uploads' : 'Featured: showing pinned sermons');
+      toast(FEATURED_TOASTS[mode]);
     } catch (err) {
       featuredMode = previous;
       renderFeaturedMode();
@@ -2776,211 +3001,7 @@ document.querySelectorAll('[data-featured-mode]').forEach(btn => {
   });
 });
 
-// ── Message of the Day ──────────────────────────────────────────────────────
-// motdSchedule/{YYYY-MM-DD} { sermonId, title, setAt }, one doc per calendar
-// date keyed by the admin's local date. sermonId is a sermon API id (numeric
-// string) or a Firestore sermons doc id. Unscheduled days get the app's
-// automatic pick.
-const SUN_FILLED = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="currentColor"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
-const SUN_OUTLINE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
-const SERMON_API_URL =
-  'https://us-central1-kharis-app-47c49.cloudfunctions.net/sermonApiProxy/sermons/';
-
-let motdSelected = null;      // { sermonId, title } for the selected date, or null
-let motdUpcoming = [];        // [{ dateKey, sermonId, title }] from today on
-let motdResults = [];         // audio-capable sermon API results
-let motdSearchState = 'idle'; // 'idle' | 'loading' | 'ok' | 'error'
-let motdSearchSeq = 0;
-let motdSearchTimer = null;
-let legacyMotdChecked = false;
-let sermonDocsShown = [];
-
-document.getElementById('motd-date').value = toDateKey(new Date());
-
-function motdDateKey() {
-  const value = document.getElementById('motd-date').value;
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : toDateKey(new Date());
-}
-
-// One-time move of the retired single pointer doc into today's schedule.
-async function migrateLegacyMotd() {
-  if (legacyMotdChecked) return;
-  const legacyRef = doc(db, 'config', 'messageOfTheDay');
-  const legacy = await getDoc(legacyRef);
-  legacyMotdChecked = true;
-  if (!legacy.exists()) return;
-  const { sermonId, title } = legacy.data();
-  const todayRef = doc(db, 'motdSchedule', toDateKey(new Date()));
-  const moved = !!sermonId && !(await getDoc(todayRef)).exists();
-  if (moved) {
-    await setDoc(todayRef, {
-      sermonId: String(sermonId),
-      title: decodeEntities(title || 'Untitled'),
-      setAt: serverTimestamp(),
-    });
-  }
-  await deleteDoc(legacyRef);
-  toast(moved
-    ? "Moved the old Message of the Day into today's schedule"
-    : 'Removed the old Message of the Day: today already had one scheduled');
-}
-
-async function refreshMotd() {
-  const dateKey = motdDateKey();
-  const todayKey = toDateKey(new Date());
-  try {
-    const [selectedSnap, upcomingSnap] = await Promise.all([
-      getDoc(doc(db, 'motdSchedule', dateKey)),
-      getDocs(query(
-        collection(db, 'motdSchedule'),
-        where(documentId(), '>=', todayKey),
-        orderBy(documentId()),
-        limit(30),
-      )),
-    ]);
-    motdSelected = selectedSnap.exists() ? selectedSnap.data() : null;
-    motdUpcoming = upcomingSnap.docs.map(d => ({ dateKey: d.id, ...d.data() }));
-    renderMotdSelected();
-    renderMotdUpcoming();
-  } catch (err) {
-    motdSelected = null;
-    document.getElementById('motd-selected').innerHTML =
-      `<span class="warn">Could not load the Message of the Day schedule: ${escHtml(err.message)}</span>`;
-    document.getElementById('motd-upcoming').innerHTML = '';
-  }
-  renderMotdResults();
-  if (sermonSource === 'library' && sermonDocsShown.length) renderSermonList(sermonDocsShown);
-}
-
-function renderMotdSelected() {
-  const dateKey = motdDateKey();
-  const heading = `<span class="where-title">${escHtml(formatDateKey(dateKey, { year: 'numeric' }))}</span>`;
-  document.getElementById('motd-selected').innerHTML = motdSelected
-    ? `${heading}<div style="display:flex;align-items:center;gap:10px;">
-        <span style="flex:1;min-width:0;">Scheduled: <strong>${escHtml(decodeEntities(motdSelected.title || 'Untitled'))}</strong></span>
-        <button type="button" class="btn btn-secondary motd-clear-btn" data-date="${dateKey}" style="font-size:12px;padding:5px 12px;">Clear</button>
-      </div>`
-    : `${heading}Nothing scheduled, so the app uses its automatic pick for this date.`;
-}
-
-function renderMotdUpcoming() {
-  const el = document.getElementById('motd-upcoming');
-  if (!motdUpcoming.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Nothing scheduled from today on.</p>';
-    return;
-  }
-  const todayKey = toDateKey(new Date());
-  el.innerHTML = `<div class="item-list">${motdUpcoming.map(e => `
-    <div class="item-card">
-      <div class="item-card-body">
-        <div class="item-card-title">${escHtml(decodeEntities(e.title || 'Untitled'))}</div>
-        <div class="item-card-meta">
-          <span>${escHtml(formatDateKey(e.dateKey, { year: 'numeric' }))}</span>
-          ${e.dateKey === todayKey ? '<span class="meta-chip motd">Today</span>' : ''}
-        </div>
-      </div>
-      <button type="button" class="btn btn-danger motd-clear-btn" data-date="${escHtml(e.dateKey)}">Clear</button>
-    </div>`).join('')}</div>`;
-}
-
-// Searches the public sermon archive through the CORS proxy. An empty query
-// lists the newest page. Only sermons with audio can be a Message of the Day.
-async function searchSermonArchive() {
-  const seq = ++motdSearchSeq;
-  const el = document.getElementById('motd-results');
-  const q = document.getElementById('motd-search').value.trim();
-  motdSearchState = 'loading';
-  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Searching the sermon archive…</div>';
-  try {
-    const res = await fetch(q ? `${SERMON_API_URL}?search=${encodeURIComponent(q)}` : SERMON_API_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (seq !== motdSearchSeq) return;
-    motdResults = (data.results || []).filter(r => r && r.audio_link);
-    motdSearchState = 'ok';
-    renderMotdResults();
-  } catch {
-    if (seq !== motdSearchSeq) return;
-    motdResults = [];
-    motdSearchState = 'error';
-    el.innerHTML = '<p style="color:var(--danger);font-size:13px;">Sermon search is unavailable right now</p>';
-  }
-}
-
-function renderMotdResults() {
-  if (motdSearchState !== 'ok') return;
-  const el = document.getElementById('motd-results');
-  if (!motdResults.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">No sermons with audio match that search.</p>';
-    return;
-  }
-  el.innerHTML = motdResults.map((r, i) => {
-    const scheduled = motdSelected?.sermonId === String(r.id);
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? formatDateKey(r.date, { year: 'numeric' }) : '';
-    const preachers = (r.preachers || []).map(p => p && p.name).filter(Boolean).join(', ');
-    const meta = [date, preachers, r.series?.name].filter(Boolean)
-      .map(s => `<span>${escHtml(s)}</span>`).join('');
-    return `<div class="item-card">
-      <div class="item-card-body">
-        <div class="item-card-title">${escHtml(decodeEntities(r.title || 'Untitled'))}</div>
-        <div class="item-card-meta">${meta}${scheduled ? '<span class="meta-chip motd">Scheduled for this date</span>' : ''}</div>
-      </div>
-      <button type="button" class="btn btn-secondary motd-schedule-btn" data-i="${i}" style="font-size:12px;padding:6px 12px;flex-shrink:0;" ${scheduled ? 'disabled' : ''}>${scheduled ? 'Scheduled' : 'Schedule'}</button>
-    </div>`;
-  }).join('');
-}
-
-async function scheduleMotd(sermonId, title) {
-  const dateKey = motdDateKey();
-  try {
-    await setDoc(doc(db, 'motdSchedule', dateKey), {
-      sermonId: String(sermonId),
-      title,
-      setAt: serverTimestamp(),
-    });
-    toast(`Message of the Day for ${formatDateKey(dateKey)}: ${title}`);
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
-  }
-  await refreshMotd();
-}
-
-async function clearMotd(dateKey) {
-  try {
-    await deleteDoc(doc(db, 'motdSchedule', dateKey));
-    toast(`Cleared the Message of the Day for ${formatDateKey(dateKey)}`);
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
-  }
-  await refreshMotd();
-}
-
-document.getElementById('motd-card').addEventListener('click', (e) => {
-  const scheduleBtn = e.target.closest('.motd-schedule-btn');
-  if (scheduleBtn) {
-    const r = motdResults[Number(scheduleBtn.dataset.i)];
-    if (!r) return;
-    scheduleBtn.disabled = true;
-    scheduleMotd(String(r.id), decodeEntities(r.title || 'Untitled'));
-    return;
-  }
-  const clearBtn = e.target.closest('.motd-clear-btn');
-  if (clearBtn) {
-    clearBtn.disabled = true;
-    clearMotd(clearBtn.dataset.date);
-  }
-});
-
-document.getElementById('motd-date').addEventListener('change', refreshMotd);
-
-document.getElementById('motd-search').addEventListener('input', () => {
-  clearTimeout(motdSearchTimer);
-  motdSearchTimer = setTimeout(searchSermonArchive, 350);
-});
-
 function renderSermonList(docs) {
-  sermonDocsShown = docs;
-  const motdDateLabel = formatDateKey(motdDateKey());
   const list = document.getElementById('sermons-list');
   list.innerHTML = docs.map(d => {
     const s = d.data();
@@ -2991,10 +3012,6 @@ function renderSermonList(docs) {
       : '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3z"/></svg>';
     const sourceLabel = s.source === 'youtube' ? 'YouTube' : 'SoundCloud';
     const dur = s.duration ? formatDuration(s.duration) : '';
-    const isMotd = d.id === motdSelected?.sermonId;
-    const motdAction = isMotd
-      ? `Clear the Message of the Day for ${motdDateLabel}`
-      : `Make this the Message of the Day for ${motdDateLabel}`;
     return `<div class="item-card" data-id="${d.id}">
       <div style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;">
         ${s.thumbnailUrl ? `<img src="${escHtml(s.thumbnailUrl)}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : `<div style="width:64px;height:64px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0;">${sourceIcon}</div>`}
@@ -3002,9 +3019,8 @@ function renderSermonList(docs) {
           <div style="display:flex;align-items:flex-start;gap:8px;">
             <strong style="font-size:14px;min-width:0;">${escHtml(decodeEntities(s.title || 'Untitled'))}</strong>
             <button class="feature-btn" data-id="${d.id}" data-featured="${featured}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${featured ? 'var(--orange)' : 'var(--muted)'};" title="${featured ? 'Unfeature' : 'Feature'}" aria-label="${featured ? 'Unfeature sermon' : 'Feature sermon'}">${featured ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>'}</button>
-            <button class="motd-btn" data-id="${d.id}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${isMotd ? '#FFD166' : 'var(--muted)'};" title="${escHtml(motdAction)}" aria-label="${escHtml(motdAction)}">${isMotd ? SUN_FILLED : SUN_OUTLINE}</button>
           </div>
-          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''} ${isMotd ? `<span class="meta-chip motd">Message of the Day, ${escHtml(motdDateLabel)}</span>` : ''}</div>
+          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''}</div>
           ${s.description ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(decodeEntities(s.description).substring(0, 100))}</div>` : ''}
         </div>
       </div>
@@ -3022,21 +3038,6 @@ function renderSermonList(docs) {
         loadSermons();
       } catch (err) {
         toast('Error: ' + err.message, 'error');
-      }
-    });
-  });
-
-  // Message of the Day: the sun schedules this sermon for the selected date,
-  // or clears that date when it already holds this sermon.
-  list.querySelectorAll('.motd-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.id;
-      btn.disabled = true;
-      if (id === motdSelected?.sermonId) {
-        clearMotd(motdDateKey());
-      } else {
-        const docSnap = docs.find(x => x.id === id);
-        scheduleMotd(id, decodeEntities(docSnap?.data().title || 'Untitled'));
       }
     });
   });
@@ -3211,11 +3212,14 @@ document.getElementById('refresh-sermons').addEventListener('click', () => {
 // Options come only from Firestore `branches`; the empty value is All
 // campuses and is always saved as null. Create/Save stay disabled until the
 // list has loaded once, so nothing is saved against a guessed branch.
+// Campus admins get only their own campus names and no All campuses option,
+// because the rules reject all-campus writes from them.
 const BRANCH_PICKERS = [
   { select: 'ev-branch', error: 'ev-branch-error', submit: 'event-submit-btn' },
   { select: 'nw-branch', error: 'nw-branch-error', submit: 'news-submit-btn' },
 ];
 let branchesLoaded = false;
+let branchDirectory = []; // [{ id, name }] for every branch, in display order
 
 function ensureSelectOption(sel, value, label) {
   if (value && ![...sel.options].some(o => o.value === value)) {
@@ -3232,13 +3236,18 @@ function setBranchValue(sel, branch) {
 }
 
 function populateBranchPickers(names) {
-  const options = '<option value="">All campuses</option>' +
-    names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  const campus = isCampusScope();
+  const choices = campus
+    ? [...new Set([...names.filter(n => adminScope.branchNames.has(n)), ...adminScope.branchNames])]
+    : names;
+  const options = (campus ? '' : '<option value="">All campuses</option>') +
+    choices.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
   BRANCH_PICKERS.forEach(({ select, error, submit }) => {
     const sel = document.getElementById(select);
     const cur = sel.value;
     sel.innerHTML = options;
-    setBranchValue(sel, cur);
+    if (campus && !canManageCampusNamed(cur)) sel.selectedIndex = 0;
+    else setBranchValue(sel, cur);
     sel.disabled = false;
     document.getElementById(error).style.display = 'none';
     if (!branchesLoaded) document.getElementById(submit).disabled = false;
@@ -3269,15 +3278,23 @@ async function loadBranches() {
   list.innerHTML = '<p style="color:var(--muted);">Loading branches…</p>';
   try {
     const snap = await getDocs(query(collection(db, 'branches'), orderBy('order', 'asc')));
-    document.getElementById('branches-count').textContent = snap.size;
-    populateBranchPickers(snap.docs.map(d => (d.data().name || '').trim()).filter(Boolean));
+    branchDirectory = snap.docs
+      .map(d => ({ id: d.id, name: (d.data().name || '').trim() }))
+      .filter(b => b.name);
+    populateBranchPickers(branchDirectory.map(b => b.name));
+    // Campus admins only ever see (and may only edit) their own branches.
+    const docs = snap.docs.filter(d => canManageBranchId(d.id));
+    document.getElementById('branches-count').textContent = docs.length;
     // The announcement picker may have just changed.
     updateNewsWherePreview();
-    if (snap.empty) {
-      list.innerHTML = '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
+    if (!docs.length) {
+      list.innerHTML = isCampusScope()
+        ? '<p style="color:var(--muted);">None of your campuses were found. Ask the church office to check your access.</p>'
+        : '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
       return;
     }
-    list.innerHTML = snap.docs.map(d => {
+    const campus = isCampusScope();
+    list.innerHTML = docs.map(d => {
       const b = d.data();
       const meeting = [b.meetingDays || b.meetingDay, b.meetingTime].filter(Boolean).join(' at ') || 'Not set';
       const subtitle = b.subtitle || b.location || '';
@@ -3291,7 +3308,7 @@ async function loadBranches() {
           </div>
           <div style="display:flex;gap:6px;">
             <button class="btn btn-secondary branch-edit-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;">Edit</button>
-            <button class="btn btn-secondary branch-delete-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;color:var(--danger);">Delete</button>
+            ${campus ? '' : `<button class="btn btn-secondary branch-delete-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;color:var(--danger);">Delete</button>`}
           </div>
         </div>
       </div>`;
@@ -3309,6 +3326,9 @@ async function loadBranches() {
         loadBranches();
       });
     });
+    // A campus admin with a single campus goes straight to its editor.
+    const form = document.getElementById('branch-form');
+    if (campus && docs.length === 1 && !form.dataset.editId) editBranch(docs[0].id);
   } catch (err) {
     list.innerHTML = `<p style="color:var(--danger);">Error: ${escHtml(err.message)}</p>`;
     if (!branchesLoaded) showBranchPickerError(err.message);
@@ -3643,10 +3663,14 @@ function resetBranchForm() {
   renderVenues([]);
   renderServices([]);
   renderGallery([]);
+  setGivingForm('br', null);
+  setHomeEditor('br', null);
   document.getElementById('branch-submit-btn').textContent = 'Save Branch';
+  syncBranchFormScope();
 }
 
 async function editBranch(id) {
+  if (!canManageBranchId(id)) return;
   const d = await getDoc(doc(db, 'branches', id));
   if (!d.exists()) return;
   const b = d.data();
@@ -3684,12 +3708,16 @@ async function editBranch(id) {
   set('br-fv-url', b.featuredVideo?.youtubeUrl);
   set('br-fv-thumb', b.featuredVideo?.thumbnailUrl);
 
+  setGivingForm('br', b.giving);
+  setHomeEditor('br', b.home);
+
   const byOrder = (a, c) => (a.order ?? 0) - (c.order ?? 0);
   renderVenues(Array.isArray(b.venues) ? b.venues : []);
   renderServices(Array.isArray(b.services) ? [...b.services].sort(byOrder) : []);
   renderGallery(Array.isArray(b.galleryImages) ? [...b.galleryImages].sort(byOrder) : []);
 
   document.getElementById('branch-form').dataset.editId = id;
+  syncBranchFormScope();
   document.getElementById('branch-submit-btn').textContent = 'Update Branch';
   document.getElementById('br-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -3697,6 +3725,11 @@ async function editBranch(id) {
 document.getElementById('branch-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const editId = e.target.dataset.editId;
+  // Campus admins only ever update one of their own branches.
+  if (isCampusScope() && !(editId && canManageBranchId(editId))) {
+    toast('You can only update your own campus', 'error');
+    return;
+  }
   const val = (id) => document.getElementById(id).value.trim();
   const orNull = (id) => val(id) || null;
   const normHex = (v) => {
@@ -3724,6 +3757,9 @@ document.getElementById('branch-form').addEventListener('submit', async (e) => {
     toast(`Service "${orphan.name || orphan.id}" points at a venue that no longer exists.`, 'error');
     return;
   }
+
+  const giving = collectGiving('br');
+  if (giving.error) { toast(giving.error, 'error'); return; }
 
   const heroImage = orNull('br-hero-image');
   const data = {
@@ -3766,8 +3802,16 @@ document.getElementById('branch-form').addEventListener('submit', async (e) => {
     meetingDays: orNull('br-meeting-days'),
     meetingTime: orNull('br-meeting-time'),
 
+    // Blank giving / default layout are stored as null: the app then uses
+    // config/giving / config/home, then its built-in fallback.
+    giving: giving.value,
+    home: collectHome('br'),
+
     updatedAt: serverTimestamp(),
   };
+  // Identity and visibility stay super-admin only, and the rules reject a
+  // campus admin's write that touches them, so those keys are never sent.
+  if (isCampusScope()) BRANCH_IDENTITY_FIELDS.forEach(k => { delete data[k]; });
 
   const btn = document.getElementById('branch-submit-btn');
   btn.disabled = true;
@@ -3795,6 +3839,419 @@ renderServices([]);
 renderGallery([]);
 
 document.getElementById('refresh-branches').addEventListener('click', loadBranches);
+
+// ── Giving + Home layout sub-forms ──────────────────────────────────────
+// Shared by the branch editor (prefix 'br' → branches/{id}.giving / .home)
+// and App settings (prefix 'st' → config/giving / config/home). Shapes match
+// GivingDetails and HomeLayout in app/lib/shared/models/campus_config.dart.
+const BRANCH_IDENTITY_FIELDS = ['name', 'order', 'group', 'isActive'];
+
+const GIVING_FIELDS = new Map([
+  ['url',           { label: 'Online giving URL', type: 'url', placeholder: 'https://…' }],
+  ['bankName',      { label: 'Bank name', placeholder: 'e.g. Barclays' }],
+  ['accountName',   { label: 'Account name', placeholder: 'e.g. Kharis Church Brighton' }],
+  ['sortCode',      { label: 'Sort code', placeholder: '00-00-00' }],
+  ['accountNumber', { label: 'Account number', placeholder: '8 digits' }],
+  ['swiftBic',      { label: 'SWIFT / BIC', placeholder: 'For international transfers' }],
+  ['iban',          { label: 'IBAN', placeholder: 'For international transfers' }],
+  ['reference',     { label: 'Reference', placeholder: 'e.g. Tithe + your name' }],
+  ['note',          { label: 'Note', textarea: true, placeholder: 'Anything givers should know' }],
+]);
+// Rows of the giving form; pairs share a line.
+const GIVING_LAYOUT = [
+  ['url'], ['bankName', 'accountName'], ['sortCode', 'accountNumber'],
+  ['swiftBic', 'iban'], ['reference'], ['note'],
+];
+
+function givingFieldHtml(prefix, key) {
+  const f = GIVING_FIELDS.get(key);
+  const id = `${prefix}-gv-${key}`;
+  const input = f.textarea
+    ? `<textarea id="${id}" style="min-height:70px;" placeholder="${escAttr(f.placeholder)}"></textarea>`
+    : `<input type="${f.type || 'text'}" id="${id}" placeholder="${escAttr(f.placeholder)}" />`;
+  return `<div class="field"><label for="${id}">${escHtml(f.label)}</label>${input}</div>`;
+}
+
+function mountGivingForm(prefix) {
+  document.getElementById(`${prefix}-giving`).innerHTML = GIVING_LAYOUT.map(keys => keys.length > 1
+    ? `<div class="field-row">${keys.map(k => givingFieldHtml(prefix, k)).join('')}</div>`
+    : givingFieldHtml(prefix, keys[0])).join('');
+}
+
+function setGivingForm(prefix, giving) {
+  GIVING_FIELDS.forEach((_, key) => {
+    const v = giving?.[key];
+    document.getElementById(`${prefix}-gv-${key}`).value = typeof v === 'string' ? v : '';
+  });
+}
+
+function hasGiving(giving) {
+  return [...GIVING_FIELDS.keys()].some(k => typeof giving?.[k] === 'string' && giving[k].trim());
+}
+
+// { value } with only the filled-in keys, or value null when every field is
+// blank (follow the church-wide / built-in details); { error } on a bad URL.
+function collectGiving(prefix) {
+  const out = {};
+  GIVING_FIELDS.forEach((_, key) => {
+    const v = document.getElementById(`${prefix}-gv-${key}`).value.trim();
+    if (v) out[key] = v;
+  });
+  if (out.url) {
+    out.url = normaliseLink(out.url);
+    if (!isHttpUrl(out.url)) return { error: 'Online giving URL must be an http:// or https:// address' };
+  }
+  return { value: Object.keys(out).length ? out : null };
+}
+
+const HOME_SECTIONS = [
+  { id: 'profileCompletion', label: 'Complete your profile' },
+  { id: 'live',              label: 'Live now' },
+  { id: 'reading',           label: 'Bible reading of the day' },
+  { id: 'announcements',     label: 'Announcements' },
+  { id: 'events',            label: 'Upcoming events' },
+  { id: 'campus',            label: 'Your campus' },
+  { id: 'continueListening', label: 'Continue listening' },
+  { id: 'giving',            label: 'Giving' },
+];
+const HOME_LABELS = new Map(HOME_SECTIONS.map(s => [s.id, s.label]));
+// HomeLayout.fallback: every block on except the Giving shortcut.
+const HOME_FALLBACK = HOME_SECTIONS.map(s => ({ id: s.id, enabled: s.id !== 'giving' }));
+let churchHomeSections = null; // parsed config/home, or null when unset
+
+const HOME_EDITORS = {
+  br: { defaultLabel: 'Use church-wide default', fallback: () => churchHomeSections || HOME_FALLBACK },
+  st: { defaultLabel: "Use the app's built-in default", fallback: () => HOME_FALLBACK },
+};
+
+// Mirrors HomeLayout.fromJson: unknown ids are dropped, duplicates keep their
+// first position, omitted blocks are appended disabled; null when unusable.
+function parseHomeSections(raw) {
+  if (!raw || !Array.isArray(raw.sections)) return null;
+  const seen = new Set();
+  const out = [];
+  for (const e of raw.sections) {
+    if (!e || typeof e !== 'object' || !HOME_LABELS.has(e.id) || seen.has(e.id)) continue;
+    seen.add(e.id);
+    out.push({ id: e.id, enabled: e.enabled !== false });
+  }
+  if (!out.length) return null;
+  HOME_SECTIONS.forEach(s => { if (!seen.has(s.id)) out.push({ id: s.id, enabled: false }); });
+  return out;
+}
+
+// `focus` = { id, dir } keeps keyboard focus on the moved row's arrow.
+function renderHomeRows(prefix, sections, focus) {
+  const host = document.getElementById(`${prefix}-home-list`);
+  const locked = document.getElementById(`${prefix}-home-default`).checked;
+  host.classList.toggle('locked', locked);
+  const last = sections.length - 1;
+  host.innerHTML = sections.map((s, i) => {
+    const label = escHtml(HOME_LABELS.get(s.id));
+    return `<li class="home-row" data-home-id="${s.id}">
+      <label><input type="checkbox" data-home-enabled ${s.enabled ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${label}</label>
+      <span class="home-row-actions">
+        <button type="button" class="btn btn-secondary home-move" data-home-move="-1" aria-label="Move ${label} up" ${locked || i === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="btn btn-secondary home-move" data-home-move="1" aria-label="Move ${label} down" ${locked || i === last ? 'disabled' : ''}>↓</button>
+      </span>
+    </li>`;
+  }).join('');
+  if (focus) {
+    const row = host.querySelector(`[data-home-id="${focus.id}"]`);
+    (row?.querySelector(`[data-home-move="${focus.dir}"]:not(:disabled)`)
+      || row?.querySelector('.home-move:not(:disabled)'))?.focus();
+  }
+}
+
+function readHomeRows(prefix) {
+  return [...document.querySelectorAll(`#${prefix}-home-list [data-home-id]`)].map(li => ({
+    id: li.dataset.homeId,
+    enabled: li.querySelector('[data-home-enabled]').checked,
+  }));
+}
+
+// A stored layout fills the editor; null ticks the default toggle and shows
+// the layout that will apply instead.
+function setHomeEditor(prefix, raw) {
+  const sections = parseHomeSections(raw);
+  document.getElementById(`${prefix}-home-default`).checked = !sections;
+  renderHomeRows(prefix, sections || HOME_EDITORS[prefix].fallback());
+}
+
+// { sections } to store, or null to follow the default.
+function collectHome(prefix) {
+  if (document.getElementById(`${prefix}-home-default`).checked) return null;
+  return { sections: readHomeRows(prefix) };
+}
+
+function mountHomeEditor(prefix) {
+  const host = document.getElementById(`${prefix}-home`);
+  host.innerHTML = `<div class="field-inline">
+      <input type="checkbox" id="${prefix}-home-default" />
+      <label for="${prefix}-home-default">${escHtml(HOME_EDITORS[prefix].defaultLabel)}</label>
+    </div>
+    <ol class="home-list" id="${prefix}-home-list" aria-label="Home sections, top to bottom"></ol>`;
+  document.getElementById(`${prefix}-home-default`).addEventListener('change', (e) => {
+    renderHomeRows(prefix, e.target.checked ? HOME_EDITORS[prefix].fallback() : readHomeRows(prefix));
+  });
+  host.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-home-move]');
+    if (!btn) return;
+    const rows = readHomeRows(prefix);
+    const id = btn.closest('[data-home-id]').dataset.homeId;
+    const from = rows.findIndex(r => r.id === id);
+    const to = from + Number(btn.dataset.homeMove);
+    if (from < 0 || to < 0 || to >= rows.length) return;
+    [rows[from], rows[to]] = [rows[to], rows[from]];
+    renderHomeRows(prefix, rows, { id, dir: btn.dataset.homeMove });
+  });
+  setHomeEditor(prefix, null);
+}
+
+// A branch editor following the default shows the church-wide layout.
+function refreshBranchHomeDefault() {
+  if (document.getElementById('br-home-default').checked) renderHomeRows('br', HOME_EDITORS.br.fallback());
+}
+
+async function loadChurchHome() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'home'));
+    churchHomeSections = snap.exists() ? parseHomeSections(snap.data()) : null;
+  } catch {
+    // Display only: the branch editor then previews the built-in order.
+    churchHomeSections = null;
+  }
+  refreshBranchHomeDefault();
+}
+
+// Campus admins edit an existing campus only: no create, and the identity
+// fields are hidden (group/order/active) or locked (name).
+function syncBranchFormScope() {
+  const campus = isCampusScope();
+  const form = document.getElementById('branch-form');
+  const editing = !!form.dataset.editId;
+  document.getElementById('br-name').disabled = campus;
+  form.hidden = campus && !editing;
+  document.getElementById('br-scope-note').hidden = !(campus && !editing);
+  document.getElementById('branch-form-title').textContent = campus ? 'Edit Campus Details' : 'Add / Edit Branch';
+}
+
+mountGivingForm('br');
+mountHomeEditor('br');
+mountGivingForm('st');
+mountHomeEditor('st');
+
+// ── App settings (super admin) ──────────────────────────────────────────
+// config/giving and config/home hold exactly the giving / home shapes; an
+// absent doc means the app's built-in fallback, so clearing deletes the doc.
+function renderGivingStatus(isSet) {
+  document.getElementById('st-giving-status').innerHTML = isSet
+    ? '<span class="where-title">Church-wide details set</span>Campuses without their own giving details show these.'
+    : '<span class="where-title">Not set</span>The app falls back to its built-in church details until you save some here.';
+}
+
+async function loadAppSettings() {
+  const status = document.getElementById('st-giving-status');
+  status.innerHTML = '<span class="spinner"></span> Loading…';
+  try {
+    const [givingSnap, homeSnap] = await Promise.all([
+      getDoc(doc(db, 'config', 'giving')),
+      getDoc(doc(db, 'config', 'home')),
+    ]);
+    const giving = givingSnap.exists() ? givingSnap.data() : null;
+    setGivingForm('st', giving);
+    renderGivingStatus(hasGiving(giving));
+    const home = homeSnap.exists() ? homeSnap.data() : null;
+    churchHomeSections = parseHomeSections(home);
+    setHomeEditor('st', home);
+    refreshBranchHomeDefault();
+  } catch (err) {
+    status.innerHTML = `<span class="warn">Could not load app settings: ${escHtml(err.message)}</span>`;
+  }
+}
+
+document.getElementById('settings-giving-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const giving = collectGiving('st');
+  if (giving.error) { toast(giving.error, 'error'); return; }
+  const btn = document.getElementById('st-giving-submit');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const ref = doc(db, 'config', 'giving');
+    if (giving.value) await setDoc(ref, giving.value);
+    else await deleteDoc(ref);
+    renderGivingStatus(!!giving.value);
+    toast(giving.value ? 'Church-wide giving saved' : 'Church-wide giving cleared: the app uses its built-in details');
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Save giving';
+});
+
+document.getElementById('settings-home-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const home = collectHome('st');
+  const btn = document.getElementById('st-home-submit');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const ref = doc(db, 'config', 'home');
+    if (home) await setDoc(ref, home);
+    else await deleteDoc(ref);
+    churchHomeSections = home ? home.sections : null;
+    refreshBranchHomeDefault();
+    toast(home ? 'Church-wide Home layout saved' : "Home layout reset to the app's built-in default");
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Save Home layout';
+});
+
+// ── Team access (super admin) ───────────────────────────────────────────
+// users/{uid}.role, plus adminBranchIds/adminBranchNames for a campus admin.
+// news/events store the branch NAME and branches are keyed by id, so both
+// lists are always written together, and both are removed when the role
+// changes away from campus_admin. Nobody may change their own access.
+const TEAM_ROLES = [
+  { value: 'member', label: 'Member (no Studio access)' },
+  { value: 'campus_admin', label: 'Campus admin' },
+  { value: 'admin', label: 'Admin (everything)' },
+];
+let teamRowSeq = 0;
+let lastTeamEmail = '';
+
+function teamRowHtml(uid, u) {
+  const self = uid === auth.currentUser?.uid;
+  const role = u.role || 'member';
+  const roles = TEAM_ROLES.some(r => r.value === role) ? TEAM_ROLES : [...TEAM_ROLES, { value: role, label: role }];
+  const ids = Array.isArray(u.adminBranchIds) ? u.adminBranchIds : [];
+  const names = Array.isArray(u.adminBranchNames) ? u.adminBranchNames : [];
+  // Assigned ids whose branch has since been deleted stay visible so saving
+  // never drops them silently.
+  const known = new Set(branchDirectory.map(b => b.id));
+  const choices = [
+    ...branchDirectory,
+    ...ids.filter(id => !known.has(id)).map(id => ({ id, name: names[ids.indexOf(id)] || id, missing: true })),
+  ];
+  const chosen = new Set(ids);
+  const roleLabel = role === 'campus_admin'
+    ? `Campus admin · ${names.join(', ') || 'no campuses'}`
+    : (roles.find(r => r.value === role)?.label || role);
+  const name = u.displayName || 'Member';
+  const roleId = `tm-role-${++teamRowSeq}`;
+  const controls = self
+    ? '<p class="muted-line" style="margin:8px 0 0;">This is you. Another admin has to change your access.</p>'
+    : `<div class="field" style="margin:10px 0 0;">
+        <label for="${roleId}">Role</label>
+        <select id="${roleId}" data-team-role>${roles.map(r =>
+          `<option value="${escAttr(r.value)}" ${r.value === role ? 'selected' : ''}>${escHtml(r.label)}</option>`).join('')}</select>
+      </div>
+      <div data-team-campuses ${role === 'campus_admin' ? '' : 'hidden'}>
+        <div class="team-campuses" role="group" aria-label="Campuses ${escAttr(name)} manages">
+          ${choices.length ? choices.map(b => `<label><input type="checkbox" data-team-branch value="${escAttr(b.id)}" data-name="${escAttr(b.name)}" ${chosen.has(b.id) ? 'checked' : ''} /> ${escHtml(b.name)}${b.missing ? ' (deleted branch)' : ''}</label>`).join('')
+            : '<span class="repeat-empty">No branches loaded.</span>'}
+        </div>
+      </div>
+      <button type="button" class="btn btn-primary" data-team-save style="margin-top:10px;font-size:12px;padding:6px 14px;">Save access</button>`;
+  return `<div class="item-card team-row" data-uid="${escAttr(uid)}">
+    <div class="item-card-body">
+      <div class="item-card-title">${escHtml(name)}</div>
+      <div class="item-card-meta"><span>${escHtml(u.email || 'No email')}</span><span class="meta-chip">${escHtml(roleLabel)}</span></div>
+      ${controls}
+    </div>
+  </div>`;
+}
+
+function renderTeamList(el, docs, emptyHtml) {
+  el.innerHTML = docs.length
+    ? `<div class="item-list">${docs.map(d => teamRowHtml(d.id, d.data())).join('')}</div>`
+    : `<p style="color:var(--muted);font-size:13px;">${emptyHtml}</p>`;
+}
+
+async function loadTeamAdmins() {
+  const el = document.getElementById('team-admins');
+  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading admins…</div>';
+  try {
+    const snap = await getDocs(query(collection(db, 'users'), where('role', 'in', ['admin', 'campus_admin'])));
+    renderTeamList(el, snap.docs, 'No admins found. Admins set through the admin claim alone do not appear here.');
+  } catch (err) {
+    el.innerHTML = `<p style="color:var(--danger);font-size:13px;">Could not load admins: ${escHtml(err.message)}</p>`;
+  }
+}
+
+// Exact match on users/{uid}.email, as typed and lower-cased.
+async function searchTeam(email) {
+  lastTeamEmail = email;
+  const el = document.getElementById('team-results');
+  if (!email) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Searching…</div>';
+  try {
+    const variants = [...new Set([email, email.toLowerCase()])];
+    const snaps = await Promise.all(variants.map(v =>
+      getDocs(query(collection(db, 'users'), where('email', '==', v), limit(10)))));
+    const docs = [...new Map(snaps.flatMap(s => s.docs).map(d => [d.id, d])).values()];
+    renderTeamList(el, docs, `No account uses ${escHtml(email)}. They need to sign up in the app first.`);
+  } catch (err) {
+    el.innerHTML = `<p style="color:var(--danger);font-size:13px;">Search failed: ${escHtml(err.message)}</p>`;
+  }
+}
+
+async function loadTeam() {
+  if (!branchDirectory.length) await loadBranches();
+  await loadTeamAdmins();
+}
+
+function onTeamRoleChange(e) {
+  const sel = e.target.closest('[data-team-role]');
+  if (!sel) return;
+  sel.closest('.team-row').querySelector('[data-team-campuses]').hidden = sel.value !== 'campus_admin';
+}
+
+async function onTeamSave(e) {
+  const btn = e.target.closest('[data-team-save]');
+  if (!btn) return;
+  const row = btn.closest('.team-row');
+  const uid = row.dataset.uid;
+  const role = row.querySelector('[data-team-role]').value;
+  let update;
+  if (role === 'campus_admin') {
+    const picked = [...row.querySelectorAll('[data-team-branch]:checked')];
+    if (!picked.length) { toast('Pick at least one campus for a campus admin', 'error'); return; }
+    update = {
+      role,
+      adminBranchIds: picked.map(c => c.value),
+      adminBranchNames: picked.map(c => c.dataset.name),
+    };
+  } else {
+    update = { role, adminBranchIds: deleteField(), adminBranchNames: deleteField() };
+  }
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await updateDoc(doc(db, 'users', uid), update);
+    toast('Access updated');
+    await Promise.all([loadTeamAdmins(), searchTeam(lastTeamEmail)]);
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Save access';
+  }
+}
+
+['team-results', 'team-admins'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('change', onTeamRoleChange);
+  el.addEventListener('click', onTeamSave);
+});
+
+document.getElementById('team-search-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  searchTeam(document.getElementById('tm-email').value.trim());
+});
+document.getElementById('refresh-team').addEventListener('click', loadTeamAdmins);
 
 </script>
 </body>

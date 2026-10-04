@@ -13,8 +13,14 @@ import 'package:kharis_app/features/giving/presentation/screens/giving_screen.da
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
-import 'package:kharis_app/features/home/presentation/widgets/latest_message_card.dart';
+import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/live_now_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
+import 'package:kharis_app/features/home/presentation/widgets/upcoming_events_strip.dart';
+import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
+import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
@@ -319,50 +325,83 @@ void main() {
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
-      testWidgets('Home: latest message card, loaded, loading and failed', (
-        tester,
-      ) async {
-        final video = testSermon(
-          'v1',
-          title: 'Sunday service',
-          videoId: 'abc123',
-          audioUrl: '',
-        );
+      testWidgets('Home: live now card', (tester) async {
         await pumpCard(
           tester,
-          const LatestMessageCard(),
+          const LiveNowCard(),
           overrides: [
-            videosProvider.overrideWith((ref) async => [video]),
+            liveStatusProvider.overrideWith(
+              (ref) => Stream.value(
+                const LiveStatus(
+                  isLive: true,
+                  videoId: 'abc123',
+                  title: 'Sunday service',
+                ),
+              ),
+            ),
           ],
         );
         await tester.pump();
         expect(find.text('Sunday service'), findsOneWidget);
+        expect(find.text('LIVE NOW'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
+      });
 
+      testWidgets('Home: campus card', (tester) async {
         await pumpCard(
           tester,
-          const LatestMessageCard(),
+          const CampusCard(),
           overrides: [
-            videosProvider.overrideWith(
-              (ref) => Completer<List<Sermon>>().future,
+            currentBranchProvider.overrideWith((ref) => Stream.value('London')),
+            branchesProvider.overrideWith(
+              (ref) => Stream.value(const [
+                Branch(
+                  id: 'london',
+                  name: 'London',
+                  subtitle: '',
+                  gradientStart: AppColors.primary,
+                  gradientEnd: AppColors.primaryDeep,
+                  contact: CampusContact(phone: '020 0000 0000'),
+                  venues: [
+                    CampusVenue(id: 'v1', name: 'Town Hall', city: 'London'),
+                  ],
+                  services: [
+                    CampusService(
+                      id: 's1',
+                      name: 'Sunday Service',
+                      day: 'Sundays',
+                      startTime: '10:00',
+                      venueId: 'v1',
+                    ),
+                  ],
+                ),
+              ]),
             ),
           ],
         );
-        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        await tester.pump();
+        expect(find.text('Sunday Service'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
+      });
 
+      testWidgets('Home: upcoming event tiles', (tester) async {
         await pumpCard(
           tester,
-          const LatestMessageCard(),
+          const UpcomingEventsStrip(),
           overrides: [
-            videosProvider.overrideWith((ref) async => const <Sermon>[]),
+            campusUpcomingEventsProvider.overrideWithValue(
+              AsyncValue.data([
+                Event(
+                  id: 'e1',
+                  title: 'Prayer Night',
+                  location: 'Main Hall',
+                  startTime: DateTime(2026, 10, 9, 19),
+                ),
+              ]),
+            ),
           ],
         );
-        await tester.pump();
-        expect(
-          find.text('The latest message could not be loaded.'),
-          findsOneWidget,
-        );
+        expect(find.text('Prayer Night'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
@@ -408,19 +447,18 @@ void main() {
 
   test('text on the solid fills and page colours keeps 4.5:1 contrast', () {
     const deep = AppColors.primaryDeep;
-    final pill = Color.alphaBlend(Colors.white.withValues(alpha: .14), deep);
     final pairs = <String, (Color, Color)>{
-      'reading/latest/news/giving: white on primaryDeep': (Colors.white, deep),
-      'reading: scripture white 88% on primaryDeep': (
+      'reading/giving: white on primaryDeep': (Colors.white, deep),
+      'reading: prayer white 88% on primaryDeep': (
         Colors.white.withValues(alpha: .88),
         deep,
       ),
       'reading: gold eyebrow on primaryDeep': (AppColors.secondary, deep),
-      'reading: outline pill label on its 14% plate': (Colors.white, pill),
-      'news: supporting line white 85% on primaryDeep': (
+      'reading: date and prayer label white 85% on primaryDeep': (
         Colors.white.withValues(alpha: .85),
         deep,
       ),
+      'live: ink badge on accentPink': (AppColors.ink, AppColors.accentPink),
       'giving: reference darkMuted2 on primaryDeep': (
         AppColors.darkMuted2,
         deep,
@@ -436,6 +474,8 @@ void main() {
         'player ($name): onBg on bg': (kc.onBg, kc.bg),
         'player ($name): muted on bg': (kc.muted, kc.bg),
         'cards ($name): muted on surface': (kc.muted, kc.surface),
+        'cards ($name): onChip on surface': (kc.onChip, kc.surface),
+        'cards ($name): onChip on chipBg': (kc.onChip, kc.chipBg),
         'player ($name): speed pill accentInk on bg': (kc.accentInk, kc.bg),
       },
     };

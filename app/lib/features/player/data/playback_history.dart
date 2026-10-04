@@ -53,7 +53,7 @@ class PlaybackHistory {
   /// Preference key of the snapshot list (read by `sermonByIdProvider`).
   static const String snapshotsKey = 'recent_sermon_snapshots';
 
-  /// Id of the live-stream pseudo-sermon the home hero plays.
+  /// Id of the live-stream pseudo-sermon Home's Live now block plays.
   static const String liveSermonId = 'live';
 
   /// Snapshots kept, newest first.
