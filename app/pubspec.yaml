@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # usePathUrlStrategy: shared links (/m/…, /e/…, /a/…) are real paths on web.
+  flutter_web_plugins:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -40,7 +43,7 @@ dependencies:
   dio: ^5.7.0
   intl: ^0.19.0
   google_fonts: ^6.2.1
-  just_audio: ^0.9.42
+  just_audio: ^0.10.6
   audio_service: ^0.18.17
   cached_network_image: ^3.4.1
   hive_flutter: ^1.1.0
@@ -64,6 +67,10 @@ dependencies:
   # youtube_player_iframe does not hold a wakelock; without this the screen can
   # sleep mid-video. Enabled only while the video engine reports playing.
   wakelock_plus: ^1.2.10
+  share_plus: ^13.3.0
+  in_app_review: ^2.0.9
+  # App version + build number shown in More.
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +102,7 @@ flutter:
     - assets/icon/
     - assets/data/
     - assets/design/
+    - assets/google_fonts/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

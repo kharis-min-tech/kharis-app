@@ -6,10 +6,10 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/data/rsvp_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
-import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
-import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 /// Events tab (design-handoff v3). Segmented Upcoming / Past /
@@ -23,9 +23,6 @@ class CalendarScreen extends ConsumerStatefulWidget {
 }
 
 enum _EventTab { upcoming, past, rsvps }
-
-/// Label used wherever the active branch is `null` (unscoped).
-const String _kAllCampuses = 'All campuses';
 
 /// Date-chip accent colours cycled per card (mirrors the prototype palette).
 const List<Color> _accentPalette = [
@@ -46,65 +43,85 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     // of truth that dies with the screen — which is exactly how the chip used
     // to appear to "revert" on relaunch.
     final branch = ref.watch(currentBranchProvider).valueOrNull;
-    final branchLabel = branch ?? _kAllCampuses;
-    final branches = ref.watch(branchesProvider).valueOrNull ??
-        BranchRepository.seedBranches;
+    final branchLabel = branch ?? kAllCampusesLabel;
 
     return Scaffold(
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _Header(
-                      branchLabel: branchLabel,
-                      onTapBranch: () => _pickBranch(branches, branch),
-                    ),
-                    const SizedBox(height: 16),
-                    _SegmentedTabs(
-                      selected: _tab,
-                      onChanged: (t) => setState(() => _tab = t),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+        child: RefreshIndicator(
+          color: context.kc.accentInk,
+          backgroundColor: context.kc.surface,
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _Header(
+                        branchLabel: branchLabel,
+                        // The shared campus picker: one sheet, one write
+                        // path (setActiveBranch), wherever campus changes.
+                        onTapBranch: () => pickActiveBranch(context, ref),
+                      ),
+                      const SizedBox(height: 16),
+                      _SegmentedTabs(
+                        selected: _tab,
+                        onChanged: (t) => setState(() => _tab = t),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            _tabSliver(branch: branch, branchLabel: branchLabel),
-          ],
+              _tabSliver(branchLabel: branchLabel),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _tabSliver({required String? branch, required String branchLabel}) {
+  /// Reloads the visible tab and holds the spinner until it has answered.
+  Future<void> _refresh() {
+    switch (_tab) {
+      case _EventTab.upcoming:
+      case _EventTab.past:
+        return refreshCampusContent(ref, pastEvents: _tab == _EventTab.past);
+      case _EventTab.rsvps:
+        return settleRefresh(ref.refresh(myRsvpEventsProvider.future));
+    }
+  }
+
+  Widget _tabSliver({required String branchLabel}) {
     switch (_tab) {
       case _EventTab.upcoming:
         return _eventsSliver(
-          ref.watch(upcomingEventsProvider(branch)),
+          ref.watch(campusUpcomingEventsProvider),
           emptyIcon: Icons.event_busy_outlined,
           emptyTitle: 'No upcoming events',
           emptySubtitle: 'Check back soon for events at $branchLabel.',
         );
       case _EventTab.past:
         return _eventsSliver(
-          ref.watch(pastEventsProvider(branch)),
+          ref.watch(campusPastEventsProvider),
           emptyIcon: Icons.history_rounded,
           emptyTitle: 'No past events',
-          emptySubtitle: 'Events at $branchLabel that have finished '
+          emptySubtitle:
+              'Events at $branchLabel that have finished '
               'will appear here.',
-          capNote: 'Showing the ${EventRepository.pastEventLimit} most recent '
+          capNote:
+              'Showing the ${EventRepository.pastEventLimit} most recent '
               'events. Anything older is no longer listed.',
         );
       case _EventTab.rsvps:
         if (ref.watch(currentUserProvider).valueOrNull == null) {
           return _signInSliver(
             title: 'Sign in to see your RSVPs',
-            subtitle: 'Your RSVPs are saved to your account so they follow '
+            subtitle:
+                'Your RSVPs are saved to your account so they follow '
                 'you between devices.',
           );
         }
@@ -122,12 +139,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     String? capNote,
   }) {
     return async.when(
+      skipLoadingOnRefresh: true,
       loading: () => _kLoadingSliver,
       error: (_, _) => _messageSliver(
         context,
         icon: Icons.error_outline_rounded,
         title: 'Unable to load events',
         subtitle: 'Please check your connection and try again.',
+        onRetry: _refresh,
       ),
       data: (events) {
         if (events.isEmpty) {
@@ -144,19 +163,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         return SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 150),
           sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                if (index == events.length) return _CapNote(text: note!);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: EventCard(
-                    event: events[index],
-                    accent: _accentPalette[index % _accentPalette.length],
-                  ),
-                );
-              },
-              childCount: events.length + (note == null ? 0 : 1),
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              if (index == events.length) return _CapNote(text: note!);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: EventCard(
+                  event: events[index],
+                  accent: _accentPalette[index % _accentPalette.length],
+                ),
+              );
+            }, childCount: events.length + (note == null ? 0 : 1)),
           ),
         );
       },
@@ -168,12 +184,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   /// contributes no header.
   Widget _rsvpSliver(AsyncValue<RsvpEvents> async) {
     return async.when(
+      skipLoadingOnRefresh: true,
       loading: () => _kLoadingSliver,
       error: (_, _) => _messageSliver(
         context,
         icon: Icons.error_outline_rounded,
         title: 'Unable to load your RSVPs',
         subtitle: 'Please check your connection and try again.',
+        onRetry: _refresh,
       ),
       data: (grouped) {
         if (grouped.isEmpty) {
@@ -192,9 +210,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               (context, index) => switch (rows[index]) {
                 _RsvpHeaderRow(:final label) => _GroupHeader(label: label),
                 _RsvpCardRow(:final event, :final accent) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: EventCard(event: event, accent: accent),
-                  ),
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: EventCard(event: event, accent: accent),
+                ),
                 _RsvpNoteRow(:final text) => _CapNote(text: text),
               },
               childCount: rows.length,
@@ -212,20 +230,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock_outline_rounded,
-                color: context.kc.muted, size: 44),
+            Icon(Icons.lock_outline_rounded, color: context.kc.muted, size: 44),
             const SizedBox(height: 14),
             Text(
               title,
-              style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                  .copyWith(color: context.kc.onBg),
+              style: AppTypography.ui(
+                size: 15,
+                weight: FontWeight.w600,
+              ).copyWith(color: context.kc.onBg),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
               subtitle,
-              style: AppTypography.ui(size: 13)
-                  .copyWith(color: context.kc.muted),
+              style: AppTypography.ui(
+                size: 13,
+              ).copyWith(color: context.kc.muted),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 18),
@@ -233,10 +253,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.pillBorder),
+                  borderRadius: AppRadius.pillBorder,
+                ),
               ),
               onPressed: () => context.push('/login'),
               child: Text(
@@ -249,49 +272,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       ),
     );
   }
-
-  /// Switches the member's campus for the whole app.
-  ///
-  /// [setActiveBranch] owns every store the campus lives in — the local
-  /// preference, this device's FCM branch topic and `users/{uid}.branch` —
-  /// and invalidates [currentBranchProvider] on the way out. None of that is
-  /// repeated here, and nothing is kept on this screen.
-  Future<void> _pickBranch(List<Branch> branches, String? current) async {
-    final choice = await showModalBottomSheet<_BranchChoice>(
-      context: context,
-      backgroundColor: context.kc.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (_) => _BranchSheet(
-        branchNames: branches.map((b) => b.name).toList(growable: false),
-        current: current,
-      ),
-    );
-    if (choice == null || !mounted) return;
-    if (choice.name == current) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final label = choice.name ?? _kAllCampuses;
-    final result = await setActiveBranch(ref, choice.name);
-    if (!mounted) return;
-    messenger.showSnackBar(
-      eventToast(
-        result.syncFailed
-            ? 'Your campus is now $label on this device. We could not reach '
-                'your profile — it will sync automatically.'
-            : 'Your campus is now $label.',
-      ),
-    );
-  }
-}
-
-/// A branch picked from the sheet. Wraps the name so "all campuses"
-/// (`name == null`) is distinguishable from "dismissed without choosing".
-@immutable
-class _BranchChoice {
-  const _BranchChoice(this.name);
-  final String? name;
 }
 
 Widget _messageSliver(
@@ -299,6 +279,7 @@ Widget _messageSliver(
   required IconData icon,
   required String title,
   required String subtitle,
+  VoidCallback? onRetry,
 }) {
   return SliverToBoxAdapter(
     child: Padding(
@@ -310,16 +291,30 @@ Widget _messageSliver(
           const SizedBox(height: 14),
           Text(
             title,
-            style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                .copyWith(color: context.kc.onBg),
+            style: AppTypography.ui(
+              size: 15,
+              weight: FontWeight.w600,
+            ).copyWith(color: context.kc.onBg),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: AppTypography.ui(size: 13)
-                .copyWith(color: context.kc.muted),
+            style: AppTypography.ui(size: 13).copyWith(color: context.kc.muted),
             textAlign: TextAlign.center,
           ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onRetry,
+              child: Text(
+                'Retry',
+                style: AppTypography.ui(
+                  size: 14,
+                  weight: FontWeight.w700,
+                ).copyWith(color: context.kc.accentInk),
+              ),
+            ),
+          ],
         ],
       ),
     ),
@@ -457,8 +452,10 @@ class _Header extends StatelessWidget {
         Expanded(
           child: Text(
             'Events',
-            style: AppTypography.display(size: 27, weight: FontWeight.w700)
-                .copyWith(color: context.kc.onBg),
+            style: AppTypography.display(
+              size: 27,
+              weight: FontWeight.w700,
+            ).copyWith(color: context.kc.onBg),
           ),
         ),
         const SizedBox(width: 12),
@@ -501,8 +498,11 @@ class _Header extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(Icons.keyboard_arrow_down_rounded,
-                          size: 16, color: AppColors.primary),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
                     ],
                   ),
                 ],
@@ -514,92 +514,6 @@ class _Header extends StatelessWidget {
     );
   }
 }
-
-// ── Branch sheet ──────────────────────────────────────────────────────────────
-
-class _BranchSheet extends StatelessWidget {
-  const _BranchSheet({required this.branchNames, required this.current});
-
-  final List<String> branchNames;
-  final String? current;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.7;
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.kc.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your campus',
-                    style: AppTypography.ui(size: 15, weight: FontWeight.w700)
-                        .copyWith(color: context.kc.onBg),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Saved to your profile and used across the app — events, '
-                    'announcements and giving. You can change it any time.',
-                    style: AppTypography.ui(size: 12)
-                        .copyWith(color: context.kc.muted),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.only(bottom: 12),
-                children: [
-                  _tile(context, label: _kAllCampuses, value: null),
-                  for (final name in branchNames)
-                    _tile(context, label: name, value: name),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _tile(BuildContext context,
-      {required String label, required String? value}) {
-    final selected = value == current;
-    return ListTile(
-      dense: true,
-      title: Text(
-        label,
-        style: AppTypography.ui(
-          size: 14,
-          weight: selected ? FontWeight.w700 : FontWeight.w500,
-        ).copyWith(
-          color: selected ? AppColors.primary : context.kc.onBg,
-        ),
-      ),
-      trailing: selected
-          ? const Icon(Icons.check_rounded, size: 18, color: AppColors.primary)
-          : null,
-      onTap: () => Navigator.of(context).pop(_BranchChoice(value)),
-    );
-  }
-}
-
 // ── Segmented tabs ────────────────────────────────────────────────────────────
 
 class _SegmentedTabs extends StatelessWidget {
@@ -660,12 +574,9 @@ class _TabChip extends StatelessWidget {
           style: AppTypography.ui(
             size: 13,
             weight: active ? FontWeight.w700 : FontWeight.w600,
-          ).copyWith(
-            color: active ? AppColors.onPrimary : context.kc.muted,
-          ),
+          ).copyWith(color: active ? AppColors.onPrimary : context.kc.muted),
         ),
       ),
     );
   }
 }
-

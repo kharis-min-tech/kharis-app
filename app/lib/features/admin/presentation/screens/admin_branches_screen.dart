@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/core/utils/service_time.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,13 +14,17 @@ const _groupOptions = ['Kharis', 'KP2'];
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-/// Admin screen: list + CRUD for [Branch].
+/// Admin screen: list + CRUD for [Branch]. A campus admin sees only their
+/// campuses, to open their branch pages; creating, deleting, reordering and
+/// renaming branches stay with super admins.
 class AdminBranchesScreen extends ConsumerWidget {
   const AdminBranchesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final branchesAsync = ref.watch(branchesProvider);
+    final scope = ref.watch(adminScopeProvider).valueOrNull;
+    final superAdmin = scope?.isSuperAdmin ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -32,12 +37,14 @@ class AdminBranchesScreen extends ConsumerWidget {
         ),
         iconTheme: const IconThemeData(color: AppColors.heading),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.secondary,
-        foregroundColor: AppColors.onSecondary,
-        onPressed: () => _openForm(context, ref),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: superAdmin
+          ? FloatingActionButton(
+              backgroundColor: AppColors.secondary,
+              foregroundColor: AppColors.onSecondary,
+              onPressed: () => _openForm(context, ref),
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: branchesAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppColors.secondary),
@@ -59,8 +66,10 @@ class AdminBranchesScreen extends ConsumerWidget {
               ),
             );
           }
-          final sorted = [...branches]
-            ..sort((a, b) => a.order.compareTo(b.order));
+          final sorted = [
+            for (final b in branches)
+              if (scope?.canManageBranchId(b.id) ?? false) b,
+          ]..sort((a, b) => a.order.compareTo(b.order));
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.gutter,
@@ -72,8 +81,12 @@ class AdminBranchesScreen extends ConsumerWidget {
             separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (_, i) => _BranchCard(
               branch: sorted[i],
-              onEdit: () => _openForm(context, ref, branch: sorted[i]),
-              onDelete: () => _confirmDelete(context, ref, sorted[i]),
+              onEdit: superAdmin
+                  ? () => _openForm(context, ref, branch: sorted[i])
+                  : null,
+              onDelete: superAdmin
+                  ? () => _confirmDelete(context, ref, sorted[i])
+                  : null,
               onTap: () => context.push(
                 '/admin/branches/${sorted[i].id}',
                 extra: sorted[i].name,
@@ -175,8 +188,10 @@ class _BranchCard extends StatelessWidget {
   });
 
   final Branch branch;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+
+  /// Identity edit and delete; null (hidden) for a campus admin.
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   final VoidCallback onTap;
 
   @override
@@ -300,22 +315,30 @@ class _BranchCard extends StatelessWidget {
                 ],
               ),
             ),
-            Column(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  color: AppColors.onSurfaceVariant,
-                  onPressed: onEdit,
-                  tooltip: 'Edit',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  color: AppColors.error,
-                  onPressed: onDelete,
-                  tooltip: 'Delete',
-                ),
-              ],
-            ),
+            if (onEdit != null || onDelete != null)
+              Column(
+                children: [
+                  if (onEdit != null)
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      color: AppColors.onSurfaceVariant,
+                      onPressed: onEdit,
+                      tooltip: 'Edit',
+                    ),
+                  if (onDelete != null)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      color: AppColors.error,
+                      onPressed: onDelete,
+                      tooltip: 'Delete',
+                    ),
+                ],
+              )
+            else
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textFaint,
+              ),
           ],
         ),
       ),

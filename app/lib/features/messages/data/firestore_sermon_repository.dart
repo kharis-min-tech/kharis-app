@@ -3,74 +3,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kharis_app/core/utils/html_entities.dart';
 import 'package:kharis_app/core/utils/sermon_categorizer.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
-import 'sermon_repository.dart';
-import 'sermon_repository_base.dart';
 
-/// Reads sermons from the Firestore `sermons` collection.
-///
-/// Falls back to the same mock data used by [SermonRepository] if Firestore
-/// is unavailable or a document is malformed.
-class FirestoreSermonRepository extends AbstractSermonRepository {
+/// Sources the Studio writes for hand-added audio sermons. The `sermons`
+/// collection also holds YouTube mirrors (`yt_<videoId>`, source 'youtube');
+/// those carry no audio and must not crowd hand-added sermons out of the
+/// member library's window.
+const List<String> kCmsAudioSources = ['audio', 'admin'];
+
+/// Reads and writes the Firestore `sermons` collection (the CMS).
+class FirestoreSermonRepository {
   FirestoreSermonRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
-
-  // Keep a single mock source so both repos share identical fallback data.
-  static final _mock = SermonRepository();
-
-  /// Fetches AUDIO sermons (the Spotify-style Messages surface).
-  ///
-  /// [limit] – maximum documents to return (default 20).
-  /// [offset] is not directly supported by Firestore; kept for API parity.
-  /// [source] – unused by default; reserved for multi-source collections.
-  /// [type] – defaults to 'audio'; pass 'video' for the video surface.
-  /// Filtering happens client-side over a small window so no composite
-  /// Firestore index is required; legacy docs without a `type` field count
-  /// as audio when they carry no videoId.
-  @override
-  Future<List<Sermon>> getSermons({
-    int limit = 0,
-    int offset = 0,
-    String? source,
-    String? type,
-  }) async {
-    try {
-      final snapshot = await _firestore
-          .collection('sermons')
-          .orderBy('publishedAt', descending: true)
-          .limit(500)
-          .get();
-      final wanted = type ?? 'audio';
-      final fromFirestore = snapshot.docs.map(_docToSermon).where((s) {
-        final docType = (s.source == 'youtube' || s.videoId != null)
-            ? 'video'
-            : 'audio';
-        return docType == wanted;
-      }).toList();
-
-      // Firestore may hold a partial sync (or nothing) until the backend
-      // functions run on schedule. Merge with the RSS/embedded dataset and
-      // dedupe by title so the library is always the full catalogue.
-      final fallback = await _mock.getSermons();
-      final seen = <String>{
-        for (final s in fromFirestore) _dedupeKey(s),
-      };
-      final merged = [
-        ...fromFirestore,
-        ...fallback.where((s) => seen.add(_dedupeKey(s))),
-      ]..sort((a, b) => (b.publishedAt ?? DateTime(0))
-          .compareTo(a.publishedAt ?? DateTime(0)));
-
-      if (merged.isEmpty) return fallback;
-      return limit > 0 ? merged.take(limit).toList() : merged;
-    } catch (_) {
-      return _mock.getSermons();
-    }
-  }
-
-  static String _dedupeKey(Sermon s) =>
-      s.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
   /// Fetches a single sermon by its Firestore document ID.
   Future<Sermon?> getSermonById(String id) async {
@@ -112,7 +57,7 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
           : FieldValue.serverTimestamp(),
       'series': series,
       'description': description,
-      'category': category ?? sermonCategory(title),
+      'category': category ?? sermonCategory(title, description: description),
       'videoId': videoId,
       'source': source ?? 'audio',
       'isFeatured': isFeatured,
@@ -150,7 +95,7 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       'duration': durationSeconds,
       'series': series,
       'description': description,
-      'category': category ?? sermonCategory(title),
+      'category': category ?? sermonCategory(title, description: description),
       'videoId': videoId,
       'source': source ?? 'audio',
       'isFeatured': isFeatured,
@@ -181,33 +126,29 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
         .map((snap) => snap.docs.map(_docToSermon).toList());
   }
 
-  /// Prefix search on the `title` field using Firestore range queries.
-  ///
-  /// Falls back to in-memory filter over mock data when Firestore is
-  /// unreachable.
-  Future<List<Sermon>> search(String query, {int limit = 20}) async {
-    if (query.isEmpty) return getSermons(limit: limit);
-    try {
-      final end = query.substring(0, query.length - 1) +
-          String.fromCharCode(query.codeUnitAt(query.length - 1) + 1);
-      final snapshot = await _firestore
-          .collection('sermons')
-          .where('title', isGreaterThanOrEqualTo: query)
-          .where('title', isLessThan: end)
-          .limit(limit)
-          .get();
-      return snapshot.docs.map(_docToSermon).toList();
-    } catch (_) {
-      final q = query.toLowerCase();
-      final catalogue = await loadCatalogue();
-      return catalogue
-          .where((s) => s.title.toLowerCase().contains(q))
-          .toList();
-    }
+  /// Streams hand-added CMS sermons (see [kCmsAudioSources]) for the member
+  /// library, newest first. Uses the (source, publishedAt) index.
+  Stream<List<Sermon>> watchCmsSermons({int limit = 100}) {
+    return _firestore
+        .collection('sermons')
+        .where('source', whereIn: kCmsAudioSources)
+        .orderBy('publishedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs.map(_docToSermon).toList());
   }
 
-  @override
-  Future<List<Sermon>> loadCatalogue() => _mock.loadCatalogue();
+  /// Streams the Studio-starred sermons (`isFeatured == true`), newest first.
+  /// Uses the (isFeatured, publishedAt) index.
+  Stream<List<Sermon>> watchPinnedFeatured({int limit = 5}) {
+    return _firestore
+        .collection('sermons')
+        .where('isFeatured', isEqualTo: true)
+        .orderBy('publishedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs.map(_docToSermon).toList());
+  }
 
   // ── Mapping ────────────────────────────────────────────────────────────────
 
@@ -220,7 +161,8 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       title: decodeHtmlEntities(data['title'] as String? ?? ''),
       speaker: data['speaker'] as String? ?? '',
       audioUrl: data['audioUrl'] as String? ?? '',
-      artworkUrl: data['thumbnailUrl'] as String? ?? data['artworkUrl'] as String?,
+      artworkUrl:
+          data['thumbnailUrl'] as String? ?? data['artworkUrl'] as String?,
       duration: data['duration'] != null
           ? Duration(seconds: (data['duration'] as num).toInt())
           : null,
@@ -228,8 +170,11 @@ class FirestoreSermonRepository extends AbstractSermonRepository {
       series: data['series'] as String?,
       description: data['description'] as String?,
       artworkColor: (data['artworkColor'] as num?)?.toInt(),
-      category: data['category'] as String? ??
-          sermonCategory(data['title'] as String? ?? ''),
+      category: topicOf(
+        title: data['title'] as String? ?? '',
+        description: data['description'] as String?,
+        category: data['category'] as String?,
+      ),
       videoId: data['videoId'] as String?,
       source: data['source'] as String?,
       isFeatured: data['isFeatured'] as bool? ?? false,

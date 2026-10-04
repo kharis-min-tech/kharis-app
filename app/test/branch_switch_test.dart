@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,9 +17,13 @@ import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 class _RecordingNotificationService extends NotificationService {
   final switches = <({String? from, String? to})>[];
 
+  /// When set, the topic switch never answers: a stalled FCM round trip.
+  bool hang = false;
+
   @override
-  Future<void> switchBranchTopic({String? from, String? to}) async {
+  Future<void> switchBranchTopic({String? from, String? to}) {
     switches.add((from: from, to: to));
+    return hang ? Completer<void>().future : Future<void>.value();
   }
 }
 
@@ -30,18 +36,24 @@ void main() {
   const uid = 'user-1';
 
   User member({String? branch}) => User(
-        id: uid,
-        email: 'member@kharis.org',
-        displayName: 'Member',
-        role: 'member',
-        branch: branch,
-        createdAt: DateTime(2024),
-      );
+    id: uid,
+    email: 'member@kharis.org',
+    displayName: 'Member',
+    role: 'member',
+    branch: branch,
+    createdAt: DateTime(2024),
+  );
 
   /// Pumps a widget so `setActiveBranch` gets a real WidgetRef, and hands the
   /// ref back to the caller.
-  Future<({ProviderContainer container, WidgetRef ref, _RecordingNotificationService fcm})>
-      harness(
+  Future<
+    ({
+      ProviderContainer container,
+      WidgetRef ref,
+      _RecordingNotificationService fcm,
+    })
+  >
+  harness(
     WidgetTester tester, {
     required FakeFirebaseFirestore db,
     User? user,
@@ -52,21 +64,27 @@ void main() {
     final fcm = _RecordingNotificationService();
     late WidgetRef captured;
 
-    final container = ProviderContainer(overrides: [
-      sharedPreferencesProvider.overrideWithValue(sp),
-      firestoreProvider.overrideWithValue(db),
-      currentUserProvider.overrideWith((ref) => Stream.value(user)),
-      notificationServiceProvider.overrideWithValue(fcm),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sp),
+        firestoreProvider.overrideWithValue(db),
+        currentUserProvider.overrideWith((ref) => Stream.value(user)),
+        notificationServiceProvider.overrideWithValue(fcm),
+      ],
+    );
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: Consumer(builder: (context, ref, _) {
-        captured = ref;
-        return const SizedBox();
-      }),
-    ));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: Consumer(
+          builder: (context, ref, _) {
+            captured = ref;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
     await container.read(currentUserProvider.future);
     return (container: container, ref: captured, fcm: fcm);
   }
@@ -74,8 +92,12 @@ void main() {
   testWidgets('a campus switch survives a relaunch', (tester) async {
     final db = FakeFirebaseFirestore();
     await db.collection('users').doc(uid).set({'branch': 'Bristol'});
-    final h = await harness(tester,
-        db: db, user: member(branch: 'Bristol'), prefs: {'onboarding_branch': 'Bristol'});
+    final h = await harness(
+      tester,
+      db: db,
+      user: member(branch: 'Bristol'),
+      prefs: {'onboarding_branch': 'Bristol'},
+    );
 
     final result = await setActiveBranch(h.ref, 'Manchester');
     expect(result.syncFailed, isFalse);
@@ -88,8 +110,12 @@ void main() {
     expect(h.fcm.switches.single, (from: 'Bristol', to: 'Manchester'));
 
     // Simulate the relaunch the owner described.
-    final relaunch = await harness(tester,
-        db: db, user: member(branch: 'Manchester'), prefs: {'onboarding_branch': 'Manchester'});
+    final relaunch = await harness(
+      tester,
+      db: db,
+      user: member(branch: 'Manchester'),
+      prefs: {'onboarding_branch': 'Manchester'},
+    );
     expect(
       await relaunch.container.read(currentBranchProvider.future),
       'Manchester',
@@ -97,35 +123,81 @@ void main() {
     );
   });
 
-  testWidgets('All campuses persists and clears the stored campus',
-      (tester) async {
+  testWidgets(
+    'a stalled notification topic switch never holds up the campus change',
+    (tester) async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(uid).set({'branch': 'Bristol'});
+      final h = await harness(
+        tester,
+        db: db,
+        user: member(branch: 'Bristol'),
+        prefs: {'onboarding_branch': 'Bristol'},
+      );
+      h.fcm.hang = true;
+
+      // Before the fix this awaited the FCM round trip (14 s on a slow
+      // Android connection) and the member sat on the branch screen.
+      final result = await setActiveBranch(
+        h.ref,
+        'Manchester',
+      ).timeout(const Duration(seconds: 2));
+
+      expect(result.syncFailed, isFalse);
+      final sp = await SharedPreferences.getInstance();
+      expect(sp.getString('onboarding_branch'), 'Manchester');
+      expect(h.fcm.switches.single, (from: 'Bristol', to: 'Manchester'));
+    },
+  );
+
+  testWidgets('All campuses persists and clears the stored campus', (
+    tester,
+  ) async {
     final db = FakeFirebaseFirestore();
     await db.collection('users').doc(uid).set({'branch': 'Bristol'});
-    final h = await harness(tester,
-        db: db, user: member(branch: 'Bristol'), prefs: {'onboarding_branch': 'Bristol'});
+    final h = await harness(
+      tester,
+      db: db,
+      user: member(branch: 'Bristol'),
+      prefs: {'onboarding_branch': 'Bristol'},
+    );
 
     await setActiveBranch(h.ref, null);
 
     // updateProfile would have omitted a null branch, leaving Bristol behind.
     final doc = await db.collection('users').doc(uid).get();
-    expect(doc.data()?['branch'], isNull,
-        reason: 'All campuses must actually clear the stored campus');
+    expect(
+      doc.data()?['branch'],
+      isNull,
+      reason: 'All campuses must actually clear the stored campus',
+    );
 
-    final relaunch = await harness(tester,
-        db: db, user: member(), prefs: {'onboarding_branch': ''});
+    final relaunch = await harness(
+      tester,
+      db: db,
+      user: member(),
+      prefs: {'onboarding_branch': ''},
+    );
     expect(await relaunch.container.read(currentBranchProvider.future), isNull);
   });
 
-  testWidgets('an unsynced All campuses pick is not overwritten by the profile',
-      (tester) async {
-    final db = FakeFirebaseFirestore();
-    await db.collection('users').doc(uid).set({'branch': 'Bristol'});
-    // Empty string reads back as null, so without hasBranchChoice this was
-    // indistinguishable from "never chose" and the stale profile won.
-    final h = await harness(tester, db: db, user: member(branch: 'Bristol'), prefs: {
-      'onboarding_branch': '',
-      'onboarding_branch_sync_pending': true,
-    });
-    expect(await h.container.read(currentBranchProvider.future), isNull);
-  });
+  testWidgets(
+    'an unsynced All campuses pick is not overwritten by the profile',
+    (tester) async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(uid).set({'branch': 'Bristol'});
+      // Empty string reads back as null, so without hasBranchChoice this was
+      // indistinguishable from "never chose" and the stale profile won.
+      final h = await harness(
+        tester,
+        db: db,
+        user: member(branch: 'Bristol'),
+        prefs: {
+          'onboarding_branch': '',
+          'onboarding_branch_sync_pending': true,
+        },
+      );
+      expect(await h.container.read(currentBranchProvider.future), isNull);
+    },
+  );
 }

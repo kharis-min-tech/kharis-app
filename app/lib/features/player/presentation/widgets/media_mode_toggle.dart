@@ -72,8 +72,8 @@ class _ModeChip extends StatelessWidget {
     final Color fg = active
         ? context.kc.onAccent
         : (enabled
-            ? context.kc.muted
-            : context.kc.muted.withValues(alpha: 0.4));
+              ? context.kc.muted
+              : context.kc.muted.withValues(alpha: 0.4));
 
     final chip = GestureDetector(
       onTap: onTap,
@@ -85,11 +85,7 @@ class _ModeChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: AppTypography.ui(
-            size: 13,
-            weight: FontWeight.w600,
-            color: fg,
-          ),
+          style: AppTypography.ui(size: 13, weight: FontWeight.w600, color: fg),
         ),
       ),
     );
@@ -100,7 +96,7 @@ class _ModeChip extends StatelessWidget {
         child: Semantics(
           button: true,
           enabled: false,
-          label: '$label — $disabledReason',
+          label: '$label, $disabledReason',
           excludeSemantics: true,
           child: chip,
         ),

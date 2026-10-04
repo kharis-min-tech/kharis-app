@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/onboarding/data/branch_repository.dart';
 import '../../features/onboarding/data/user_admin_repository.dart';
-import '../models/user.dart';
+import 'branch_provider.dart' show firestoreProvider;
 
 // ── Branches ──────────────────────────────────────────────────────────────────
 
@@ -18,10 +18,11 @@ final branchesProvider = StreamProvider<List<Branch>>((ref) {
 // ── Users (admin) ───────────────────────────────────────────────────────────
 
 final userAdminRepositoryProvider = Provider<UserAdminRepository>((ref) {
-  return UserAdminRepository();
+  return UserAdminRepository(firestore: ref.watch(firestoreProvider));
 });
 
-/// Every user profile, realtime. Readable only by admins (Firestore rules).
-final allUsersProvider = StreamProvider<List<User>>((ref) {
+/// Every user profile with its admin campuses, realtime. Readable only by
+/// super admins (Firestore rules).
+final allUsersProvider = StreamProvider<List<AdminUser>>((ref) {
   return ref.watch(userAdminRepositoryProvider).watchUsers();
 });

@@ -7,7 +7,8 @@ import {
   getFirestore,
 } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
-import { branchTopic } from './topics';
+import { PREF_TOPIC, PushAudience, branchTopic, prefAudience } from './topics';
+import { dueService, REMINDER_RUN_EVERY_MS } from './service-reminders';
 
 /**
  * Content Studio -> device pushes, driven by Firestore document triggers.
@@ -80,7 +81,7 @@ async function claimPush(key: string): Promise<boolean> {
 }
 
 /**
- * Sends one topic push under a one-shot claim.
+ * Sends one push under a one-shot claim.
  *
  * On a send failure the claim is released, so the next retry or the next
  * meaningful edit can try again instead of being deduped forever against a
@@ -88,28 +89,29 @@ async function claimPush(key: string): Promise<boolean> {
  */
 async function sendPush(
   key: string,
-  topic: string,
+  audience: PushAudience,
   title: string,
   body: string,
   data: Record<string, string>,
 ): Promise<void> {
   if (!(await claimPush(key))) return;
   const ref = getFirestore().collection(PUSH_LOG).doc(key);
+  const target = 'topic' in audience ? audience.topic : audience.condition;
   try {
     const messageId = await getMessaging().send({
-      topic,
+      ...audience,
       notification: { title, body },
       data,
       android: { priority: 'high' },
       apns: { payload: { aps: { sound: 'default' } } },
     });
     await ref.set(
-      { topic, title, body, messageId, sentAt: FieldValue.serverTimestamp() },
+      { target, title, body, messageId, sentAt: FieldValue.serverTimestamp() },
       { merge: true },
     );
-    console.log(`[push] ${key} -> ${topic} (${messageId})`);
+    console.log(`[push] ${key} -> ${target} (${messageId})`);
   } catch (e) {
-    console.error(`[push] failed ${key} -> ${topic}:`, e);
+    console.error(`[push] failed ${key} -> ${target}:`, e);
     await ref.delete().catch(() => undefined);
   }
 }
@@ -136,6 +138,7 @@ const EVENT_PUSH_FIELDS = [
   'startTime',
   'endTime',
   'location',
+  'address',
   'branch',
 ] as const;
 
@@ -145,6 +148,7 @@ const EVENT_CHANGE_LABEL: Record<string, string> = {
   startTime: 'time',
   endTime: 'time',
   location: 'venue',
+  address: 'venue',
   branch: 'campus',
 };
 
@@ -186,7 +190,7 @@ function eventBody(changed: string[], whenWhere: string): string {
       ? labels[0]
       : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
   return cap(
-    `${what.charAt(0).toUpperCase()}${what.slice(1)} changed — ${whenWhere}`,
+    `${what.charAt(0).toUpperCase()}${what.slice(1)} changed: ${whenWhere}`,
     MAX_BODY,
   );
 }
@@ -195,9 +199,12 @@ function eventBody(changed: string[], whenWhere: string): string {
  * Pushes when an event is added, or when its name, time, venue or campus
  * changes on an event people may already have RSVP'd to.
  *
- * Silent for deletions (nowhere to route a tap), for events without a start
- * time, and for events already in the past — backfilling history must not
- * blast the congregation.
+ * Sent only to devices that keep the app's Events toggle on (`events` topic)
+ * and follow the event's campus.
+ *
+ * Silent for deletions (nowhere to route a tap), for hidden tombstones of
+ * deleted website events, for events without a start time, and for events
+ * already in the past — backfilling history must not blast the congregation.
  */
 export const onEventWritten = onDocumentWritten(
   { document: 'events/{eventId}', memory: '256MiB', timeoutSeconds: 60 },
@@ -205,6 +212,7 @@ export const onEventWritten = onDocumentWritten(
     const after = event.data?.after;
     if (!after?.exists) return;
     const next = after.data() as DocumentData;
+    if (next.hidden === true) return;
 
     const start = next.startTime;
     if (!(start instanceof Timestamp) || start.toMillis() <= Date.now()) return;
@@ -215,6 +223,10 @@ export const onEventWritten = onDocumentWritten(
       ? EVENT_PUSH_FIELDS.filter((f) => !sameValue(prev[f], next[f]))
       : [];
     if (prev && changed.length === 0) return;
+    // Website imports (sync-website-events.ts) bring in every weekly service
+    // the site lists; announcing each as "New event" would spam the church.
+    // A later time or venue change to one of them is still pushed.
+    if (!prev && next.source === 'website') return;
 
     const title = (next.title ?? '').toString().trim() || 'Kharis event';
     const location = (next.location ?? '').toString().trim();
@@ -231,9 +243,14 @@ export const onEventWritten = onDocumentWritten(
       startTime: start.toDate().toISOString(),
       location,
     };
-
     const topic = branchTopic(next.branch);
-    await sendPush(`${event.id}_${topic}`, topic, heading, body, payload);
+    await sendPush(
+      `${event.id}_${topic}`,
+      prefAudience(PREF_TOPIC.events, next.branch),
+      heading,
+      body,
+      payload,
+    );
 
     // A campus move also has to reach the members it moved AWAY from — they
     // are the ones who will otherwise turn up at the old venue. Distinct claim
@@ -243,9 +260,9 @@ export const onEventWritten = onDocumentWritten(
     const movedTo = (next.branch ?? '').toString().trim() || 'all campuses';
     await sendPush(
       `${event.id}_${from}`,
-      from,
+      prefAudience(PREF_TOPIC.events, prev?.branch),
       heading,
-      cap(`Moved to ${movedTo} — ${whenWhere}`, MAX_BODY),
+      cap(`Moved to ${movedTo}: ${whenWhere}`, MAX_BODY),
       payload,
     );
   },
@@ -308,7 +325,7 @@ export const onBranchVenueWritten = onDocumentWritten(
     const topic = branchTopic(name);
     await sendPush(
       `${event.id}_${topic}`,
-      topic,
+      { topic },
       `${name}: service details updated`,
       cap(`We now meet ${detail}`, MAX_BODY),
       {
@@ -319,6 +336,64 @@ export const onBranchVenueWritten = onDocumentWritten(
         schedule,
       },
     );
+  },
+);
+
+// ── Service reminders ───────────────────────────────────────────────────────
+
+/**
+ * Reminds each campus an hour before its service, from the branch's
+ * `meetingDays` / `meetingTime` (see service-reminders.ts for the parsing).
+ *
+ * Sent only to devices that keep the app's Service Reminders toggle on
+ * (`service_reminders` topic) and follow that campus. Runs every 15 minutes;
+ * the claim key is campus + London date, so a retried or overlapping run can
+ * never remind the same service twice. A campus whose schedule cannot be read
+ * unambiguously (no weekday, several times) gets no reminder.
+ */
+export const pushServiceReminders = onSchedule(
+  {
+    schedule: 'every 15 minutes',
+    timeZone: LONDON,
+    memory: '256MiB',
+    timeoutSeconds: 60,
+  },
+  async () => {
+    // The runs tile time in REMINDER_RUN_EVERY_MS steps; snap to the step so
+    // scheduler jitter cannot open a gap or overlap between two windows.
+    const nowMs = Math.floor(Date.now() / REMINDER_RUN_EVERY_MS) * REMINDER_RUN_EVERY_MS;
+    const snap = await getFirestore().collection('branches').get();
+    let sent = 0;
+    for (const doc of snap.docs) {
+      const branch = doc.data() as DocumentData;
+      const name = (branch.name ?? '').toString().trim();
+      if (!name) continue;
+      const due = dueService(branch.meetingDays, branch.meetingTime, nowMs);
+      if (!due) continue;
+
+      const start = new Date(due.startMs);
+      const address = (branch.address ?? '').toString().trim();
+      await sendPush(
+        `service_${doc.id}_${due.dateKey}`,
+        prefAudience(PREF_TOPIC.serviceReminders, name),
+        `${name}: service at ${londonTime.format(start)}`,
+        cap(
+          address
+            ? `Starting in an hour at ${address}. See you there.`
+            : 'Starting in an hour. See you there.',
+          MAX_BODY,
+        ),
+        {
+          type: 'service_reminder',
+          branchId: doc.id,
+          branch: name,
+          startTime: start.toISOString(),
+          address,
+        },
+      );
+      sent++;
+    }
+    console.log(`[service-reminder] ${sent} campus reminder(s) due`);
   },
 );
 

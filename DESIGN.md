@@ -1,117 +1,153 @@
 # Kharis Design System
 
-> Every value below was extracted from computed styles on kharis.org.
-> Do not invent colours, radii, or button styles. The website is the source of truth.
+> This file documents the tokens the app actually ships. The source of truth is
+> `app/lib/core/theme/` (`AppColors`, `KharisColors` via `context.kc`,
+> `AppTypography`, `AppSpacing`, `AppRadius`, `AppShadows`, `kharisTheme`).
+> If this file and the code disagree, the code wins and this file is wrong.
+> Import everything through `package:kharis_app/core/theme/theme.dart`.
+
+## Rules for screens
+
+- Colours that change with light/dark mode come from `context.kc`, never from
+  `AppColors.lightBg`, `AppColors.surfaceDark` or a hex literal.
+- Text styles come from `AppTypography`. Never call `GoogleFonts.*` in a
+  screen.
+- One CTA style: solid gold (`kc.accent`) with gold ink (`kc.onAccent`). No
+  gradients on buttons, no white text on gold.
+- No em dashes in user-facing copy. UK spelling.
 
 ## Colour
 
-### Brand Palette (from kharis.org)
-| Token | Hex | RGB | Role |
-|-------|-----|-----|------|
-| orange | #FD7F20 | rgb(253, 127, 32) | Primary CTA. Every button on the website. |
-| purple | #6B34FA | rgb(107, 52, 250) | Identity. Logo, social icons. Not for buttons. |
-| magenta | #800654 | rgb(128, 6, 84) | Feature icons (50px icon-boxes). |
+### Brand (same in both themes, `AppColors`)
 
-### Text Palette
 | Token | Hex | Role |
 |-------|-----|------|
-| heading | #32363D | Section headings on light surfaces |
-| body | #7A7A7A | Body copy, descriptions |
-| muted | #999999 | Secondary metadata |
-| near-black | #000002 | Nav links (DM Sans 12px bold uppercase) |
-| white | #FFFFFF | Headings on dark surfaces, button text |
+| `primary` | #5D3FD3 | Brand purple: logo, identity, avatar gradient start |
+| `primaryDeep` | #451EBB | Deep purple: brand ink cards (Giving scripture card) |
+| `secondary` / `gold` | #F8B537 | Gold: the CTA colour, active chips, progress |
+| `onSecondary` / `goldInk` | #1A1205 | Ink on gold |
+| `ink` | #0B0A10 | Dark base (splash, player, dark-mode background) |
+| `danger` | #E11D48 | Destructive actions, form errors on light surfaces |
+| `accentPink` | #F531B3 | Live badge, notification dot |
+| `errorContainer` | #93000A | Error snackbar fill |
 
-### Surface Palette
-| Token | Hex | Role |
-|-------|-----|------|
-| page | #FFFFFF | Website default background |
-| section-alt | #F9FAFE | Alternate section background |
-| card | #FDFDFD | Card backgrounds, 15px radius, shadow |
-| overlay | rgba(0,0,0,0.6) | Hero/banner overlays |
-| dark | #0D0D0D | App dark mode background |
-| elevated | #1A1A1A | Cards and sheets in dark mode |
-| subtle | #252525 | Inputs and secondary surfaces in dark mode |
+`AppColors.error` (#FFB4AB) is a dark-surface error tint; it is unreadable on
+light backgrounds, so forms use `danger`.
 
-### Colour Strategy
-Restrained. Tinted neutrals with one accent (orange) at CTA points. Purple reserved for identity marks only. No gradients on buttons. No glows. The church's warmth comes from content (photography, sermon artwork), not from surface effects.
+### Theme-aware (`context.kc`, `KharisColors`)
 
-## Typography
+| Token | Light | Dark | Role |
+|-------|-------|------|------|
+| `bg` | #FAF7F2 | #0B0A10 | Screen background |
+| `surface` | #FFFFFF | #241F30 | Cards, sheets, dialogs |
+| `surfaceAlt` | #F2EEE8 | #1E1E1E | Inset fills: inputs, search |
+| `surfaceMuted` | #F0ECFF | #1C1826 | Inactive chips |
+| `onBg` | #171717 | #F2EEF4 | Primary text and icons |
+| `muted` | #8A8580 | #9B93B5 | Secondary text |
+| `faint` | #A8A29B | #6E6A70 | Tertiary text |
+| `divider` | 8% ink | 8% white | Hairlines |
+| `outline` | 12% ink | #4A4451 | Borders on interactive elements |
+| `chipBg` | #F0ECFF | #1C1826 | Icon-tile background |
+| `onChip` | #5D3FD3 | #C6B4FF | Icon or link on `chipBg`, in-text links |
+| `accent` | #F8B537 | #E0A32B | Gold CTA fill |
+| `onAccent` | #1A1205 | #1A1205 | Text and icons on `accent` |
+| `accentInk` | #8A5A06 | #F8B537 | Gold used as text or icon on `bg` |
+| `scrim` | 55% ink | 70% ink | Modal and image overlays |
 
-### Fonts
-- **Headings**: Maven Pro (weights: 400, 500, 600, 700, 800)
-- **Body**: DM Sans (weights: 400, 500, 600, 700)
+Snackbars are a fixed dark plate in both themes (`KharisColors.dark.surface`).
 
-### Scale (from kharis.org)
-| Step | Size | Weight | Font | Usage |
-|------|------|--------|------|-------|
-| Display | 42px | 700 | Maven Pro | Page headings ("WELCOME TO KHARIS") |
-| H2 | 24px | 700 | Maven Pro | Section subheads ("About Us", "Locations") |
-| H3 | 18px | 600 | Maven Pro | Card titles, sermon names |
-| Body | 17px | 400 | Maven Pro | Default body text |
-| Nav | 12px | 700 | DM Sans | Navigation links (uppercase) |
-| Caption | 14px | 400 | DM Sans | Metadata, timestamps |
-| Overline | 11px | 600 | DM Sans | Labels, badges (uppercase, tracking) |
+### Colour strategy
 
-### Letter Spacing
-- Display headings: -1.134px (tracking-tighter)
-- Section headings: -0.648px
-- Body and nav: normal
+Warm neutral surfaces, brand purple for identity and links, gold only where a
+member acts. Warmth comes from photography and sermon artwork, not surface
+effects. No teal or green surfaces, no glows, no gradient buttons.
+
+## Typography (`AppTypography`)
+
+| Family | Builder | Use |
+|--------|---------|-----|
+| Bricolage Grotesque 700, tracking -0.015em | `display(size:)` | Screen titles, wordmark, sheet titles |
+| Hanken Grotesk 400 to 800 | `ui(size:, weight:)` | Body, labels, buttons, list rows, navigation |
+| Newsreader, often italic | `serif(size:, italic:)` | Scripture, taglines, devotional reading |
+
+Named scale:
+
+| Getter | Spec | Use |
+|--------|------|-----|
+| `displayLg` | Bricolage 48/56 | Hero display |
+| `headlineLg` | Bricolage 32/40 | Large screen title |
+| `headlineLgMobile` | Bricolage 28/36 | Screen title (Giving, sign in) |
+| `titleMd` | Hanken 600 20/28 | Card title |
+| `bodyLg` | Hanken 400 16/24 | Body |
+| `bodySm` | Hanken 400 14/20 | Small body |
+| `labelMd` | Hanken 600 12/16, +0.05em | Eyebrow labels |
+
+Section eyebrows ("GIVING TO", "APP") are `ui(size: 11, weight: w700,
+letterSpacing: 1.1)` in `kc.muted`.
 
 ## Buttons
 
-One button style. From kharis.org (all 6 CTAs identical):
+- **Primary**: `ElevatedButton` with the theme defaults: `kc.accent` fill,
+  `kc.onAccent` text, `AppRadius.button` (15), no elevation, Hanken 700.
+  Pill-shaped variants use `AppRadius.pillBorder`.
+- **Secondary**: `OutlinedButton`, transparent, `kc.outline` border,
+  `kc.onBg` text.
+- **Text link**: `TextButton` with `kc.accentInk` (gold) or `kc.onChip`
+  (purple) text.
+- **Destructive**: text in `AppColors.danger`.
 
-```
-background: #FD7F20 (solid, no gradient)
-color: #FFFFFF
-font-family: "Maven Pro", sans-serif
-font-size: 14px
-font-weight: 700
-text-transform: uppercase
-padding: 18px 40px
-border-radius: 12px
-border: none
-box-shadow: none
-letter-spacing: normal
-```
+## Radius (`AppRadius`)
 
-There is no secondary/outline/ghost button on the website. For the app, derive secondary and ghost variants from the same family:
-- Secondary: transparent background, 1px solid #FD7F20 border, #FD7F20 text
-- Ghost: transparent background, #7A7A7A text, no border
+| Token | Value | Use |
+|-------|-------|-----|
+| `card` / `cardBorder` | 18 | Cards, menu groups, dialogs |
+| `button` / `buttonBorder` | 15 | CTAs |
+| `input` / `inputBorder` | 15 | Text fields, search |
+| `tile` / `tileBorder` | 13 | 40 to 44 px icon tiles, mini player |
+| `lg` | 16 | Bottom sheets (inset, all corners) |
+| `md` | 12 | Thumbnails |
+| `pill` / `pillBorder` | 9999 | Chips, pill buttons |
 
-## Radius
+## Spacing (`AppSpacing`)
 
-| Token | Value | Source |
-|-------|-------|--------|
-| button | 12px | All CTAs on kharis.org |
-| card | 15px | Feature cards (box-shadow: 0 0 30px rgba(0,0,0,0.18)) |
-| social | 50% | Social media icon circles |
-| input | 8px | Derived for form fields |
+`xs` 4, `sm` 12, `gutter` 16, `marginMobile` 20 (screen side margin), `md` 24,
+`lg` 40, `xl` 64. Cards use 14 to 20 internal padding; groups are separated by
+22.
 
-## Shadows
-| Token | Value | Source |
-|-------|-------|--------|
-| card | 0 0 30px rgba(0,0,0,0.18) | Feature cards on kharis.org |
-| none | none | All buttons (no shadow on any CTA) |
+## Elevation (`AppShadows`)
+
+- `card`: `0 2px 12px rgba(30,20,60,.05)`, the only shadow on light cards.
+- `miniPlayer`: `0 12px 30px rgba(0,0,0,.4)`.
+- Buttons never have shadows.
+
+## Components
+
+- **Menu card** (More): `kc.surface`, `cardBorder`, `AppShadows.card`; rows are
+  a 40 px tinted icon tile, Hanken 600 15 label, optional muted value, chevron
+  (or an external-link glyph when the row leaves the app).
+- **Bottom sheet**: inset 8 px from the screen edges, `kc.surface`,
+  `AppRadius.lg`, 36x4 drag handle in `kc.outline`, Bricolage 18 title. See
+  `add_to_playlist_sheet.dart` and `branch_picker_sheet.dart`.
+- **Campus picker**: always `pickActiveBranch` (the shared sheet in
+  `app/lib/shared/widgets/branch_picker_sheet.dart`), which persists via
+  `setActiveBranch`.
 
 ## Motion
-- Transitions: 200ms ease
-- No bounce, no elastic
-- Reduced motion: honour prefers-reduced-motion, degrade to instant
+
+- 120 to 200 ms ease-out; press feedback scales to 0.97.
+- No bounce, no elastic. Honour reduced motion.
 
 ## Icons
-- Feature icons: magenta (#800654) at 50px (from icon-box components on kharis.org)
-- Social icons: purple (#6B34FA) foreground on orange (#FD7F20) circle background
-- App navigation: outlined inactive, filled active (active state in orange #FD7F20)
 
-## Absolute Bans (for this project)
-- No gradient text
-- No glassmorphism
-- No AI-purple glows
-- No em dashes
+Material rounded/outlined icons. Inactive navigation uses `kc.muted`, active
+uses `kc.accentInk`.
+
+## Bans
+
+- No gradient text or gradient buttons
+- No glassmorphism or glows
+- No em dashes in copy
 - No side-stripe borders
-- No identical card grids
-- No fake product screenshots
-- No serif fonts
-- No Inter font
-- No teal/green (the old app's off-brand colour)
+- No teal or green surfaces
+- No raw `GoogleFonts` calls or hex colours in screens
+- No fake data (progress bars, history, counts) that is not backed by a source

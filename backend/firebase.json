@@ -12,7 +12,10 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
+        "*.local",
+        ".test-build",
+        "test",
+        "tsconfig.test.json"
       ]
     }
   ],

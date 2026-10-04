@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["Z9TTRH45X3.com.kharis.church"],
+        "components": [
+          { "/": "/m/*", "comment": "Messages" },
+          { "/": "/e/*", "comment": "Events" },
+          { "/": "/a/*", "comment": "Announcements" }
+        ],
+        "appID": "Z9TTRH45X3.com.kharis.church",
+        "paths": ["/m/*", "/e/*", "/a/*"]
+      }
+    ]
+  }
+}

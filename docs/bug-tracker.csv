@@ -1,0 +1,28 @@
+id,severity,title,area,type,source,reported,owner,status,notes
+KA-001,P0,Playback mini-bar can't be dismissed during giving,Giving/Player,Bug,NJ,2026-08-30,Ayo,Done,9 Sep: bar auto-hides on Giving tab (audio keeps playing); swipe-down dismiss already in repo
+KA-002,P0,Event-calendar notification won't open; needs date/time/venue,Notifications/Events,Bug,External tester,2026-08-27,,Done,Already in repo (build lag): detail sheet shows date/time/venue + add-to-calendar; FCM taps deep-link; verify next TestFlight
+KA-003,P0,Sermon notes can't be retrieved after creation,Notes,Bug,Tester + NJ,2026-08-27,,Done,Already in repo (build lag): More → My Notes + player Notes sheet; persistence tests green
+KA-004,P0,Reading Plan button doesn't open a Bible; Bible failed to load,Reading Plan,Bug,Pastor Luke + tester,2026-08-19,,Done,Already in repo (build lag): in-app reader at /reading with version switcher + error view
+KA-005,P1,Video scrubbing clunky/laggy,Player,Bug,External tester,2026-08-27,,Open,youtube_player_iframe constraint? investigate seek throttling; needs device testing
+KA-006,P1,No sound during video intro (recovered afterwards),Player,Bug,External tester,2026-08-27,,Needs-repro,Possibly content-side; capture video ID
+KA-007,P1,Page with no way back (NJ screenshot),Navigation,Bug,NJ,2026-08-24,,Done,9 Sep audit: all pushed routes have back; Browse has home exit; reopen with Q-2 screenshot if it recurs
+KA-008,P1,Share only copies link — no native share sheet,Sharing,Bug,External tester,2026-08-27,,Done,Already in repo (build lag): share_plus OS sheet with youtu.be link
+KA-009,P1,Daily reading needs more prominent Home position,Home,UX,Pastor Luke,2026-08-19,,Done,9 Sep: Today's Reading is the first Home block above the hero message
+KA-010,P1,Daily Prayer tap behaviour undefined,Daily Prayer,Product,NJ,2026-08-24,,Needs-decision,Pastor Luke to define; reading screen already renders a daily-prayer card beneath the passage
+KA-011,P1,First-load branch prompt; default London,Onboarding/Events,Product,NJ,2026-08-24,,Needs-decision,One-time branch prompt already in repo; open half: default branch when prompt skipped
+KA-012,P1,Ratings prompt: quarterly pop-up + menu button,Engagement,Feature,Daniel + Pastor Luke,2026-09-05,,Done,9 Sep: More → Rate & Feedback + quarterly nudge (≥3 sessions); in_app_review with TestFlight fallback
+KA-013,P2,Duplicate share buttons (top + bottom),Player UI,Bug,NJ,2026-09-03,Ayo,Done,9 Sep: header share removed; single share in actions row
+KA-014,P2,Search bar square idle vs circular active,UI consistency,UX,NJ,2026-08-24,,Done,Already in repo (build lag): pill shape in both states
+KA-015,P2,Scrolling possible on message-viewing surface,Player UI,UX,NJ,2026-08-24,,Done,Already in repo (build lag): video pinned outside scrollable
+KA-016,P2,Continue-as-guest doesn't read as tappable,Onboarding,UX,NJ,2026-08-24,,Done,Already in repo (build lag): full-width outlined button
+KA-017,P2,Rewind/forward 10s buttons styling,Player UI,UX,NJ,2026-08-24,,Done,Already in repo (build lag): tonal circles with ripple + bigger targets
+KA-018,P2,Video container styling (sharp corners),Player UI,UX,NJ,2026-08-24,,Done,Already in repo (build lag): corner mask rounds the platform view
+KA-019,P2,Previously-viewed + not-finished library filters,Library,Enhancement,NJ,2026-08-31,,Open,Pairs with resume-playback state
+KA-020,P2,Notifications bell missing in tested build,Home,Bug,NJ,2026-08-31,,Done,Verified in repo: header bell + dot → notifications feed; tested build predated it
+KA-023,P2,Bell dot always lit — contradicted an empty feed,Home,Bug,Device walkthrough,2026-09-09,,Done,Dot was hard-coded; now mirrors the feed (undismissed rows; off while loading). Unit + on-device check
+KA-024,P1,Mini-player swipe-away asserted on device (dismissed Dismissible still in tree),Player,Bug,Device walkthrough,2026-09-09,,Done,Bar hides synchronously on dismiss; resets when sermon clears. Widget test + on-device swipe
+KA-021,P2,Branch maps only Phase 2 + Chatham,Branches,Data,External tester,2026-08-27,,Data,CMS completeness — BACKLOG §7
+KA-022,P2,Catalogue gaps (Phase 2 vs London),Content,Data,External tester,2026-08-27,,Data,API P0 filter bug + CMS side; INTEGRATION_ISSUES §1
+Q-1,Q,Caching strategy for R2/Worker pipeline,Media pipeline,Question,Daniel,2026-09-08,Jonathan,Open,Unanswered as of 8 Sep
+Q-2,Q,Playback bar question — example requested,Player,Question,NJ,2026-09-03,NJ,Open,Screenshot pending
+Q-3,Q,Export NJ's Apple-feedback submissions into tracker,QA,Question,NJ,2026-08-30,Kenny,Open,Items sent via Apple tracker not captured here

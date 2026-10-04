@@ -10,6 +10,7 @@ import {
   YouTubeVideoDetails,
   YouTubeVideosResponse,
 } from './types';
+import { decodeHtmlEntities } from './html-text';
 
 // Direct channel ID — more reliable than handle/username lookup
 const CHANNEL_ID = 'UC4l8WmdF9ivMDQHHVOdYKqQ';
@@ -26,22 +27,6 @@ function iso8601ToSeconds(duration: string): number {
   const m = parseInt(match[2] || '0', 10);
   const s = parseInt(match[3] || '0', 10);
   return h * 3600 + m * 60 + s;
-}
-
-/**
- * YouTube API strings arrive HTML-entity-encoded (&#39; &amp; &quot; …).
- * Decode them once at the boundary so Firestore stores clean text.
- */
-function decodeHtmlEntities(s: string): string {
-  return s
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ');
 }
 
 async function fetchLatestVideos(

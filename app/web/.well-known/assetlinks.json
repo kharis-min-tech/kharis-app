@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.kharis.church",
+      "sha256_cert_fingerprints": [
+        "A8:B6:7B:79:C3:18:CB:81:B2:E0:73:1D:A3:7D:61:82:E6:94:AB:F2:75:86:1E:FC:8C:C2:23:18:B7:47:61:93"
+      ]
+    }
+  }
+]

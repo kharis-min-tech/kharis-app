@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kharis_app/core/constants/api_config.dart';
+import 'package:kharis_app/core/constants/bible_books.dart';
 import 'package:kharis_app/features/home/data/reading_plan_repository.dart';
 
 @immutable
@@ -10,6 +11,8 @@ class DailyContent {
     required this.reading,
     required this.prayer,
     required this.prayerReference,
+    this.planDay,
+    this.planDays,
   });
 
   final BibleReading reading;
@@ -17,6 +20,14 @@ class DailyContent {
 
   /// Scripture reference for the prayer (e.g. "Philippians 4:6").
   final String prayerReference;
+
+  /// 1-based day of the reading plan this came from ("Day 3 of 13"), never
+  /// above [planDays]; a finished plan pinned to its last day reports
+  /// [planDays]. `null` for a hand-written day or the built-in fallback.
+  final int? planDay;
+
+  /// Length of the reading plan in days; `null` when [planDay] is.
+  final int? planDays;
 }
 
 @immutable
@@ -78,8 +89,8 @@ class DailyContentRepository {
   DailyContentRepository({
     FirebaseFirestore? firestore,
     ReadingPlanRepository? plans,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _plans = plans ?? ReadingPlanRepository(firestore: firestore);
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _plans = plans ?? ReadingPlanRepository(firestore: firestore);
 
   final FirebaseFirestore _firestore;
   final ReadingPlanRepository _plans;
@@ -116,14 +127,12 @@ class DailyContentRepository {
           .doc(readingDateKey(today))
           .snapshots()
           .map((doc) {
-        final data = doc.data();
-        // A hand-written day always wins over the plan.
-        if (_hasReading(data)) return _mapData(data!);
-        final resolved = resolvePlanReading(plans, today);
-        return resolved == null
-            ? _hardcodedContent
-            : _fromPlan(resolved.reading);
-      });
+            final data = doc.data();
+            // A hand-written day always wins over the plan.
+            if (_hasReading(data)) return _mapData(data!);
+            final resolved = resolvePlanReading(plans, today);
+            return resolved == null ? _hardcodedContent : _fromPlan(resolved);
+          });
     } catch (_) {
       yield _hardcodedContent;
     }
@@ -152,8 +161,10 @@ class DailyContentRepository {
   Future<ResolvedDailyContent> resolveForDate(String dateKey) async {
     final date = parseReadingDate(dateKey) ?? dateOnly(DateTime.now());
     try {
-      final doc =
-          await _firestore.collection('dailyContent').doc(dateKey).get();
+      final doc = await _firestore
+          .collection('dailyContent')
+          .doc(dateKey)
+          .get();
       final data = doc.data();
       // A hand-written day BEATS the plan for that date — that is what lets an
       // admin special-case Christmas without disturbing the plan around it.
@@ -175,7 +186,7 @@ class DailyContentRepository {
       );
     }
     return ResolvedDailyContent(
-      content: _fromPlan(resolved.reading),
+      content: _fromPlan(resolved),
       source: resolved.pinnedToLastDay
           ? DailyContentSource.planLastDay
           : DailyContentSource.plan,
@@ -198,29 +209,55 @@ class DailyContentRepository {
     return reading is Map && (reading['book'] as String?)?.isNotEmpty == true;
   }
 
-  DailyContent _fromPlan(PlanDayReading reading) => DailyContent(
-        reading: BibleReading(
-          book: reading.book,
-          chapter: reading.chapter,
-          verse: reading.verse,
-        ),
-        prayer: reading.prayer,
-        prayerReference: reading.prayerReference,
-      );
+  DailyContent _fromPlan(PlanResolution resolved) {
+    final reading = resolved.reading;
+    return DailyContent(
+      reading: BibleReading(
+        book: reading.book,
+        chapter: reading.chapter,
+        verse: reading.verse,
+      ),
+      prayer: reading.prayer,
+      prayerReference: reading.prayerReference,
+      planDay: resolved.day.clamp(1, resolved.plan.days),
+      planDays: resolved.plan.days,
+    );
+  }
 
+  /// Maps a `dailyContent` document or a `getDailyReading` API reading.
+  ///
+  /// A chapter past the end of a known book is clamped to its last chapter:
+  /// no such chapter exists, and an older backend could still emit one for an
+  /// over-long plan (the "2 Corinthians 17" bug), which the Bible API 404s.
   DailyContent _mapData(Map<String, dynamic> data) {
     final readingData = data['reading'] as Map<String, dynamic>?;
+    final planDays = (data['planDays'] as num?)?.toInt();
+    final planDay = (data['planDay'] as num?)?.toInt();
     return DailyContent(
       reading: readingData != null
-          ? BibleReading(
-              book: readingData['book'] as String? ?? '',
-              chapter: (readingData['chapter'] as num?)?.toInt() ?? 1,
-              verse: readingData['verse'] as String? ?? '1',
+          ? _boundedReading(
+              readingData['book'] as String? ?? '',
+              (readingData['chapter'] as num?)?.toInt() ?? 1,
+              readingData['verse'] as String? ?? '1',
             )
           : _hardcodedContent.reading,
       prayer: data['prayer'] as String? ?? _hardcodedContent.prayer,
-      prayerReference: data['prayerReference'] as String? ??
+      prayerReference:
+          data['prayerReference'] as String? ??
           _hardcodedContent.prayerReference,
+      planDays: planDays != null && planDays > 0 ? planDays : null,
+      planDay: planDay != null && planDays != null && planDays > 0
+          ? planDay.clamp(1, planDays)
+          : null,
+    );
+  }
+
+  static BibleReading _boundedReading(String book, int chapter, String verse) {
+    final total = kBibleBooks[book];
+    return BibleReading(
+      book: book,
+      chapter: total != null && chapter > total ? total : chapter,
+      verse: verse,
     );
   }
 
@@ -244,15 +281,18 @@ class DailyContentRepository {
       _firestore.collection('dailyContent').doc(dateKey).delete();
 
   /// Streams the most recent dailyContent documents for the admin list view.
-  Stream<List<MapEntry<String, DailyContent>>> watchRecentContent({int limit = 30}) {
+  Stream<List<MapEntry<String, DailyContent>>> watchRecentContent({
+    int limit = 30,
+  }) {
     return _firestore
         .collection('dailyContent')
         .orderBy(FieldPath.documentId, descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => MapEntry(d.id, _mapData(d.data())))
-            .toList());
+        .map(
+          (snap) =>
+              snap.docs.map((d) => MapEntry(d.id, _mapData(d.data()))).toList(),
+        );
   }
 
   // ── Fallback ───────────────────────────────────────────────────────────────

@@ -1,5 +1,14 @@
 name: Build iOS
 
+# Builds an unsigned release archive (smoke test that the iOS release build
+# compiles exactly like a local one). Signed IPAs for App Store Connect are
+# still produced locally with app/scripts/deploy-testflight.sh.
+#
+# Required repository secret (Settings -> Secrets and variables -> Actions):
+#
+#   ENV_JSON   Verbatim copy of app/env.json (YOUVERSION_API_KEY,
+#              YOUTUBE_API_KEY). Same secret build-android.yml and ci.yml use.
+
 'on':
   workflow_dispatch:
     inputs:
@@ -10,32 +19,68 @@ name: Build iOS
 
 jobs:
   build-ios:
-    name: Build iOS IPA
+    name: Build iOS archive (unsigned)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check required secrets are present
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: |
+          if [ -z "$ENV_JSON" ]; then
+            echo "::error::Missing repository secret ENV_JSON (see the header of .github/workflows/build-ios.yml)"
+            exit 1
+          fi
 
       - name: Set up Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
+      # Same Flutter as local development: the single pin is app/.fvmrc.
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version-file: app/.fvmrc
           channel: stable
           cache: true
 
       - name: Install Flutter dependencies
         working-directory: app
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
-      - name: Build IPA
+      - name: Restore env.json
         working-directory: app
-        run: flutter build ipa --release --no-codesign
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: printf '%s' "$ENV_JSON" > env.json
 
-      - name: Upload .ipa artifact
+      # --no-codesign stops after the archive (no IPA is exported without
+      # signing), so the archive is the artifact.
+      - name: Build iOS archive
+        working-directory: app
+        # The input reaches the shell as data, never as script text.
+        env:
+          BUILD_NUMBER: ${{ github.event.inputs.build_number }}
+        run: |
+          EXTRA=()
+          if [ -n "$BUILD_NUMBER" ]; then
+            if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+              echo "::error::build_number must be digits only"
+              exit 1
+            fi
+            EXTRA=(--build-number="$BUILD_NUMBER")
+          fi
+          flutter build ipa --release --no-codesign --dart-define-from-file=env.json "${EXTRA[@]}"
+
+      - name: Upload archive artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-release-ipa
-          path: app/build/ios/ipa/*.ipa
+          name: ios-release-xcarchive
+          path: app/build/ios/archive/Runner.xcarchive
+          if-no-files-found: error
           retention-days: 30
+
+      - name: Scrub env.json
+        if: always()
+        run: rm -f app/env.json

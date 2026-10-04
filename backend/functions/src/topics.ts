@@ -21,3 +21,25 @@ export function branchTopic(branch?: string | null): string {
   const name = (branch ?? '').toString().trim();
   return name ? `branch_${slugifyBranch(name)}` : 'all';
 }
+
+/** Where a push goes: one topic, or an FCM topic condition. */
+export type PushAudience = { topic: string } | { condition: string };
+
+/**
+ * FCM topics behind the app's notification preference toggles. MUST match
+ * `KharisTopics.events` / `KharisTopics.serviceReminders` in
+ * `app/lib/core/services/notification_service.dart`.
+ */
+export const PREF_TOPIC = {
+  events: 'events',
+  serviceReminders: 'service_reminders',
+} as const;
+
+/**
+ * Devices that opted into [prefTopic] AND follow [branch]'s campus, so turning
+ * a toggle off in the app really stops that kind of push. Every device is on
+ * `all`, so all-campus content reduces to "opted in".
+ */
+export function prefAudience(prefTopic: string, branch?: string | null): PushAudience {
+  return { condition: `'${prefTopic}' in topics && '${branchTopic(branch)}' in topics` };
+}

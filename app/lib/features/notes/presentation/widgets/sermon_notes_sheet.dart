@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
@@ -85,26 +84,12 @@ class SermonNotesSheet extends ConsumerWidget {
             Flexible(
               child: notes.isEmpty
                   ? _empty(context)
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.lg,
-                        0,
-                        AppSpacing.lg,
-                        AppSpacing.md,
-                      ),
-                      shrinkWrap: true,
-                      itemCount: notes.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (context, index) => _TimelineNoteTile(
-                        note: notes[index],
-                        onSeek: () => _seek(context, ref, notes[index]),
-                        onEdit: () => _openEditor(context, note: notes[index]),
-                        onDelete: () =>
-                            ref.read(notesRepositoryProvider).delete(
-                                  notes[index].id,
-                                ),
-                      ),
+                  : _NoteTimeline(
+                      notes: notes,
+                      onSeek: (note) => _seek(context, ref, note),
+                      onEdit: (note) => _openEditor(context, note: note),
+                      onDelete: (note) =>
+                          ref.read(notesRepositoryProvider).delete(note.id),
                     ),
             ),
             _addButton(context),
@@ -117,63 +102,58 @@ class SermonNotesSheet extends ConsumerWidget {
   // ── Chrome ─────────────────────────────────────────────────────────────────
 
   Widget _grabber(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: AppSpacing.sm),
-        height: 4,
-        width: 40,
-        decoration: BoxDecoration(
-          color: context.kc.divider,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
+    margin: const EdgeInsets.only(top: AppSpacing.sm),
+    height: 4,
+    width: 40,
+    decoration: BoxDecoration(
+      color: context.kc.divider,
+      borderRadius: BorderRadius.circular(2),
+    ),
+  );
 
   Widget _header(BuildContext context, int count) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.md,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              count == 1 ? '1 note on this message' : '$count notes on this message',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.kc.onBg,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              sermon.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                color: context.kc.muted,
-              ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _empty(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.xl,
-        ),
-        child: Text(
-          'Nothing written on this message yet. Notes you add here are stamped '
-          'with the moment you wrote them.',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            height: 1.5,
-            color: context.kc.muted,
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.lg,
+      AppSpacing.lg,
+      AppSpacing.lg,
+      AppSpacing.md,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          count == 1
+              ? '1 note on this message'
+              : '$count notes on this message',
+          style: AppTypography.ui(
+            size: 18,
+            weight: FontWeight.w700,
+            color: context.kc.onBg,
           ),
         ),
-      );
+        const SizedBox(height: 2),
+        Text(
+          sermon.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.ui(size: 13, color: context.kc.muted),
+        ),
+      ],
+    ),
+  );
+
+  Widget _empty(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.lg,
+      vertical: AppSpacing.xl,
+    ),
+    child: Text(
+      'Nothing written on this message yet. Notes you add here are stamped '
+      'with the moment you wrote them.',
+      textAlign: TextAlign.center,
+      style: AppTypography.ui(size: 14, height: 1.5, color: context.kc.muted),
+    ),
+  );
 
   /// Rebuilt on its own so the ticking playback position does not repaint the
   /// whole sheet.
@@ -222,10 +202,7 @@ class SermonNotesSheet extends ConsumerWidget {
           positionMs == null
               ? 'Add a note'
               : 'Add a note at ${formatNotePosition(positionMs)}',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.ui(size: 15, weight: FontWeight.w600),
         ),
       );
 
@@ -244,11 +221,7 @@ class SermonNotesSheet extends ConsumerWidget {
     return ref.watch(positionProvider).valueOrNull?.inMilliseconds;
   }
 
-  void _openEditor(
-    BuildContext context, {
-    Note? note,
-    int? capturePositionMs,
-  }) {
+  void _openEditor(BuildContext context, {Note? note, int? capturePositionMs}) {
     // Capture the navigator before the sheet is popped: `context` is defunct
     // once its route is gone.
     final navigator = Navigator.of(context);
@@ -299,6 +272,61 @@ class SermonNotesSheet extends ConsumerWidget {
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
+/// The sheet's note list. Hides a swiped-away note at once: the delete only
+/// lands in the notes stream a frame or more later, and a dismissed
+/// [Dismissible] still in the tree for that frame asserts.
+class _NoteTimeline extends StatefulWidget {
+  const _NoteTimeline({
+    required this.notes,
+    required this.onSeek,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final List<Note> notes;
+  final ValueChanged<Note> onSeek;
+  final ValueChanged<Note> onEdit;
+  final ValueChanged<Note> onDelete;
+
+  @override
+  State<_NoteTimeline> createState() => _NoteTimelineState();
+}
+
+class _NoteTimelineState extends State<_NoteTimeline> {
+  final Set<String> _deleted = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final notes = [
+      for (final note in widget.notes)
+        if (!_deleted.contains(note.id)) note,
+    ];
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.md,
+      ),
+      shrinkWrap: true,
+      itemCount: notes.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+      itemBuilder: (context, index) {
+        final note = notes[index];
+        return _TimelineNoteTile(
+          note: note,
+          onSeek: () => widget.onSeek(note),
+          onEdit: () => widget.onEdit(note),
+          onDelete: () {
+            setState(() => _deleted.add(note.id));
+            widget.onDelete(note);
+          },
+        );
+      },
+    );
+  }
+}
+
 class _TimelineNoteTile extends StatelessWidget {
   const _TimelineNoteTile({
     required this.note,
@@ -348,8 +376,8 @@ class _TimelineNoteTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   note.body,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
+                  style: AppTypography.ui(
+                    size: 14,
                     height: 1.4,
                     color: context.kc.onBg,
                   ),
@@ -396,9 +424,9 @@ class _SeekPill extends StatelessWidget {
               const SizedBox(width: 2),
               Text(
                 formatNotePosition(positionMs),
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                style: AppTypography.ui(
+                  size: 11,
+                  weight: FontWeight.w600,
                   color: AppColors.primary,
                 ),
               ),

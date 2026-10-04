@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/service_time.dart';
+import 'package:kharis_app/features/admin/data/branch_settings_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 
-/// Bottom sheet that edits the member-facing venue fields of a branch:
+/// Bottom sheet that edits the member-facing venue summary of a branch:
 /// address, meeting day(s) and meeting time.
 ///
-/// Deliberately narrow. Name, subtitle, gradients, image, order and group are
-/// edited on the branches list screen and are passed straight through here, so
-/// a venue edit can never blank them.
+/// Deliberately narrow: a partial update of just those three fields, so a
+/// venue edit can never touch the name, order, group, gradients or image
+/// (and stays within what a campus admin may change).
 class BranchVenueFormSheet extends StatefulWidget {
   const BranchVenueFormSheet({
     super.key,
@@ -20,7 +21,7 @@ class BranchVenueFormSheet extends StatefulWidget {
   });
 
   final Branch branch;
-  final BranchRepository repo;
+  final BranchSettingsRepository repo;
   final void Function(String) onSuccess;
   final void Function(String) onError;
 
@@ -190,19 +191,11 @@ class _BranchVenueFormSheetState extends State<BranchVenueFormSheet> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      final b = widget.branch;
-      await widget.repo.updateBranch(
-        b.id,
-        name: b.name,
-        subtitle: b.subtitle,
-        gradientStart: b.gradientStart,
-        gradientEnd: b.gradientEnd,
-        imageUrl: b.imageUrl,
-        order: b.order,
+      await widget.repo.setVenueSummary(
+        widget.branch.id,
         address: _nullIfBlank(_addressCtrl.text),
         meetingDays: _nullIfBlank(_meetingDaysCtrl.text),
         meetingTime: _nullIfBlank(_meetingTimeCtrl.text),
-        group: b.group,
       );
       widget.onSuccess('Venue updated.');
       if (mounted) Navigator.pop(context);

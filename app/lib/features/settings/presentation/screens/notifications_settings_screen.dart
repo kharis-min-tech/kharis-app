@@ -36,8 +36,12 @@ class _NotificationsSettingsScreenState
   }
 
   Future<void> _requestPermission() async {
-    await ref.read(notificationServiceProvider).requestPermission();
-    ref.invalidate(notificationPermissionProvider);
+    // Taken before the OS sheet opens: the member can leave this screen
+    // while it is up, after which this widget's `ref` is dead. The follow-up
+    // runs on its own provider, so the topics are still re-applied.
+    final service = ref.read(notificationServiceProvider);
+    final onAnswer = ref.read(notificationPermissionAnsweredProvider);
+    await onAnswer(await service.requestPermission());
   }
 
   @override
@@ -74,8 +78,10 @@ class _NotificationsSettingsScreenState
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
               child: Text(
                 'Notifications',
-                style: AppTypography.display(size: 26, weight: FontWeight.w700)
-                    .copyWith(color: context.kc.onBg),
+                style: AppTypography.display(
+                  size: 26,
+                  weight: FontWeight.w700,
+                ).copyWith(color: context.kc.onBg),
               ),
             ),
             // Content area
@@ -87,54 +93,51 @@ class _NotificationsSettingsScreenState
                     strokeWidth: 2,
                   ),
                 ),
-                error: (err, _) => const SizedBox.shrink(),
-                data: (_) {
-                  final prefs = _prefs ?? const {};
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        // Toggles can't deliver anything while the OS blocks
-                        // us, so say so rather than lying with four switches.
-                        if (permitted == false) ...[
-                          _PermissionNotice(onEnable: _requestPermission),
-                          const SizedBox(height: 14),
-                        ],
-                        _ToggleRow(
-                          label: 'Service Reminders',
-                          subtitle: 'Reminders before services start',
-                          value: prefs['serviceReminders'] ?? true,
-                          onChanged: (v) => _onToggle('serviceReminders', v),
-                        ),
-                        const SizedBox(height: 14),
-                        _ToggleRow(
-                          label: 'Events',
-                          subtitle: 'Updates on upcoming events',
-                          value: prefs['events'] ?? true,
-                          onChanged: (v) => _onToggle('events', v),
-                        ),
-                        const SizedBox(height: 14),
-                        _ToggleRow(
-                          label: 'Daily Reading',
-                          subtitle: 'Your daily scripture notification',
-                          value: prefs['dailyReading'] ?? true,
-                          onChanged: (v) => _onToggle('dailyReading', v),
-                        ),
-                        const SizedBox(height: 14),
-                        _ToggleRow(
-                          label: 'New Sermons',
-                          subtitle: 'Alert when new sermons are added',
-                          value: prefs['newSermons'] ?? true,
-                          onChanged: (v) => _onToggle('newSermons', v),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                // The prefs stream falls back to defaults for guests; a read
+                // failure for a member still shows working switches (they
+                // apply to this device's topics) rather than a blank page.
+                error: (_, _) => _toggles(_prefs ?? const {}, permitted),
+                data: (_) => _toggles(_prefs ?? const {}, permitted),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _toggles(Map<String, bool> prefs, bool? permitted) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          // Toggles can't deliver anything while the OS blocks
+          // us, so say so rather than lying with three switches.
+          if (permitted == false) ...[
+            _PermissionNotice(onEnable: _requestPermission),
+            const SizedBox(height: 14),
+          ],
+          _ToggleRow(
+            label: 'Service Reminders',
+            subtitle: 'Reminders before services start',
+            value: prefs['serviceReminders'] ?? true,
+            onChanged: (v) => _onToggle('serviceReminders', v),
+          ),
+          const SizedBox(height: 14),
+          _ToggleRow(
+            label: 'Events',
+            subtitle: 'Updates on upcoming events',
+            value: prefs['events'] ?? true,
+            onChanged: (v) => _onToggle('events', v),
+          ),
+          const SizedBox(height: 14),
+          _ToggleRow(
+            label: 'Daily Reading',
+            subtitle: 'Your daily scripture notification',
+            value: prefs['dailyReading'] ?? true,
+            onChanged: (v) => _onToggle('dailyReading', v),
+          ),
+        ],
       ),
     );
   }
@@ -163,15 +166,16 @@ class _PermissionNotice extends StatelessWidget {
         children: [
           Text(
             'Notifications are turned off',
-            style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                .copyWith(color: context.kc.onBg),
+            style: AppTypography.ui(
+              size: 15,
+              weight: FontWeight.w600,
+            ).copyWith(color: context.kc.onBg),
           ),
           const SizedBox(height: 2),
           Text(
             'Your device is blocking Kharis notifications. Allow them to start '
             'receiving the alerts you pick below.',
-            style: AppTypography.ui(size: 12)
-                .copyWith(color: context.kc.muted),
+            style: AppTypography.ui(size: 12).copyWith(color: context.kc.muted),
           ),
           const SizedBox(height: 10),
           Align(
@@ -180,8 +184,10 @@ class _PermissionNotice extends StatelessWidget {
               onPressed: onEnable,
               child: Text(
                 'Allow notifications',
-                style: AppTypography.ui(size: 13, weight: FontWeight.w600)
-                    .copyWith(color: context.kc.accentInk),
+                style: AppTypography.ui(
+                  size: 13,
+                  weight: FontWeight.w600,
+                ).copyWith(color: context.kc.accentInk),
               ),
             ),
           ),
@@ -223,14 +229,17 @@ class _ToggleRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                      .copyWith(color: context.kc.onBg),
+                  style: AppTypography.ui(
+                    size: 15,
+                    weight: FontWeight.w600,
+                  ).copyWith(color: context.kc.onBg),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: AppTypography.ui(size: 12)
-                      .copyWith(color: context.kc.muted),
+                  style: AppTypography.ui(
+                    size: 12,
+                  ).copyWith(color: context.kc.muted),
                 ),
               ],
             ),

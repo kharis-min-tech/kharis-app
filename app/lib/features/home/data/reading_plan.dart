@@ -6,11 +6,13 @@
 /// `backend/functions/src/reading-plans.ts` exactly, so the app shows the same
 /// reading whether it came from the API or from the Firestore fallback.
 ///
-/// Deliberately import-free: the plan arithmetic is pure Dart and can be
-/// exercised without Flutter or Firestore. Firestore access lives in
+/// Deliberately Flutter- and Firestore-free: the plan arithmetic is pure Dart
+/// and can be exercised on its own. Firestore access lives in
 /// `reading_plan_repository.dart`. Every class here is immutable by
 /// construction — const constructor, all fields final.
 library;
+
+import 'package:kharis_app/core/constants/bible_books.dart';
 
 /// How a plan advances from one day to the next.
 enum ReadingPlanMode {
@@ -46,7 +48,7 @@ DateTime? parseReadingDate(String key) {
 /// across a BST switch, which is enough to shift a reading by a whole day.
 int readingDayNumber(DateTime date) =>
     DateTime.utc(date.year, date.month, date.day).millisecondsSinceEpoch ~/
-        Duration.millisecondsPerDay;
+    Duration.millisecondsPerDay;
 
 /// Strips the time component so a picked date compares cleanly.
 DateTime dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
@@ -136,21 +138,57 @@ class ReadingPlan {
   int offsetFor(DateTime date) =>
       readingDayNumber(date) - readingDayNumber(startDate);
 
+  /// Chapters in [book], or `null` for a name outside [kBibleBooks] (such a
+  /// plan cannot be bounded and resolves unclamped, as before).
+  int? get bookChapters => kBibleBooks[book];
+
+  /// The 1-based chapter day 1 reads, never past the end of the book.
+  int get firstChapter {
+    final first = startChapter < 1 ? 1 : startChapter;
+    final total = bookChapters;
+    return total != null && first > total ? total : first;
+  }
+
+  /// Chapter-mode days the book can fill from [firstChapter] (one chapter a
+  /// day); `null` when the book is unknown. The Studio caps [days] to this.
+  int? get chaptersRemaining {
+    final total = bookChapters;
+    return total == null ? null : total - firstChapter + 1;
+  }
+
+  /// True for a chapter plan with more days than chapters left in the book.
+  /// Such a plan holds on the final chapter for its remaining days; the
+  /// Studio flags it so an admin can shorten it or add the next book.
+  bool get overrunsBook {
+    final remaining = chaptersRemaining;
+    return mode == ReadingPlanMode.chapter &&
+        remaining != null &&
+        days > remaining;
+  }
+
   /// The last reading the plan yields.
   PlanDayReading get lastReading => readingForDay(days - 1);
 
   /// The reading for day [offset] (0-based).
+  ///
+  /// Chapter mode never emits a chapter beyond the book: day 14 of a plan that
+  /// starts at 2 Corinthians 1 is 2 Corinthians 13, not the non-existent 14.
+  /// Mirrors `planReading` in `backend/functions/src/reading-plans.ts`.
   PlanDayReading readingForDay(int offset) {
-    final firstChapter = startChapter < 1 ? 1 : startChapter;
+    final first = firstChapter;
     final int chapter;
     final String verse;
     if (mode == ReadingPlanMode.verse) {
       final perDay = versesPerDay < 1 ? 1 : versesPerDay;
-      final first = (startVerse < 1 ? 1 : startVerse) + offset * perDay;
-      chapter = firstChapter;
-      verse = perDay == 1 ? '$first' : '$first-${first + perDay - 1}';
+      final firstVerse = (startVerse < 1 ? 1 : startVerse) + offset * perDay;
+      chapter = first;
+      verse = perDay == 1
+          ? '$firstVerse'
+          : '$firstVerse-${firstVerse + perDay - 1}';
     } else {
-      chapter = firstChapter + offset;
+      final total = bookChapters;
+      final unbounded = first + (offset < 0 ? 0 : offset);
+      chapter = total != null && unbounded > total ? total : unbounded;
       final range = (verses ?? '').trim();
       verse = range.isEmpty ? '1-end' : range;
     }
@@ -224,18 +262,18 @@ class ReadingPlan {
   }
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'book': book,
-        'startDate': readingDateKey(startDate),
-        'days': days,
-        'mode': mode == ReadingPlanMode.verse ? 'verse' : 'chapter',
-        'startChapter': startChapter,
-        'verses': mode == ReadingPlanMode.chapter ? verses : null,
-        'startVerse': startVerse,
-        'versesPerDay': versesPerDay,
-        'prayer': prayer,
-        'prayerReference': prayerReference,
-      };
+    'title': title,
+    'book': book,
+    'startDate': readingDateKey(startDate),
+    'days': days,
+    'mode': mode == ReadingPlanMode.verse ? 'verse' : 'chapter',
+    'startChapter': startChapter,
+    'verses': mode == ReadingPlanMode.chapter ? verses : null,
+    'startVerse': startVerse,
+    'versesPerDay': versesPerDay,
+    'prayer': prayer,
+    'prayerReference': prayerReference,
+  };
 }
 
 /// A resolved plan reading plus why it was chosen.
@@ -244,6 +282,7 @@ class PlanResolution {
     required this.plan,
     required this.reading,
     required this.pinnedToLastDay,
+    required this.day,
   });
 
   final ReadingPlan plan;
@@ -251,6 +290,10 @@ class PlanResolution {
 
   /// True when [plan] had already finished and its LAST day is being shown.
   final bool pinnedToLastDay;
+
+  /// 1-based plan day being shown ("Day 3 of 13"); [ReadingPlan.days] when
+  /// pinned to the last day.
+  final int day;
 }
 
 /// Resolves [date] against [plans].
@@ -279,6 +322,7 @@ PlanResolution? resolvePlanReading(List<ReadingPlan> plans, DateTime date) {
       plan: covering,
       reading: covering.readingForDay(covering.offsetFor(date)),
       pinnedToLastDay: false,
+      day: covering.offsetFor(date) + 1,
     );
   }
 
@@ -296,5 +340,6 @@ PlanResolution? resolvePlanReading(List<ReadingPlan> plans, DateTime date) {
           plan: pinned,
           reading: pinned.lastReading,
           pinnedToLastDay: true,
+          day: pinned.days,
         );
 }

@@ -4,13 +4,16 @@ import {
   Timestamp,
   FieldValue,
   FieldPath,
-  QueryDocumentSnapshot,
+  Query,
 } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getMessaging } from 'firebase-admin/messaging';
-import { SermonDoc, NewsDoc } from './types';
+import { EventDoc, NewsDoc } from './types';
 import { branchTopic } from './topics';
+import { todayInLondon } from './london-time';
+import { NewsRecord, isPushDue, pickAnnouncements } from './announcements';
+import { EventRecord, IN_PROGRESS_LOOKBACK_MS, pickEvents } from './events-api';
 import {
   DATE_KEY,
   MONTH_KEY,
@@ -28,184 +31,36 @@ import {
 initializeApp();
 
 // Re-export scheduled functions
-export { syncSoundCloud } from './sync-soundcloud';
 export { syncYouTube, searchYouTube } from './sync-youtube';
+export { syncWebsiteEvents } from './sync-website-events';
 export { feedProxy } from './feed-proxy';
+export { sermonApiProxy } from './sermon-proxy';
 
 // Content Studio -> device pushes: Firestore triggers that fire on the write
-// itself (events, branch venue details). See `content-notifications.ts`.
+// itself (events, branch venue details), plus the service reminder schedule.
+// See `content-notifications.ts`.
 export {
   onEventWritten,
   onBranchVenueWritten,
+  pushServiceReminders,
   purgePushLog,
 } from './content-notifications';
 
-const PAGE_SIZE = 20;
-
-/**
- * HTTP fallback: GET /getSermons
- * Query params:
- *   - source: 'soundcloud' | 'youtube' (optional filter)
- *   - type: 'audio' | 'video' (optional filter)
- *   - after: Firestore document ID to paginate from (optional)
- *   - limit: number (max 50, default 20)
- */
-export const getSermons = onRequest(
-  {
-    memory: '256MiB',
-    timeoutSeconds: 30,
-    cors: true,
-  },
-  async (req, res) => {
-    if (req.method !== 'GET') {
-      res.status(405).json({ error: 'Method Not Allowed' });
-      return;
-    }
-
-    const db = getFirestore();
-    const { source, type, after, limit: limitParam } = req.query as Record<string, string>;
-
-    const limit = Math.min(
-      parseInt(limitParam || String(PAGE_SIZE), 10) || PAGE_SIZE,
-      50
-    );
-
-    let query = db
-      .collection('sermons')
-      .orderBy('publishedAt', 'desc')
-      .limit(limit);
-
-    if (source === 'soundcloud' || source === 'youtube') {
-      query = query.where('source', '==', source);
-    }
-
-    if (type === 'audio' || type === 'video') {
-      query = query.where('type', '==', type);
-    }
-
-    if (after) {
-      const cursorDoc = await db.collection('sermons').doc(after).get();
-      if (cursorDoc.exists) {
-        query = query.startAfter(cursorDoc);
-      }
-    }
-
-    const snapshot = await query.get();
-
-    const sermons: (SermonDoc & { id: string })[] = snapshot.docs.map((doc) => {
-      const data = doc.data() as SermonDoc;
-      return { ...data, id: doc.id };
-    });
-
-    const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-    const nextCursor = snapshot.docs.length === limit ? lastDoc?.id : null;
-
-    res.status(200).json({
-      sermons,
-      nextCursor,
-      count: sermons.length,
-      timestamp: Timestamp.now().toDate().toISOString(),
-    });
-  }
-);
-
 const ANNOUNCEMENT_PAGE_SIZE = 20;
 
-/** JSON shape returned by getAnnouncements. `branch: null` = all-campus. */
-interface AnnouncementJson {
-  id: string;
-  title: string;
-  body: string;
-  type: string;
-  branch: string | null;
-  imageUrl: string | null;
-  publishedAt: string | null;
-  expiresAt: string | null;
-}
-
-function toAnnouncement(doc: QueryDocumentSnapshot): AnnouncementJson {
-  const data = doc.data() as NewsDoc;
-  const branch = (data.branch ?? '').toString().trim();
-  const { publishedAt, expiresAt } = data;
-  return {
-    id: doc.id,
-    title: data.title ?? '',
-    body: data.body ?? '',
-    // An announcement is a message, never an event. Legacy docs typed 'Event'
-    // by the old admin dropdown are surfaced as announcements so nothing in
-    // the app can render a `news` doc as a dated, RSVP-able occurrence.
-    type: data.type && data.type !== 'Event' ? data.type : 'Announcement',
-    branch: branch || null,
-    imageUrl: data.imageUrl ?? null,
-    publishedAt:
-      publishedAt instanceof Timestamp
-        ? publishedAt.toDate().toISOString()
-        : null,
-    // `expiresAt` is written by the web admin portal; null means "never
-    // expires". Surfaced so clients reading the Firestore fallback path can
-    // apply the same rule.
-    expiresAt:
-      expiresAt instanceof Timestamp ? expiresAt.toDate().toISOString() : null,
-  };
-}
-
-const BY_NEWEST = (a: AnnouncementJson, b: AnnouncementJson) =>
-  Date.parse(b.publishedAt ?? '') - Date.parse(a.publishedAt ?? '');
-
-/**
- * The announcements a member at [branch] should see, newest first.
- *
- * Branch-scoped notices are selected BEFORE all-campus ones and only then is
- * the page re-sorted for display. That ordering is the whole point of the
- * function: a campus notice is the most relevant thing a member can be shown,
- * so it must never be crowded off the page by newer church-wide items — which
- * is exactly how a branch's announcement used to disappear.
- *
- * Passing no [branch] returns the plain church-wide feed.
- */
-async function selectAnnouncements(
+/** The newest published `news` docs, optionally for one campus. */
+async function newestNews(
   db: FirebaseFirestore.Firestore,
-  branch: string | undefined,
-  limit: number
-): Promise<AnnouncementJson[]> {
-  // Over-fetch so the post-filter for expired items still fills the page.
-  const newest = () =>
-    db
-      .collection('news')
-      .orderBy('publishedAt', 'desc')
-      .limit(Math.min(limit * 2, 100));
-
-  const nowMs = Date.now();
-  // Shared expiry rule — an expired notice must not reach any caller.
-  const live = (docs: QueryDocumentSnapshot[]) =>
-    docs
-      .map(toAnnouncement)
-      .filter((a) => a.expiresAt === null || Date.parse(a.expiresAt) > nowMs)
-      .sort(BY_NEWEST);
-
-  if (!branch) return live((await newest().get()).docs).slice(0, limit);
-
-  // The all-campus half cannot use `where('branch', '==', null)` the way
-  // getEvents does: docs created before the portal gained a branch field carry
-  // no `branch` key at all, and Firestore equality never matches a missing
-  // field. So the second query is unfiltered and the absent/blank branches are
-  // picked out in memory.
-  const [branchSnap, anySnap] = await Promise.all([
-    newest().where('branch', '==', branch).get(),
-    newest().get(),
-  ]);
-  const scoped = live(branchSnap.docs).slice(0, limit);
-  const seen = new Set(scoped.map((a) => a.id));
-  const campus = live(
-    anySnap.docs.filter((d) => {
-      const b = (d.data() as NewsDoc).branch;
-      return b === null || b === undefined || String(b).trim() === '';
-    })
-  )
-    .filter((a) => !seen.has(a.id))
-    .slice(0, limit - scoped.length);
-
-  return [...scoped, ...campus].sort(BY_NEWEST);
+  now: Timestamp,
+  fetch: number,
+  branch?: string,
+): Promise<NewsRecord[]> {
+  // `publishedAt <= now` in the query itself: Studio-scheduled future notices
+  // sort first and would otherwise eat the over-fetch window.
+  let query: Query = db.collection('news').where('publishedAt', '<=', now);
+  if (branch) query = query.where('branch', '==', branch);
+  const snap = await query.orderBy('publishedAt', 'desc').limit(fetch).get();
+  return snap.docs.map((d) => ({ id: d.id, data: d.data() as NewsDoc }));
 }
 
 /**
@@ -214,8 +69,8 @@ async function selectAnnouncements(
  *   - branch: branch name (optional). When given, returns that branch's
  *     announcements PLUS all-campus ones, mirroring getEvents.
  *   - limit: number (max 50, default 20)
- * Returns recent announcements from the `news` collection (newest first),
- * excluding any whose `expiresAt` has passed.
+ * Returns live announcements from the `news` collection (newest first):
+ * published (`publishedAt <= now`) and not expired. See `pickAnnouncements`.
  */
 export const getAnnouncements = onRequest(
   { memory: '256MiB', timeoutSeconds: 30, cors: true },
@@ -230,19 +85,31 @@ export const getAnnouncements = onRequest(
         ANNOUNCEMENT_PAGE_SIZE,
       50
     );
-    const announcements = await selectAnnouncements(
-      getFirestore(),
+    const db = getFirestore();
+    const now = Timestamp.now();
+    // Over-fetch so the post-filter for expired items still fills the page.
+    const fetch = Math.min(limit * 2, 100);
+    const [branchDocs, anyDocs] = await Promise.all([
+      branch ? newestNews(db, now, fetch, branch) : Promise.resolve([]),
+      newestNews(db, now, fetch),
+    ]);
+    const announcements = pickAnnouncements(
       branch,
-      limit
+      branchDocs,
+      anyDocs,
+      limit,
+      now.toMillis(),
     );
 
     res.status(200).json({
       announcements,
       count: announcements.length,
-      timestamp: Timestamp.now().toDate().toISOString(),
+      timestamp: now.toDate().toISOString(),
     });
   }
 );
+
+const PUSH_WINDOW_MS = 15 * 60 * 1000;
 
 /**
  * Push pending announcements. Finds recently-published `news` docs that haven't
@@ -253,6 +120,10 @@ export const getAnnouncements = onRequest(
  * to exactly the audience that can later read it back. Idempotent via the
  * `pushedAt` marker; only the last 15 minutes are considered, so it never
  * blasts the backlog.
+ *
+ * A Studio-scheduled notice (future `publishedAt`) is pushed when its time
+ * arrives, not when it is saved: the query and `isPushDue` both require
+ * `publishedAt <= now`, the same rule getAnnouncements serves by.
  *
  * Scheduled every minute, which is what keeps the 15-minute window meaningful:
  * an announcement is picked up within a minute of publishing, and one bad run
@@ -267,25 +138,19 @@ export const pushPendingAnnouncements = onSchedule(
   },
   async () => {
     const db = getFirestore();
-    const cutoff = Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
+    const now = Timestamp.now();
+    const nowMs = now.toMillis();
     const snap = await db
       .collection('news')
+      .where('publishedAt', '<=', now)
+      .where('publishedAt', '>=', Timestamp.fromMillis(nowMs - PUSH_WINDOW_MS))
       .orderBy('publishedAt', 'desc')
       .limit(25)
       .get();
 
-    const nowMs = Date.now();
-    const pending = snap.docs.filter((d) => {
-      const data = d.data() as NewsDoc & { pushedAt?: Timestamp };
-      if (data.pushedAt) return false;
-      // Never push a notice that getAnnouncements would already hide.
-      if (data.expiresAt instanceof Timestamp &&
-          data.expiresAt.toMillis() <= nowMs) {
-        return false;
-      }
-      const pub = data.publishedAt;
-      return pub instanceof Timestamp && pub.toMillis() >= cutoff.toMillis();
-    });
+    const pending = snap.docs.filter((d) =>
+      isPushDue(d.data() as NewsDoc & { pushedAt?: unknown }, nowMs, PUSH_WINDOW_MS),
+    );
 
     let pushed = 0;
     for (const doc of pending) {
@@ -299,11 +164,17 @@ export const pushPendingAnnouncements = onSchedule(
         (data.body && data.body.length > 140
           ? `${data.body.slice(0, 137)}...`
           : data.body) || 'New announcement';
+      const eventId = (data.eventId ?? '').toString().trim();
       try {
         const id = await getMessaging().send({
           topic,
           notification: { title, body },
-          data: { type: 'announcement', newsId: doc.id, branch },
+          data: {
+            type: 'announcement',
+            newsId: doc.id,
+            branch,
+            ...(eventId ? { eventId } : {}),
+          },
           android: { priority: 'high' },
           apns: { payload: { aps: { sound: 'default' } } },
         });
@@ -330,7 +201,7 @@ export const pushPendingAnnouncements = onSchedule(
 const EVENT_PAGE_SIZE = 50;
 const API_CACHE_CONTROL = 'public, max-age=300';
 // Past events are a "moving window" — an event crosses from upcoming to past
-// the moment it starts, so the past variant is cached far more briefly than
+// the moment it finishes, so the past variant is cached far more briefly than
 // the rest of the read API. The `when` query param is part of the CDN cache
 // key, so the two variants can never be served from each other's entry.
 const EVENT_PAST_CACHE_CONTROL = 'public, max-age=60';
@@ -369,17 +240,22 @@ export const getBranches = onRequest(
   }
 );
 
+/** How many docs the all-campus half of a branch-scoped view reads. */
+const ALL_CAMPUS_EVENT_WINDOW = 200;
+
 /**
  * HTTP: GET /getEvents
  * Query params:
  *   - branch: branch name (optional). When given, includes events for that
- *     branch OR all-campus events (branch == null).
+ *     branch OR all-campus events (null, blank or absent `branch`).
  *   - when: 'upcoming' (default) | 'past'
  *   - limit: number. Upcoming: default and max 50. Past: PAST_EVENT_LIMIT is
  *     both the default and the ceiling — a larger `limit` is clamped, so no
  *     caller can widen the past archive beyond the 15 most recent.
- * Returns upcoming events (startTime >= now) ordered by startTime asc, or
- * past events (startTime < now) ordered by startTime desc.
+ * Upcoming = not yet finished (effective end >= now, reaching back
+ * IN_PROGRESS_LOOKBACK_MS so a running event stays listed), soonest first.
+ * Past = finished, most recent first. Same rules as the app's Firestore
+ * stream, so the list does not change when one source replaces the other.
  */
 export const getEvents = onRequest(
   { memory: '256MiB', timeoutSeconds: 30, cors: true },
@@ -397,61 +273,31 @@ export const getEvents = onRequest(
     const past = when === 'past';
     const maxLimit = past ? PAST_EVENT_LIMIT : EVENT_PAGE_SIZE;
     const limit = Math.min(parseInt(limitParam, 10) || maxLimit, maxLimit);
-    const now = Timestamp.now();
+    const nowMs = Date.now();
+    // Over-fetch: running events sit in both windows and are dropped from one.
+    const fetch = Math.min(limit * 2, 100);
 
-    const baseQuery = () =>
-      past
-        ? db
-            .collection('events')
-            .where('startTime', '<', now)
+    const window = async (size: number, campus?: string): Promise<EventRecord[]> => {
+      let query: Query = db.collection('events');
+      if (campus) query = query.where('branch', '==', campus);
+      query = past
+        ? query
+            .where('startTime', '<', Timestamp.fromMillis(nowMs))
             .orderBy('startTime', 'desc')
-            .limit(limit)
-        : db
-            .collection('events')
-            .where('startTime', '>=', now)
-            .orderBy('startTime', 'asc')
-            .limit(limit);
+        : query
+            .where('startTime', '>=', Timestamp.fromMillis(nowMs - IN_PROGRESS_LOOKBACK_MS))
+            .orderBy('startTime', 'asc');
+      const snap = await query.limit(size).get();
+      return snap.docs.map((d) => ({ id: d.id, data: d.data() as EventDoc }));
+    };
 
-    let docs;
-    if (branch) {
-      // Branch-scoped events plus all-campus events (branch == null).
-      const [branchSnap, globalSnap] = await Promise.all([
-        baseQuery().where('branch', '==', branch).get(),
-        baseQuery().where('branch', '==', null).get(),
-      ]);
-      docs = [...branchSnap.docs, ...globalSnap.docs]
-        .sort((a, b) => {
-          const aStart = a.data().startTime as Timestamp;
-          const bStart = b.data().startTime as Timestamp;
-          const delta = aStart.toMillis() - bStart.toMillis();
-          return past ? -delta : delta;
-        })
-        .slice(0, limit);
-    } else {
-      const snapshot = await baseQuery().get();
-      docs = snapshot.docs;
-    }
-
-    const events = docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        title: data.title ?? '',
-        description: data.description ?? null,
-        location: data.location ?? null,
-        branch: data.branch ?? null,
-        imageUrl: data.imageUrl ?? null,
-        isFeatured: data.isFeatured ?? false,
-        startTime:
-          data.startTime instanceof Timestamp
-            ? data.startTime.toDate().toISOString()
-            : null,
-        endTime:
-          data.endTime instanceof Timestamp
-            ? data.endTime.toDate().toISOString()
-            : null,
-      };
-    });
+    // The all-campus half is read unfiltered and picked in memory: an
+    // equality filter on `branch == null` misses docs with no `branch` key.
+    const [branchDocs, anyDocs] = await Promise.all([
+      branch ? window(fetch, branch) : Promise.resolve([]),
+      window(branch ? ALL_CAMPUS_EVENT_WINDOW : fetch),
+    ]);
+    const events = pickEvents(branch, branchDocs, anyDocs, past, limit, nowMs);
 
     res.set('Cache-Control', past ? EVENT_PAST_CACHE_CONTROL : API_CACHE_CONTROL);
     res.status(200).json({
@@ -460,16 +306,6 @@ export const getEvents = onRequest(
     });
   }
 );
-
-/** Today's date as YYYY-MM-DD in Europe/London. */
-function todayInLondon(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/London',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
 
 /** FCM topic for the daily reading — mirrors the app's `KharisTopics.dailyReading`. */
 const DAILY_READING_TOPIC = 'daily_reading';
@@ -659,5 +495,85 @@ export const pushDailyReading = onSchedule(
         .set({ pushError: String(e) }, { merge: true })
         .catch(() => undefined);
     }
+  },
+);
+
+// ─── Birthday pushes ──────────────────────────────────────────────────────────
+
+/**
+ * Daily 08:00 London: members whose profile `dob` (yyyy-mm-dd) matches
+ * today's month-day get a direct push on their saved device token
+ * (`users/{uid}.fcmToken`, written by the app at sign-in/refresh).
+ *
+ * The users collection is small (tens of docs); when it grows past ~2k,
+ * add a `dobMMDD` field at write time and query on it instead of the
+ * in-memory filter. A create()-guarded marker in `birthdayPushes/{date}`
+ * keeps retried runs idempotent, mirroring the daily-reading worker.
+ * Dead tokens are pruned so the next run stays clean.
+ */
+export const pushBirthdays = onSchedule(
+  { schedule: '0 8 * * *', timeZone: 'Europe/London', region: 'us-central1' },
+  async () => {
+    const db = getFirestore();
+    const todayFull = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Europe/London',
+    }); // yyyy-mm-dd
+    const monthDay = todayFull.slice(5); // mm-dd
+
+    const marker = db.collection('birthdayPushes').doc(todayFull);
+    try {
+      await marker.create({ claimedAt: FieldValue.serverTimestamp() });
+    } catch {
+      console.log(`[birthday] ${todayFull} already claimed; skipping`);
+      return;
+    }
+
+    const snap = await db.collection('users').limit(2000).get();
+    const celebrants = snap.docs.filter((d) => {
+      const dob = d.data().dob;
+      return (
+        typeof dob === 'string' &&
+        dob.slice(5) === monthDay &&
+        typeof d.data().fcmToken === 'string' &&
+        d.data().fcmToken.length > 0
+      );
+    });
+    if (celebrants.length === 0) {
+      console.log(`[birthday] no celebrants for ${monthDay}`);
+      return;
+    }
+
+    let sent = 0;
+    for (const doc of celebrants) {
+      const { fcmToken, displayName } = doc.data() as {
+        fcmToken: string;
+        displayName?: string;
+      };
+      const first = (displayName ?? '').trim().split(/\s+/)[0];
+      try {
+        await getMessaging().send({
+          token: fcmToken,
+          notification: {
+            title: 'Happy birthday! 🎉',
+            body: first
+              ? `${first}, the whole Kharis family is celebrating you today.`
+              : 'The whole Kharis family is celebrating you today.',
+          },
+          data: { type: 'birthday' },
+        });
+        sent += 1;
+      } catch (err) {
+        const code = (err as { code?: string }).code ?? '';
+        console.warn(`[birthday] send failed for ${doc.id}: ${code}`);
+        if (code.includes('registration-token-not-registered')) {
+          await doc.ref.update({ fcmToken: FieldValue.delete() });
+        }
+      }
+    }
+    await marker.set(
+      { pushedAt: FieldValue.serverTimestamp(), celebrants: celebrants.length, sent },
+      { merge: true },
+    );
+    console.log(`[birthday] sent ${sent}/${celebrants.length} for ${monthDay}`);
   },
 );
