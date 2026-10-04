@@ -20,7 +20,7 @@ import '../../features/home/data/kharis_api_announcement_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/curation_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
-import '../../features/messages/data/kharis_api_sermon_repository.dart';
+import '../../features/messages/data/r2_messages_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
 import '../models/sermon.dart';
@@ -32,10 +32,13 @@ import 'onboarding_provider.dart';
 // ── Repository ────────────────────────────────────────────────────────────────
 
 final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
-  // Kharis public sermon API (yetanothersermon.host; the sermonApiProxy
-  // function on web). The notifier falls back to the bundled catalogue when
-  // the first page is unreachable.
-  return KharisApiSermonRepository();
+  // The R2 mirror the Cloudflare import Worker publishes (whole archive plus
+  // transcripts in one request), headed by the live API's page 1 so arrivals
+  // since the Worker's last run still show. Falls back to the paged public
+  // API (yetanothersermon.host; the sermonApiProxy function on web) when R2
+  // is unreachable, and the notifier falls back to the bundled catalogue
+  // when both are.
+  return R2MessagesRepository();
 });
 
 // ── Sermon library (paged live fetch + disk cache) ───────────────────────────

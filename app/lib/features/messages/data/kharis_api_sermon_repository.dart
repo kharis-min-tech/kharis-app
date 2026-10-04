@@ -109,7 +109,7 @@ Sermon mapApiSermon(Map<String, dynamic> j) {
     title: title,
     speaker: speaker,
     audioUrl: audioUrl,
-    artworkUrl: _biggerImage(j['image'] as String?),
+    artworkUrl: biggerSermonImage(j['image'] as String?),
     duration: audio?['duration'] != null
         ? Duration(seconds: (audio!['duration'] as num).toInt())
         : null,
@@ -134,7 +134,7 @@ String _absolutise(String? url) {
 }
 
 /// Bumps the CDN thumbnail from `?width=256` to a sharper-but-light `512`.
-String? _biggerImage(String? url) {
+String? biggerSermonImage(String? url) {
   if (url == null || url.isEmpty) return null;
   return url.contains('width=')
       ? url.replaceAll(RegExp(r'width=\d+'), 'width=512')

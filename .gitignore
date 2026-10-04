@@ -65,3 +65,7 @@ app/.omc/
 **/.omc/
 bugreport-*.zip
 **/xcshareddata/swiftpm/Package.resolved
+
+# Wrangler's local dev-simulation cache (fake local R2/D1 state) — never
+# reflects anything real, shouldn't be shared.
+backend/cloudflare-worker/.wrangler/
