@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -432,10 +433,22 @@ void main() {
             );
             expect(title.overlaps(back), isFalse);
             expect(title.left, lessThan(button.left));
-            // One line, with most of the bar to itself: the compact action
-            // leaves the title room instead of squeezing it to a sliver.
+            // One line and shown in full: the compact action leaves the title
+            // room instead of squeezing it into an ellipsis. (Asserted on the
+            // paragraph, not a pixel width, so it holds for the real bundled
+            // fonts as well as the test font.)
             expect(title.height, lessThan(kToolbarHeight));
-            expect(title.width, greaterThan(width / 2));
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(
+                of: find.byKey(const ValueKey('playlists-title')),
+                matching: find.byType(RichText),
+              ),
+            );
+            expect(
+              paragraph.didExceedMaxLines,
+              isFalse,
+              reason: 'the Playlists title must not be truncated',
+            );
             expect(find.byTooltip('New playlist'), findsOneWidget);
             expect(button.right, lessThanOrEqualTo(width));
             expect(tester.takeException(), isNull);
