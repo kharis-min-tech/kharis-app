@@ -3,19 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
+import 'package:kharis_app/features/player/presentation/widgets/transcript_sheet.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
 /// Row of secondary player actions shown below the transport controls:
-/// Notes · Playlist · Share, each an icon over a small muted label.
+/// Notes · Playlist · Transcript · Share, each an icon over a small muted
+/// label.
 ///
 /// Notes opens [SermonNotesSheet] for the message on screen — everything
 /// already written against it, in timeline order, plus a "add a note at
 /// MM:SS" action stamped with the live playback position. Playlist opens
 /// [AddToPlaylistSheet], filing the message into the member's persisted
-/// playlists. Both are only rendered when a message is actually resolvable;
-/// Share confirms with a lightweight toast.
+/// playlists. Transcript opens [TranscriptSheet] and only shows up when the
+/// message actually has one (most don't fail to scrape one, but a handful
+/// genuinely have none). Share confirms with a lightweight toast.
 class PlayerActions extends ConsumerWidget {
   const PlayerActions({super.key, this.sermon, this.timeline});
 
@@ -52,6 +55,12 @@ class PlayerActions extends ConsumerWidget {
               sermonId: target.id,
               sermonTitle: target.title,
             ),
+          ),
+        if (target != null && target.hasTranscript)
+          _ActionButton(
+            icon: Icons.article_outlined,
+            label: 'Transcript',
+            onTap: () => TranscriptSheet.show(context, target),
           ),
         _ActionButton(
           icon: Icons.ios_share_rounded,

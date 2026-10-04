@@ -17,6 +17,7 @@ class Sermon {
     this.videoId,
     this.source,
     this.isFeatured = false,
+    this.transcriptUrl,
   });
 
   /// Whether this sermon has a streamable audio recording.
@@ -62,6 +63,12 @@ class Sermon {
   /// Whether this sermon is featured on the Messages home.
   final bool isFeatured;
 
+  /// Absolute URL to this sermon's transcript text, when one exists.
+  final String? transcriptUrl;
+
+  /// Whether a transcript exists for this sermon.
+  bool get hasTranscript => (transcriptUrl ?? '').trim().isNotEmpty;
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   String get formattedDuration {
@@ -89,6 +96,7 @@ class Sermon {
     String? videoId,
     String? source,
     bool? isFeatured,
+    String? transcriptUrl,
   }) {
     return Sermon(
       id: id ?? this.id,
@@ -105,6 +113,7 @@ class Sermon {
       videoId: videoId ?? this.videoId,
       source: source ?? this.source,
       isFeatured: isFeatured ?? this.isFeatured,
+      transcriptUrl: transcriptUrl ?? this.transcriptUrl,
     );
   }
 
