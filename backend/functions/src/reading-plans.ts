@@ -21,6 +21,38 @@
 
 const MS_PER_DAY = 86_400_000;
 
+/**
+ * Chapters per book. MUST stay identical to `kBibleBooks` in
+ * `app/lib/core/constants/bible_books.dart`: the Studio caps plans with that
+ * table and the app mirrors this resolution with it.
+ */
+export const BIBLE_CHAPTERS: Readonly<Record<string, number>> = {
+  'Genesis': 50, 'Exodus': 40, 'Leviticus': 27, 'Numbers': 36,
+  'Deuteronomy': 34, 'Joshua': 24, 'Judges': 21, 'Ruth': 4,
+  '1 Samuel': 31, '2 Samuel': 24, '1 Kings': 22, '2 Kings': 25,
+  '1 Chronicles': 29, '2 Chronicles': 36, 'Ezra': 10, 'Nehemiah': 13,
+  'Esther': 10, 'Job': 42, 'Psalms': 150, 'Proverbs': 31,
+  'Ecclesiastes': 12, 'Song of Solomon': 8, 'Isaiah': 66, 'Jeremiah': 52,
+  'Lamentations': 5, 'Ezekiel': 48, 'Daniel': 12, 'Hosea': 14,
+  'Joel': 3, 'Amos': 9, 'Obadiah': 1, 'Jonah': 4,
+  'Micah': 7, 'Nahum': 3, 'Habakkuk': 3, 'Zephaniah': 3,
+  'Haggai': 2, 'Zechariah': 14, 'Malachi': 4,
+  'Matthew': 28, 'Mark': 16, 'Luke': 24, 'John': 21,
+  'Acts': 28, 'Romans': 16, '1 Corinthians': 16, '2 Corinthians': 13,
+  'Galatians': 6, 'Ephesians': 6, 'Philippians': 4, 'Colossians': 4,
+  '1 Thessalonians': 5, '2 Thessalonians': 3, '1 Timothy': 6, '2 Timothy': 4,
+  'Titus': 3, 'Philemon': 1, 'Hebrews': 13, 'James': 5,
+  '1 Peter': 5, '2 Peter': 3, '1 John': 5, '2 John': 1,
+  '3 John': 1, 'Jude': 1, 'Revelation': 22,
+};
+
+/** Chapters in [book], or `undefined` for a name outside the table. */
+export function bookChapters(book: string): number | undefined {
+  return Object.prototype.hasOwnProperty.call(BIBLE_CHAPTERS, book)
+    ? BIBLE_CHAPTERS[book]
+    : undefined;
+}
+
 /** How many recently-started plans to consider when resolving a date. */
 export const PLAN_LOOKBACK = 25;
 
@@ -58,6 +90,10 @@ export interface ResolvedReading {
   source: ReadingSource;
   planId: string | null;
   planTitle: string | null;
+  /** 1-based plan day shown ("Day 3 of 13"); null for a hand-written day. */
+  planDay: number | null;
+  /** Plan length in days; null for a hand-written day. */
+  planDays: number | null;
 }
 
 /** A validated plan with its date range pre-computed. */
@@ -103,6 +139,12 @@ export function planEntry(
 /**
  * Resolves day [offset] (0-based) of [entry]. [date] is the date being asked
  * about, which is later than the plan's own day when a reading is pinned.
+ *
+ * Chapter mode never emits a chapter past the end of the book: a plan longer
+ * than the chapters remaining holds on the final chapter (2 Corinthians 1 for
+ * 20 days reads 2 Corinthians 13 from day 13 on, never the non-existent 14+,
+ * which the Bible API answers with a 404). The Studio caps `days` and flags
+ * plans that still overrun.
  */
 export function planReading(
   entry: PlanEntry,
@@ -112,7 +154,9 @@ export function planReading(
 ): ResolvedReading {
   const plan = entry.data;
   const book = plan.book ?? '';
-  const firstChapter = Math.max(1, Math.floor(plan.startChapter ?? 1));
+  const total = bookChapters(book);
+  const requested = Math.max(1, Math.floor(plan.startChapter ?? 1));
+  const firstChapter = total !== undefined ? Math.min(requested, total) : requested;
 
   let chapter: number;
   let verse: string;
@@ -122,10 +166,10 @@ export function planReading(
     chapter = firstChapter;
     verse = perDay === 1 ? `${first}` : `${first}-${first + perDay - 1}`;
   } else {
-    chapter = firstChapter + offset;
+    const unbounded = firstChapter + Math.max(0, offset);
+    chapter = total !== undefined ? Math.min(unbounded, total) : unbounded;
     verse = (plan.verses ?? '').trim() || '1-end';
   }
-
   const reference = formatReference(book, chapter, verse);
   return {
     date,
@@ -137,6 +181,8 @@ export function planReading(
     source,
     planId: entry.id,
     planTitle: plan.title ?? null,
+    planDay: Math.min(Math.max(offset, 0), entry.days - 1) + 1,
+    planDays: entry.days,
   };
 }
 
@@ -157,6 +203,8 @@ export function dayDocReading(
     source: 'day',
     planId: null,
     planTitle: null,
+    planDay: null,
+    planDays: null,
   };
 }
 

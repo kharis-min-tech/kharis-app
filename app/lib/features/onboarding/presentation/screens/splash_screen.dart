@@ -7,8 +7,8 @@ import 'package:kharis_app/core/theme/theme.dart';
 ///
 /// Full-bleed worship photo in its own colours under a neutral legibility
 /// scrim, centred dove
-/// + "Kharis" wordmark + serif tagline, then a gold **Get started** CTA and a
-/// "Log in with iKharis" row. Button-driven (no auto-advance) so returning
+/// + "Kharis" wordmark + serif tagline, then a gold **Get started** CTA and an
+/// "I already have an account" sign-in row. Button-driven (no auto-advance) so returning
 /// users are routed by the auth redirect and new users choose to begin.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -79,8 +79,10 @@ class _SplashScreenState extends State<SplashScreen>
                     const SizedBox(height: 18),
                     Text(
                       'Kharis',
-                      style: AppTypography.display(size: 44, weight: FontWeight.w700)
-                          .copyWith(color: Colors.white),
+                      style: AppTypography.display(
+                        size: 44,
+                        weight: FontWeight.w700,
+                      ).copyWith(color: Colors.white),
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -104,8 +106,8 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // Log in with iKharis.
-                    _IKharisLoginRow(onTap: () => context.go('/login')),
+                    // Returning members sign in with their Kharis app account.
+                    _SignInRow(onTap: () => context.go('/login')),
                     const SizedBox(height: 20),
 
                     Text(
@@ -127,8 +129,8 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-class _IKharisLoginRow extends StatelessWidget {
-  const _IKharisLoginRow({required this.onTap});
+class _SignInRow extends StatelessWidget {
+  const _SignInRow({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -142,12 +144,18 @@ class _IKharisLoginRow extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_outline_rounded, size: 18, color: Colors.white),
+            const Icon(
+              Icons.lock_outline_rounded,
+              size: 18,
+              color: Colors.white,
+            ),
             const SizedBox(width: 8),
             Text(
-              'Log in with iKharis',
-              style: AppTypography.ui(size: 15, weight: FontWeight.w600)
-                  .copyWith(color: Colors.white),
+              'I already have an account',
+              style: AppTypography.ui(
+                size: 15,
+                weight: FontWeight.w600,
+              ).copyWith(color: Colors.white),
             ),
           ],
         ),

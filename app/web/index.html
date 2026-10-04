@@ -16,11 +16,17 @@
 
   <!-- Online-first: evict any previously-installed Flutter service worker and
        its cached app shell so a new deploy always loads immediately, instead
-       of showing a stale build until a later reload. -->
+       of showing a stale build until a later reload. Only the Flutter worker
+       is removed: firebase-messaging-sw.js must stay registered for web push. -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (regs) {
-        regs.forEach(function (r) { r.unregister(); });
+        regs.forEach(function (r) {
+          var w = r.active || r.waiting || r.installing;
+          if (w && /\/flutter_service_worker\.js(\?|$)/.test(w.scriptURL)) {
+            r.unregister();
+          }
+        });
       }).catch(function () {});
     }
     if (window.caches && caches.keys) {

@@ -1,25 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-
-/// Offline fallback for [ConnectBranchDropdown].
-///
-/// Only used when the live branch list has not loaded. The real list comes
-/// from `branchesProvider` — this used to be a hardcoded const the dropdown
-/// read directly, which meant a branch added or renamed in Content Studio
-/// never reached these forms, and it still listed "Medway", which is not a
-/// branch in the network.
-const List<String> _kFallbackBranches = [
-  'London',
-  'Birmingham',
-  'Reading',
-  'Chatham',
-  'Croydon',
-  'Accra',
-  'Freetown',
-];
 
 /// Styled text form field matching the dark connect form aesthetic.
 class ConnectFormField extends StatelessWidget {
@@ -53,47 +36,35 @@ class ConnectFormField extends StatelessWidget {
       validator: validator,
       maxLines: maxLines,
       maxLength: maxLength,
-      style: GoogleFonts.plusJakartaSans(
-        fontSize: 15,
-        color: context.kc.onBg,
-      ),
+      style: AppTypography.ui(size: 15, color: context.kc.onBg),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.plusJakartaSans(
-          fontSize: 14,
-          color: context.kc.muted,
-        ),
+        labelStyle: AppTypography.ui(size: 14, color: context.kc.muted),
         filled: true,
         fillColor: context.kc.surfaceAlt,
         suffixIcon: suffixIcon,
-        counterStyle: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          color: context.kc.muted,
-        ),
+        counterStyle: AppTypography.ui(size: 12, color: context.kc.muted),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.inputBorder,
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.inputBorder,
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.inputBorder,
           borderSide: BorderSide(color: context.kc.accentInk, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.error, width: 1),
+          borderRadius: AppRadius.inputBorder,
+          borderSide: const BorderSide(color: AppColors.danger, width: 1),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+          borderRadius: AppRadius.inputBorder,
+          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
         ),
-        errorStyle: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          color: AppColors.error,
-        ),
+        errorStyle: AppTypography.ui(size: 12, color: AppColors.danger),
       ),
     );
   }
@@ -115,11 +86,11 @@ class ConnectBranchDropdown extends ConsumerWidget {
     final live = ref.watch(branchesProvider).valueOrNull;
     final names = (live != null && live.isNotEmpty)
         ? (live.map((b) => b.name).toList()..sort())
-        : _kFallbackBranches;
+        : BranchRepository.seedBranches.map((b) => b.name).toList();
     return Container(
       decoration: BoxDecoration(
         color: context.kc.surfaceAlt,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.inputBorder,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: DropdownButtonHideUnderline(
@@ -127,25 +98,14 @@ class ConnectBranchDropdown extends ConsumerWidget {
           value: value,
           hint: Text(
             'Branch',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: context.kc.muted,
-            ),
+            style: AppTypography.ui(size: 14, color: context.kc.muted),
           ),
           dropdownColor: context.kc.surface,
           isExpanded: true,
           icon: Icon(Icons.keyboard_arrow_down, color: context.kc.muted),
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            color: context.kc.onBg,
-          ),
+          style: AppTypography.ui(size: 15, color: context.kc.onBg),
           items: names
-              .map(
-                (b) => DropdownMenuItem(
-                  value: b,
-                  child: Text(b),
-                ),
-              )
+              .map((b) => DropdownMenuItem(value: b, child: Text(b)))
               .toList(),
           onChanged: onChanged,
         ),

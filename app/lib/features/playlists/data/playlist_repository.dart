@@ -67,10 +67,8 @@ class Playlist {
 /// `FirebaseAuth` directly: the repository is rebuilt on sign-in / sign-out,
 /// which keeps the streams here dumb and the whole thing testable.
 class PlaylistRepository {
-  PlaylistRepository(
-    this._firestore, {
-    required String? uid,
-  }) : _uid = (uid == null || uid.isEmpty) ? null : uid;
+  PlaylistRepository(this._firestore, {required String? uid})
+    : _uid = (uid == null || uid.isEmpty) ? null : uid;
 
   final String? _uid;
   final FirebaseFirestore _firestore;
@@ -105,7 +103,9 @@ class PlaylistRepository {
 
   // ── Reads ──────────────────────────────────────────────────────────────────
 
-  /// Every playlist the member owns, most recently touched first.
+  /// The member's own playlists (their categorisations), most recently
+  /// touched first. The Favorites doc shares the collection but is never one
+  /// of them, so it is left out here; see [watchFavorites].
   /// Empty while signed out / auth resolving.
   Stream<List<Playlist>> watchPlaylists() {
     final uid = _uid;
@@ -113,7 +113,22 @@ class PlaylistRepository {
     return _playlistsOf(uid)
         .orderBy('updatedAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map(_fromDoc).whereType<Playlist>().toList());
+        .map(
+          (snap) => [
+            for (final doc in snap.docs)
+              if (doc.id != favoritesId) ?_fromDoc(doc),
+          ],
+        );
+  }
+
+  /// The member's Favorites (the player's heart), or null until the first
+  /// heart creates the doc. Null while signed out / auth resolving.
+  Stream<Playlist?> watchFavorites() {
+    final uid = _uid;
+    if (uid == null) return Stream.value(null);
+    return _playlistsOf(
+      uid,
+    ).doc(favoritesId).snapshots().map((snap) => _fromDoc(snap));
   }
 
   // ── Writes ─────────────────────────────────────────────────────────────────
@@ -178,6 +193,56 @@ class PlaylistRepository {
     );
   }
 
+  /// Doc id of the member's Favorites, which the player's heart fills. It
+  /// lives beside the playlists (`users/{uid}/playlists/liked`, so the
+  /// existing rules cover it) but is not one of them: a fixed id keeps it a
+  /// single list however often the heart is tapped, and every playlist
+  /// surface leaves it out. [FieldValue.arrayUnion] appends, so its
+  /// `sermonIds` are in the order they were favorited, oldest first.
+  static const String favoritesId = 'liked';
+  static const String favoritesName = 'Favorites';
+
+  /// Favorites or unfavorites [sermonId]. [favoritesExist] says whether the
+  /// Favorites doc already exists: the first heart creates it, later ones
+  /// update it in place. Unfavoriting also removes [aliases] (other ids the
+  /// same message was favorited under).
+  ///
+  /// The create path merges rather than replaces: if the doc does exist
+  /// after all (a snapshot that had not caught up, another device), the
+  /// favorite is added to it instead of overwriting every earlier one.
+  void setLiked(
+    String sermonId, {
+    required bool liked,
+    required bool favoritesExist,
+    Iterable<String> aliases = const [],
+  }) {
+    final uid = _requireUid();
+    final doc = _playlistsOf(uid).doc(favoritesId);
+    final now = Timestamp.now();
+    if (!favoritesExist) {
+      if (!liked) return;
+      _commit(
+        doc.set({
+          'name': favoritesName,
+          'sermonIds': FieldValue.arrayUnion([sermonId]),
+          'createdAt': now,
+          'updatedAt': now,
+        }, SetOptions(merge: true)),
+        'like',
+      );
+      return;
+    }
+    _commit(
+      doc.update({
+        'sermonIds': liked
+            ? FieldValue.arrayUnion([sermonId])
+            : FieldValue.arrayRemove([sermonId, ...aliases]),
+        'updatedAt': now,
+      }),
+      liked ? 'like' : 'unlike',
+    );
+  }
+
   /// Fire-and-forget commit: the optimistic snapshot has already updated the
   /// UI, and the SDK's offline queue owns delivery. A rejection (rules, doc
   /// deleted on another device) is logged, not surfaced mid-scroll.
@@ -191,8 +256,9 @@ class PlaylistRepository {
 
   // ── Mapping ────────────────────────────────────────────────────────────────
 
-  Playlist? _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  Playlist? _fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
+    if (data == null) return null;
     final name = data['name'];
     final updatedAt = data['updatedAt'];
     if (name is! String || updatedAt is! Timestamp) return null;

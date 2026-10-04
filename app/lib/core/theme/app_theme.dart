@@ -22,24 +22,25 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
   final isDark = brightness == Brightness.dark;
   final kc = isDark ? KharisColors.dark : KharisColors.light;
 
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.primary,
-    brightness: brightness,
-  ).copyWith(
-    primary: AppColors.primary,
-    onPrimary: AppColors.onPrimary,
-    primaryContainer: AppColors.primaryContainer,
-    onPrimaryContainer: AppColors.onPrimary,
-    secondary: kc.accent,
-    onSecondary: kc.onAccent,
-    tertiary: AppColors.tertiary,
-    surface: kc.surface,
-    onSurface: kc.onBg,
-    onSurfaceVariant: kc.muted,
-    error: AppColors.danger,
-    onError: Colors.white,
-    outlineVariant: kc.divider,
-  );
+  final colorScheme =
+      ColorScheme.fromSeed(
+        seedColor: AppColors.primary,
+        brightness: brightness,
+      ).copyWith(
+        primary: AppColors.primary,
+        onPrimary: AppColors.onPrimary,
+        primaryContainer: AppColors.primaryContainer,
+        onPrimaryContainer: AppColors.onPrimary,
+        secondary: kc.accent,
+        onSecondary: kc.onAccent,
+        tertiary: AppColors.tertiary,
+        surface: kc.surface,
+        onSurface: kc.onBg,
+        onSurfaceVariant: kc.muted,
+        error: AppColors.danger,
+        onError: Colors.white,
+        outlineVariant: kc.divider,
+      );
 
   return ThemeData(
     useMaterial3: true,
@@ -103,8 +104,9 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
     // the bright gold, which only reads correctly on this dark plate.
     snackBarTheme: SnackBarThemeData(
       backgroundColor: KharisColors.dark.surface,
-      contentTextStyle:
-          AppTypography.bodySm.copyWith(color: KharisColors.dark.onBg),
+      contentTextStyle: AppTypography.bodySm.copyWith(
+        color: KharisColors.dark.onBg,
+      ),
       actionTextColor: AppColors.secondary,
       behavior: SnackBarBehavior.floating,
       elevation: 0,
@@ -133,8 +135,10 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
       foregroundColor: kc.onBg,
-      titleTextStyle: AppTypography.display(size: 20, weight: FontWeight.w700)
-          .copyWith(color: kc.onBg),
+      titleTextStyle: AppTypography.display(
+        size: 20,
+        weight: FontWeight.w700,
+      ).copyWith(color: kc.onBg),
     ),
 
     // ── Input — surface fill, 15px, purple focus ────────────────────────────

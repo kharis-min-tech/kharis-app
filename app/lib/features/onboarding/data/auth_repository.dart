@@ -8,8 +8,9 @@ import 'package:kharis_app/shared/models/user.dart';
 // ── Exceptions ──────────────────────────────────────────────────────────────
 
 class InvalidCredentialsException implements Exception {
-  const InvalidCredentialsException(
-      [this.message = 'Invalid email or password']);
+  const InvalidCredentialsException([
+    this.message = 'Invalid email or password',
+  ]);
   final String message;
   @override
   String toString() => message;
@@ -39,6 +40,13 @@ abstract class AuthRepository {
   Future<User> loginAsGuest();
 
   Future<void> logout();
+
+  /// Emails a password-reset link to [email].
+  ///
+  /// Throws [InvalidCredentialsException] with a readable message when the
+  /// address is malformed. An unknown address completes normally so the
+  /// screen cannot be used to probe which emails have accounts.
+  Future<void> sendPasswordResetEmail(String email);
 
   User? get currentUser;
   bool get isAuthenticated;
@@ -112,12 +120,12 @@ class TestAuthRepository implements AuthRepository {
   Map<String, Map<String, dynamic>> _readLocalUsers() {
     final raw = _prefs.getString(_localUsersKey);
     if (raw == null) return {};
-    return (jsonDecode(raw) as Map<String, dynamic>)
-        .map((k, v) => MapEntry(k, v as Map<String, dynamic>));
+    return (jsonDecode(raw) as Map<String, dynamic>).map(
+      (k, v) => MapEntry(k, v as Map<String, dynamic>),
+    );
   }
 
-  Future<void> _writeLocalUsers(
-      Map<String, Map<String, dynamic>> users) async {
+  Future<void> _writeLocalUsers(Map<String, Map<String, dynamic>> users) async {
     await _prefs.setString(_localUsersKey, jsonEncode(users));
   }
 
@@ -212,6 +220,14 @@ class TestAuthRepository implements AuthRepository {
   @override
   Future<void> logout() async {
     await _persist(null);
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!email.contains('@')) {
+      throw const InvalidCredentialsException('That email looks invalid');
+    }
   }
 
   void dispose() {

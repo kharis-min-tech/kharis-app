@@ -10,7 +10,7 @@ import 'kharis_content.dart';
 /// Primary source is the YouTube Data API v3. Unlike the Atom feed, the API
 /// sends permissive CORS headers, so the list is genuinely live on web and
 /// mobile alike. It also exposes durations, letting us drop Shorts reliably
-/// (the home hero must always be a full sermon, never a 30s clip).
+/// (a featured message must always be a full sermon, never a 30s clip).
 ///
 /// Falls back to the public Atom feed, then to the embedded [kharisVideos]
 /// dataset, when the API is unreachable or no key is configured.
@@ -53,14 +53,17 @@ class VideoRepository {
   // ── YouTube Data API v3 ───────────────────────────────────────────────────
 
   Future<List<Sermon>> _fetchFromDataApi() async {
-    final listUrl = Uri.parse(
-      'https://www.googleapis.com/youtube/v3/playlistItems',
-    ).replace(queryParameters: {
-      'part': 'snippet,contentDetails',
-      'maxResults': '20',
-      'playlistId': _uploadsPlaylist,
-      'key': _apiKey,
-    }).toString();
+    final listUrl =
+        Uri.parse('https://www.googleapis.com/youtube/v3/playlistItems')
+            .replace(
+              queryParameters: {
+                'part': 'snippet,contentDetails',
+                'maxResults': '20',
+                'playlistId': _uploadsPlaylist,
+                'key': _apiKey,
+              },
+            )
+            .toString();
 
     final body = await fetchFeed(listUrl);
     final json = jsonDecode(body) as Map<String, dynamic>;
@@ -92,20 +95,25 @@ class VideoRepository {
       final secs = durations[videoId];
       if (secs != null && secs < _minSermonSeconds) continue;
       final snippet = snippets[videoId]!;
-      final title = decodeHtmlEntities(snippet['title'] as String? ?? '');
-      if (_isShort(title)) continue;
-      out.add(Sermon(
-        id: videoId,
-        title: title,
-        speaker: 'David Antwi',
-        audioUrl: '',
-        videoId: videoId,
-        artworkUrl: _thumbnail(snippet, videoId),
-        publishedAt:
-            DateTime.tryParse(snippet['publishedAt'] as String? ?? ''),
-        source: 'youtube',
-        artworkColor: i % 10,
-      ));
+      final rawTitle = decodeHtmlEntities(snippet['title'] as String? ?? '');
+      if (_isShort(rawTitle)) continue;
+      final (title, speaker) = splitVideoTitle(rawTitle);
+      out.add(
+        Sermon(
+          id: videoId,
+          title: title,
+          speaker: speaker,
+          audioUrl: '',
+          videoId: videoId,
+          artworkUrl: _thumbnail(snippet, videoId),
+          duration: secs != null ? Duration(seconds: secs) : null,
+          publishedAt: DateTime.tryParse(
+            snippet['publishedAt'] as String? ?? '',
+          ),
+          source: 'youtube',
+          artworkColor: i % 10,
+        ),
+      );
       i++;
     }
     return out;
@@ -113,13 +121,15 @@ class VideoRepository {
 
   Future<Map<String, int>> _fetchDurations(List<String> ids) async {
     try {
-      final url = Uri.parse(
-        'https://www.googleapis.com/youtube/v3/videos',
-      ).replace(queryParameters: {
-        'part': 'contentDetails',
-        'id': ids.join(','),
-        'key': _apiKey,
-      }).toString();
+      final url = Uri.parse('https://www.googleapis.com/youtube/v3/videos')
+          .replace(
+            queryParameters: {
+              'part': 'contentDetails',
+              'id': ids.join(','),
+              'key': _apiKey,
+            },
+          )
+          .toString();
       final body = await fetchFeed(url);
       final json = jsonDecode(body) as Map<String, dynamic>;
       final items = (json['items'] as List?) ?? const [];
@@ -127,8 +137,9 @@ class VideoRepository {
       for (final item in items) {
         final map = item as Map<String, dynamic>;
         final id = map['id'] as String?;
-        final iso = (map['contentDetails'] as Map<String, dynamic>?)?['duration']
-            as String?;
+        final iso =
+            (map['contentDetails'] as Map<String, dynamic>?)?['duration']
+                as String?;
         if (id != null && iso != null) out[id] = _isoToSeconds(iso);
       }
       return out;
@@ -150,7 +161,8 @@ class VideoRepository {
 
   String _thumbnail(Map<String, dynamic> snippet, String videoId) {
     final thumbs = snippet['thumbnails'] as Map<String, dynamic>?;
-    final best = thumbs?['maxres'] ??
+    final best =
+        thumbs?['maxres'] ??
         thumbs?['standard'] ??
         thumbs?['high'] ??
         thumbs?['medium'];
@@ -162,28 +174,34 @@ class VideoRepository {
 
   List<Sermon> _parseAtom(String xml) {
     final entries = <Sermon>[];
-    final entryBlocks =
-        RegExp(r'<entry>(.*?)</entry>', dotAll: true).allMatches(xml);
+    final entryBlocks = RegExp(
+      r'<entry>(.*?)</entry>',
+      dotAll: true,
+    ).allMatches(xml);
     var i = 0;
     for (final m in entryBlocks) {
       final block = m.group(1) ?? '';
       final videoId = _extract(block, r'<yt:videoId>([^<]+)</yt:videoId>');
-      final title =
-          decodeHtmlEntities(_extract(block, r'<title>([^<]+)</title>'));
+      final rawTitle = decodeHtmlEntities(
+        _extract(block, r'<title>([^<]+)</title>'),
+      );
       final published = _extract(block, r'<published>([^<]+)</published>');
       if (videoId.isEmpty) continue;
-      if (_isShort(title) || _hasClipMarker(block)) continue;
-      entries.add(Sermon(
-        id: videoId,
-        title: title,
-        speaker: 'David Antwi',
-        audioUrl: '',
-        videoId: videoId,
-        artworkUrl: 'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
-        publishedAt: DateTime.tryParse(published),
-        source: 'youtube',
-        artworkColor: i % 10,
-      ));
+      if (_isShort(rawTitle) || _hasClipMarker(block)) continue;
+      final (title, speaker) = splitVideoTitle(rawTitle);
+      entries.add(
+        Sermon(
+          id: videoId,
+          title: title,
+          speaker: speaker,
+          audioUrl: '',
+          videoId: videoId,
+          artworkUrl: 'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+          publishedAt: DateTime.tryParse(published),
+          source: 'youtube',
+          artworkColor: i % 10,
+        ),
+      );
       i++;
     }
     return entries;
@@ -211,10 +229,13 @@ class VideoRepository {
     return kharisVideos.asMap().entries.map((entry) {
       final i = entry.key;
       final v = entry.value;
+      final (title, speaker) = splitVideoTitle(
+        decodeHtmlEntities(v['title'] as String),
+      );
       return Sermon(
         id: v['videoId'] as String,
-        title: decodeHtmlEntities(v['title'] as String),
-        speaker: 'David Antwi',
+        title: title,
+        speaker: speaker,
         audioUrl: '',
         videoId: v['videoId'] as String,
         artworkUrl: v['thumbnailUrl'] as String?,
@@ -224,4 +245,35 @@ class VideoRepository {
       );
     }).toList();
   }
+}
+
+/// Speaker shown for a channel upload whose title names no preacher.
+const String kChannelSpeaker = 'Kharis Church';
+
+/// Splits a channel upload title such as
+/// `The LOGOS Became Flesh | John 1:14 | David Antwi | Kharis Phase Two`
+/// into the message title (first segment) and the preacher (the last segment
+/// that reads as a person's name). Falls back to [kChannelSpeaker] rather
+/// than guessing a preacher.
+(String, String) splitVideoTitle(String raw) {
+  final parts = [
+    for (final p in raw.split('|'))
+      if (p.trim().isNotEmpty) p.trim(),
+  ];
+  if (parts.length < 2) return (raw.trim(), kChannelSpeaker);
+  final speaker = parts
+      .skip(1)
+      .lastWhere(_looksLikePerson, orElse: () => kChannelSpeaker);
+  return (parts.first, speaker);
+}
+
+/// A title segment that names a person: two to five words, no digits, and
+/// not a channel, series or episode label.
+bool _looksLikePerson(String segment) {
+  if (RegExp(r'\d').hasMatch(segment)) return false;
+  final lower = segment.toLowerCase();
+  const notPeople = ['kharis', 'series', 'church', 'service', 'live', 'phase'];
+  if (notPeople.any(lower.contains)) return false;
+  final words = segment.split(RegExp(r'\s+'));
+  return words.length >= 2 && words.length <= 5;
 }

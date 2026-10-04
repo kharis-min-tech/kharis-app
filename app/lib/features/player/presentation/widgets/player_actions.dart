@@ -1,33 +1,52 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/core/utils/share_sermon.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
+import 'package:kharis_app/features/player/presentation/widgets/transcript_sheet.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
 /// Row of secondary player actions shown below the transport controls:
-/// Notes · Playlist · Share, each an icon over a small muted label.
+/// Notes · Playlist · Transcript · Share, each an icon over a small muted
+/// label.
 ///
 /// Notes opens [SermonNotesSheet] for the message on screen — everything
 /// already written against it, in timeline order, plus a "add a note at
 /// MM:SS" action stamped with the live playback position. Playlist opens
 /// [AddToPlaylistSheet], filing the message into the member's persisted
-/// playlists. Both are only rendered when a message is actually resolvable;
-/// Share confirms with a lightweight toast.
+/// playlists. Transcript opens [TranscriptSheet] and only shows up when the
+/// message actually has one (a handful genuinely have none). Share opens the
+/// OS share sheet with the right link for the medium on screen (see
+/// [sermonShareLink]).
 class PlayerActions extends ConsumerWidget {
-  const PlayerActions({super.key, this.sermon, this.timeline});
+  const PlayerActions({
+    super.key,
+    this.sermon,
+    this.timeline,
+    this.asVideo = false,
+    this.positionOf,
+  });
 
-  /// The message on screen. Supplied by the video player, whose sermon is not
-  /// the one loaded into the audio service. Falls back to whatever the audio
-  /// service is playing.
+  /// The message on screen. Falls back to whatever the audio service is
+  /// playing.
   final Sermon? sermon;
 
   /// The engine that owns playback on the hosting screen, handed through to
   /// [SermonNotesSheet] so note capture and anchor seeks drive the ACTIVE
   /// engine. Null means the audio service (the sheet's default).
   final NoteTimelineBinding? timeline;
+
+  /// Whether the message is being watched, so Share hands out the video link.
+  final bool asVideo;
+
+  /// The active engine's position, read when Share is tapped so a video link
+  /// starts where the member is.
+  final Duration Function()? positionOf;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,22 +72,25 @@ class PlayerActions extends ConsumerWidget {
               sermonTitle: target.title,
             ),
           ),
-        _ActionButton(
-          icon: Icons.ios_share_rounded,
-          label: 'Share',
-          onTap: () => _toast(context, 'Share link copied'),
-        ),
+        if (target != null && target.hasTranscript)
+          _ActionButton(
+            icon: Icons.article_outlined,
+            label: 'Transcript',
+            onTap: () => TranscriptSheet.show(context, target),
+          ),
+        if (target != null)
+          _ActionButton(
+            icon: Icons.ios_share_rounded,
+            label: 'Share',
+            onTap: () => unawaited(
+              shareSermon(
+                target,
+                asVideo: asVideo,
+                position: positionOf?.call(),
+              ),
+            ),
+          ),
       ],
-    );
-  }
-
-  void _toast(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(milliseconds: 1700),
-      ),
     );
   }
 }

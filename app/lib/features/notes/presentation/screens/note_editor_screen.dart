@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
@@ -63,7 +62,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             id: repo.newId(),
             // Canonical key, not the raw sermon id: the audio and video
             // variants of one message must share a single note timeline.
-            sermonId: sermon == null ? null : NoteTimelineKey.of(sermon).canonical,
+            sermonId: sermon == null
+                ? null
+                : NoteTimelineKey.of(sermon).canonical,
             sermonTitle: sermon?.title,
             positionMs: widget.positionMs,
             body: text,
@@ -121,10 +122,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             onPressed: _save,
             child: Text(
               'Save',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
+              style: AppTypography.ui(
+                size: 16,
+                weight: FontWeight.w600,
+                color: context.kc.accentInk,
               ),
             ),
           ),
@@ -152,17 +153,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 maxLines: null,
                 expands: true,
                 textAlignVertical: TextAlignVertical.top,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
+                style: AppTypography.ui(
+                  size: 16,
                   color: context.kc.onBg,
                   height: 1.6,
                 ),
-                cursorColor: AppColors.primary,
+                cursorColor: context.kc.accentInk,
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   hintText: 'Start typing...',
-                  hintStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
+                  hintStyle: AppTypography.ui(
+                    size: 16,
                     color: context.kc.muted,
                   ),
                 ),

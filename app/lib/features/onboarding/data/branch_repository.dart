@@ -3,9 +3,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:kharis_app/core/constants/api_config.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 
 /// A church branch / campus. Gradient colours and a landmark image are stored
 /// as plain strings in Firestore so admins can edit them, and parsed here.
+///
+/// [contact], [venues], [services], [giving] and [home] are the per-campus
+/// settings Content Studio writes (shapes in `campus_config.dart`). The flat
+/// [address] / [meetingDays] / [meetingTime] are the legacy mirrors, read as
+/// a fallback when a campus has no structured services yet.
 @immutable
 class Branch {
   const Branch({
@@ -20,6 +26,11 @@ class Branch {
     this.meetingDays,
     this.meetingTime,
     this.group = 'Kharis',
+    this.contact = const CampusContact(),
+    this.venues = const [],
+    this.services = const [],
+    this.giving,
+    this.home,
   });
 
   final String id;
@@ -33,6 +44,26 @@ class Branch {
   final String? meetingDays;
   final String? meetingTime;
   final String group;
+  final CampusContact contact;
+  final List<CampusVenue> venues;
+
+  /// Active services in Studio order.
+  final List<CampusService> services;
+
+  /// Campus giving details; null gives to the church-wide account.
+  final GivingDetails? giving;
+
+  /// Campus Home layout; null falls back to `config/home`.
+  final HomeLayout? home;
+
+  /// The venue a service meets at, if [venueId] names one.
+  CampusVenue? venueById(String? venueId) {
+    if (venueId == null) return null;
+    for (final v in venues) {
+      if (v.id == venueId) return v;
+    }
+    return null;
+  }
 
   List<Color> get gradient => [gradientStart, gradientEnd];
 
@@ -207,12 +238,15 @@ class BranchRepository {
   Branch _map(String id, Map<String, dynamic> data) => Branch(
         id: id,
         name: data['name'] as String? ?? '',
-        // The web portal (admin/index.html) offers both `subtitle` and
-        // `description` inputs, and legacy docs used `location`. Fall through
-        // all three so a branch authored in either admin surface renders.
+        // The web portal offers `subtitle`, `shortDescription` and a full
+        // `description`; legacy docs used `location`. `description` is now a
+        // paragraph in the Studio's branch schema, so it sinks to last resort:
+        // promoting it would put a whole paragraph on the branch card whenever
+        // an admin left the subtitle blank.
         subtitle: data['subtitle'] as String? ??
-            data['description'] as String? ??
+            data['shortDescription'] as String? ??
             data['location'] as String? ??
+            data['description'] as String? ??
             '',
         gradientStart:
             Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF3B2A6B)),
@@ -224,6 +258,16 @@ class BranchRepository {
         meetingDays: data['meetingDays'] as String?,
         meetingTime: data['meetingTime'] as String?,
         group: data['group'] as String? ?? 'Kharis',
+        contact: CampusContact.fromBranchJson(data),
+        venues: data['venues'] is List
+            ? (data['venues'] as List)
+                .map(CampusVenue.fromJson)
+                .whereType<CampusVenue>()
+                .toList()
+            : const [],
+        services: CampusService.listFromJson(data['services']),
+        giving: GivingDetails.fromJson(data['giving']),
+        home: HomeLayout.fromJson(data['home']),
       );
 
   /// Built-in branches — the real Kharis network (kharis.org), used to seed

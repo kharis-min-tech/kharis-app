@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -41,6 +42,8 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
       key: ValueKey('full-player-${sermon.id}'),
       sermon: sermon,
       mode: MediaMode.audio,
+      // Previous / Next keep walking the list playback was launched from.
+      queue: ref.read(audioPlayerServiceProvider).queue?.items,
     );
   }
 }
@@ -53,50 +56,42 @@ class _NothingPlaying extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: playerAmbientColors(context),
-            stops: const [0.0, 0.44, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    behavior: HitTestBehavior.opaque,
-                    child: SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: context.kc.onBg,
-                        size: 28,
-                      ),
+      backgroundColor: context.kc.bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+                child: GestureDetector(
+                  // Deep-linked here with nothing beneath: go home rather
+                  // than pop into an empty stack.
+                  onTap: () => Navigator.of(context).canPop()
+                      ? Navigator.of(context).pop()
+                      : context.go('/home'),
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: context.kc.onBg,
+                      size: 28,
                     ),
                   ),
                 ),
               ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    'Nothing playing yet',
-                    style: AppTypography.ui(
-                      size: 14,
-                      color: context.kc.muted,
-                    ),
-                  ),
+            ),
+            Expanded(
+              child: Center(
+                child: Text(
+                  'Nothing playing yet',
+                  style: AppTypography.ui(size: 14, color: context.kc.muted),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

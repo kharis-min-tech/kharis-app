@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
@@ -11,7 +10,7 @@ import 'package:kharis_app/shared/providers/notes_provider.dart';
 
 import 'note_editor_screen.dart';
 
-/// The member's whole notebook, newest edit first — the "go to their notes and
+/// The member's whole notebook, newest edit first: the "go to their notes and
 /// read as they go through" view. Notes anchored to a message carry a chip that
 /// jumps playback back to the moment they were written.
 class NotesScreen extends ConsumerWidget {
@@ -28,15 +27,20 @@ class NotesScreen extends ConsumerWidget {
         scrolledUnderElevation: 0,
         title: Text(
           'Notes',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
+          style: AppTypography.display(
+            size: 28,
+            weight: FontWeight.w700,
             color: context.kc.onBg,
           ),
         ),
       ),
       body: notesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Center(
+          child: CircularProgressIndicator(
+            color: context.kc.accentInk,
+            strokeWidth: 2,
+          ),
+        ),
         error: (_, _) => _buildMessage(
           context,
           Icons.cloud_off_outlined,
@@ -46,7 +50,7 @@ class NotesScreen extends ConsumerWidget {
             ? _buildMessage(
                 context,
                 Icons.notes_outlined,
-                'Take notes during any sermon',
+                'Take notes while you listen to any message. They will appear here.',
               )
             : _buildList(context, ref, notes),
       ),
@@ -61,29 +65,31 @@ class NotesScreen extends ConsumerWidget {
 
   Widget _buildMessage(BuildContext context, IconData icon, String message) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 64, color: context.kc.muted),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              color: context.kc.muted,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 56, color: context.kc.muted),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTypography.ui(size: 16, color: context.kc.muted),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildList(BuildContext context, WidgetRef ref, List<Note> notes) {
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.marginMobile,
+        AppSpacing.sm,
+        AppSpacing.marginMobile,
+        96,
       ),
       itemCount: notes.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
@@ -92,7 +98,9 @@ class NotesScreen extends ConsumerWidget {
         return _NoteCard(
           note: note,
           onTap: () => _openEditor(context, note: note),
-          onPlay: note.isAnchored ? () => _playAnchor(context, ref, note) : null,
+          onPlay: note.isAnchored
+              ? () => _playAnchor(context, ref, note)
+              : null,
           onDelete: () => ref.read(notesRepositoryProvider).delete(note.id),
         );
       },
@@ -157,10 +165,10 @@ class _NoteCard extends StatelessWidget {
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppSpacing.xl),
+        padding: const EdgeInsets.only(right: AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.error,
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.danger,
+          borderRadius: AppRadius.cardBorder,
         ),
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
@@ -168,10 +176,11 @@ class _NoteCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.gutter),
           decoration: BoxDecoration(
             color: context.kc.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppRadius.cardBorder,
+            boxShadow: AppShadows.card,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,8 +188,8 @@ class _NoteCard extends StatelessWidget {
               // Body text preview
               Text(
                 note.body,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
+                style: AppTypography.ui(
+                  size: 15,
                   color: context.kc.onBg,
                   height: 1.4,
                 ),
@@ -202,10 +211,7 @@ class _NoteCard extends StatelessWidget {
                   const Spacer(),
                   Text(
                     _relativeDate(note.updatedAt),
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      color: context.kc.muted,
-                    ),
+                    style: AppTypography.ui(size: 12, color: context.kc.muted),
                   ),
                 ],
               ),

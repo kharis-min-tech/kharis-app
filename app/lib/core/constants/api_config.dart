@@ -20,11 +20,25 @@ abstract final class ApiConfig {
   static const String _base =
       'https://$region-$backendProjectId.cloudfunctions.net';
 
-  static const String getSermons = '$_base/getSermons';
   static const String getAnnouncements = '$_base/getAnnouncements';
   static const String getBranches = '$_base/getBranches';
   static const String getEvents = '$_base/getEvents';
   static const String getDailyReading = '$_base/getDailyReading';
+
+  /// The public sermon API (yetanothersermon.host), called directly on
+  /// mobile with a browser User-Agent.
+  static const String sermonApiDirectBase =
+      'https://yetanothersermon.host/_/kc/public-api/v1/';
+
+  /// Same API through the `sermonApiProxy` Cloud Function. The upstream host
+  /// sends no CORS headers, so browsers cannot call it directly; the proxy
+  /// adds them and rewrites `next` links to stay on the proxy.
+  static const String sermonApiProxyBase = '$_base/sermonApiProxy/';
+
+  /// Base URL for sermon API reads on this platform.
+  static const String sermonApiBase = kIsWeb
+      ? sermonApiProxyBase
+      : sermonApiDirectBase;
 
   /// True when the Firebase SDK is configured against a different project than
   /// the one serving the HTTP API. In that state Firestore, Auth and FCM all

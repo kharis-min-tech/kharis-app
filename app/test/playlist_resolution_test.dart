@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,8 @@ import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+
+import 'support/fake_sermon_repository.dart';
 
 Sermon _sermon(String id, String title) => Sermon(
   id: id,
@@ -52,18 +56,30 @@ void main() {
       },
     );
 
+    final repo = FakePagedSermonRepository([
+      [_sermon('s1', 'First'), _sermon('s2', 'Second')],
+    ])..holdFirstPage = Completer<void>();
     final container = ProviderContainer(
       overrides: [
         firestoreProvider.overrideWithValue(db),
         currentUserProvider.overrideWith((ref) => Stream.value(member)),
-        sermonsProvider.overrideWith(
-          (ref) async => [_sermon('s1', 'First'), _sermon('s2', 'Second')],
-        ),
+        sermonRepositoryProvider.overrideWithValue(repo),
+        sermonArchiveAutoHydrateProvider.overrideWithValue(false),
+        videosProvider.overrideWith((ref) async => const <Sermon>[]),
       ],
     );
     addTearDown(container.dispose);
     container.listen(playlistsProvider, (_, _) {});
-    container.listen(playlistSermonsProvider('p1'), (_, _) {});
+    container.listen(playlistResolutionProvider('p1'), (_, _) {});
+
+    // Before the archive answers, nothing is "missing": all three ids are
+    // still pending, so the UI must not say "no longer in the library".
+    await until(
+      () => container.read(playlistResolutionProvider('p1')).pending == 3,
+    );
+    expect(container.read(playlistResolutionProvider('p1')).missing, 0);
+
+    repo.holdFirstPage!.complete();
 
     await until(() {
       final resolved = container.read(playlistSermonsProvider('p1'));
@@ -80,6 +96,13 @@ void main() {
     expect(playlist, isNotNull);
     expect(playlist!.sermonIds, hasLength(3));
     expect(playlist.sermonIds.length - resolved.length, 1);
+
+    // Once the archive is complete and the CMS has no such doc, the ghost
+    // id is reported as missing (not pending forever).
+    await until(
+      () => container.read(playlistResolutionProvider('p1')).missing == 1,
+    );
+    expect(container.read(playlistResolutionProvider('p1')).pending, 0);
   });
 
   test('unknown playlist id resolves to null / empty, not a crash', () async {

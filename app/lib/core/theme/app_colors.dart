@@ -52,8 +52,9 @@ abstract final class AppColors {
   /// Body text on light surfaces.
   static const Color textPrimary = Color(0xFF171717);
 
-  /// Secondary text on light surfaces.
-  static const Color textMutedLight = Color(0xFF8A8580);
+  /// Secondary text on light surfaces: 4.93:1 on [lightBg], 5.27:1 on white
+  /// (WCAG AA for body text). Was #8A8580 at 3.42:1, which failed.
+  static const Color textMutedLight = Color(0xFF706B66);
 
   /// Purple-tint icon-tile background on light screens.
   static const Color chipLight = Color(0xFFF0ECFF);

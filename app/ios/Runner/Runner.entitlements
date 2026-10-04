@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Push Notifications capability (FCM via APNs). Xcode rewrites this to
+	     "production" when the archive is exported for App Store/TestFlight. -->
+	<key>aps-environment</key>
+	<string>development</string>
+	<!-- Universal Links: shared links (AppLinks.host, paths /m/ /e/ /a/) open
+	     the app. Verified against
+	     https://kharis-app-47c49.web.app/.well-known/apple-app-site-association
+	     (app/web/.well-known/). -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:kharis-app-47c49.web.app</string>
+	</array>
+</dict>
+</plist>

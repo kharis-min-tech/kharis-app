@@ -10,7 +10,8 @@ Future<String> fetchFeed(String url) async {
   final response = await globalContext
       .callMethod<JSPromise<JSObject>>('fetch'.toJS, url.toJS)
       .toDart;
-  final text =
-      await response.callMethod<JSPromise<JSString>>('text'.toJS).toDart;
+  final text = await response
+      .callMethod<JSPromise<JSString>>('text'.toJS)
+      .toDart;
   return text.toDart;
 }

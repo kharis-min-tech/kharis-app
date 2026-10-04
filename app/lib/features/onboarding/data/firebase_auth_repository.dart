@@ -15,8 +15,8 @@ import 'auth_repository.dart';
 /// `role == 'admin'`, evaluated by the Firestore rules and [authStateChanges].
 class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({fb.FirebaseAuth? auth, FirebaseFirestore? firestore})
-      : _auth = auth ?? fb.FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+    : _auth = auth ?? fb.FirebaseAuth.instance,
+      _firestore = firestore ?? FirebaseFirestore.instance;
 
   final fb.FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -125,11 +125,25 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<void> logout() => _auth.signOut();
 
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on fb.FirebaseAuthException catch (e) {
+      // Unknown addresses succeed silently: telling the visitor "no account"
+      // would let anyone probe which emails are registered.
+      if (e.code == 'user-not-found') return;
+      throw _mapError(e);
+    }
+  }
+
   /// Updates the signed-in user's editable profile fields and refreshes cache.
   Future<User> updateProfile({
     String? displayName,
     String? branch,
     String? photoUrl,
+    String? phone,
+    DateTime? dob,
   }) async {
     final fbUser = _auth.currentUser;
     if (fbUser == null) {
@@ -139,6 +153,8 @@ class FirebaseAuthRepository implements AuthRepository {
       'displayName': ?displayName,
       'branch': ?branch,
       'photoUrl': ?photoUrl,
+      'phone': ?phone,
+      if (dob != null) 'dob': dob.toIso8601String().substring(0, 10),
     };
     if (updates.isNotEmpty) {
       await _upsertProfile(fbUser, updates);
@@ -199,6 +215,13 @@ class FirebaseAuthRepository implements AuthRepository {
     return false;
   }
 
+  /// Accepts the 'yyyy-MM-dd' strings we write plus any legacy Timestamp.
+  static DateTime? _parseDob(Object? raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
+    return null;
+  }
+
   /// Reads (or lazily creates) the Firestore profile doc for [fbUser].
   Future<User> _hydrate(fb.User fbUser) async {
     final ref = _firestore.collection('users').doc(fbUser.uid);
@@ -209,12 +232,15 @@ class FirebaseAuthRepository implements AuthRepository {
         return User(
           id: fbUser.uid,
           email: (data['email'] as String?) ?? fbUser.email ?? '',
-          displayName: (data['displayName'] as String?) ??
+          displayName:
+              (data['displayName'] as String?) ??
               fbUser.displayName ??
               'Member',
           role: (data['role'] as String?) ?? 'member',
           branch: data['branch'] as String?,
           photoUrl: (data['photoUrl'] as String?) ?? fbUser.photoURL,
+          phone: data['phone'] as String?,
+          dob: _parseDob(data['dob']),
           createdAt:
               (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );
@@ -254,11 +280,14 @@ class FirebaseAuthRepository implements AuthRepository {
         return const InvalidCredentialsException();
       case 'weak-password':
         return const InvalidCredentialsException(
-            'Password must be at least 6 characters');
+          'Password must be at least 6 characters',
+        );
       case 'invalid-email':
         return const InvalidCredentialsException('That email looks invalid');
       default:
-        return InvalidCredentialsException(e.message ?? 'Authentication failed');
+        return InvalidCredentialsException(
+          e.message ?? 'Authentication failed',
+        );
     }
   }
 }

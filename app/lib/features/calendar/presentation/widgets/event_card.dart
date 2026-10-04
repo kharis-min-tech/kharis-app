@@ -12,22 +12,38 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Toast for the Events surface. Plate colour, content type, floating
-/// behaviour and shape all come from `snackBarTheme`; only the bottom margin
-/// that clears the tab bar is surface-specific. Shared with
-/// `calendar_screen.dart` so every Events toast sits at the same height.
+/// Toast for event actions (RSVP, add to calendar). Plate colour, content
+/// type, floating behaviour and shape all come from `snackBarTheme`; only the
+/// bottom margin that clears the tab bar is surface-specific.
 SnackBar eventToast(String message, {SnackBarAction? action}) => SnackBar(
-      content: Text(message),
-      action: action,
-      duration: const Duration(milliseconds: 1900),
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-    );
+  content: Text(message),
+  action: action,
+  duration: const Duration(milliseconds: 1900),
+  margin: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+);
+
+/// Where an event happens, for one-line display: the venue name, else its
+/// street address, else the campus it belongs to. `null` when none is known.
+String? eventPlaceLabel(Event event) {
+  for (final candidate in [event.location, event.address, event.branch]) {
+    final value = candidate?.trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return null;
+}
+
+/// Opens the event detail screen, handing over the loaded [event] so it
+/// paints immediately. Pushed (never `go`) so Back returns to the caller.
+void openEventDetail(BuildContext context, Event event) {
+  context.push('/events/${Uri.encodeComponent(event.id)}', extra: event);
+}
 
 /// One event: photo banner with an overlaid date chip, title/time/location,
-/// and a split RSVP | Add-to-calendar footer.
+/// and a split RSVP | Add-to-calendar footer. The whole card opens the event
+/// detail; the footer buttons keep their own actions.
 ///
-/// [accent] tints the date chip and the fallback banner gradient; the caller
-/// cycles a palette so no two adjacent cards match.
+/// [accent] tints the date chip and fills the banner when there is no photo;
+/// the caller cycles a palette so no two adjacent cards match.
 class EventCard extends ConsumerWidget {
   const EventCard({super.key, required this.event, required this.accent});
 
@@ -41,121 +57,123 @@ class EventCard extends ConsumerWidget {
     final weekday = DateFormat('EEE').format(event.startTime);
     final time = DateFormat('h:mm a').format(event.startTime);
     final whenText = '$weekday \u00b7 $time';
-    final place = event.location ?? event.branch ?? '';
+    final place = eventPlaceLabel(event);
     final isPast = event.isPastAt(DateTime.now());
     final isRsvped = ref.watch(isEventRsvpedProvider(event.id));
 
-    return Container(
-      clipBehavior: Clip.antiAlias,
+    // Shadow outside, ink inside: Material clips its children, so the shadow
+    // has to live on a box around it to stay visible.
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: context.kc.surface,
         borderRadius: AppRadius.cardBorder,
         boxShadow: AppShadows.card,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Photo banner with overlaid date chip.
-          Stack(
+      child: Material(
+        color: context.kc.surface,
+        borderRadius: AppRadius.cardBorder,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => openEventDetail(context, event),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                height: 104,
-                width: double.infinity,
-                child: _banner(),
+              // Photo banner with overlaid date chip.
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 104,
+                    width: double.infinity,
+                    child: _banner(),
+                  ),
+                  Positioned(
+                    top: 11,
+                    left: 11,
+                    child: _DateChip(day: day, month: month, color: accent),
+                  ),
+                  if (event.isFeatured)
+                    const Positioned(
+                      top: 11,
+                      right: 11,
+                      child: _FeaturedPill(),
+                    ),
+                ],
               ),
-              Positioned(
-                top: 11,
-                left: 11,
-                child: _DateChip(day: day, month: month, color: accent),
+
+              // Title + time + location.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.title,
+                      style: AppTypography.ui(
+                        size: 15.5,
+                        weight: FontWeight.w700,
+                        height: 1.15,
+                      ).copyWith(color: context.kc.onBg),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    _InfoRow(icon: Icons.schedule_rounded, text: whenText),
+                    if (place != null) ...[
+                      const SizedBox(height: 3),
+                      _InfoRow(icon: Icons.place_outlined, text: place),
+                    ],
+                  ],
+                ),
               ),
-              if (event.isFeatured)
-                const Positioned(top: 11, right: 11, child: _FeaturedPill()),
+
+              // Split footer: RSVP | Add to calendar.
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: context.kc.divider)),
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: isPast
+                            ? _FooterAction(
+                                label: 'Ended',
+                                color: context.kc.muted,
+                                onTap: null,
+                              )
+                            : _FooterAction(
+                                label: isRsvped ? 'Going \u2713' : 'RSVP',
+                                color: isRsvped
+                                    ? context.kc.muted
+                                    : AppColors.primary,
+                                onTap: () =>
+                                    toggleEventRsvp(context, ref, event),
+                              ),
+                      ),
+                      VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: context.kc.divider,
+                      ),
+                      Expanded(
+                        child: _FooterAction(
+                          label: 'Add to calendar',
+                          color: context.kc.muted,
+                          onTap: () => addEventToCalendar(context, event),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
-
-          // Title + time + location.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.title,
-                  style: AppTypography.ui(
-                    size: 15.5,
-                    weight: FontWeight.w700,
-                    height: 1.15,
-                  ).copyWith(color: context.kc.onBg),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                _InfoRow(icon: Icons.schedule_rounded, text: whenText),
-                if (place.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  _InfoRow(icon: Icons.place_outlined, text: place),
-                ],
-              ],
-            ),
-          ),
-
-          // Split footer: RSVP | Add to calendar.
-          DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: context.kc.divider)),
-            ),
-            child: IntrinsicHeight(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: isPast
-                        ? _FooterAction(
-                            label: 'Ended',
-                            color: context.kc.muted,
-                            onTap: null,
-                          )
-                        : _FooterAction(
-                            label: isRsvped ? 'Going \u2713' : 'RSVP',
-                            color: isRsvped
-                                ? context.kc.muted
-                                : AppColors.primary,
-                            onTap: () => _toggleRsvp(context, ref),
-                          ),
-                  ),
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: context.kc.divider,
-                  ),
-                  Expanded(
-                    child: _FooterAction(
-                      label: 'Add to calendar',
-                      color: context.kc.muted,
-                      onTap: () => _addToCalendar(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _banner() {
-    final fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: 0.85),
-            AppColors.primaryDeep,
-          ],
-        ),
-      ),
-    );
+    final fallback = ColoredBox(color: accent);
     final url = event.imageUrl;
     if (url == null || url.isEmpty) return fallback;
     return CachedNetworkImage(
@@ -165,67 +183,82 @@ class EventCard extends ConsumerWidget {
       errorWidget: (_, _, _) => fallback,
     );
   }
+}
 
-  /// Toggles the persisted RSVP. The button state comes from
-  /// [isEventRsvpedProvider], which is driven by the Firestore stream, so the
-  /// UI settles on the value that was actually written.
-  Future<void> _toggleRsvp(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
-    if (ref.read(currentUserProvider).valueOrNull == null) {
-      _promptSignIn(messenger, router);
-      return;
-    }
-    final activeBranch = ref.read(currentBranchProvider).valueOrNull;
-    try {
-      final going = await ref
-          .read(rsvpRepositoryProvider)
-          .toggleRsvp(event, branch: event.branch ?? activeBranch);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(eventToast(going
-            ? 'You\u2019re going to ${event.title} \ud83c\udf89'
-            : 'RSVP cancelled for ${event.title}.'));
-    } on RsvpAuthRequiredException {
-      _promptSignIn(messenger, router);
-    } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-            eventToast('Couldn\u2019t save your RSVP. Please try again.'));
-    }
+/// Toggles the persisted RSVP for [event]. Button state comes from
+/// [isEventRsvpedProvider], which is driven by the Firestore stream, so the
+/// UI settles on the value that was actually written.
+Future<void> toggleEventRsvp(
+  BuildContext context,
+  WidgetRef ref,
+  Event event,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final router = GoRouter.of(context);
+  if (ref.read(currentUserProvider).valueOrNull == null) {
+    _promptSignIn(messenger, router);
+    return;
   }
-
-  void _promptSignIn(ScaffoldMessengerState messenger, GoRouter router) {
+  final activeBranch = ref.read(currentBranchProvider).valueOrNull;
+  try {
+    final going = await ref
+        .read(rsvpRepositoryProvider)
+        .toggleRsvp(event, branch: event.branch ?? activeBranch);
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(eventToast(
+      ..showSnackBar(
+        eventToast(
+          going
+              ? 'You\u2019re going to ${event.title} \ud83c\udf89'
+              : 'RSVP cancelled for ${event.title}.',
+        ),
+      );
+  } on RsvpAuthRequiredException {
+    _promptSignIn(messenger, router);
+  } catch (_) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        eventToast('Couldn\u2019t save your RSVP. Please try again.'),
+      );
+  }
+}
+
+void _promptSignIn(ScaffoldMessengerState messenger, GoRouter router) {
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      eventToast(
         'Sign in to RSVP to events.',
         action: SnackBarAction(
           label: 'Sign in',
           onPressed: () => router.push('/login'),
         ),
-      ));
-  }
-
-  Future<void> _addToCalendar(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    // Events may legitimately have no end time; a one-hour block is the
-    // sensible default for a calendar entry.
-    final calEvent = add2cal.Event(
-      title: event.title,
-      description: event.description,
-      location: event.location,
-      startDate: event.startTime,
-      endDate: event.endTime ?? event.startTime.add(const Duration(hours: 1)),
+      ),
     );
-    try {
-      await add2cal.Add2Calendar.addEvent2Cal(calEvent);
-    } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(eventToast('Couldn\u2019t open your calendar.'));
-    }
+}
+
+/// Hands [event] to the device calendar. Events may legitimately have no end
+/// time; a one-hour block is the sensible default for a calendar entry.
+Future<void> addEventToCalendar(BuildContext context, Event event) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final where = [
+    event.location,
+    event.address,
+  ].map((s) => s?.trim() ?? '').where((s) => s.isNotEmpty).join(', ');
+  final calEvent = add2cal.Event(
+    title: event.title,
+    description: event.description,
+    location: where.isEmpty ? event.branch : where,
+    startDate: event.startTime,
+    endDate: event.endTime ?? event.startTime.add(const Duration(hours: 1)),
+  );
+  try {
+    await add2cal.Add2Calendar.addEvent2Cal(calEvent);
+  } catch (_) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(eventToast('Couldn\u2019t open your calendar.'));
   }
 }
 
@@ -294,8 +327,11 @@ class _DateChip extends StatelessWidget {
         children: [
           Text(
             day,
-            style: AppTypography.ui(size: 18, weight: FontWeight.w700, height: 1)
-                .copyWith(color: color),
+            style: AppTypography.ui(
+              size: 18,
+              weight: FontWeight.w700,
+              height: 1,
+            ).copyWith(color: color),
           ),
           Text(
             month,
@@ -326,8 +362,9 @@ class _InfoRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: AppTypography.ui(size: 12.5)
-                .copyWith(color: context.kc.muted),
+            style: AppTypography.ui(
+              size: 12.5,
+            ).copyWith(color: context.kc.muted),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -359,8 +396,10 @@ class _FooterAction extends StatelessWidget {
         child: Center(
           child: Text(
             label,
-            style: AppTypography.ui(size: 13, weight: FontWeight.w700)
-                .copyWith(color: color),
+            style: AppTypography.ui(
+              size: 13,
+              weight: FontWeight.w700,
+            ).copyWith(color: color),
           ),
         ),
       ),

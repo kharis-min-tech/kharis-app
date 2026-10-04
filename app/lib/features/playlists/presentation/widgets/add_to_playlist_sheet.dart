@@ -60,160 +60,163 @@ class AddToPlaylistSheet extends ConsumerWidget {
     final playlists = playlistsAsync.valueOrNull ?? const <Playlist>[];
 
     return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        decoration: BoxDecoration(
+      // A Material (not a decorated Container) hosts the ListTile rows so
+      // their ink splashes paint on the sheet surface instead of under it.
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        child: Material(
           color: context.kc.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 10),
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.kc.outline,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.kc.outline,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Add to playlist',
-                    style: AppTypography.display(
-                      size: 18,
-                      weight: FontWeight.w700,
-                      color: context.kc.onBg,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add to playlist',
+                      style: AppTypography.display(
+                        size: 18,
+                        weight: FontWeight.w700,
+                        color: context.kc.onBg,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    sermonTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 2),
+                    Text(
+                      sermonTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 13,
+                        color: context.kc.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!repo.hasUser)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  child: Text(
+                    'Still signing you in. Try again in a moment.',
                     style: AppTypography.bodySm.copyWith(
                       fontSize: 13,
                       color: context.kc.muted,
                     ),
                   ),
-                ],
-              ),
-            ),
-            if (!repo.hasUser)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                child: Text(
-                  'Hold on — we’re still signing you in. '
-                  'Try again in a moment.',
-                  style: AppTypography.bodySm.copyWith(
-                    fontSize: 13,
-                    color: context.kc.muted,
-                  ),
-                ),
-              )
-            else ...[
-              ListTile(
-                onTap: () => _createAndAdd(context, ref),
-                leading: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: context.kc.surfaceAlt,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(
-                    Icons.add_rounded,
-                    color: context.kc.accentInk,
-                    size: 24,
-                  ),
-                ),
-                title: Text(
-                  'New playlist',
-                  style: AppTypography.ui(
-                    size: 15,
-                    weight: FontWeight.w700,
-                    color: context.kc.accentInk,
-                  ),
-                ),
-              ),
-              if (playlistsAsync.isLoading && playlists.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(
-                    child: CircularProgressIndicator(
+                )
+              else ...[
+                ListTile(
+                  onTap: () => _createAndAdd(context, ref),
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: context.kc.surfaceAlt,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Icon(
+                      Icons.add_rounded,
                       color: context.kc.accentInk,
-                      strokeWidth: 2,
+                      size: 24,
                     ),
                   ),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.only(bottom: 12),
-                    itemCount: playlists.length,
-                    itemBuilder: (context, index) {
-                      final playlist = playlists[index];
-                      final isIn = playlist.contains(sermonId);
-                      return ListTile(
-                        onTap: () {
-                          if (isIn) {
-                            repo.removeSermon(playlist.id, sermonId);
-                          } else {
-                            repo.addSermon(playlist.id, sermonId);
-                          }
-                        },
-                        leading: SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: ArtworkImage(
-                            url: null,
-                            gradientIndex: playlistGradientIndex(playlist.id),
-                            radius: AppRadius.md,
-                          ),
-                        ),
-                        title: Text(
-                          playlist.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.ui(
-                            size: 15,
-                            weight: FontWeight.w600,
-                            color: context.kc.onBg,
-                          ),
-                        ),
-                        subtitle: Text(
-                          playlist.sermonIds.length == 1
-                              ? '1 message'
-                              : '${playlist.sermonIds.length} messages',
-                          style: AppTypography.labelMd.copyWith(
-                            fontSize: 11.5,
-                            color: context.kc.muted,
-                          ),
-                        ),
-                        trailing: Icon(
-                          isIn
-                              ? Icons.check_circle_rounded
-                              : Icons.add_circle_outline_rounded,
-                          color: isIn ? context.kc.accentInk : context.kc.muted,
-                          size: 24,
-                        ),
-                      );
-                    },
+                  title: Text(
+                    'New playlist',
+                    style: AppTypography.ui(
+                      size: 15,
+                      weight: FontWeight.w700,
+                      color: context.kc.accentInk,
+                    ),
                   ),
                 ),
+                if (playlistsAsync.isLoading && playlists.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: context.kc.accentInk,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.only(bottom: 12),
+                      itemCount: playlists.length,
+                      itemBuilder: (context, index) {
+                        final playlist = playlists[index];
+                        final isIn = playlist.contains(sermonId);
+                        return ListTile(
+                          onTap: () {
+                            if (isIn) {
+                              repo.removeSermon(playlist.id, sermonId);
+                            } else {
+                              repo.addSermon(playlist.id, sermonId);
+                            }
+                          },
+                          leading: SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: ArtworkImage(
+                              url: null,
+                              gradientIndex: playlistGradientIndex(playlist.id),
+                              radius: AppRadius.md,
+                            ),
+                          ),
+                          title: Text(
+                            playlist.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.ui(
+                              size: 15,
+                              weight: FontWeight.w600,
+                              color: context.kc.onBg,
+                            ),
+                          ),
+                          subtitle: Text(
+                            playlist.sermonIds.length == 1
+                                ? '1 message'
+                                : '${playlist.sermonIds.length} messages',
+                            style: AppTypography.labelMd.copyWith(
+                              fontSize: 11.5,
+                              color: context.kc.muted,
+                            ),
+                          ),
+                          trailing: Icon(
+                            isIn
+                                ? Icons.check_circle_rounded
+                                : Icons.add_circle_outline_rounded,
+                            color: isIn
+                                ? context.kc.accentInk
+                                : context.kc.muted,
+                            size: 24,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 4),
             ],
-            const SizedBox(height: 4),
-          ],
+          ),
         ),
       ),
     );

@@ -3,11 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/service_time.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/announcement_form_sheet.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/branch_contact_form_sheet.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/branch_service_form_sheet.dart';
 import 'package:kharis_app/features/admin/presentation/widgets/branch_venue_form_sheet.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/event_form_sheet.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/giving_editor.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/home_layout_editor.dart';
+import 'package:kharis_app/features/admin/presentation/widgets/studio_form_kit.dart';
+import 'package:kharis_app/features/admin/providers/content_config_providers.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // Announcement categories live on the model — see [NewsItem.types]. There is
@@ -16,8 +26,47 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-/// Drill-down screen for a single branch. Shows branch info, events scoped
-/// to this branch, and announcements scoped to this branch.
+/// A campus's own settings, read from the raw `branches/{id}` doc.
+typedef _CampusSettings = ({
+  GivingDetails? giving,
+  HomeLayout? home,
+  CampusContact contact,
+  List<CampusService> services,
+  List<CampusVenue> venues,
+});
+
+_CampusSettings _settingsFrom(Map<String, dynamic> doc) => (
+  giving: GivingDetails.fromJson(doc['giving']),
+  home: HomeLayout.fromJson(doc['home']),
+  contact: CampusContact.fromBranchJson(doc),
+  services: allCampusServices(doc['services']),
+  venues: [
+    if (doc['venues'] is List)
+      for (final v in doc['venues'] as List) ?CampusVenue.fromJson(v),
+  ],
+);
+
+void _snack(
+  ScaffoldMessengerState messenger,
+  String msg, {
+  bool error = false,
+}) => messenger.showSnackBar(
+  SnackBar(
+    content: Text(msg),
+    backgroundColor: error
+        ? AppColors.errorContainer
+        : AppColors.surfaceElevated,
+  ),
+);
+
+/// Drill-down screen for a single branch: branch info, the campus's own
+/// settings (contact, service times, giving, Home layout), and the events
+/// and announcements scoped to it.
+///
+/// A campus admin may only open their own campuses (the router guard sends
+/// them back to the hub otherwise), never sees identity fields (name, group)
+/// and cannot edit church-wide items listed here. Campus settings are
+/// partial `update()`s of their own fields (see [BranchSettingsRepository]).
 class AdminBranchDetailScreen extends ConsumerWidget {
   const AdminBranchDetailScreen({
     super.key,
@@ -30,14 +79,22 @@ class AdminBranchDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scope = ref.watch(adminScopeProvider).valueOrNull;
     final branchesAsync = ref.watch(branchesProvider);
     final eventsAsync = ref.watch(upcomingEventsProvider(branchName));
     final newsAsync = ref.watch(adminNewsProvider);
+    final docAsync = ref.watch(adminBranchDocProvider(branchId));
+    final churchHome =
+        ref.watch(adminChurchHomeProvider).valueOrNull ?? HomeLayout.fallback;
 
     final branch = branchesAsync.valueOrNull
         ?.where((b) => b.id == branchId)
         .firstOrNull;
+    final doc = docAsync.valueOrNull;
+    final settings = doc == null ? null : _settingsFrom(doc);
 
+    bool canManage(String? campus) =>
+        scope?.canManageCampusNamed(campus) ?? false;
     final events = eventsAsync.valueOrNull ?? [];
     final branchNews = (newsAsync.valueOrNull ?? [])
         .where((n) => n.branch == branchName)
@@ -65,50 +122,261 @@ class AdminBranchDetailScreen extends ConsumerWidget {
         ),
         iconTheme: const IconThemeData(color: AppColors.heading),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.gutter,
-          AppSpacing.sm,
-          AppSpacing.gutter,
-          AppSpacing.lg + AppSpacing.lg,
-        ),
+      body: scope != null && !scope.canManageBranchId(branchId)
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  'You can only manage your own campuses.',
+                  style: AppTypography.bodyLg.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                AppSpacing.sm,
+                AppSpacing.gutter,
+                AppSpacing.lg + AppSpacing.lg,
+              ),
+              children: [
+                _InfoCard(
+                  branch: branch,
+                  showIdentity: scope?.isSuperAdmin ?? false,
+                  onEdit: branch == null || doc == null
+                      ? null
+                      : () => _openVenueForm(context, ref, branch),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                if (settings == null)
+                  _SectionCard(
+                    label: 'CAMPUS SETTINGS',
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: Text(
+                        docAsync.isLoading
+                            ? 'Loading campus settings...'
+                            : docAsync.hasError
+                            ? 'Could not load campus settings.'
+                            : 'Campus settings are available once this '
+                                  'branch has been saved in Studio.',
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  )
+                else ...[
+                  _ContactCard(
+                    contact: settings.contact,
+                    onEdit: () => _openContactForm(context, ref, settings),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _ServicesCard(
+                    services: settings.services,
+                    venues: settings.venues,
+                    onAdd: () => _openServiceForm(context, ref, settings),
+                    onEdit: (s) =>
+                        _openServiceForm(context, ref, settings, service: s),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _GivingCard(
+                    giving: settings.giving,
+                    onEdit: () => _openGivingEditor(context, ref, settings),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _HomeLayoutCard(
+                    home: settings.home,
+                    churchHome: churchHome,
+                    onEdit: () =>
+                        _openHomeEditor(context, ref, settings, churchHome),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.sm),
+                _EventsCard(
+                  branchName: branchName,
+                  events: events,
+                  isLoading: eventsAsync.isLoading,
+                  canManage: (e) => canManage(e.branch),
+                  onAdd: () => _openEventForm(context, ref),
+                  onEdit: (e) => _openEventForm(context, ref, event: e),
+                  onDelete: (e) => _confirmDeleteEvent(context, ref, e),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _AnnouncementsCard(
+                  branchName: branchName,
+                  items: branchNews,
+                  isLoading: newsAsync.isLoading,
+                  canManage: (n) => canManage(n.branch),
+                  onAdd: () => _openNewsForm(context, ref),
+                  onEdit: (n) => _openNewsForm(context, ref, item: n),
+                  onDelete: (n) => _confirmDeleteNews(context, ref, n),
+                ),
+              ],
+            ),
+    );
+  }
+
+  /// A campus-settings editor in a bottom sheet.
+  void _openEditorSheet(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required Widget editor,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StudioSheet(
         children: [
-          _InfoCard(
-            branch: branch,
-            onEdit: branch == null
-                ? null
-                : () => _openVenueForm(context, ref, branch),
+          Text(
+            title,
+            style: AppTypography.titleMd.copyWith(color: AppColors.heading),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _EventsCard(
-            branchName: branchName,
-            events: events,
-            isLoading: eventsAsync.isLoading,
-            onAdd: () => _openEventForm(context, ref),
-            onEdit: (e) => _openEventForm(context, ref, event: e),
-            onDelete: (e) => _confirmDeleteEvent(context, ref, e),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            subtitle,
+            style: AppTypography.labelMd.copyWith(color: AppColors.textMuted),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _AnnouncementsCard(
-            branchName: branchName,
-            items: branchNews,
-            isLoading: newsAsync.isLoading,
-            onAdd: () => _openNewsForm(context, ref),
-            onEdit: (n) => _openNewsForm(context, ref, item: n),
-            onDelete: (n) => _confirmDeleteNews(context, ref, n),
-          ),
+          const SizedBox(height: AppSpacing.md),
+          editor,
         ],
       ),
     );
   }
 
-  /// Opens the venue editor for this branch. Writes `address`,
-  /// `meetingDays` and `meetingTime` through [BranchRepository.updateBranch],
-  /// preserving every other field so a venue edit cannot blank the branch's
-  /// name, gradient, image, order or group.
+  void _openContactForm(
+    BuildContext context,
+    WidgetRef ref,
+    _CampusSettings settings,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BranchContactFormSheet(
+        branchId: branchId,
+        branchName: branchName,
+        contact: settings.contact,
+        repo: ref.read(branchSettingsRepositoryProvider),
+        onSuccess: (msg) => _snack(messenger, msg),
+        onError: (msg) => _snack(messenger, msg, error: true),
+      ),
+    );
+  }
+
+  void _openServiceForm(
+    BuildContext context,
+    WidgetRef ref,
+    _CampusSettings settings, {
+    CampusService? service,
+  }) {
+    final messenger = ScaffoldMessenger.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BranchServiceFormSheet(
+        branchId: branchId,
+        services: settings.services,
+        venues: settings.venues,
+        service: service,
+        repo: ref.read(branchSettingsRepositoryProvider),
+        onSuccess: (msg) => _snack(messenger, msg),
+        onError: (msg) => _snack(messenger, msg, error: true),
+      ),
+    );
+  }
+
+  void _openGivingEditor(
+    BuildContext context,
+    WidgetRef ref,
+    _CampusSettings settings,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final repo = ref.read(branchSettingsRepositoryProvider);
+    _openEditorSheet(
+      context,
+      title: 'Giving',
+      subtitle:
+          'Where $branchName members give. Leave blank to use the '
+          'church-wide details.',
+      editor: GivingEditor(
+        initial: settings.giving,
+        clearLabel: 'Use church-wide giving',
+        fallbackHint: 'Not set: members give to the church-wide account.',
+        onSave: (giving) async {
+          try {
+            await repo.setGiving(branchId, giving);
+          } catch (e) {
+            _snack(messenger, 'Save failed: $e', error: true);
+            rethrow;
+          }
+          _snack(
+            messenger,
+            giving == null
+                ? '$branchName now uses the church-wide giving details.'
+                : 'Giving details updated.',
+          );
+          navigator.pop();
+        },
+      ),
+    );
+  }
+
+  void _openHomeEditor(
+    BuildContext context,
+    WidgetRef ref,
+    _CampusSettings settings,
+    HomeLayout churchHome,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final repo = ref.read(branchSettingsRepositoryProvider);
+    _openEditorSheet(
+      context,
+      title: 'Home layout',
+      subtitle: 'The blocks $branchName members see on Home, top to bottom.',
+      editor: HomeLayoutEditor(
+        initial: settings.home,
+        inherited: churchHome,
+        inheritedHint:
+            'Using the church-wide default. Saving makes a '
+            'layout just for this campus.',
+        clearLabel: 'Use church-wide default',
+        onSave: (home) async {
+          try {
+            await repo.setHome(branchId, home);
+          } catch (e) {
+            _snack(messenger, 'Save failed: $e', error: true);
+            rethrow;
+          }
+          _snack(
+            messenger,
+            home == null
+                ? '$branchName now uses the church-wide Home layout.'
+                : 'Home layout updated.',
+          );
+          navigator.pop();
+        },
+      ),
+    );
+  }
+
+  /// Opens the venue summary editor for this branch: a partial update of
+  /// `address`, `meetingDays` and `meetingTime` only, so a venue edit cannot
+  /// touch the branch's name, gradient, image, order or group.
   void _openVenueForm(BuildContext context, WidgetRef ref, Branch branch) {
     final messenger = ScaffoldMessenger.of(context);
-    final repo = ref.read(branchRepositoryProvider);
+    final repo = ref.read(branchSettingsRepositoryProvider);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -139,9 +407,9 @@ class AdminBranchDetailScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BranchEventFormSheet(
+      builder: (_) => EventFormSheet(
         event: event,
-        branchName: branchName,
+        scopeBranch: branchName,
         eventRepo: eventRepo,
         onSuccess: (msg) => messenger.showSnackBar(
           SnackBar(
@@ -166,9 +434,9 @@ class AdminBranchDetailScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BranchNewsFormSheet(
+      builder: (_) => AnnouncementFormSheet(
         item: item,
-        branchName: branchName,
+        scopeBranch: branchName,
         repo: repo,
         onSuccess: (msg) => messenger.showSnackBar(
           SnackBar(
@@ -186,8 +454,7 @@ class AdminBranchDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmDeleteEvent(
-      BuildContext context, WidgetRef ref, Event event) {
+  void _confirmDeleteEvent(BuildContext context, WidgetRef ref, Event event) {
     final messenger = ScaffoldMessenger.of(context);
     final eventRepo = ref.read(eventRepositoryProvider);
     showDialog<void>(
@@ -207,8 +474,9 @@ class AdminBranchDetailScreen extends ConsumerWidget {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: AppTypography.bodyLg
-                  .copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodyLg.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
             ),
           ),
           TextButton(
@@ -216,15 +484,19 @@ class AdminBranchDetailScreen extends ConsumerWidget {
               Navigator.pop(context);
               try {
                 await eventRepo.deleteEvent(event.id);
-                messenger.showSnackBar(const SnackBar(
-                  content: Text('Event deleted.'),
-                  backgroundColor: AppColors.surfaceElevated,
-                ));
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Event deleted.'),
+                    backgroundColor: AppColors.surfaceElevated,
+                  ),
+                );
               } catch (e) {
-                messenger.showSnackBar(SnackBar(
-                  content: Text('Delete failed: $e'),
-                  backgroundColor: AppColors.errorContainer,
-                ));
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Delete failed: $e'),
+                    backgroundColor: AppColors.errorContainer,
+                  ),
+                );
               }
             },
             child: Text(
@@ -237,8 +509,7 @@ class AdminBranchDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmDeleteNews(
-      BuildContext context, WidgetRef ref, NewsItem item) {
+  void _confirmDeleteNews(BuildContext context, WidgetRef ref, NewsItem item) {
     final messenger = ScaffoldMessenger.of(context);
     final newsRepo = ref.read(newsRepositoryProvider);
     showDialog<void>(
@@ -258,8 +529,9 @@ class AdminBranchDetailScreen extends ConsumerWidget {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: AppTypography.bodyLg
-                  .copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodyLg.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
             ),
           ),
           TextButton(
@@ -267,15 +539,19 @@ class AdminBranchDetailScreen extends ConsumerWidget {
               Navigator.pop(context);
               try {
                 await newsRepo.deleteNews(item.id);
-                messenger.showSnackBar(const SnackBar(
-                  content: Text('Announcement deleted.'),
-                  backgroundColor: AppColors.surfaceElevated,
-                ));
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Announcement deleted.'),
+                    backgroundColor: AppColors.surfaceElevated,
+                  ),
+                );
               } catch (e) {
-                messenger.showSnackBar(SnackBar(
-                  content: Text('Delete failed: $e'),
-                  backgroundColor: AppColors.errorContainer,
-                ));
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Delete failed: $e'),
+                    backgroundColor: AppColors.errorContainer,
+                  ),
+                );
               }
             },
             child: Text(
@@ -292,11 +568,7 @@ class AdminBranchDetailScreen extends ConsumerWidget {
 // ── Section card wrapper ──────────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.label,
-    required this.child,
-    this.trailing,
-  });
+  const _SectionCard({required this.label, required this.child, this.trailing});
 
   final String label;
   final Widget child;
@@ -314,14 +586,18 @@ class _SectionCard extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.sm, AppSpacing.sm, AppSpacing.xs, 0,
+              AppSpacing.sm,
+              AppSpacing.sm,
+              AppSpacing.xs,
+              0,
             ),
             child: Row(
               children: [
                 Text(
                   label,
-                  style: AppTypography.labelMd
-                      .copyWith(color: AppColors.onSurfaceVariant),
+                  style: AppTypography.labelMd.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ),
                 const Spacer(),
                 ?trailing,
@@ -335,7 +611,10 @@ class _SectionCard extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.sm,
+              AppSpacing.sm,
+              0,
+              AppSpacing.sm,
+              AppSpacing.sm,
             ),
             child: child,
           ),
@@ -348,9 +627,16 @@ class _SectionCard extends StatelessWidget {
 // ── Branch info section ───────────────────────────────────────────────────────
 
 class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.branch, required this.onEdit});
+  const _InfoCard({
+    required this.branch,
+    required this.showIdentity,
+    required this.onEdit,
+  });
 
   final Branch? branch;
+
+  /// Name and group are super-admin territory; campus admins don't see them.
+  final bool showIdentity;
 
   /// `null` until the branch has loaded — no edit affordance before there is
   /// something to edit.
@@ -378,15 +664,17 @@ class _InfoCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Text(
                 'Loading branch info...',
-                style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.textMuted,
+                ),
               ),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoRow(label: 'Name', value: b.name),
+                if (showIdentity) _InfoRow(label: 'Name', value: b.name),
                 _InfoRow(label: 'Subtitle', value: b.subtitle),
-                _InfoRow(label: 'Group', value: b.group),
+                if (showIdentity) _InfoRow(label: 'Group', value: b.group),
                 _InfoRow(label: 'Address', value: b.address ?? 'Not set'),
                 _InfoRow(
                   label: 'Meeting days',
@@ -421,8 +709,7 @@ class _InfoRow extends StatelessWidget {
             width: 100,
             child: Text(
               label,
-              style:
-                  AppTypography.labelMd.copyWith(color: AppColors.textMuted),
+              style: AppTypography.labelMd.copyWith(color: AppColors.textMuted),
             ),
           ),
           Expanded(
@@ -444,6 +731,7 @@ class _EventsCard extends StatelessWidget {
     required this.branchName,
     required this.events,
     required this.isLoading,
+    required this.canManage,
     required this.onAdd,
     required this.onEdit,
     required this.onDelete,
@@ -452,6 +740,10 @@ class _EventsCard extends StatelessWidget {
   final String branchName;
   final List<Event> events;
   final bool isLoading;
+
+  /// False for events this admin may not change (a campus admin and an
+  /// all-campus event); their edit and delete controls are hidden.
+  final bool Function(Event) canManage;
   final VoidCallback onAdd;
   final void Function(Event) onEdit;
   final void Function(Event) onDelete;
@@ -461,8 +753,11 @@ class _EventsCard extends StatelessWidget {
     return _SectionCard(
       label: 'BRANCH EVENTS',
       trailing: IconButton(
-        icon: const Icon(Icons.add_circle_outline,
-            size: 20, color: AppColors.secondary),
+        icon: const Icon(
+          Icons.add_circle_outline,
+          size: 20,
+          color: AppColors.secondary,
+        ),
         onPressed: onAdd,
         tooltip: 'Add Event',
       ),
@@ -474,31 +769,36 @@ class _EventsCard extends StatelessWidget {
               ),
             )
           : events.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  child: Text(
-                    'No events for this branch yet.',
-                    style: AppTypography.bodySm
-                        .copyWith(color: AppColors.textMuted),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (int i = 0; i < events.length; i++) ...[
-                      if (i > 0)
-                        const Divider(
-                          color: AppColors.outlineVariant,
-                          height: 1,
-                          thickness: 0.5,
-                        ),
-                      _EventRow(
-                        event: events[i],
-                        onEdit: () => onEdit(events[i]),
-                        onDelete: () => onDelete(events[i]),
-                      ),
-                    ],
-                  ],
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(
+                'No events for this branch yet.',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.textMuted,
                 ),
+              ),
+            )
+          : Column(
+              children: [
+                for (int i = 0; i < events.length; i++) ...[
+                  if (i > 0)
+                    const Divider(
+                      color: AppColors.outlineVariant,
+                      height: 1,
+                      thickness: 0.5,
+                    ),
+                  _EventRow(
+                    event: events[i],
+                    onEdit: canManage(events[i])
+                        ? () => onEdit(events[i])
+                        : null,
+                    onDelete: canManage(events[i])
+                        ? () => onDelete(events[i])
+                        : null,
+                  ),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -511,8 +811,8 @@ class _EventRow extends StatelessWidget {
   });
 
   final Event event;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -526,34 +826,48 @@ class _EventRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  event.title,
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        event.title,
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (isWebsiteEvent(event)) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      const FromWebsiteChip(),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${dateFmt.format(event.startTime)}, ${timeFmt.format(event.startTime)}',
-                  style: AppTypography.labelMd
-                      .copyWith(color: AppColors.textMuted),
+                  '${dateFmt.format(event.startTime)}, ${timeFmt.format(event.startTime)}'
+                  '${event.branch == null ? ' · All campuses' : ''}',
+                  style: AppTypography.labelMd.copyWith(
+                    color: AppColors.textMuted,
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 16),
-            color: AppColors.onSurfaceVariant,
-            onPressed: onEdit,
-            tooltip: 'Edit',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, size: 16),
-            color: AppColors.error,
-            onPressed: onDelete,
-            tooltip: 'Delete',
-          ),
+          if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              color: AppColors.onSurfaceVariant,
+              onPressed: onEdit,
+              tooltip: 'Edit',
+            ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 16),
+              color: AppColors.error,
+              onPressed: onDelete,
+              tooltip: 'Delete',
+            ),
         ],
       ),
     );
@@ -567,6 +881,7 @@ class _AnnouncementsCard extends StatelessWidget {
     required this.branchName,
     required this.items,
     required this.isLoading,
+    required this.canManage,
     required this.onAdd,
     required this.onEdit,
     required this.onDelete,
@@ -575,6 +890,10 @@ class _AnnouncementsCard extends StatelessWidget {
   final String branchName;
   final List<NewsItem> items;
   final bool isLoading;
+
+  /// False for announcements this admin may not change; their edit and
+  /// delete controls are hidden.
+  final bool Function(NewsItem) canManage;
   final VoidCallback onAdd;
   final void Function(NewsItem) onEdit;
   final void Function(NewsItem) onDelete;
@@ -584,8 +903,11 @@ class _AnnouncementsCard extends StatelessWidget {
     return _SectionCard(
       label: 'BRANCH ANNOUNCEMENTS',
       trailing: IconButton(
-        icon: const Icon(Icons.add_circle_outline,
-            size: 20, color: AppColors.secondary),
+        icon: const Icon(
+          Icons.add_circle_outline,
+          size: 20,
+          color: AppColors.secondary,
+        ),
         onPressed: onAdd,
         tooltip: 'Add Announcement',
       ),
@@ -597,31 +919,34 @@ class _AnnouncementsCard extends StatelessWidget {
               ),
             )
           : items.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  child: Text(
-                    'No announcements for this branch yet.',
-                    style: AppTypography.bodySm
-                        .copyWith(color: AppColors.textMuted),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (int i = 0; i < items.length; i++) ...[
-                      if (i > 0)
-                        const Divider(
-                          color: AppColors.outlineVariant,
-                          height: 1,
-                          thickness: 0.5,
-                        ),
-                      _NewsRow(
-                        item: items[i],
-                        onEdit: () => onEdit(items[i]),
-                        onDelete: () => onDelete(items[i]),
-                      ),
-                    ],
-                  ],
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(
+                'No announcements for this branch yet.',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.textMuted,
                 ),
+              ),
+            )
+          : Column(
+              children: [
+                for (int i = 0; i < items.length; i++) ...[
+                  if (i > 0)
+                    const Divider(
+                      color: AppColors.outlineVariant,
+                      height: 1,
+                      thickness: 0.5,
+                    ),
+                  _NewsRow(
+                    item: items[i],
+                    onEdit: canManage(items[i]) ? () => onEdit(items[i]) : null,
+                    onDelete: canManage(items[i])
+                        ? () => onDelete(items[i])
+                        : null,
+                  ),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -634,8 +959,8 @@ class _NewsRow extends StatelessWidget {
   });
 
   final NewsItem item;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -660,700 +985,255 @@ class _NewsRow extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs, vertical: 2),
+                        horizontal: AppSpacing.xs,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceSubtle,
                         borderRadius: AppRadius.pillBorder,
                       ),
                       child: Text(
                         item.type,
-                        style: AppTypography.labelMd
-                            .copyWith(color: AppColors.primary),
+                        style: AppTypography.labelMd.copyWith(
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
                       dateFmt.format(item.publishedAt),
-                      style: AppTypography.labelMd
-                          .copyWith(color: AppColors.textMuted),
+                      style: AppTypography.labelMd.copyWith(
+                        color: AppColors.textMuted,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 16),
-            color: AppColors.onSurfaceVariant,
-            onPressed: onEdit,
-            tooltip: 'Edit',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, size: 16),
-            color: AppColors.error,
-            onPressed: onDelete,
-            tooltip: 'Delete',
-          ),
+          if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              color: AppColors.onSurfaceVariant,
+              onPressed: onEdit,
+              tooltip: 'Edit',
+            ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 16),
+              color: AppColors.error,
+              onPressed: onDelete,
+              tooltip: 'Delete',
+            ),
         ],
       ),
     );
   }
 }
 
-// ── Branch event form sheet ───────────────────────────────────────────────────
+// ── Campus settings sections ──────────────────────────────────────────────────
 
-class _BranchEventFormSheet extends StatefulWidget {
-  const _BranchEventFormSheet({
-    this.event,
-    required this.branchName,
-    required this.eventRepo,
-    required this.onSuccess,
-    required this.onError,
-  });
+Widget _editButton(String label, VoidCallback onPressed) => TextButton.icon(
+  onPressed: onPressed,
+  icon: const Icon(Icons.edit_outlined, size: 14, color: AppColors.secondary),
+  label: Text(
+    label,
+    style: AppTypography.bodySm.copyWith(color: AppColors.secondary),
+  ),
+);
 
-  final Event? event;
-  final String branchName;
-  final EventRepository eventRepo;
-  final void Function(String) onSuccess;
-  final void Function(String) onError;
+Widget _mutedLine(String text) => Padding(
+  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+  child: Text(
+    text,
+    style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
+  ),
+);
 
-  @override
-  State<_BranchEventFormSheet> createState() => _BranchEventFormSheetState();
-}
+class _ContactCard extends StatelessWidget {
+  const _ContactCard({required this.contact, required this.onEdit});
 
-class _BranchEventFormSheetState extends State<_BranchEventFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _titleCtrl;
-  late final TextEditingController _descCtrl;
-  late final TextEditingController _locationCtrl;
-  DateTime? _startTime;
-  DateTime? _endTime;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final ev = widget.event;
-    _titleCtrl = TextEditingController(text: ev?.title ?? '');
-    _descCtrl = TextEditingController(text: ev?.description ?? '');
-    _locationCtrl = TextEditingController(text: ev?.location ?? '');
-    _startTime = ev?.startTime;
-    _endTime = ev?.endTime;
-  }
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _descCtrl.dispose();
-    _locationCtrl.dispose();
-    super.dispose();
-  }
+  final CampusContact contact;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final isEdit = widget.event != null;
-    final dtFmt = DateFormat('MMM d, y h:mm a');
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.md,
-        bottom: AppSpacing.md + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.outlineVariant,
-                    borderRadius: AppRadius.pillBorder,
-                  ),
+    return _SectionCard(
+      label: 'CONTACT',
+      trailing: _editButton('Edit contact', onEdit),
+      child: contact.isEmpty
+          ? _mutedLine('No contact details yet.')
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _InfoRow(label: 'Email', value: contact.email ?? 'Not set'),
+                _InfoRow(label: 'Phone', value: contact.phone ?? 'Not set'),
+                _InfoRow(
+                  label: 'Instagram',
+                  value: contact.instagram ?? 'Not set',
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                isEdit ? 'Edit Event' : 'New Event',
-                style: AppTypography.titleMd.copyWith(color: AppColors.heading),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              // Branch indicator (locked to this branch)
-              Row(
-                children: [
-                  const Icon(Icons.location_on_outlined,
-                      size: 14, color: AppColors.secondary),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.branchName,
-                    style: AppTypography.labelMd
-                        .copyWith(color: AppColors.secondary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Title
-              _label('Title'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _titleCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _deco(hint: 'Event title'),
-                textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Title is required' : null,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Description
-              _label('Description (optional)'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _descCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _deco(hint: 'Optional description'),
-                maxLines: 3,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Location
-              _label('Location (optional)'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _locationCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _deco(hint: 'e.g. Main Auditorium'),
-                textInputAction: TextInputAction.done,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Start time
-              _label('Start time'),
-              const SizedBox(height: AppSpacing.xs),
-              _DateTimeButton(
-                label: _startTime != null
-                    ? dtFmt.format(_startTime!)
-                    : 'Pick start date and time',
-                hasValue: _startTime != null,
-                onTap: () => _pickDateTime(isStart: true),
-              ),
-              if (_startTime == null && _saving)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Start time is required',
-                    style: AppTypography.labelMd.copyWith(color: AppColors.error),
-                  ),
-                ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // End time
-              _label('End time'),
-              const SizedBox(height: AppSpacing.xs),
-              _DateTimeButton(
-                label: _endTime != null
-                    ? dtFmt.format(_endTime!)
-                    : 'Pick end date and time',
-                hasValue: _endTime != null,
-                onTap: () => _pickDateTime(isStart: false),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton(
-                  onPressed: _saving ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: AppColors.onSecondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.buttonBorder,
-                    ),
-                  ),
-                  child: _saving
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.onSecondary,
-                          ),
-                        )
-                      : Text(
-                          isEdit ? 'Save changes' : 'Add event',
-                          style: AppTypography.bodyLg.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onSecondary,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickDateTime({required bool isStart}) async {
-    final now = DateTime.now();
-    final initial = isStart
-        ? (_startTime ?? now)
-        : (_endTime ?? (_startTime ?? now).add(const Duration(hours: 1)));
-
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: now.subtract(const Duration(days: 365)),
-      lastDate: now.add(const Duration(days: 365 * 5)),
-      builder: (ctx, child) => Theme(
-        data: _datePickerTheme(),
-        child: child!,
-      ),
-    );
-    if (date == null || !mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-      builder: (ctx, child) => Theme(
-        data: _datePickerTheme(),
-        child: child!,
-      ),
-    );
-    if (time == null || !mounted) return;
-
-    final combined = DateTime(
-      date.year, date.month, date.day, time.hour, time.minute,
-    );
-    setState(() {
-      if (isStart) {
-        _startTime = combined;
-      } else {
-        _endTime = combined;
-      }
-    });
-  }
-
-  ThemeData _datePickerTheme() => ThemeData.dark().copyWith(
-        colorScheme: const ColorScheme.dark(
-          primary: AppColors.secondary,
-          onPrimary: AppColors.onSecondary,
-          surface: AppColors.surfaceDark,
-          onSurface: AppColors.onSurface,
-        ),
-      );
-
-  Future<void> _submit() async {
-    setState(() => _saving = true);
-    if (!_formKey.currentState!.validate() ||
-        _startTime == null ||
-        _endTime == null) {
-      setState(() => _saving = false);
-      return;
-    }
-    try {
-      final title = _titleCtrl.text.trim();
-      final desc =
-          _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim();
-      final loc = _locationCtrl.text.trim().isEmpty
-          ? null
-          : _locationCtrl.text.trim();
-
-      if (widget.event == null) {
-        await widget.eventRepo.addEvent(
-          title: title,
-          description: desc,
-          location: loc,
-          branch: widget.branchName,
-          startTime: _startTime!,
-          endTime: _endTime!,
-        );
-        widget.onSuccess('Event added.');
-      } else {
-        await widget.eventRepo.updateEvent(
-          widget.event!.id,
-          title: title,
-          description: desc,
-          location: loc,
-          branch: widget.branchName,
-          startTime: _startTime!,
-          endTime: _endTime!,
-        );
-        widget.onSuccess('Event updated.');
-      }
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      widget.onError('Save failed: $e');
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Widget _label(String text) => Text(
-        text,
-        style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant),
-      );
-
-  InputDecoration _deco({String? hint}) => InputDecoration(
-        hintText: hint,
-        hintStyle: AppTypography.bodyLg.copyWith(color: AppColors.textFaint),
-        filled: true,
-        fillColor: AppColors.surfaceSubtle,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.sm,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.error, width: 1),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-        ),
-        errorStyle: AppTypography.labelMd.copyWith(color: AppColors.error),
-      );
-}
-
-// ── Branch news form sheet ────────────────────────────────────────────────────
-
-class _BranchNewsFormSheet extends StatefulWidget {
-  const _BranchNewsFormSheet({
-    this.item,
-    required this.branchName,
-    required this.repo,
-    required this.onSuccess,
-    required this.onError,
-  });
-
-  final NewsItem? item;
-  final String branchName;
-  final NewsRepository repo;
-  final void Function(String) onSuccess;
-  final void Function(String) onError;
-
-  @override
-  State<_BranchNewsFormSheet> createState() => _BranchNewsFormSheetState();
-}
-
-class _BranchNewsFormSheetState extends State<_BranchNewsFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _titleCtrl;
-  late final TextEditingController _bodyCtrl;
-  late final TextEditingController _imageUrlCtrl;
-  late String _type;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleCtrl = TextEditingController(text: widget.item?.title ?? '');
-    _bodyCtrl = TextEditingController(text: widget.item?.body ?? '');
-    _imageUrlCtrl = TextEditingController(text: widget.item?.imageUrl ?? '');
-    // normaliseType keeps a legacy 'Event' doc off an item the dropdown does
-    // not carry — DropdownButton asserts on a value outside `items`.
-    _type = NewsItem.normaliseType(widget.item?.type);
-  }
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _bodyCtrl.dispose();
-    _imageUrlCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isEdit = widget.item != null;
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.md,
-        bottom: AppSpacing.md + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.outlineVariant,
-                    borderRadius: AppRadius.pillBorder,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                isEdit ? 'Edit Announcement' : 'New Announcement',
-                style: AppTypography.titleMd.copyWith(color: AppColors.heading),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              // Branch indicator (locked to this branch)
-              Row(
-                children: [
-                  const Icon(Icons.location_on_outlined,
-                      size: 14, color: AppColors.secondary),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.branchName,
-                    style: AppTypography.labelMd
-                        .copyWith(color: AppColors.secondary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Title
-              _inputLabel('Title'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _titleCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(hint: 'Enter a title'),
-                textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Title is required' : null,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Type
-              _inputLabel('Type'),
-              const SizedBox(height: AppSpacing.xs),
-              DropdownButtonFormField<String>(
-                initialValue: _type,
-                dropdownColor: AppColors.surfaceContainer,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(),
-                items: NewsItem.types
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _type = v);
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Body
-              _inputLabel('Body (optional)'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _bodyCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(hint: 'Optional body text'),
-                maxLines: 4,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              // Image URL
-              _inputLabel('Image URL (optional)'),
-              const SizedBox(height: AppSpacing.xs),
-              TextFormField(
-                controller: _imageUrlCtrl,
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-                decoration: _inputDeco(hint: 'https://...'),
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.done,
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton(
-                  onPressed: _saving ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    foregroundColor: AppColors.onSecondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.buttonBorder,
-                    ),
-                  ),
-                  child: _saving
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.onSecondary,
-                          ),
-                        )
-                      : Text(
-                          isEdit ? 'Save changes' : 'Add announcement',
-                          style: AppTypography.bodyLg.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onSecondary,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
-    try {
-      final title = _titleCtrl.text.trim();
-      final body =
-          _bodyCtrl.text.trim().isEmpty ? null : _bodyCtrl.text.trim();
-      final imageUrl = _imageUrlCtrl.text.trim().isEmpty
-          ? null
-          : _imageUrlCtrl.text.trim();
-
-      if (widget.item == null) {
-        await widget.repo.addNews(
-          title: title,
-          type: _type,
-          body: body,
-          imageUrl: imageUrl,
-          branch: widget.branchName,
-        );
-        widget.onSuccess('Announcement added.');
-      } else {
-        await widget.repo.updateNews(
-          widget.item!.id,
-          title: title,
-          type: _type,
-          body: body,
-          imageUrl: imageUrl,
-          branch: widget.branchName,
-        );
-        widget.onSuccess('Announcement updated.');
-      }
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      widget.onError('Save failed: $e');
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Widget _inputLabel(String text) => Text(
-        text,
-        style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant),
-      );
-
-  InputDecoration _inputDeco({String? hint}) => InputDecoration(
-        hintText: hint,
-        hintStyle: AppTypography.bodyLg.copyWith(color: AppColors.textFaint),
-        filled: true,
-        fillColor: AppColors.surfaceSubtle,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.sm,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.error, width: 1),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-        ),
-        errorStyle: AppTypography.labelMd.copyWith(color: AppColors.error),
-      );
-}
-
-// ── Date / time button ────────────────────────────────────────────────────────
-
-class _DateTimeButton extends StatelessWidget {
-  const _DateTimeButton({
-    required this.label,
-    required this.hasValue,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool hasValue;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceSubtle,
-          borderRadius: AppRadius.inputBorder,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 16,
-              color: hasValue ? AppColors.secondary : AppColors.textFaint,
+              ],
             ),
-            const SizedBox(width: AppSpacing.xs),
+    );
+  }
+}
+
+class _ServicesCard extends StatelessWidget {
+  const _ServicesCard({
+    required this.services,
+    required this.venues,
+    required this.onAdd,
+    required this.onEdit,
+  });
+
+  final List<CampusService> services;
+  final List<CampusVenue> venues;
+  final VoidCallback onAdd;
+  final void Function(CampusService) onEdit;
+
+  String _when(CampusService s) {
+    final start = formatServiceTime(s.startTime);
+    final end = formatServiceTime(s.endTime);
+    final time = start == null ? null : (end == null ? start : '$start–$end');
+    final venue = venues.where((v) => v.id == s.venueId).firstOrNull;
+    return [?s.day, ?time, ?venue?.name].join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      label: 'SERVICE TIMES',
+      trailing: IconButton(
+        icon: const Icon(
+          Icons.add_circle_outline,
+          size: 20,
+          color: AppColors.secondary,
+        ),
+        onPressed: onAdd,
+        tooltip: 'Add service',
+      ),
+      child: services.isEmpty
+          ? _mutedLine('No service times yet.')
+          : Column(
+              children: [
+                for (final s in services)
+                  InkWell(
+                    onTap: () => onEdit(s),
+                    borderRadius: AppRadius.inputBorder,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s.name,
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: s.isActive
+                                        ? AppColors.onSurface
+                                        : AppColors.textMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  [
+                                    _when(s),
+                                    if (!s.isActive) 'Hidden',
+                                  ].where((t) => t.isNotEmpty).join(' · '),
+                                  style: AppTypography.labelMd.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: AppColors.textFaint,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _GivingCard extends StatelessWidget {
+  const _GivingCard({required this.giving, required this.onEdit});
+
+  final GivingDetails? giving;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = giving;
+    return _SectionCard(
+      label: 'GIVING',
+      trailing: _editButton('Edit giving', onEdit),
+      child: g == null
+          ? _mutedLine('Uses the church-wide giving details.')
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (g.url != null) _InfoRow(label: 'Online', value: g.url!),
+                if (g.bankName != null)
+                  _InfoRow(label: 'Bank', value: g.bankName!),
+                if (g.hasBankTransfer)
+                  _InfoRow(
+                    label: 'Account',
+                    value: '${g.accountName} · ${g.accountNumber}',
+                  ),
+                if (g.sortCode != null)
+                  _InfoRow(label: 'Sort code', value: g.sortCode!),
+                if (g.swiftBic != null)
+                  _InfoRow(label: 'SWIFT / BIC', value: g.swiftBic!),
+                if (g.iban != null) _InfoRow(label: 'IBAN', value: g.iban!),
+                if (g.reference != null)
+                  _InfoRow(label: 'Reference', value: g.reference!),
+              ],
+            ),
+    );
+  }
+}
+
+class _HomeLayoutCard extends StatelessWidget {
+  const _HomeLayoutCard({
+    required this.home,
+    required this.churchHome,
+    required this.onEdit,
+  });
+
+  /// The campus's own layout; null uses [churchHome].
+  final HomeLayout? home;
+  final HomeLayout churchHome;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = (home ?? churchHome).visible;
+    return _SectionCard(
+      label: 'HOME LAYOUT',
+      trailing: _editButton('Edit layout', onEdit),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _mutedLine(
+            home == null ? 'Uses the church-wide default.' : 'Custom layout.',
+          ),
+          for (var i = 0; i < visible.length; i++)
             Text(
-              label,
-              style: AppTypography.bodyLg.copyWith(
-                color: hasValue ? AppColors.onSurface : AppColors.textFaint,
-              ),
+              '${i + 1}. ${visible[i].label}',
+              style: AppTypography.bodySm.copyWith(color: AppColors.onSurface),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

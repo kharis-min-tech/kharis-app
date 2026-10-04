@@ -12,3 +12,6 @@ lib/
 # Firebase
 .firebase/
 firebase-debug.log
+
+# Unit test build output
+.test-build/

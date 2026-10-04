@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Declared here rather than relying on debug/profile manifests or on
+         plugin manifests merging it in: streaming, the API and Firebase all
+         need it in release builds. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Lock-screen / notification media controls (just_audio_background). -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
@@ -6,7 +10,7 @@
     <!-- Push notifications (required to prompt on API 33+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="kharis_app"
+        android:label="Kharis Church"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -29,6 +33,20 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- App Links: shared links (AppLinks.host, paths /m/ /e/ /a/)
+                 open the app; go_router routes the path. Verified against
+                 https://kharis-app-47c49.web.app/.well-known/assetlinks.json
+                 (app/web/.well-known/). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"/>
+                <data android:host="kharis-app-47c49.web.app"/>
+                <data android:pathPrefix="/m/"/>
+                <data android:pathPrefix="/e/"/>
+                <data android:pathPrefix="/a/"/>
             </intent-filter>
         </activity>
         <service

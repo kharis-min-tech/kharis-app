@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
+import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart'
+    show authFieldDecoration;
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -84,9 +85,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Text(
                   'Create Account',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
+                  style: AppTypography.headlineLgMobile.copyWith(
                     color: context.kc.onBg,
                   ),
                 ),
@@ -94,10 +93,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Text(
                   'Join the Kharis family',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    color: context.kc.muted,
-                  ),
+                  style: AppTypography.bodyLg.copyWith(color: context.kc.muted),
                 ),
                 const SizedBox(height: 40),
 
@@ -192,10 +188,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Text(
                     _errorMessage!,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      color: AppColors.error,
-                    ),
+                    style: AppTypography.ui(size: 14, color: AppColors.danger),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -212,28 +205,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                       foregroundColor: context.kc.onAccent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.buttonBorder,
                       ),
                       elevation: 0,
                       shadowColor: Colors.transparent,
                     ),
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
+                              color: context.kc.onAccent,
                             ),
                           )
                         : Text(
-                            'CREATE ACCOUNT',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                            'Create account',
+                            style: AppTypography.ui(
+                              size: 15,
+                              weight: FontWeight.w700,
+                              color: context.kc.onAccent,
                             ),
                           ),
                   ),
@@ -245,20 +236,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Already have an account? ',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
+                      'Already have an account?',
+                      style: AppTypography.ui(
+                        size: 14,
                         color: context.kc.muted,
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => context.pop(),
+                    TextButton(
+                      onPressed: () => context.pop(),
                       child: Text(
-                        'Sign In',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
+                        'Sign in',
+                        style: AppTypography.ui(
+                          size: 14,
+                          weight: FontWeight.w600,
                           color: context.kc.accentInk,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -276,44 +267,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   TextStyle get _textStyle =>
-      GoogleFonts.plusJakartaSans(fontSize: 15, color: context.kc.onBg);
+      AppTypography.ui(size: 15, color: context.kc.onBg);
 
-  InputDecoration _fieldDecoration({required String hint}) {
-    return InputDecoration(
-      filled: true,
-      fillColor: context.kc.surfaceAlt,
-      hintText: hint,
-      hintStyle: GoogleFonts.plusJakartaSans(
-        fontSize: 15,
-        color: context.kc.muted,
-      ),
-      errorStyle: GoogleFonts.plusJakartaSans(
-        fontSize: 12,
-        color: AppColors.error,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: context.kc.accentInk, width: 2),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error, width: 1),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    );
-  }
+  InputDecoration _fieldDecoration({required String hint}) =>
+      authFieldDecoration(context, hint: hint);
 
   Widget _eyeToggle({required bool obscure, required VoidCallback onTap}) {
     return IconButton(

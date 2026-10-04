@@ -10,7 +10,7 @@ export interface SermonDoc {
   thumbnailUrl?: string;
   duration: number; // seconds
   publishedAt: Timestamp;
-  source: 'soundcloud' | 'youtube';
+  source: 'youtube';
   type: 'audio' | 'video';
   series?: string;
   category?: string;
@@ -22,14 +22,24 @@ export interface SermonDoc {
 export interface EventDoc {
   id?: string;
   title: string;
-  description: string;
-  location: string;
-  branch: string;
+  description?: string | null;
+  /** Venue name, e.g. "Kensington Town Hall". */
+  location?: string | null;
+  /** Street address of the venue. */
+  address?: string | null;
+  /** Campus name; null, absent or blank = all-campus. */
+  branch?: string | null;
   startTime: Timestamp;
-  endTime?: Timestamp;
-  imageUrl?: string;
-  isFeatured: boolean;
-  createdAt: Timestamp;
+  endTime?: Timestamp | null;
+  imageUrl?: string | null;
+  isFeatured?: boolean;
+  createdAt?: Timestamp;
+  /**
+   * Tombstone for a website-synced (`web_*`) event an admin deleted. The
+   * hourly sync recreates missing `web_*` docs, so Studio marks them hidden
+   * instead of deleting them; every reader must drop hidden docs.
+   */
+  hidden?: boolean;
 }
 
 export interface DailyContentDoc {
@@ -50,36 +60,14 @@ export interface NewsDoc {
   body: string;
   type?: string;
   branch?: string | null;
-  imageUrl?: string;
+  imageUrl?: string | null;
   publishedAt: Timestamp;
-  expiresAt?: Timestamp;
-}
-
-// RSS feed types
-export interface RssItem {
-  title: string;
-  description?: string;
-  enclosure?: {
-    '@_url': string;
-    '@_length'?: string;
-    '@_type'?: string;
-  };
-  pubDate?: string;
-  'itunes:duration'?: string;
-  'itunes:image'?: {
-    '@_href': string;
-  };
-  link?: string;
-  guid?: string | { '#text': string; '@_isPermaLink'?: string };
-}
-
-export interface RssFeed {
-  rss: {
-    channel: {
-      title: string;
-      item: RssItem | RssItem[];
-    };
-  };
+  expiresAt?: Timestamp | null;
+  /** `events/{eventId}` this announcement promotes. */
+  eventId?: string | null;
+  /** Optional call-to-action link (http/https) and its button label. */
+  linkUrl?: string | null;
+  ctaLabel?: string | null;
 }
 
 // YouTube API types

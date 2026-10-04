@@ -22,7 +22,9 @@
 build/
 .pub-cache/
 .pub/
-pubspec.lock
+# app/pubspec.lock is committed so CI resolves the exact package versions
+# used locally. FVM's per-project SDK cache is not (the pin is app/.fvmrc).
+.fvm/
 
 # IDE
 .idea/
@@ -58,3 +60,12 @@ node_modules/
 app/env.json
 admin/.firebase/
 app/.omc/
+.claude/
+.omc/
+**/.omc/
+bugreport-*.zip
+**/xcshareddata/swiftpm/Package.resolved
+
+# Wrangler's local dev-simulation cache (fake local R2/D1 state) — never
+# reflects anything real, shouldn't be shared.
+backend/cloudflare-worker/.wrangler/

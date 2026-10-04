@@ -1,9 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:kharis_app/shared/providers/branch_provider.dart';
+
+/// Connect-card and testimony writes, on the app's (overridable) Firestore.
+final connectRepositoryProvider = Provider<ConnectRepository>(
+  (ref) => ConnectRepository(firestore: ref.watch(firestoreProvider)),
+);
 
 /// Writes visitor and testimony records to Firestore.
 class ConnectRepository {
   ConnectRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 

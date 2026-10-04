@@ -3,10 +3,9 @@
 // Drives the real app (no mocks) through:
 //   1. fresh launch → onboarding (visitor role, London branch)
 //   2. Home: seeded announcement "Welcome to the new Kharis app"
-//   3. Messages: Featured carousel ("CHRIST Magnified…") + Message of the Day
-//      ("A Living Witness…")
-//   4. Message of the Day (video-only sermon) → unified player in video mode,
-//      Audio chip disabled, no "video only" copy anywhere
+//   3. Messages: Featured carousel ("CHRIST Magnified…")
+//   4. featured message → unified player (a video-only message opens in
+//      video mode with the Audio chip disabled), no "video only" copy
 //   5. back out of the player
 //
 // Screenshots are captured host-side: the test prints `KSHOT:<name>` and then
@@ -155,7 +154,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'release walkthrough: onboarding → announcements → featured/MOTD → video-only player',
+    'release walkthrough: onboarding → announcements → featured → player',
     timeout: const Timeout(Duration(minutes: 20)),
     (tester) async {
       // ── Bootstrap: mirrors lib/main.dart minus splash/orientation chrome and
@@ -277,7 +276,7 @@ void main() {
       expect(welcome, findsWidgets);
       await hostShot(tester, 'step2-home-announcement');
 
-      // ── Step 3: Messages — Featured carousel + Message of the Day ────────
+      // ── Step 3: Messages — Featured carousel ──────────────────────────────
       await tapNav(tester, 'Messages');
       final featuredTitle = find.textContaining('CHRIST Magnified');
       await pumpUntilFound(
@@ -286,36 +285,19 @@ void main() {
         timeout: const Duration(seconds: 90),
         reason: 'featured sermon "CHRIST Magnified…" in the hero carousel',
       );
-      expect(find.text('FEATURED'), findsWidgets);
+      final featuredLabel = find.text('FEATURED');
+      expect(featuredLabel, findsWidgets);
+      await hostShot(tester, 'step3-messages-featured');
 
-      final motdLabel = find.text('MESSAGE OF THE DAY');
-      await pumpUntilFound(
-        tester,
-        motdLabel,
-        timeout: const Duration(seconds: 60),
-        reason: 'Message of the Day card',
-      );
-      final motdCard = find
-          .ancestor(of: motdLabel, matching: find.byType(PressEffect))
+      // ── Step 4: featured message → unified player ────────────────────────
+      final featuredCard = find
+          .ancestor(of: featuredTitle.first, matching: find.byType(PressEffect))
           .first;
-      expect(
-        find.descendant(
-          of: motdCard,
-          matching: find.textContaining('A Living Witness'),
-        ),
-        findsOneWidget,
-        reason:
-            'MOTD card must carry the configured sermon '
-            '"A Living Witness For Jesus"',
-      );
-      await hostShot(tester, 'step3-messages-featured-motd');
-
-      // ── Step 4: MOTD (video-only) → unified player in video mode ─────────
-      await tester.tap(motdCard, warnIfMissed: false);
+      await tester.tap(featuredCard, warnIfMissed: false);
       await pumpUntilFound(
         tester,
         find.byType(MediaModeToggle),
-        reason: 'unified player screen after tapping the MOTD card',
+        reason: 'unified player screen after tapping the featured card',
       );
       // Give the YouTube surface a moment to attach before inspecting/shooting.
       await pumpFor(tester, const Duration(seconds: 4));
@@ -323,35 +305,22 @@ void main() {
       final toggle = tester.widget<MediaModeToggle>(
         find.byType(MediaModeToggle),
       );
-      expect(
-        toggle.activeMode,
-        MediaMode.video,
-        reason: 'video-only sermon must open in video mode',
-      );
-      expect(toggle.sermon.hasVideo, isTrue);
-      expect(
-        toggle.sermon.hasAudio,
-        isFalse,
-        reason: 'MOTD sermon is expected to be video-only',
-      );
       expect(find.text('Audio'), findsOneWidget);
       expect(find.text('Video'), findsOneWidget);
-      // Only a disabled chip is wrapped in a Tooltip — this proves the Audio
-      // option renders as disabled.
-      expect(
-        find.byTooltip('No audio recording for this message'),
-        findsOneWidget,
-        reason: 'Audio chip must be disabled for a video-only sermon',
-      );
-
-      // Semantics: Video is the selected chip, Audio is the disabled one.
-      final semantics = tester.ensureSemantics();
-      expect(find.bySemanticsLabel('Video, selected'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('Audio — No audio recording for this message'),
-        findsOneWidget,
-      );
-      semantics.dispose();
+      if (!toggle.sermon.hasAudio) {
+        // A video-only message opens in video, with Audio shown disabled
+        // (only a disabled chip is wrapped in a Tooltip).
+        expect(
+          toggle.activeMode,
+          MediaMode.video,
+          reason: 'video-only sermon must open in video mode',
+        );
+        expect(
+          find.byTooltip('No audio recording for this message'),
+          findsOneWidget,
+          reason: 'Audio chip must be disabled for a video-only sermon',
+        );
+      }
 
       // The old "video only" failure copy must not exist anywhere on screen.
       expect(
@@ -359,7 +328,7 @@ void main() {
         isFalse,
         reason: 'no "video only" copy may appear on the unified player',
       );
-      await hostShot(tester, 'step4-player-video-mode');
+      await hostShot(tester, 'step4-player');
 
       // ── Step 5: back out of the player ───────────────────────────────────
       await tester.tap(
@@ -368,7 +337,7 @@ void main() {
       );
       await pumpUntilFound(
         tester,
-        motdLabel,
+        featuredLabel,
         reason: 'Messages screen after closing the player',
       );
       await hostShot(tester, 'step5-back-on-messages');

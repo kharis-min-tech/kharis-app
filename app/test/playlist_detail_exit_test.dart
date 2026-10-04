@@ -101,7 +101,10 @@ void main() {
     expect(find.text('Deep Roots'), findsOneWidget);
     expect(find.text('Play all'), findsNothing);
 
-    // Open the detail — a push, so home stays on the stack beneath.
+    // Open the detail — a push, so home stays on the stack beneath. The
+    // pinned Favorites tile sits above the grid, so scroll the card in.
+    await tester.ensureVisible(find.text('Deep Roots'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Deep Roots'));
     await tester.pumpAndSettle();
     expect(find.text('Play all'), findsOneWidget);

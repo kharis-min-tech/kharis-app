@@ -119,10 +119,12 @@ firebase deploy --only firestore:indexes
 
 ---
 
-## 7. Set admin custom claims (for write access)
+## 7. Admins
 
-Firestore rules restrict writes to users with `admin: true` custom claim.
-Set this from a trusted server environment or via the Firebase Admin SDK:
+### Super admins
+
+A super admin may write everything admins can write. Either set the `admin: true`
+custom claim from a trusted server environment via the Firebase Admin SDK:
 
 ```typescript
 import { getAuth } from 'firebase-admin/auth';
@@ -131,7 +133,40 @@ import { getAuth } from 'firebase-admin/auth';
 await getAuth().setCustomUserClaims('USER_UID_HERE', { admin: true });
 ```
 
-Or use the Firebase CLI extension / Admin SDK script once you have a service account.
+or set `role: 'admin'` on the user's `users/{uid}` profile (Content Studio does
+this; only an existing super admin can change a role).
+
+### Campus admins
+
+A campus admin manages only their own campuses: the `news` and `events` whose
+`branch` is one of their campuses, and the non-identity fields of those
+`branches/{id}` docs (contact, services, venues, giving, Home layout, …). They
+cannot write all-campus (null/blank `branch`) items, move an item to another
+campus, change a branch's `name`, `order`, `group` or `isActive`, create or
+delete branches, or touch `config/*`, sermons, reading plans, daily content,
+users or submissions.
+
+A super admin assigns one by setting all three fields together on
+`users/{uid}` (Content Studio's user editor does this):
+
+| Field | Value |
+|---|---|
+| `role` | `'campus_admin'` |
+| `adminBranchIds` | branch doc ids, e.g. `['north']` |
+| `adminBranchNames` | the matching branch **names**, e.g. `['North']` — news/events store `branch` as the name |
+
+Keep the two lists in step (and update `adminBranchNames` if a branch is
+renamed). Users can never set their own `role` or campus lists.
+
+### Testing the rules
+
+`backend/functions/test/rules/` exercises `firestore.rules` against the
+Firestore emulator (needs Java 11+ on `PATH`):
+
+```bash
+cd ~/Workspace/kharis-org/backend/functions
+npm run test:rules
+```
 
 ---
 
@@ -231,6 +266,26 @@ Document ID is the date string in `YYYY-MM-DD` format.
 | `imageUrl` | string? | |
 | `publishedAt` | Timestamp | |
 | `expiresAt` | Timestamp? | Auto-hide after this date |
+
+### `branches` collection — campus customisation
+
+Besides name, services, venues and contact details, each branch may carry:
+
+| Field | Type | Notes |
+|---|---|---|
+| `giving` | map? | `{url?, bankName?, accountName?, sortCode?, accountNumber?, swiftBic?, iban?, reference?, note?}` — all strings, `url` http(s). Absent/null = church-wide `config/giving` |
+| `home` | map? | `{sections: [{id, enabled}]}` — ordered Home blocks. Absent/null = `config/home` |
+
+### `config` collection
+
+Publicly readable; super-admin writable only.
+
+| Doc | Shape | Notes |
+|---|---|---|
+| `live` | live status | |
+| `featured` | `{mode: 'auto' \| 'pinned' \| 'off', setAt}` | Messages tab featured carousel; `off` hides it |
+| `giving` | same as `branches.giving` | Church-wide giving details; absent = the app's built-in details |
+| `home` | `{sections: [{id, enabled}]}` | Church-wide default Home layout. Section ids: `profileCompletion, live, reading, announcements, events, campus, continueListening, giving`; absent = the app's built-in order |
 
 ---
 

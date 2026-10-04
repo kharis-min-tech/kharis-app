@@ -70,7 +70,7 @@ class _AdminReadingPlansScreenState
             const SizedBox(height: AppSpacing.xs),
             if (plans.isEmpty)
               Text(
-                'Add a plan to schedule a whole month at once — a chapter a '
+                'Add a plan to schedule a whole month at once: a chapter a '
                 'day, or a verse block a day.',
                 style:
                     AppTypography.bodySm.copyWith(color: AppColors.textMuted),
@@ -285,11 +285,11 @@ class _PreviewCard extends ConsumerWidget {
         : 'a plan';
     switch (resolved.source) {
       case DailyContentSource.day:
-        return 'Written by hand for this date — overrides any plan.';
+        return 'Written by hand for this date. Overrides any plan.';
       case DailyContentSource.plan:
         return 'From plan $plan.';
       case DailyContentSource.planLastDay:
-        return 'Plan $plan has finished — held on its last day until a new '
+        return 'Plan $plan has finished. Held on its last day until a new '
             'plan starts.';
       case DailyContentSource.fallback:
         return 'Nothing covers this date. Members see the built-in default '
@@ -362,6 +362,10 @@ class _PlanCard extends StatelessWidget {
                     style: AppTypography.bodySm
                         .copyWith(color: AppColors.textMuted),
                   ),
+                  if (plan.overrunsBook) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    _OverrunWarning(plan: plan),
+                  ],
                 ],
               ),
             ),
@@ -383,6 +387,46 @@ class _PlanCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Flags a chapter plan with more days than its book has chapters left: the
+/// tail days hold on the final chapter, which the admin probably did not mean.
+class _OverrunWarning extends StatelessWidget {
+  const _OverrunWarning({required this.plan});
+
+  final ReadingPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = plan.bookChapters;
+    final remaining = plan.chaptersRemaining;
+    if (total == null || remaining == null) return const SizedBox.shrink();
+    final start = plan.startDate;
+    // First day past the final chapter: the day the plan starts repeating it.
+    final heldFrom = DateTime(start.year, start.month, start.day + remaining);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.12),
+        borderRadius: AppRadius.cardBorder,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              size: 16, color: AppColors.error),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Runs past ${plan.book} $total: holds on chapter $total from '
+              '${formatPlanDate(heldFrom)}',
+              style: AppTypography.labelMd.copyWith(color: AppColors.error),
+            ),
+          ),
+        ],
       ),
     );
   }

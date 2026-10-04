@@ -1,0 +1,24 @@
+{
+  "hosting": {
+    "site": "kharis-church-admin",
+    "public": ".",
+    "ignore": ["firebase.json", "firebase.kharis-church.json", "**/.*", "**/node_modules/**", "Dockerfile", "docker-compose.yml"],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|html)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  }
+}

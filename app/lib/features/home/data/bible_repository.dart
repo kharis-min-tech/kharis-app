@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 /// Fetches Bible passage text and version metadata from the YouVersion
 /// Platform API.
@@ -8,10 +9,15 @@ import 'package:dio/dio.dart';
 /// License set (June 2026): 20 English versions incl. NIV11 (111),
 /// AMP (1588), NASB2020 (2692), BSB (3034), ASV (12).
 class BibleRepository {
-  BibleRepository({Dio? dio}) : _dio = dio ?? Dio();
+  /// [appKey] defaults to the build-time `YOUVERSION_API_KEY` define.
+  BibleRepository({Dio? dio, String? appKey})
+    : _dio = dio ?? Dio(),
+      _key = appKey ?? _appKey;
 
   static const _base = 'https://api.youversion.com/v1';
   static const _appKey = String.fromEnvironment('YOUVERSION_API_KEY');
+
+  final String _key;
 
   /// NIV 2011 - the default reading translation.
   static const defaultBibleId = 111;
@@ -23,16 +29,15 @@ class BibleRepository {
   List<BibleVersion>? _biblesCache;
 
   Options get _options {
-    if (_appKey.isEmpty) {
+    if (_key.isEmpty) {
       throw StateError(
         'YOUVERSION_API_KEY missing. Build with '
         '--dart-define-from-file=env.json (see env.example.json).',
       );
     }
-    return Options(headers: {
-      'x-yvp-app-key': _appKey,
-      'Accept': 'application/json',
-    });
+    return Options(
+      headers: {'x-yvp-app-key': _key, 'Accept': 'application/json'},
+    );
   }
 
   /// Lists the Bible versions licensed for this app key.
@@ -49,9 +54,9 @@ class BibleRepository {
       for (final b in data)
         BibleVersion(
           id: (b['id'] as num).toInt(),
-          abbreviation: (b['localized_abbreviation'] ??
-              b['abbreviation'] ??
-              '?') as String,
+          abbreviation:
+              (b['localized_abbreviation'] ?? b['abbreviation'] ?? '?')
+                  as String,
           title: (b['localized_title'] ?? b['title'] ?? '') as String,
         ),
     ];
@@ -69,10 +74,12 @@ class BibleRepository {
     final cached = _passageCache[cacheKey];
     if (cached != null) return cached;
 
-    final response = await _dio.get<Map<String, dynamic>>(
-      '$_base/bibles/$bibleId/passages/$usfmId',
-      queryParameters: {'format': 'html', 'include_headings': 'true'},
-      options: _options,
+    final response = await _withRetry(
+      () => _dio.get<Map<String, dynamic>>(
+        '$_base/bibles/$bibleId/passages/$usfmId',
+        queryParameters: {'format': 'html', 'include_headings': 'true'},
+        options: _options,
+      ),
     );
 
     final data = response.data ?? const {};
@@ -90,6 +97,23 @@ class BibleRepository {
     return passage;
   }
 
+  /// One retry, after a short pause, for failures that never reached the
+  /// server (dropped connection, DNS blip, timeout). A real answer such as a
+  /// 404 for a chapter that does not exist is returned to the caller at once.
+  static Future<T> _withRetry<T>(Future<T> Function() request) async {
+    try {
+      return await request();
+    } on DioException catch (e) {
+      if (e.response != null) rethrow;
+      await Future<void>.delayed(retryDelay);
+      return request();
+    }
+  }
+
+  /// Pause before the single transient retry. Tests shorten it.
+  @visibleForTesting
+  static Duration retryDelay = const Duration(milliseconds: 800);
+
   // ── HTML parsing ────────────────────────────────────────────────────────────
   //
   // The platform returns regular markup:
@@ -98,10 +122,11 @@ class BibleRepository {
   // Block classes: p/m prose, q1..q3 poetry indents, d superscription,
   // s/s1/s2 headings. Verse labels arrive as yv-vlbl spans.
 
-  static final _blockRe =
-      RegExp(r'<div class="([^"]*)">(.*?)</div>', dotAll: true);
-  static final _verseLabelRe =
-      RegExp(r'<span class="yv-vlbl">(\d+)</span>');
+  static final _blockRe = RegExp(
+    r'<div class="([^"]*)">(.*?)</div>',
+    dotAll: true,
+  );
+  static final _verseLabelRe = RegExp(r'<span class="yv-vlbl">(\d+)</span>');
   static final _tagRe = RegExp(r'<[^>]+>');
 
   List<PassageBlock> _parseHtml(String html) {
@@ -129,10 +154,9 @@ class BibleRepository {
       }
 
       if (segments.isEmpty) continue;
-      blocks.add(PassageBlock(
-        styleClass: cls.split(' ').first,
-        segments: segments,
-      ));
+      blocks.add(
+        PassageBlock(styleClass: cls.split(' ').first, segments: segments),
+      );
     }
     return blocks;
   }
@@ -182,10 +206,10 @@ class PassageBlock {
   bool get isHeading => styleClass.startsWith('s');
   bool get isSuperscription => styleClass == 'd';
   int get poetryIndent => switch (styleClass) {
-        'q2' => 1,
-        'q3' => 2,
-        _ => 0,
-      };
+    'q2' => 1,
+    'q3' => 2,
+    _ => 0,
+  };
 }
 
 class PassageSegment {

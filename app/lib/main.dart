@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/services/app_router.dart';
+import 'features/shared_links/presentation/open_in_app_banner.dart';
 import 'core/constants/api_config.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
@@ -18,6 +20,7 @@ import 'shared/providers/theme_provider.dart';
 import 'core/theme/theme.dart';
 import 'shared/providers/auth_provider.dart';
 import 'shared/providers/cache_provider.dart';
+import 'shared/providers/sermon_provider.dart';
 import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
 
@@ -28,17 +31,35 @@ Future<void> main() async {
       final binding = WidgetsFlutterBinding.ensureInitialized();
       FlutterNativeSplash.preserve(widgetsBinding: binding);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      // Real paths on web (no `#/`), so a shared link such as
+      // https://<AppLinks.host>/m/<id> routes in the web app exactly as it
+      // does in the native apps. No-op off the web.
+      usePathUrlStrategy();
+      // Fonts ship in assets/google_fonts (google_fonts prefers bundled files
+      // over fetching), so first launch renders the same offline as online.
+      // Their SIL Open Font Licenses appear in the licences page.
+      LicenseRegistry.addLicense(() async* {
+        for (final family in const [
+          'bricolagegrotesque',
+          'hankengrotesk',
+          'newsreader',
+        ]) {
+          yield LicenseEntryWithLineBreaks(
+            ['google_fonts'],
+            await rootBundle.loadString('assets/google_fonts/OFL-$family.txt'),
+          );
+        }
+      });
 
       // Lock-screen / notification / CarPlay media controls (Now Playing).
-      // Must run before any AudioPlayer is created. 15 s skip intervals give
-      // CarPlay + lock screen podcast-style ±15 s buttons (sermons have no
-      // next/previous queue, so skip buttons are the useful transport).
+      // Must run before any AudioPlayer is created. The transport is
+      // Previous / Next message, driven by the queue window the audio
+      // service loads (see AudioPlayerService), so the OS shows the same
+      // controls as the in-app player and no ±seconds skip buttons.
       await JustAudioBackground.init(
         androidNotificationChannelId: 'com.kharis.church.channel.audio',
         androidNotificationChannelName: 'Kharis audio playback',
         androidNotificationOngoing: true,
-        fastForwardInterval: const Duration(seconds: 15),
-        rewindInterval: const Duration(seconds: 15),
       );
       FlutterError.onError = (details) {
         if (kDebugMode) {
@@ -64,6 +85,7 @@ Future<void> main() async {
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
             cacheServiceProvider.overrideWithValue(cacheService),
+            sermonArchiveCacheProvider.overrideWithValue(cacheService),
           ],
           child: const KharisApp(),
         ),
@@ -82,6 +104,20 @@ Future<void> main() async {
     },
   );
 }
+
+/// Bounds for the member's system text size. Beyond 1.3x the fixed-height
+/// cards and the mini player clip; below 0.85x text is no longer legible.
+const double kMinTextScale = 0.85;
+const double kMaxTextScale = 1.3;
+
+/// `MaterialApp.builder` that honours the system text size within
+/// [kMinTextScale]..[kMaxTextScale] for every route, dialog and sheet.
+Widget clampTextScaling(BuildContext context, Widget? child) =>
+    MediaQuery.withClampedTextScaling(
+      minScaleFactor: kMinTextScale,
+      maxScaleFactor: kMaxTextScale,
+      child: child ?? const SizedBox.shrink(),
+    );
 
 class KharisApp extends ConsumerWidget {
   const KharisApp({super.key});
@@ -107,6 +143,12 @@ class KharisApp extends ConsumerWidget {
         darkTheme: kharisTheme(brightness: Brightness.dark),
         scaffoldMessengerKey: kharisMessengerKey,
         routerConfig: ref.watch(appRouterProvider),
+        // On web, a shared link opened in the browser gets the "Open in the
+        // Kharis app" bar above every route.
+        builder: (context, child) => clampTextScaling(
+          context,
+          OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
   }

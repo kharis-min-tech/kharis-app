@@ -11,7 +11,6 @@ import 'package:kharis_app/features/playlists/presentation/widgets/playlist_name
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 enum _PlaylistAction { rename, delete }
 
@@ -183,9 +182,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
       );
     }
 
-    final sermonsAsync = ref.watch(sermonsProvider);
-    final sermons = ref.watch(playlistSermonsProvider(playlistId));
-    final missing = playlist.sermonIds.length - sermons.length;
+    final resolution = ref.watch(playlistResolutionProvider(playlistId));
+    final sermons = resolution.sermons;
+    final missing = resolution.missing;
     final currentSermon = ref.watch(currentSermonProvider);
     final playerState = ref.watch(playerStateProvider).valueOrNull;
 
@@ -248,7 +247,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(AppRadius.card),
-                          boxShadow: AppShadows.miniPlayer,
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: PlaylistArt(playlist: playlist),
@@ -294,7 +292,12 @@ class PlaylistDetailScreen extends ConsumerWidget {
                     child: FilledButton.icon(
                       onPressed: sermons.isEmpty
                           ? null
-                          : () => startPlayback(ref, sermons.first),
+                          : () => startPlayback(
+                              context,
+                              ref,
+                              sermons.first,
+                              queue: sermons,
+                            ),
                       style: FilledButton.styleFrom(
                         backgroundColor: context.kc.accent,
                         foregroundColor: context.kc.onAccent,
@@ -325,7 +328,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
           ),
 
           // ── Loading catalogue ─────────────────────────────────────────────
-          if (sermonsAsync.isLoading && sermons.isEmpty)
+          if (resolution.pending > 0 && sermons.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -385,7 +388,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 artworkUrl: sermon.artworkUrl,
                 listIndex: index,
                 isPlaying: isPlaying,
-                onTap: () => startPlayback(ref, sermon),
+                onTap: () =>
+                    startPlayback(context, ref, sermon, queue: sermons),
                 onMoreTap: () => _removeSermon(context, ref, sermon),
               );
             }, childCount: sermons.length),
