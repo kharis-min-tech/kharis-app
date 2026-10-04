@@ -35,6 +35,21 @@ Future<void> main() async {
       // https://<AppLinks.host>/m/<id> routes in the web app exactly as it
       // does in the native apps. No-op off the web.
       usePathUrlStrategy();
+      // Fonts ship in assets/google_fonts (google_fonts prefers bundled files
+      // over fetching), so first launch renders the same offline as online.
+      // Their SIL Open Font Licenses appear in the licences page.
+      LicenseRegistry.addLicense(() async* {
+        for (final family in const [
+          'bricolagegrotesque',
+          'hankengrotesk',
+          'newsreader',
+        ]) {
+          yield LicenseEntryWithLineBreaks(
+            ['google_fonts'],
+            await rootBundle.loadString('assets/google_fonts/OFL-$family.txt'),
+          );
+        }
+      });
 
       // Lock-screen / notification / CarPlay media controls (Now Playing).
       // Must run before any AudioPlayer is created. The transport is
