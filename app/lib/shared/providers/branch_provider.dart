@@ -76,11 +76,9 @@ Future<void> _writeProfileBranch(
   FirebaseFirestore db,
   String uid,
   String? branch,
-) =>
-    db.collection('users').doc(uid).set(
-      {'branch': branch},
-      SetOptions(merge: true),
-    );
+) => db.collection('users').doc(uid).set({
+  'branch': branch,
+}, SetOptions(merge: true));
 
 /// Best-effort re-push of a campus that never reached the profile.
 ///
@@ -125,23 +123,38 @@ class BranchSwitchResult {
 /// switch appear to revert on the next launch.
 ///
 /// `branch == null` means all campuses and is a real, persisted choice.
-Future<BranchSwitchResult> setActiveBranch(WidgetRef ref, String? branch) async {
+Future<BranchSwitchResult> setActiveBranch(
+  WidgetRef ref,
+  String? branch,
+) async {
   final onboarding = ref.read(onboardingRepositoryProvider);
   final previous = onboarding.selectedBranch;
 
   // Local first: it cannot fail, so the choice is never lost to the network.
   await onboarding.setSelectedBranch(branch);
 
-  await ref.read(notificationServiceProvider).switchBranchTopic(
-        from: previous,
-        to: branch,
-      );
+  // The FCM topic move is a network round trip (14 s seen on a slow
+  // connection) and notificationTopicSyncProvider re-applies topics anyway,
+  // so it must never hold the member on the branch screen.
+  unawaited(
+    ref
+        .read(notificationServiceProvider)
+        .switchBranchTopic(from: previous, to: branch)
+        .catchError((Object e) => debugPrint('switchBranchTopic: $e')),
+  );
 
   var syncFailed = false;
   final user = ref.read(currentUserProvider).valueOrNull;
   if (user != null && user.id.isNotEmpty && user.role != 'guest') {
     try {
-      await _writeProfileBranch(ref.read(firestoreProvider), user.id, branch);
+      // Bounded: offline, the write is queued by Firestore but its future
+      // waits for the server. Unacknowledged in time = sync pending, which
+      // is retried on a later launch.
+      await _writeProfileBranch(
+        ref.read(firestoreProvider),
+        user.id,
+        branch,
+      ).timeout(profileSyncTimeout);
       await onboarding.setBranchSyncPending(false);
     } catch (_) {
       syncFailed = true;
@@ -152,6 +165,10 @@ Future<BranchSwitchResult> setActiveBranch(WidgetRef ref, String? branch) async 
   ref.invalidate(currentBranchProvider);
   return BranchSwitchResult(syncFailed: syncFailed);
 }
+
+/// How long [setActiveBranch] waits for the profile write to be acknowledged.
+@visibleForTesting
+Duration profileSyncTimeout = const Duration(seconds: 6);
 
 /// Streams `users/{uid}.branch`, degrading to [local] if Firestore is
 /// unreachable or rules deny the read. Degrading to the last known-good
