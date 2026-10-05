@@ -37,15 +37,6 @@ bool _sameMessage(Sermon a, Sermon b) =>
     a.id == b.id ||
     NoteTimelineKey.of(a).canonical == NoteTimelineKey.of(b).canonical;
 
-/// Ambient wash shared by the player screens, settling into the page background
-/// at the bottom so they belong to whichever theme is active. Dark mode keeps
-/// the deep purple→ink gradient from the design handoff; light mode uses a soft
-/// lavender that fades into the warm page background.
-List<Color> playerAmbientColors(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? [const Color(0xFF3A1D6E), const Color(0xFF1A0F33), context.kc.bg]
-    : [const Color(0xFFE6DEF8), const Color(0xFFF2ECF9), context.kc.bg];
-
 /// Unified media player: one screen for every message, whatever media it
 /// carries. An Audio | Video segmented toggle switches engines in place,
 /// handing the playback position across so the timeline never resets:
@@ -750,15 +741,6 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       ),
     );
   }
-
-  BoxDecoration get _gradient => BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: playerAmbientColors(context),
-      stops: const [0.0, 0.44, 1.0],
-    ),
-  );
 
   Widget _buildVideoSurface() {
     final Widget player;

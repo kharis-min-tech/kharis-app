@@ -47,14 +47,6 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
-    packaging {
-        jniLibs {
-            // NDK 28 strip step fails under Flutter 3.44 on macOS; keeping
-            // symbols makes the task a no-op so appbundle builds complete.
-            // Play strips on delivery; only the upload artifact is bigger.
-            keepDebugSymbols.add("**/*.so")
-        }
-    }
 }
 
 kotlin {
