@@ -742,7 +742,9 @@ void main() {
         await tester.pump();
         await tester.runAsync(pumpEventQueue);
         expect(
-          find.text('Your Favorites are still loading. Try again in a moment.'),
+          find.text(
+            'Your Favourites are still loading. Try again in a moment.',
+          ),
           findsOneWidget,
         );
         final untouched = await tester.runAsync(doc.get);

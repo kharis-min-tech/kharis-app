@@ -39,6 +39,9 @@ class ConnectFormField extends StatelessWidget {
       style: AppTypography.ui(size: 15, color: context.kc.onBg),
       decoration: InputDecoration(
         labelText: label,
+        // A multi-line field keeps its label at the top, not floating in the
+        // middle of an empty box.
+        alignLabelWithHint: maxLines > 1,
         labelStyle: AppTypography.ui(size: 14, color: context.kc.muted),
         filled: true,
         fillColor: context.kc.surfaceAlt,
@@ -58,13 +61,13 @@ class ConnectFormField extends StatelessWidget {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.danger, width: 1),
+          borderSide: BorderSide(color: context.kc.danger, width: 1),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+          borderSide: BorderSide(color: context.kc.danger, width: 1.5),
         ),
-        errorStyle: AppTypography.ui(size: 12, color: AppColors.danger),
+        errorStyle: AppTypography.ui(size: 12, color: context.kc.danger),
       ),
     );
   }
@@ -92,7 +95,8 @@ class ConnectBranchDropdown extends ConsumerWidget {
         color: context.kc.surfaceAlt,
         borderRadius: AppRadius.inputBorder,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      // 20 on the left lines "Branch" up with the text-field labels above.
+      padding: const EdgeInsets.only(left: 20, right: 14),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,

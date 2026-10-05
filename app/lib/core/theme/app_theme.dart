@@ -37,8 +37,8 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
         surface: kc.surface,
         onSurface: kc.onBg,
         onSurfaceVariant: kc.muted,
-        error: AppColors.danger,
-        onError: Colors.white,
+        error: kc.danger,
+        onError: isDark ? AppColors.ink : Colors.white,
         outlineVariant: kc.divider,
       );
 
@@ -156,11 +156,11 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: kc.onChip, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: AppRadius.inputBorder,
-        borderSide: const BorderSide(color: AppColors.danger, width: 1),
+        borderSide: BorderSide(color: kc.danger, width: 1),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),

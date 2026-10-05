@@ -224,7 +224,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 value: _PlaylistAction.delete,
                 child: Text(
                   'Delete playlist',
-                  style: AppTypography.ui(size: 14, color: AppColors.danger),
+                  style: AppTypography.ui(size: 14, color: context.kc.danger),
                 ),
               ),
             ],

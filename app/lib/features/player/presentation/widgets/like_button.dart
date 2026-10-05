@@ -35,7 +35,7 @@ class LikeButton extends ConsumerWidget {
       );
     }
 
-    final label = isLiked ? 'Remove from Favorites' : 'Add to Favorites';
+    final label = isLiked ? 'Remove from Favourites' : 'Add to Favourites';
     return Semantics(
       button: true,
       toggled: isLiked,
@@ -57,7 +57,7 @@ class LikeButton extends ConsumerWidget {
             // create path over the member's existing favorites.
             if (!favoritesAsync.hasValue) {
               notify(
-                'Your Favorites are still loading. Try again in a moment.',
+                'Your Favourites are still loading. Try again in a moment.',
               );
               return;
             }
@@ -69,12 +69,22 @@ class LikeButton extends ConsumerWidget {
             );
           },
           behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 2, left: 6),
-            child: Icon(
-              isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: context.kc.accentInk,
-              size: 24,
+          // 44 x 44 target; the heart stays top-right, level with the title.
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(
+                  isLiked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: context.kc.accentInk,
+                  size: 24,
+                ),
+              ),
             ),
           ),
         ),

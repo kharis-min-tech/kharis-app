@@ -890,7 +890,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           // Share lives in the actions row below (Notes · Playlist · Share).
           // This header copy was the duplicate testers flagged (KA-013); the
           // spacer keeps the series label optically centred.
-          const SizedBox(width: 40, height: 40),
+          const SizedBox(width: 44, height: 44),
         ],
       ),
     );
@@ -901,8 +901,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 40,
-        height: 40,
+        width: 44,
+        height: 44,
         child: Icon(icon, color: context.kc.onBg, size: size),
       ),
     );
@@ -929,46 +929,42 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         ? '$speaker · $extra'
         : speaker;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
+    // No extra inset: the title lines up with the mode toggle and seek bar
+    // below it (it used to sit 24 px further in than everything else).
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _sermon.title,
+                style: AppTypography.display(
+                  size: 22,
+                  weight: FontWeight.w700,
+                  height: 1.08,
+                  color: context.kc.onBg,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 5),
                 Text(
-                  _sermon.title,
-                  style: AppTypography.display(
-                    size: 22,
-                    weight: FontWeight.w700,
-                    height: 1.08,
-                    color: context.kc.onBg,
-                  ),
-                  maxLines: 2,
+                  subtitle,
+                  style: AppTypography.ui(size: 13.5, color: context.kc.muted),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  Text(
-                    subtitle,
-                    style: AppTypography.ui(
-                      size: 13.5,
-                      color: context.kc.muted,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ],
-            ),
+            ],
           ),
-          const SizedBox(width: 12),
-          LikeButton(sermon: _sermon),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        LikeButton(sermon: _sermon),
+      ],
     );
   }
 }

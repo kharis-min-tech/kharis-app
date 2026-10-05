@@ -83,7 +83,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 // ── Heading ─────────────────────────────────────────────────
                 Text(
-                  'Create Account',
+                  'Create account',
                   textAlign: TextAlign.center,
                   style: AppTypography.headlineLgMobile.copyWith(
                     color: context.kc.onBg,
@@ -188,7 +188,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Text(
                     _errorMessage!,
                     textAlign: TextAlign.center,
-                    style: AppTypography.ui(size: 14, color: AppColors.danger),
+                    style: AppTypography.ui(size: 14, color: context.kc.danger),
                   ),
                   const SizedBox(height: 12),
                 ],

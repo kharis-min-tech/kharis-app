@@ -25,7 +25,7 @@ class FavoritesTile extends ConsumerWidget {
 
     return Semantics(
       button: true,
-      label: 'Favorites, $subtitle',
+      label: 'Favourites, $subtitle',
       excludeSemantics: true,
       child: PressEffect(
         onTap: onTap,
@@ -57,7 +57,7 @@ class FavoritesTile extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Favorites',
+                      'Favourites',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.display(

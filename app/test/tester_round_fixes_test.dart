@@ -290,17 +290,17 @@ void main() {
       await tester.pumpAndSettle();
 
       for (final label in [
-        'Daily Reading',
-        'My Notes',
-        'My Playlists',
-        'Rate & Feedback',
+        'Daily reading',
+        'My notes',
+        'My playlists',
+        'Rate & feedback',
       ]) {
         expect(find.text(label), findsOneWidget, reason: 'More row "$label"');
       }
 
-      await tester.ensureVisible(find.text('Rate & Feedback'));
+      await tester.ensureVisible(find.text('Rate & feedback'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Rate & Feedback'));
+      await tester.tap(find.text('Rate & feedback'));
       await tester.pumpAndSettle();
 
       // KA-012 now opens the in-app feedback sheet (stars + comment saved to
@@ -329,7 +329,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final guest = find.text('Continue as Guest');
+    final guest = find.text('Continue as guest');
     expect(guest, findsOneWidget);
     final button = find.ancestor(
       of: guest,

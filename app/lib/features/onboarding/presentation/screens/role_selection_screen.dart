@@ -47,7 +47,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'How do you journey with Kharis?',
+                'How are you connected to Kharis?',
                 style: AppTypography.serif(
                   size: 17,
                   italic: true,
@@ -68,7 +68,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
               ),
               const SizedBox(height: 12),
               RoleCard(
-                icon: Icons.auto_awesome_outlined,
+                icon: Icons.waving_hand_outlined,
                 title: 'New here',
                 description: 'First time? Help me settle in',
                 accent: context.kc.accentInk,
@@ -94,7 +94,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
               const SizedBox(height: 22),
               Center(
                 child: _FooterLink(
-                  label: 'Privacy Policy',
+                  label: 'Privacy policy',
                   onTap: () => launchUrl(
                     Uri.parse(_kPrivacyPolicyUrl),
                     mode: LaunchMode.externalApplication,
@@ -165,8 +165,9 @@ class _FooterLink extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: AppRadius.pillBorder,
+      // 14 + 16 line + 14: a 44 px target.
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         child: Text(
           label,
           style: AppTypography.ui(

@@ -224,9 +224,10 @@ class AnnouncementDetailSheet extends ConsumerWidget {
                   width: double.infinity,
                   child: FilledButton.icon(
                     key: const Key('announcement-cta'),
+                    // DESIGN.md: one CTA style, gold with gold ink.
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.onPrimary,
+                      backgroundColor: context.kc.accent,
+                      foregroundColor: context.kc.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.button),
@@ -242,7 +243,7 @@ class AnnouncementDetailSheet extends ConsumerWidget {
                     label: Text(
                       item.ctaLabel?.trim().isNotEmpty == true
                           ? item.ctaLabel!.trim()
-                          : 'Learn more',
+                          : 'Open link',
                     ),
                   ),
                 ),

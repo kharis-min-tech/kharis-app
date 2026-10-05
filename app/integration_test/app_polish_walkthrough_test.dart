@@ -699,7 +699,7 @@ void main() {
         }
 
         final visitor = find.text('Visitor');
-        final guestButton = find.text('Continue as Guest');
+        final guestButton = find.text('Continue as guest');
         final londonTile = find
             .descendant(
               of: find.byType(BranchTile),
@@ -924,8 +924,8 @@ void main() {
             '(production news expired); checking the empty state instead',
           );
           walk.check(
-            find.text('No announcements').evaluate().isNotEmpty,
-            'empty announcements carousel says "No announcements"',
+            find.textContaining('No announcements').evaluate().isNotEmpty,
+            'empty announcements carousel says there are no announcements',
           );
           walk.check(
             find.byKey(const Key('announcements-skeleton')).evaluate().isEmpty,
@@ -1239,7 +1239,7 @@ void main() {
         );
         await scrollUntilFound(
           tester,
-          find.text('Find encouragement'),
+          find.text('Browse by topic'),
           scrollable: scroll,
           step: const Offset(0, -150),
         );
@@ -1390,10 +1390,10 @@ void main() {
             await pumpUntil(
               tester,
               () =>
-                  find.text('All Messages \u00b7 $year').evaluate().isNotEmpty,
+                  find.text('All messages \u00b7 $year').evaluate().isNotEmpty,
               timeout: const Duration(seconds: 15),
             ),
-            'list header shows "All Messages · $year"',
+            'list header shows "All messages · $year"',
           );
           await pumpUntilFound(tester, find.byType(SermonListItem));
           final painted = tester
@@ -1910,10 +1910,10 @@ void main() {
         final moreScroll = find.byType(SingleChildScrollView).first;
         await scrollUntilFound(
           tester,
-          find.text('My Playlists'),
+          find.text('My playlists'),
           scrollable: moreScroll,
         );
-        await tester.tap(find.text('My Playlists'), warnIfMissed: false);
+        await tester.tap(find.text('My playlists'), warnIfMissed: false);
         await pumpUntilFound(tester, find.byType(PlaylistsScreen));
         await pumpUntilFound(
           tester,
@@ -2000,7 +2000,7 @@ void main() {
         await tapBack(tester, reason: 'My Playlists needs a way back');
         await pumpUntilFound(
           tester,
-          find.text('My Playlists'),
+          find.text('My playlists'),
           reason: 'More after My Playlists',
         );
       });
@@ -2048,18 +2048,18 @@ void main() {
         }
 
         await pushed(
-          'Daily Reading',
+          'Daily reading',
           find.byType(ReadingScreen),
           '6-more-daily-reading',
         );
-        await pushed('My Notes', find.byType(NotesScreen), '6-more-my-notes');
+        await pushed('My notes', find.byType(NotesScreen), '6-more-my-notes');
         await pushed(
-          'My Playlists',
+          'My playlists',
           find.byType(PlaylistsScreen),
           '6-more-my-playlists',
         );
         await pushed(
-          'Switch Branch',
+          'Switch branch',
           find.byType(BranchSelectionScreen),
           '6-more-switch-branch',
         );
@@ -2097,7 +2097,7 @@ void main() {
         );
 
         // Rate & Feedback sheet.
-        await openRow('Rate & Feedback');
+        await openRow('Rate & feedback');
         walk.check(
           await pumpUntil(
             tester,
@@ -2121,8 +2121,8 @@ void main() {
         // External links: url_launcher reaches the platform, the browser
         // takes over, and the app comes back.
         for (final (label, url, shot) in [
-          ('Help & Support', kHelpUrl, '6-more-help-browser'),
-          ('Privacy Policy', kPrivacyPolicyUrl, '6-more-privacy-browser'),
+          ('Help & support', kHelpUrl, '6-more-help-browser'),
+          ('Privacy policy', kPrivacyPolicyUrl, '6-more-privacy-browser'),
         ]) {
           final before = urlLaunches().length;
           await openRow(label);

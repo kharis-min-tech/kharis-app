@@ -283,13 +283,14 @@ class _EventBody extends ConsumerWidget {
                     if (!isPast) ...[
                       Expanded(
                         child: FilledButton(
+                          // DESIGN.md: one CTA style, gold with gold ink.
                           style: FilledButton.styleFrom(
                             backgroundColor: isRsvped
                                 ? context.kc.surfaceAlt
-                                : AppColors.primary,
+                                : context.kc.accent,
                             foregroundColor: isRsvped
                                 ? context.kc.onBg
-                                : AppColors.onPrimary,
+                                : context.kc.onAccent,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(

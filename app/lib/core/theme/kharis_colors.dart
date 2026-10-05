@@ -30,6 +30,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     required this.accent,
     required this.onAccent,
     required this.accentInk,
+    required this.danger,
     required this.scrim,
   });
 
@@ -51,7 +52,9 @@ class KharisColors extends ThemeExtension<KharisColors> {
   /// Secondary text.
   final Color muted;
 
-  /// Tertiary / disabled text.
+  /// Tertiary marks: disabled text, placeholder icons, hairline glyphs.
+  /// Clears 3:1 against every surface (non-text contrast) but not 4.5:1, so
+  /// it is never used for readable body or caption text; use [muted].
   final Color faint;
 
   /// Hairline dividers.
@@ -82,6 +85,12 @@ class KharisColors extends ThemeExtension<KharisColors> {
   /// bright gold directly.
   final Color accentInk;
 
+  /// Destructive actions and error text. `AppColors.danger` (#E11D48) is
+  /// 4.4:1 on the light paper and 4.2:1 on ink, so text uses this instead:
+  /// a deeper rose on light (5.9:1 on `bg`), a lighter rose on dark (7.3:1).
+  /// Filled destructive buttons keep `AppColors.danger` with white text.
+  final Color danger;
+
   /// Overlay behind modals and over imagery.
   final Color scrim;
 
@@ -92,7 +101,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     surfaceMuted: AppColors.chipLight,
     onBg: AppColors.textPrimary,
     muted: AppColors.textMutedLight,
-    faint: Color(0xFFA8A29B),
+    faint: Color(0xFF8C867F),
     divider: AppColors.dividerLight,
     outline: Color(0x1F171717),
     chipBg: AppColors.chipLight,
@@ -100,6 +109,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     accent: AppColors.secondary,
     onAccent: AppColors.onSecondary,
     accentInk: Color(0xFF8A5A06),
+    danger: Color(0xFFBE123C),
     scrim: Color(0x8C0B0A10),
   );
 
@@ -110,7 +120,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     surfaceMuted: AppColors.darkSurface2,
     onBg: AppColors.heading,
     muted: AppColors.darkMuted,
-    faint: AppColors.textFaint,
+    faint: Color(0xFF8A8590),
     divider: Color(0x14FFFFFF),
     outline: AppColors.outlineVariant,
     chipBg: AppColors.darkSurface2,
@@ -118,6 +128,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     accent: Color(0xFFE0A32B),
     onAccent: AppColors.onSecondary,
     accentInk: AppColors.secondary,
+    danger: Color(0xFFFB7185),
     scrim: Color(0xB30B0A10),
   );
 
@@ -137,6 +148,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     Color? accent,
     Color? onAccent,
     Color? accentInk,
+    Color? danger,
     Color? scrim,
   }) {
     return KharisColors(
@@ -154,6 +166,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
       accent: accent ?? this.accent,
       onAccent: onAccent ?? this.onAccent,
       accentInk: accentInk ?? this.accentInk,
+      danger: danger ?? this.danger,
       scrim: scrim ?? this.scrim,
     );
   }
@@ -176,6 +189,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
       accent: Color.lerp(accent, other.accent, t)!,
       onAccent: Color.lerp(onAccent, other.onAccent, t)!,
       accentInk: Color.lerp(accentInk, other.accentInk, t)!,
+      danger: Color.lerp(danger, other.danger, t)!,
       scrim: Color.lerp(scrim, other.scrim, t)!,
     );
   }

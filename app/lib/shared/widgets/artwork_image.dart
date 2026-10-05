@@ -1,10 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:kharis_app/core/utils/artwork_gradient.dart';
+import 'package:kharis_app/core/utils/artwork_fill.dart';
 
-/// Artwork tile that always has an on-brand fill: a gradient base with the
-/// network [url] drawn over it (cover). If the image is missing or fails, the
-/// gradient shows through, so cards never flash empty. An optional [overlay]
+/// Artwork tile that always has an on-brand fill: a flat brand colour with
+/// the network [url] drawn over it (cover). If the image is missing or fails,
+/// the fill shows through, so cards never flash empty. An optional [overlay]
 /// (play icon, equalizer) paints centred above, with an optional dark [scrim].
 ///
 /// Uses [CachedNetworkImage] for disk caching and decodes at the tile's display
@@ -28,27 +28,19 @@ class ArtworkImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = sermonGradient(gradientIndex);
     final dpr = MediaQuery.of(context).devicePixelRatio;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: colors,
-              ),
-            ),
-          ),
+          ColoredBox(color: artworkFill(gradientIndex)),
           if (url != null && url!.isNotEmpty)
             LayoutBuilder(
               builder: (context, constraints) {
-                final w =
-                    constraints.maxWidth.isFinite ? constraints.maxWidth : 400.0;
+                final w = constraints.maxWidth.isFinite
+                    ? constraints.maxWidth
+                    : 400.0;
                 final cacheW = (w * dpr).round().clamp(64, 1080);
                 return CachedNetworkImage(
                   imageUrl: url!,

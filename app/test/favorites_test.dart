@@ -250,7 +250,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('No favorites yet'), findsOneWidget);
+      expect(find.text('No Favourites yet'), findsOneWidget);
       expect(find.textContaining('tap the heart'), findsOneWidget);
       expect(find.text('Play all'), findsNothing);
     });
@@ -302,7 +302,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Message 3'), findsNothing);
-      expect(find.text('Removed from Favorites'), findsOneWidget);
+      expect(find.text('Removed from Favourites'), findsOneWidget);
       expect(await tester.runAsync(() => storedFavorites(db)), ['s1', 's2']);
 
       await tester.tap(find.text('Undo'));
@@ -328,7 +328,7 @@ void main() {
       // Rows are newest first: the first ⋮ belongs to Message 2.
       await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Remove from Favorites'));
+      await tester.tap(find.text('Remove from Favourites'));
       await tester.pumpAndSettle();
 
       expect(find.text('Message 2'), findsNothing);
@@ -356,7 +356,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Message 1'), findsOneWidget);
       expect(find.text('Message 4'), findsNothing);
-      expect(find.byTooltip('Add to Favorites'), findsOneWidget);
+      expect(find.byTooltip('Add to Favourites'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.favorite_border_rounded));
       await tester.pumpAndSettle();
@@ -367,7 +367,7 @@ void main() {
         tester.getTopLeft(find.text('Message 4')).dy,
         lessThan(tester.getTopLeft(find.text('Message 1')).dy),
       );
-      expect(find.byTooltip('Remove from Favorites'), findsOneWidget);
+      expect(find.byTooltip('Remove from Favourites'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.favorite_rounded));
       await tester.pumpAndSettle();

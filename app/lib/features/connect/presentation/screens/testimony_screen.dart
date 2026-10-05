@@ -89,7 +89,7 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
             Icon(Icons.check_circle, color: context.kc.accentInk, size: 56),
             const SizedBox(height: 24),
             Text(
-              'Thank you for sharing!',
+              'Thank you for sharing',
               textAlign: TextAlign.center,
               style: AppTypography.display(
                 size: 22,
@@ -112,7 +112,7 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
                   foregroundColor: context.kc.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppRadius.buttonBorder,
                   ),
                   elevation: 0,
                 ),
@@ -140,7 +140,7 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Share Your Testimony',
+                'Share your testimony',
                 style: AppTypography.display(
                   size: 28,
                   weight: FontWeight.w700,
@@ -157,7 +157,7 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
               // Name
               ConnectFormField(
                 controller: _nameController,
-                label: 'Full Name *',
+                label: 'Full name *',
                 textInputAction: TextInputAction.next,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Name is required';
@@ -169,7 +169,7 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
               // Email (optional, validated if non-empty)
               ConnectFormField(
                 controller: _emailController,
-                label: 'Email Address',
+                label: 'Email address',
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 validator: (v) {
@@ -191,7 +191,7 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
               // Testimony text
               ConnectFormField(
                 controller: _testimonyController,
-                label: 'Your Testimony *',
+                label: 'Your testimony *',
                 maxLines: 6,
                 maxLength: 2000,
                 textInputAction: TextInputAction.newline,
@@ -214,7 +214,7 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
                       foregroundColor: context.kc.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.buttonBorder,
                       ),
                       elevation: 0,
                     ),

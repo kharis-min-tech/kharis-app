@@ -342,7 +342,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(londonTile, warnIfMissed: false);
 
-        final guestButton = find.text('Continue as Guest');
+        final guestButton = find.text('Continue as guest');
         final shellDeadline = DateTime.now().add(const Duration(seconds: 90));
         var loginSeen = false;
         while (tester.widgetList(navHomeLabel).isEmpty) {
@@ -636,7 +636,7 @@ void main() {
       // ── KA-003 / KA-012 (row): More menu ──────────────────────────────────
       await tapNav(tester, 'More');
       final moreScroll = find.byType(SingleChildScrollView).first;
-      for (final label in ['Daily Reading', 'My Notes', 'My Playlists']) {
+      for (final label in ['Daily reading', 'My notes', 'My playlists']) {
         await scrollUntilFound(
           tester,
           find.text(label),
@@ -646,7 +646,7 @@ void main() {
       }
       verified.add('KA-003 More has My Notes + My Playlists');
       await hostShot(tester, 'ka003-more-menu');
-      await tester.tap(find.text('My Notes'), warnIfMissed: false);
+      await tester.tap(find.text('My notes'), warnIfMissed: false);
       await pumpUntilFound(
         tester,
         find.byType(NotesScreen),
@@ -655,16 +655,16 @@ void main() {
       await pumpFor(tester, const Duration(seconds: 2));
       await hostShot(tester, 'ka003-my-notes');
       await tapBack(tester, reason: 'KA-007: My Notes needs a way back');
-      await pumpUntilFound(tester, find.text('My Notes'), reason: 'More again');
+      await pumpUntilFound(tester, find.text('My notes'), reason: 'More again');
       verified.add('KA-003 My Notes opens and exits');
 
       await scrollUntilFound(
         tester,
-        find.text('Rate & Feedback'),
+        find.text('Rate & feedback'),
         scrollable: moreScroll,
         timeout: const Duration(seconds: 20),
       );
-      await tester.tap(find.text('Rate & Feedback'), warnIfMissed: false);
+      await tester.tap(find.text('Rate & feedback'), warnIfMissed: false);
       await pumpUntilFound(
         tester,
         find.byType(FeedbackSheet),

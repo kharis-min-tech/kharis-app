@@ -242,7 +242,7 @@ void main() {
         // still land on /login, whose no-account path is "Continue as
         // Guest". Accept either: pump until the shell appears, tapping the
         // guest button if the login screen shows up on the way.
-        final guestButton = find.text('Continue as Guest');
+        final guestButton = find.text('Continue as guest');
         final shellDeadline = DateTime.now().add(const Duration(seconds: 90));
         while (tester.widgetList(navHomeLabel).isEmpty) {
           if (DateTime.now().isAfter(shellDeadline)) {
