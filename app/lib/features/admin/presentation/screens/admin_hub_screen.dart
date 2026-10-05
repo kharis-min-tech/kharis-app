@@ -97,9 +97,9 @@ class AdminHubScreen extends ConsumerWidget {
       ),
       _HubCard(
         icon: Icons.location_city_rounded,
-        title: superAdmin ? 'Branches' : 'Your campus',
+        title: superAdmin ? 'Branches' : 'Your branch',
         subtitle: superAdmin
-            ? 'Add, edit, and reorder campus branches'
+            ? 'Add, edit, and reorder branches'
             : 'Giving, contact, service times and Home layout',
         route: '/admin/branches',
       ),
@@ -113,7 +113,7 @@ class AdminHubScreen extends ConsumerWidget {
         _HubCard(
           icon: Icons.group_rounded,
           title: 'Users',
-          subtitle: 'View members, manage roles and campus admins',
+          subtitle: 'View members, manage roles and branch admins',
           route: '/admin/users',
         ),
         _HubCard(
@@ -153,18 +153,18 @@ class _CampusHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'CAMPUS ADMIN',
+          'BRANCH ADMIN',
           style: AppTypography.labelMd.copyWith(color: AppColors.textMuted),
         ),
         const SizedBox(height: 2),
         Text(
-          names.isEmpty ? 'Your campus' : names.join(' · '),
+          names.isEmpty ? 'Your branch' : names.join(' · '),
           style: AppTypography.titleMd.copyWith(color: AppColors.heading),
         ),
         const SizedBox(height: 2),
         Text(
-          'You manage announcements, events and campus details for '
-          '${names.length == 1 ? 'this campus' : 'these campuses'}.',
+          'You manage announcements, events and branch details for '
+          '${names.length == 1 ? 'this branch' : 'these branches'}.',
           style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
         ),
       ],

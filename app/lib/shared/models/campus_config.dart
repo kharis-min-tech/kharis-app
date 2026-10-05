@@ -302,7 +302,7 @@ enum HomeSectionId {
   events('events', 'Upcoming events'),
 
   /// Venue, service times and contact for the member's campus.
-  campus('campus', 'Your campus'),
+  campus('campus', 'Your branch'),
 
   /// Resume the last message; renders only when there is one.
   continueListening('continueListening', 'Continue listening'),

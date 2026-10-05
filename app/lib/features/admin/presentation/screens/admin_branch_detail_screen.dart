@@ -127,7 +127,7 @@ class AdminBranchDetailScreen extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Text(
-                  'You can only manage your own campuses.',
+                  'You can only manage your own branches.',
                   style: AppTypography.bodyLg.copyWith(
                     color: AppColors.onSurfaceVariant,
                   ),
@@ -153,17 +153,17 @@ class AdminBranchDetailScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.sm),
                 if (settings == null)
                   _SectionCard(
-                    label: 'CAMPUS SETTINGS',
+                    label: 'BRANCH SETTINGS',
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: AppSpacing.sm,
                       ),
                       child: Text(
                         docAsync.isLoading
-                            ? 'Loading campus settings...'
+                            ? 'Loading branch settings...'
                             : docAsync.hasError
-                            ? 'Could not load campus settings.'
-                            : 'Campus settings are available once this '
+                            ? 'Could not load branch settings.'
+                            : 'Branch settings are available once this '
                                   'branch has been saved in Studio.',
                         style: AppTypography.bodySm.copyWith(
                           color: AppColors.textMuted,
@@ -350,7 +350,7 @@ class AdminBranchDetailScreen extends ConsumerWidget {
         inherited: churchHome,
         inheritedHint:
             'Using the church-wide default. Saving makes a '
-            'layout just for this campus.',
+            'layout just for this branch.',
         clearLabel: 'Use church-wide default',
         onSave: (home) async {
           try {
@@ -846,7 +846,7 @@ class _EventRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${dateFmt.format(event.startTime)}, ${timeFmt.format(event.startTime)}'
-                  '${event.branch == null ? ' · All campuses' : ''}',
+                  '${event.branch == null ? ' · All branches' : ''}',
                   style: AppTypography.labelMd.copyWith(
                     color: AppColors.textMuted,
                   ),

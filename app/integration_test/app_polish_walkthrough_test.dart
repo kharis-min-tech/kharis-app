@@ -954,7 +954,7 @@ void main() {
                       .evaluate()
                       .isNotEmpty &&
                   find
-                      .text('News from your campus will show up here.')
+                      .text('News from your branch will show up here.')
                       .evaluate()
                       .isNotEmpty,
               timeout: const Duration(seconds: 15),

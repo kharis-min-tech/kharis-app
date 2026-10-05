@@ -268,7 +268,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         return const _Empty(
           icon: Icons.campaign_outlined,
           title: 'No announcements right now',
-          subtitle: 'News from your campus will show up here.',
+          subtitle: 'News from your branch will show up here.',
         );
       }
       return _Empty(

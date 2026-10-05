@@ -198,7 +198,7 @@ class _BranchSelector extends StatelessWidget {
     final kc = context.kc;
     return Semantics(
       button: true,
-      label: 'Giving to $recipient from $branch. Change campus',
+      label: 'Giving to $recipient from $branch. Change branch',
       excludeSemantics: true,
       child: GestureDetector(
         key: const ValueKey('giving-branch-selector'),

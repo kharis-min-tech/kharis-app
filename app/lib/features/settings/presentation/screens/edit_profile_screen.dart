@@ -142,7 +142,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   (v == null || v.trim().isEmpty) ? 'Name is required' : null,
             ),
             const SizedBox(height: 20),
-            _label('Home campus'),
+            _label('Home branch'),
             _CampusRow(
               label: branch ?? kAllCampusesLabel,
               onTap: () => pickActiveBranch(context, ref),

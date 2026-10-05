@@ -136,13 +136,13 @@ await getAuth().setCustomUserClaims('USER_UID_HERE', { admin: true });
 or set `role: 'admin'` on the user's `users/{uid}` profile (Content Studio does
 this; only an existing super admin can change a role).
 
-### Campus admins
+### Branch admins
 
-A campus admin manages only their own campuses: the `news` and `events` whose
-`branch` is one of their campuses, and the non-identity fields of those
+A branch admin manages only their own branches: the `news` and `events` whose
+`branch` is one of their branches, and the non-identity fields of those
 `branches/{id}` docs (contact, services, venues, giving, Home layout, …). They
-cannot write all-campus (null/blank `branch`) items, move an item to another
-campus, change a branch's `name`, `order`, `group` or `isActive`, create or
+cannot write all-branch (null/blank `branch`) items, move an item to another
+branch, change a branch's `name`, `order`, `group` or `isActive`, create or
 delete branches, or touch `config/*`, sermons, reading plans, daily content,
 users or submissions.
 
@@ -156,7 +156,7 @@ A super admin assigns one by setting all three fields together on
 | `adminBranchNames` | the matching branch **names**, e.g. `['North']` — news/events store `branch` as the name |
 
 Keep the two lists in step (and update `adminBranchNames` if a branch is
-renamed). Users can never set their own `role` or campus lists.
+renamed). Users can never set their own `role` or branch lists.
 
 ### Testing the rules
 
@@ -267,7 +267,7 @@ Document ID is the date string in `YYYY-MM-DD` format.
 | `publishedAt` | Timestamp | |
 | `expiresAt` | Timestamp? | Auto-hide after this date |
 
-### `branches` collection — campus customisation
+### `branches` collection — branch customisation
 
 Besides name, services, venues and contact details, each branch may carry:
 

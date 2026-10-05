@@ -40,7 +40,7 @@ class AdminAppSettingsScreen extends ConsumerWidget {
           _SettingsCard(
             title: 'Church-wide giving',
             subtitle:
-                'Shown in Giving for every campus without its own details.',
+                'Shown in Giving for every branch without its own details.',
             child: givingAsync.when(
               loading: () => const _Loading(),
               error: (_, _) => const _LoadError('giving details'),
@@ -68,7 +68,7 @@ class AdminAppSettingsScreen extends ConsumerWidget {
           _SettingsCard(
             title: 'Default Home layout',
             subtitle:
-                'The Home blocks every campus without its own layout shows, '
+                'The Home blocks every branch without its own layout shows, '
                 'top to bottom.',
             child: homeAsync.when(
               loading: () => const _Loading(),

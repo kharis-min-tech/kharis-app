@@ -282,7 +282,7 @@ class BranchRepository {
     Branch(
       id: 'london-hq',
       name: 'London',
-      subtitle: 'United Kingdom · Main Campus',
+      subtitle: 'United Kingdom · Main Branch',
       gradientStart: _gA,
       gradientEnd: _gB,
       imageUrl: AppAssets.city('london-hq'),

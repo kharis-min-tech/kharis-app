@@ -907,7 +907,7 @@
             <div class="field">
               <label for="ev-branch">Branch</label>
               <select id="ev-branch" disabled>
-                <option value="">All campuses</option>
+                <option value="">All branches</option>
               </select>
             </div>
             <div class="inline-error" id="ev-branch-error" style="display:none;"></div>
@@ -986,7 +986,7 @@
               <div class="field">
                 <label for="nw-branch">Branch</label>
                 <select id="nw-branch" disabled>
-                  <option value="">All campuses</option>
+                  <option value="">All branches</option>
                 </select>
               </div>
             </div>
@@ -1041,7 +1041,7 @@
           </div>
           <p style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">
             A member sees an announcement on the app home screen when it is set to
-            their branch or to All campuses, its publish time has arrived, and it
+            their branch or to All branches, its publish time has arrived, and it
             has not expired. Each row says exactly where it stands.
           </p>
           <div id="news-list">
@@ -1284,7 +1284,7 @@
       <div class="pane-layout">
         <div class="card">
           <div class="card-title"><span class="dot"></span> <span id="branch-form-title">Add / Edit Branch</span></div>
-          <p class="repeat-empty" id="br-scope-note" hidden>Choose Edit on your campus to update its details. Name, order, group and visibility are managed by the church office.</p>
+          <p class="repeat-empty" id="br-scope-note" hidden>Choose Edit on your branch to update its details. Name, order, group and visibility are managed by the church office.</p>
           <form id="branch-form">
             <div class="section-label">Basic information</div>
             <div class="field">
@@ -1426,7 +1426,7 @@
             <div id="br-giving"></div>
 
             <div class="section-label">Home layout</div>
-            <p class="repeat-empty">Order of the blocks on the app Home screen for members of this campus.</p>
+            <p class="repeat-empty">Order of the blocks on the app Home screen for members of this branch.</p>
             <div id="br-home"></div>
 
             <button type="submit" class="btn btn-primary btn-full" id="branch-submit-btn" style="margin-top:22px;">Save Branch</button>
@@ -1448,7 +1448,7 @@
         <div class="card">
           <div class="card-title"><span class="dot"></span> Church-wide giving</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
-            Shown on the Giving screen for every campus without its own giving
+            Shown on the Giving screen for every branch without its own giving
             details. Leave every field blank to fall back to the church details
             built into the app.
           </p>
@@ -1461,7 +1461,7 @@
         <div class="card">
           <div class="card-title"><span class="dot"></span> Church-wide Home layout</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
-            Order of the blocks on the app Home screen for every campus without
+            Order of the blocks on the app Home screen for every branch without
             its own layout. Live now, Complete your profile and Continue
             listening only appear when they apply to the member.
           </p>
@@ -1480,8 +1480,8 @@
           <div class="card-title"><span class="dot"></span> Team access</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
             Find someone by the email they signed up with, then choose what they
-            can manage. Admins manage everything. Campus admins manage only their
-            campuses' announcements, events and branch details.
+            can manage. Admins manage everything. Branch admins manage only their
+            branches' announcements, events and branch details.
           </p>
           <form id="team-search-form">
             <div class="field">
@@ -1628,8 +1628,8 @@ function applyScope() {
   const chip = document.getElementById('scope-chip');
   const names = [...(adminScope?.branchNames || [])];
   chip.textContent = superAdmin
-    ? 'Super admin · all campuses'
-    : `Campus admin · ${names.join(', ') || 'your campus'}`;
+    ? 'Super admin · all branches'
+    : `Branch admin · ${names.join(', ') || 'your branch'}`;
   chip.title = chip.textContent;
   chip.hidden = !adminScope;
   const active = document.querySelector('.tab-btn.active');
@@ -1859,7 +1859,7 @@ document.getElementById('event-form').addEventListener('submit', async (e) => {
   const form = e.target;
   const editId = form.dataset.editId;
   if (!canManageCampusNamed(document.getElementById('ev-branch').value)) {
-    toast('Choose one of your campuses for this event', 'error');
+    toast('Choose one of your branches for this event', 'error');
     return;
   }
   const btn = document.getElementById('event-submit-btn');
@@ -1924,7 +1924,7 @@ function linkableEventLabel(ev) {
   const day = start
     ? start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: LONDON_TZ })
     : 'No date';
-  return `${ev.title || 'Untitled'} · ${day} · ${ev.branch || 'All campuses'}`;
+  return `${ev.title || 'Untitled'} · ${day} · ${ev.branch || 'All branches'}`;
 }
 
 // Keeps a link to an event that has dropped out of the upcoming list.
@@ -2074,7 +2074,7 @@ function toJsDate(value) {
 }
 
 function homeAudience(branch) {
-  return (branch || '').trim() || 'All campuses';
+  return (branch || '').trim() || 'All branches';
 }
 
 function homeVisibility(branch, expiresAt, publishedAt) {
@@ -2208,9 +2208,9 @@ function updateNewsWherePreview() {
   if (!el) return;
   const branch = document.getElementById('nw-branch').value;
   const visibility = homeVisibility(branch, newsExpiryDate(), newsPublishDate());
-  const audienceLine = visibility.audience === 'All campuses'
+  const audienceLine = visibility.audience === 'All branches'
     ? 'Seen by <strong>everyone, at every branch</strong>.'
-    : `Seen <strong>only by members whose campus is ${escHtml(visibility.audience)}</strong>.`;
+    : `Seen <strong>only by members whose branch is ${escHtml(visibility.audience)}</strong>.`;
   const publishLine = visibility.scheduled
     ? `Appears, and its notification goes out, at <strong>${escHtml(formatLondonDateTime(visibility.publish))}</strong> UK time.`
     : 'Shows on the home screen as soon as it is saved.';
@@ -2289,7 +2289,7 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
   const form = e.target;
   const editId = form.dataset.editId;
   if (!canManageCampusNamed(document.getElementById('nw-branch').value)) {
-    toast('Choose one of your campuses for this announcement', 'error');
+    toast('Choose one of your branches for this announcement', 'error');
     return;
   }
   const linkUrl = normaliseLink(document.getElementById('nw-link').value);
@@ -3240,7 +3240,7 @@ function populateBranchPickers(names) {
   const choices = campus
     ? [...new Set([...names.filter(n => adminScope.branchNames.has(n)), ...adminScope.branchNames])]
     : names;
-  const options = (campus ? '' : '<option value="">All campuses</option>') +
+  const options = (campus ? '' : '<option value="">All branches</option>') +
     choices.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
   BRANCH_PICKERS.forEach(({ select, error, submit }) => {
     const sel = document.getElementById(select);
@@ -3289,7 +3289,7 @@ async function loadBranches() {
     updateNewsWherePreview();
     if (!docs.length) {
       list.innerHTML = isCampusScope()
-        ? '<p style="color:var(--muted);">None of your campuses were found. Ask the church office to check your access.</p>'
+        ? '<p style="color:var(--muted);">None of your branches were found. Ask the church office to check your access.</p>'
         : '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
       return;
     }
@@ -3727,7 +3727,7 @@ document.getElementById('branch-form').addEventListener('submit', async (e) => {
   const editId = e.target.dataset.editId;
   // Campus admins only ever update one of their own branches.
   if (isCampusScope() && !(editId && canManageBranchId(editId))) {
-    toast('You can only update your own campus', 'error');
+    toast('You can only update your own branch', 'error');
     return;
   }
   const val = (id) => document.getElementById(id).value.trim();
@@ -3910,7 +3910,7 @@ const HOME_SECTIONS = [
   { id: 'reading',           label: 'Bible reading of the day' },
   { id: 'announcements',     label: 'Announcements' },
   { id: 'events',            label: 'Upcoming events' },
-  { id: 'campus',            label: 'Your campus' },
+  { id: 'campus',            label: 'Your branch' },
   { id: 'continueListening', label: 'Continue listening' },
   { id: 'giving',            label: 'Giving' },
 ];
@@ -4033,7 +4033,7 @@ function syncBranchFormScope() {
   document.getElementById('br-name').disabled = campus;
   form.hidden = campus && !editing;
   document.getElementById('br-scope-note').hidden = !(campus && !editing);
-  document.getElementById('branch-form-title').textContent = campus ? 'Edit Campus Details' : 'Add / Edit Branch';
+  document.getElementById('branch-form-title').textContent = campus ? 'Edit Branch Details' : 'Add / Edit Branch';
 }
 
 mountGivingForm('br');
@@ -4046,7 +4046,7 @@ mountHomeEditor('st');
 // absent doc means the app's built-in fallback, so clearing deletes the doc.
 function renderGivingStatus(isSet) {
   document.getElementById('st-giving-status').innerHTML = isSet
-    ? '<span class="where-title">Church-wide details set</span>Campuses without their own giving details show these.'
+    ? '<span class="where-title">Church-wide details set</span>Branches without their own giving details show these.'
     : '<span class="where-title">Not set</span>The app falls back to its built-in church details until you save some here.';
 }
 
@@ -4117,7 +4117,7 @@ document.getElementById('settings-home-form').addEventListener('submit', async (
 // changes away from campus_admin. Nobody may change their own access.
 const TEAM_ROLES = [
   { value: 'member', label: 'Member (no Studio access)' },
-  { value: 'campus_admin', label: 'Campus admin' },
+  { value: 'campus_admin', label: 'Branch admin' },
   { value: 'admin', label: 'Admin (everything)' },
 ];
 let teamRowSeq = 0;
@@ -4138,7 +4138,7 @@ function teamRowHtml(uid, u) {
   ];
   const chosen = new Set(ids);
   const roleLabel = role === 'campus_admin'
-    ? `Campus admin · ${names.join(', ') || 'no campuses'}`
+    ? `Branch admin · ${names.join(', ') || 'no branches'}`
     : (roles.find(r => r.value === role)?.label || role);
   const name = u.displayName || 'Member';
   const roleId = `tm-role-${++teamRowSeq}`;
@@ -4150,7 +4150,7 @@ function teamRowHtml(uid, u) {
           `<option value="${escAttr(r.value)}" ${r.value === role ? 'selected' : ''}>${escHtml(r.label)}</option>`).join('')}</select>
       </div>
       <div data-team-campuses ${role === 'campus_admin' ? '' : 'hidden'}>
-        <div class="team-campuses" role="group" aria-label="Campuses ${escAttr(name)} manages">
+        <div class="team-campuses" role="group" aria-label="Branches ${escAttr(name)} manages">
           ${choices.length ? choices.map(b => `<label><input type="checkbox" data-team-branch value="${escAttr(b.id)}" data-name="${escAttr(b.name)}" ${chosen.has(b.id) ? 'checked' : ''} /> ${escHtml(b.name)}${b.missing ? ' (deleted branch)' : ''}</label>`).join('')
             : '<span class="repeat-empty">No branches loaded.</span>'}
         </div>
@@ -4219,7 +4219,7 @@ async function onTeamSave(e) {
   let update;
   if (role === 'campus_admin') {
     const picked = [...row.querySelectorAll('[data-team-branch]:checked')];
-    if (!picked.length) { toast('Pick at least one campus for a campus admin', 'error'); return; }
+    if (!picked.length) { toast('Pick at least one branch for a branch admin', 'error'); return; }
     update = {
       role,
       adminBranchIds: picked.map(c => c.value),

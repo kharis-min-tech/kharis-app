@@ -190,7 +190,7 @@ class _EventBody extends ConsumerWidget {
     final now = DateTime.now();
     final isPast = event.isPastAt(now);
     final isRsvped = ref.watch(isEventRsvpedProvider(event.id));
-    final campus = _clean(event.branch) ?? 'All campuses';
+    final campus = _clean(event.branch) ?? 'All branches';
     final description = _clean(event.description);
     final mapsQuery = _mapsQuery;
 
@@ -257,7 +257,7 @@ class _EventBody extends ConsumerWidget {
                 _InfoBlock(
                   icon: Icons.church_outlined,
                   title: campus,
-                  subtitle: 'Campus',
+                  subtitle: 'Branch',
                 ),
                 if (description != null) ...[
                   const SizedBox(height: 26),

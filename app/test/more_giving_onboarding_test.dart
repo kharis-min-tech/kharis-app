@@ -387,7 +387,7 @@ void main() {
       final prefs = await pumpGiving(tester);
       await tester.tap(find.byKey(const ValueKey('giving-branch-selector')));
       await tester.pumpAndSettle();
-      expect(find.text('Choose your campus'), findsOneWidget);
+      expect(find.text('Choose your branch'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('branch-choice-Manchester')));
       await tester.pumpAndSettle();

@@ -296,12 +296,12 @@ class StudioCampusField extends ConsumerWidget {
           color: AppColors.secondary,
         ),
       ),
-      'Loading campuses',
+      'Loading branches',
     );
     if (branches.hasError || scopeAsync.hasError) {
       return _status(
         const Icon(Icons.cloud_off_rounded, size: 16, color: AppColors.error),
-        'Could not load campuses.',
+        'Could not load branches.',
         action: TextButton(
           onPressed: () => ref
             ..invalidate(branchesProvider)
@@ -333,7 +333,7 @@ class StudioCampusField extends ConsumerWidget {
       initialValue: current,
       dropdownColor: AppColors.surfaceContainer,
       style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-      decoration: studioInputDecoration(hint: 'Choose a campus'),
+      decoration: studioInputDecoration(hint: 'Choose a branch'),
       items: [
         if (!campusOnly)
           DropdownMenuItem<String?>(value: null, child: Text(allLabel)),
@@ -341,7 +341,7 @@ class StudioCampusField extends ConsumerWidget {
           DropdownMenuItem<String?>(value: name, child: Text(name)),
       ],
       validator: campusOnly
-          ? (v) => v == null ? 'Choose one of your campuses' : null
+          ? (v) => v == null ? 'Choose one of your branches' : null
           : null,
       onChanged: onChanged,
     );
@@ -390,7 +390,7 @@ String? studioDefaultCampus(WidgetRef ref) {
   return (scope.branchNames.toList()..sort()).firstOrNull;
 }
 
-const String kLoadingCampusesHint = 'Loading campuses';
+const String kLoadingCampusesHint = 'Loading branches';
 
 /// Muted helper line under a field or button.
 class StudioHint extends StatelessWidget {

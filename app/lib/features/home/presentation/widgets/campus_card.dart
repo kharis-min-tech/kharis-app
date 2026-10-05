@@ -103,7 +103,7 @@ class CampusCard extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  'YOUR CAMPUS',
+                  'YOUR BRANCH',
                   style: AppTypography.ui(
                     size: 11,
                     weight: FontWeight.w700,

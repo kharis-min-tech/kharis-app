@@ -110,7 +110,7 @@ void main() {
       expect(find.text('Leeds · London'), findsOneWidget);
       expect(find.text('Announcements'), findsOneWidget);
       expect(find.text('Events'), findsOneWidget);
-      expect(find.text('Your campus'), findsOneWidget);
+      expect(find.text('Your branch'), findsOneWidget);
       for (final hidden in [
         'Users',
         'Sermons',
@@ -142,7 +142,7 @@ void main() {
         await tester.scrollUntilVisible(find.text(shown), 100);
         expect(find.text(shown), findsOneWidget, reason: shown);
       }
-      expect(find.text('CAMPUS ADMIN'), findsNothing);
+      expect(find.text('BRANCH ADMIN'), findsNothing);
     });
   });
 
@@ -284,7 +284,7 @@ void main() {
         ],
       );
       expect(
-        find.text('You can only manage your own campuses.'),
+        find.text('You can only manage your own branches.'),
         findsOneWidget,
       );
     });
@@ -313,11 +313,11 @@ void main() {
 
       await tester.tap(find.text('Ada'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Campus admin'));
+      await tester.tap(find.text('Branch admin'));
       await tester.pumpAndSettle();
 
       // Save stays disabled until a campus is picked.
-      final save = find.widgetWithText(FilledButton, 'Make campus admin');
+      final save = find.widgetWithText(FilledButton, 'Make branch admin');
       expect(tester.widget<FilledButton>(save).onPressed, isNull);
 
       await tester.tap(find.text('London'));

@@ -154,7 +154,7 @@ class _EventFormSheetState extends ConsumerState<EventFormSheet> {
               ),
               const SizedBox(width: 4),
               Text(
-                shownScope ?? 'All campuses',
+                shownScope ?? 'All branches',
                 style: AppTypography.labelMd.copyWith(
                   color: AppColors.secondary,
                 ),

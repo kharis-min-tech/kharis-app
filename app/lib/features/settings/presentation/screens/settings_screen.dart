@@ -475,7 +475,7 @@ class _SignedOutCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Sign in to keep your notes, playlists and campus on every device.',
+            'Sign in to keep your notes, playlists and branch on every device.',
             style: AppTypography.ui(
               size: 13,
               height: 1.5,

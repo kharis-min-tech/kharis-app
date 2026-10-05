@@ -225,7 +225,7 @@ class AnnouncementWillAppearPanel extends StatelessWidget {
           _line(
             audience == AnnouncementHomeVisibility.allBranches
                 ? 'Seen by everyone, at every branch.'
-                : 'Seen only by members whose campus is $audience.',
+                : 'Seen only by members whose branch is $audience.',
           ),
           if (goesLive != null)
             _line(

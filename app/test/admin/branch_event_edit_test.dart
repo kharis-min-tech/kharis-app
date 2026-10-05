@@ -94,7 +94,7 @@ void main() {
       );
 
       // The branch page shows the event's own scope, not the page's campus.
-      expect(find.text('All campuses'), findsOneWidget);
+      expect(find.text('All branches'), findsOneWidget);
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Harvest Thanksgiving'),
@@ -144,7 +144,7 @@ void main() {
       settle: false,
     );
 
-    expect(find.text('Loading campuses'), findsWidgets);
+    expect(find.text('Loading branches'), findsWidgets);
     final save = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Add event'),
     );

@@ -475,7 +475,7 @@ class _Header extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'YOUR CAMPUS',
+                    'YOUR BRANCH',
                     style: AppTypography.ui(
                       size: 9,
                       weight: FontWeight.w700,
