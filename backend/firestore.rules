@@ -130,6 +130,7 @@ service cloud.firestore {
     // profiles and are the only ones who may set `role`, `adminBranchIds` or
     // `adminBranchNames` (no self-promotion, no self-assigned campuses). A
     // self-created profile starts as a plain member role with no campus lists.
+    // A member may delete their own profile (in-app account deletion).
     match /users/{uid} {
       allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
       allow create: if isAuthenticated() && request.auth.uid == uid
@@ -139,7 +140,7 @@ service cloud.firestore {
                     || (isAuthenticated() && request.auth.uid == uid
                         && !request.resource.data.diff(resource.data).affectedKeys()
                               .hasAny(['role', 'adminBranchIds', 'adminBranchNames']));
-      allow delete: if isSuperAdmin();
+      allow delete: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == uid);
 
       // notes — the member's private notebook. Owner-only: nobody else, not
       // even an admin, may read what a member wrote. Anchored notes also

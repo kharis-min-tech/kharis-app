@@ -640,7 +640,7 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 
 | Collection | Read | Create / update / delete |
 |---|---|---|
-| `users/{uid}` | owner, super admin | Create: owner only, with `role` in `member`/`guest`/`new_here` and no admin lists. Update: owner (cannot change `role`, `adminBranchIds` or `adminBranchNames`) or super admin. Delete: super admin. |
+| `users/{uid}` | owner, super admin | Create: owner only, with `role` in `member`/`guest`/`new_here` and no admin lists. Update: owner (cannot change `role`, `adminBranchIds` or `adminBranchNames`) or super admin. Delete: owner (in-app account deletion) or super admin. |
 | `users/{uid}/notes/{id}` | owner only (not admins) | Owner. `body` must be 1..20000 chars; `updatedAt` must be a timestamp. |
 | `users/{uid}/playlists/{id}` | owner only | Owner. `name` 1..80 chars, `sermonIds` a list, `createdAt` and `updatedAt` timestamps. |
 | `branches/{id}` | public | Create and delete: super admin. Update: super admin, or a Branch admin for an id in `adminBranchIds` who does not change `name`, `order`, `group` or `isActive`. `giving` and `home` are shape-checked for every writer. |
@@ -733,6 +733,15 @@ A Studio delete of a `web_*` doc writes `{hidden: true, hiddenAt}` instead of de
 | `phone`, `dob` (`yyyy-MM-dd`) | owner |
 | `notificationPrefs` | owner, `Map<String,bool>` |
 | `fcmToken`, `fcmTokenUpdatedAt` | app (`NotificationService.syncToken`) |
+
+**Account deletion** (More → Delete account, signed-in email members only; Apple Guideline 5.1.1(v)). `AccountDeletionService` (`app/lib/features/settings/data/account_deletion.dart`) runs, in order:
+
+1. `reauthenticateWithCredential` with the password the member re-enters.
+2. `AccountDataRepository.deleteUserData`: batched deletes of `users/{uid}/notes/*`, `users/{uid}/playlists/*` (Favorites included), `rsvps` where `userId == uid`, then `users/{uid}`. All are owner deletes under the rules.
+3. Firebase Auth `currentUser.delete()`. On `requires-recent-login` the app asks for the password and retries the whole sequence, which is idempotent.
+4. Clears the device's notes box and saved onboarding role and Branch, then returns to Welcome.
+
+`app_feedback`, `visitors` and `testimonies` are create-only for members and are not removed.
 
 ### 6.9 rsvps, visitors, testimonies, app_feedback, pushLog
 

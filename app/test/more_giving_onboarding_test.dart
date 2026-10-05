@@ -63,6 +63,15 @@ class _FakeAuth implements AuthRepository {
   Future<User> loginAsGuest() => throw UnimplementedError();
 
   @override
+  bool get usesPasswordSignIn => false;
+
+  @override
+  Future<void> reauthenticate(String password) => throw UnimplementedError();
+
+  @override
+  Future<void> deleteAccount() => throw UnimplementedError();
+
+  @override
   User? get currentUser => null;
 
   @override

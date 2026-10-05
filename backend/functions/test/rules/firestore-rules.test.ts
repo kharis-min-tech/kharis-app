@@ -292,6 +292,98 @@ describe('users', () => {
   });
 });
 
+describe('account deletion', () => {
+  const NOW = Timestamp.now();
+
+  /** The member's own data, plus another member's to prove isolation. */
+  const seed = async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, 'users/other'), { role: 'member', displayName: 'O' });
+      for (const uid of ['member', 'other']) {
+        await setDoc(doc(d, `users/${uid}/notes/n1`), { body: 'note', updatedAt: NOW });
+        await setDoc(doc(d, `users/${uid}/playlists/favorites`), {
+          name: 'Favourites',
+          sermonIds: ['s1'],
+          createdAt: NOW,
+          updatedAt: NOW,
+        });
+        await setDoc(doc(d, `rsvps/${uid}_e1`), { userId: uid, eventId: 'e1' });
+      }
+    });
+  };
+
+  test('owner can delete their own profile', async () => {
+    await assertSucceeds(deleteDoc(doc(db(member()), 'users/member')));
+  });
+
+  test("a member cannot delete another member's profile", async () => {
+    await seed();
+    await assertFails(deleteDoc(doc(db(member()), 'users/other')));
+    await assertFails(deleteDoc(doc(env.unauthenticatedContext().firestore(), 'users/member')));
+  });
+
+  test('super admin can still delete any profile', async () => {
+    await assertSucceeds(deleteDoc(doc(db(superAdmin()), 'users/member')));
+    await assertSucceeds(deleteDoc(doc(db(claimAdmin()), 'users/campus')));
+  });
+
+  test('owner deletes own notes, playlists and RSVPs but not anyone else’s', async () => {
+    await seed();
+    const d = db(member());
+    await assertSucceeds(deleteDoc(doc(d, 'users/member/notes/n1')));
+    await assertSucceeds(deleteDoc(doc(d, 'users/member/playlists/favorites')));
+    await assertSucceeds(deleteDoc(doc(d, 'rsvps/member_e1')));
+    await assertFails(deleteDoc(doc(d, 'users/other/notes/n1')));
+    await assertFails(deleteDoc(doc(d, 'users/other/playlists/favorites')));
+    await assertFails(deleteDoc(doc(d, 'rsvps/other_e1')));
+    // Not even an admin may touch a member's notes or playlists.
+    await assertFails(deleteDoc(doc(db(superAdmin()), 'users/other/notes/n1')));
+    await assertFails(deleteDoc(doc(db(superAdmin()), 'users/other/playlists/favorites')));
+  });
+
+  test('the in-app deletion sequence succeeds and leaves others intact', async () => {
+    await seed();
+    const d = db(member());
+    // Same order as AccountDataRepository.deleteUserData.
+    const notes = await assertSucceeds(getDocs(collection(d, 'users/member/notes')));
+    const playlists = await assertSucceeds(getDocs(collection(d, 'users/member/playlists')));
+    const rsvps = await assertSucceeds(
+      getDocs(query(collection(d, 'rsvps'), where('userId', '==', 'member'))),
+    );
+    for (const snap of [...notes.docs, ...playlists.docs, ...rsvps.docs]) {
+      await assertSucceeds(deleteDoc(snap.ref));
+    }
+    await assertSucceeds(deleteDoc(doc(d, 'users/member')));
+
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      for (const path of [
+        'users/member',
+        'users/member/notes/n1',
+        'users/member/playlists/favorites',
+        'rsvps/member_e1',
+      ]) {
+        if ((await getDoc(doc(admin, path))).exists()) throw new Error(`${path} survived`);
+      }
+      for (const path of [
+        'users/other',
+        'users/other/notes/n1',
+        'users/other/playlists/favorites',
+        'rsvps/other_e1',
+      ]) {
+        if (!(await getDoc(doc(admin, path))).exists()) throw new Error(`${path} was removed`);
+      }
+    });
+  });
+
+  test('a deleted profile cannot be recreated without a role', async () => {
+    await assertSucceeds(deleteDoc(doc(db(member()), 'users/member')));
+    // e.g. a late FCM token merge from the deleted session.
+    await assertFails(setDoc(doc(db(member()), 'users/member'), { fcmToken: 't' }, { merge: true }));
+  });
+});
+
 describe('other collections', () => {
   test('motdSchedule is denied to everyone', async () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'motdSchedule/2026-10-04')));

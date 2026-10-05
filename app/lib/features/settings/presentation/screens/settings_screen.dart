@@ -11,6 +11,7 @@ import 'package:kharis_app/features/connect/presentation/screens/new_here_screen
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
+import 'package:kharis_app/features/settings/presentation/widgets/delete_account_flow.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
@@ -221,8 +222,16 @@ class SettingsScreen extends ConsumerWidget {
                       label: 'Sign out',
                       accent: context.kc.danger,
                       danger: true,
-                      isLast: true,
                       onTap: () => _confirmSignOut(context, ref),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.person_remove_outlined,
+                      label: 'Delete account',
+                      accent: context.kc.danger,
+                      danger: true,
+                      isLast: true,
+                      onTap: () =>
+                          unawaited(confirmDeleteAccount(context, user)),
                     ),
                   ],
                 )
