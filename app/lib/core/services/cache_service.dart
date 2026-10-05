@@ -80,9 +80,21 @@ class CacheService implements SermonArchiveStore {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+  /// Hive appends every `put` and only reclaims overwritten frames once 60
+  /// have piled up. The sermon box holds one ~1.5 MB archive rewritten on
+  /// every archive walk, so the default let `sermons.hive` grow past 90 MB of
+  /// dead copies in the app's storage. Compact as soon as anything is stale.
+  static bool sermonsCompaction(int entries, int deletedEntries) =>
+      deletedEntries > 0;
+
   static Future<CacheService> init() async {
     await Hive.initFlutter();
-    final sermonsBox = await Hive.openBox<dynamic>('sermons');
+    final sermonsBox = await Hive.openBox<dynamic>(
+      'sermons',
+      compactionStrategy: sermonsCompaction,
+    );
+    // Reclaims space already lost on installs that ran the default strategy.
+    await sermonsBox.compact();
     final eventsBox = await Hive.openBox<dynamic>('events');
     final preferencesBox = await Hive.openBox<dynamic>('preferences');
     final playbackPositionsBox = await Hive.openBox<dynamic>(
