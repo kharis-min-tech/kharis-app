@@ -1735,9 +1735,11 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  connectAuthEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
 import {
   getFirestore,
+  connectFirestoreEmulator,
   collection,
   addDoc,
   getDocs,
@@ -1756,9 +1758,22 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-const app  = initializeApp(firebaseConfig);
+// Local testing against the Firebase emulators: serve this folder on
+// localhost and open it with `?emulators=1` (see backend/SETUP.md). Only
+// honoured on localhost, so the hosted Studio can never be pointed away from
+// production data. The demo- project id keeps the emulators fully offline.
+const useEmulators =
+  ['localhost', '127.0.0.1'].includes(location.hostname) &&
+  new URLSearchParams(location.search).has('emulators');
+const app  = initializeApp(
+  useEmulators ? { ...firebaseConfig, projectId: 'demo-kharis' } : firebaseConfig,
+);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+if (useEmulators) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8181);
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  TOAST

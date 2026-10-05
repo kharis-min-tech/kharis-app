@@ -198,6 +198,29 @@ firebase emulators:start
 
 The emulator UI is available at [http://localhost:4000](http://localhost:4000).
 
+### Content Studio against the emulators
+
+`admin/index.html` connects to the Auth emulator (`127.0.0.1:9099`) and the
+Firestore emulator (`127.0.0.1:8181`) under the offline project `demo-kharis`
+when it is opened on localhost with `?emulators=1`. The hosted Studio ignores
+the flag, so it can never be pointed away from production.
+
+```bash
+# firebase.json for the emulators: {"firestore":{"rules":"<repo>/backend/firestore.rules"},
+#   "emulators":{"auth":{"port":9099},"firestore":{"port":8181},"singleProjectMode":true}}
+firebase emulators:start --only auth,firestore --project demo-kharis
+cd ~/Workspace/kharis-org/admin && python3 -m http.server 5055 --bind 127.0.0.1
+open 'http://localhost:5055/?emulators=1'
+```
+
+The emulators start empty: create test users through the Auth emulator REST API
+(`/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`) and write their
+`users/{uid}` docs (role `admin` or `campus_admin` with `adminBranchIds` and
+`adminBranchNames`) plus sample `branches`, `news` (`publishedAt`, `expiresAt`)
+and `events` through the Firestore emulator REST API with
+`Authorization: Bearer owner`, which bypasses the rules. Notifications can be
+composed but are not delivered: the functions are not emulated.
+
 ---
 
 ## Firestore Schema Reference
