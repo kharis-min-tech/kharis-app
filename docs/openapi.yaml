@@ -1,0 +1,980 @@
+openapi: 3.1.0
+info:
+  title: Kharis app HTTP APIs
+  version: 2026-10-05
+  summary: Cloud Functions, the public sermon API and the R2 media files used by the Kharis app and Content Studio.
+  description: |
+    Prose reference: docs/API.md. App integration guide: docs/MOBILE-INTEGRATION.md.
+
+    Four hosts are described here, each set as per-path `servers`:
+    - Cloud Functions, us-central1 (project kharis-app-47c49)
+    - Cloud Functions, europe-west1 (feedProxy only)
+    - Public sermon API, yetanothersermon.host (third party; native clients must send a browser User-Agent; no CORS)
+    - R2 public bucket written by the Cloudflare import Worker (static files; no CORS headers today)
+
+    Examples are taken from live responses captured on 2026-10-05 unless marked as built from code.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://us-central1-kharis-app-47c49.cloudfunctions.net
+    description: Cloud Functions (default region)
+tags:
+  - name: Functions
+    description: Firebase Cloud Functions (backend/functions/src)
+  - name: Sermon API
+    description: Public sermon API at yetanothersermon.host
+  - name: R2
+    description: Static files in the kharis-messages R2 bucket
+security: []
+paths:
+  /getAnnouncements:
+    get:
+      tags: [Functions]
+      operationId: getAnnouncements
+      summary: Live announcements, newest first
+      description: Published (`publishedAt <= now`) and not expired `news` docs. With `branch`, that Branch's items plus church-wide ones.
+      parameters:
+        - name: branch
+          in: query
+          description: Branch name, e.g. `London`.
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Announcements
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnnouncementsResponse' }
+              examples:
+                live-empty:
+                  summary: Live, 2026-10-05
+                  value: { announcements: [], count: 0, timestamp: '2026-10-05T22:02:47.278Z' }
+                from-code:
+                  summary: Built from announcements.ts
+                  value:
+                    announcements:
+                      - id: Xa12
+                        title: Baptism Sunday
+                        body: Speak to the welcome team after the service.
+                        type: Announcement
+                        branch: London
+                        imageUrl: null
+                        publishedAt: '2026-10-04T08:00:00.000Z'
+                        expiresAt: null
+                        eventId: null
+                        linkUrl: https://kharis.org/baptism
+                        ctaLabel: Learn more
+                    count: 1
+                    timestamp: '2026-10-05T22:02:47.278Z'
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+  /getBranches:
+    get:
+      tags: [Functions]
+      operationId: getBranches
+      summary: All Branches ordered by `order`
+      description: Branch documents verbatim plus `id`. Firestore timestamps are serialised as `{_seconds, _nanoseconds}`.
+      responses:
+        '200':
+          description: Branches
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheFiveMinutes' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BranchesResponse' }
+              examples:
+                live:
+                  summary: Live, 2026-10-05 (trimmed)
+                  value:
+                    branches:
+                      - id: london-hq
+                        group: Kharis
+                        name: London
+                        subtitle: United Kingdom · Main Campus
+                        order: 0
+                        isActive: true
+                        meetingDays: Sundays
+                        meetingTime: '10:00 AM'
+                        address: Kensington Town Hall, Hornton St, London W8 7NX, United Kingdom
+                        imageUrl: assets/design/city-london-hq.jpg
+                        gradientStart: '#3B2A6B'
+                        gradientEnd: '#7C3AED'
+                        contact: { email: '', phone: '' }
+                        instagram: ''
+                        venues:
+                          - id: main
+                            name: London Venue
+                            addressLine1: Kensington Town Hall, Hornton St, London W8 7NX
+                            addressLine2: ''
+                            city: ''
+                            postcode: ''
+                            country: United Kingdom
+                            latitude: null
+                            longitude: null
+                            parkingInfo: teset oark
+                            publicTransportInfo: bus
+                            directionsText: ask
+                        services:
+                          - id: main-service
+                            name: Sunday Service
+                            type: sunday
+                            day: Sundays
+                            startTime: '10:00 AM'
+                            endTime: '12:00'
+                            venueId: main
+                            description: ''
+                            order: 1
+                            isActive: true
+                        updatedAt: { _seconds: 1788190536, _nanoseconds: 248000000 }
+                    count: 24
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+  /getEvents:
+    get:
+      tags: [Functions]
+      operationId: getEvents
+      summary: Upcoming or past events
+      parameters:
+        - name: branch
+          in: query
+          description: Branch name. Adds church-wide events (null/blank/absent branch).
+          schema: { type: string }
+        - name: when
+          in: query
+          schema: { type: string, enum: [upcoming, past], default: upcoming }
+        - name: limit
+          in: query
+          description: Upcoming default and max 50; past default and max 15.
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        '200':
+          description: Events. Upcoming soonest first; past most recent first.
+          headers:
+            Cache-Control:
+              description: '`public, max-age=300` (upcoming) or `public, max-age=60` (past).'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventsResponse' }
+              examples:
+                live-past:
+                  summary: Live, `?when=past&limit=1`
+                  value:
+                    events:
+                      - id: aug-2026-kp2-revival
+                        title: KP2 Youth Revival
+                        description: Kharis Phase Two - a revival night for young people.
+                        location: Kensington Town Hall, London
+                        branch: null
+                        imageUrl: null
+                        isFeatured: true
+                        startTime: '2026-08-29T16:00:00.000Z'
+                        endTime: '2026-08-29T19:00:00.000Z'
+                    count: 1
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+  /getDailyReading:
+    get:
+      tags: [Functions]
+      operationId: getDailyReading
+      summary: Resolved daily Bible reading for a date or month
+      parameters:
+        - name: date
+          in: query
+          description: Defaults to today in Europe/London.
+          schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        - name: month
+          in: query
+          description: Every resolvable reading in the month, date ascending. Takes precedence over `date`.
+          schema: { type: string, pattern: '^\d{4}-\d{2}$' }
+      responses:
+        '200':
+          description: Readings
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheFiveMinutes' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DailyReadingResponse' }
+              examples:
+                live:
+                  summary: Live, 2026-10-05
+                  value:
+                    readings:
+                      - date: '2026-10-05'
+                        reading: { book: 2 Corinthians, chapter: 19, verse: 1-end }
+                        prayer: Lord, speak to us through 2 Corinthians 19 today.
+                        prayerReference: 2 Corinthians 19
+                        source: plan
+                        planId: MlCzng0YB8ZqbIvLzVK4
+                        planTitle: September - part 2
+                    count: 1
+        '400':
+          description: Malformed `date` or `month`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                live:
+                  value: { error: date must be YYYY-MM-DD }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+  /searchYouTube:
+    get:
+      tags: [Functions]
+      operationId: searchYouTube
+      summary: Admin-only search over the church YouTube channel
+      description: Each call spends about 101 YouTube Data API quota units. Caller must be a super admin (`users/{uid}.role == 'admin'` or claim `admin`).
+      security:
+        - firebaseIdToken: []
+      parameters:
+        - name: q
+          in: query
+          description: Empty lists newest uploads; non-empty searches by relevance.
+          schema: { type: string }
+        - name: pageToken
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+      responses:
+        '200':
+          description: Videos
+          headers:
+            Cache-Control:
+              description: '`private, no-store`'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/YouTubeSearchResponse' }
+              examples:
+                from-code:
+                  summary: Built from sync-youtube.ts
+                  value:
+                    videos:
+                      - videoId: VdGcMD4Rwy8
+                        title: 'Christ: The Eternally Blessed God'
+                        description: ''
+                        thumbnailUrl: https://i.ytimg.com/vi/VdGcMD4Rwy8/hqdefault.jpg
+                        publishedAt: '2026-09-27T12:00:00Z'
+                        duration: 2945
+                        inLibrary: true
+                        isFeatured: false
+                    nextPageToken: CBkQAA
+                    totalResults: 812
+                    count: 1
+        '401':
+          description: Missing or invalid ID token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                live:
+                  value: { error: Sign-in required }
+        '403':
+          description: Signed in but not a super admin
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Admin only }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500':
+          description: Server YouTube key not configured
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: YouTube API error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /sermonApiProxy/{resource}/:
+    get:
+      tags: [Functions]
+      operationId: sermonApiProxyList
+      summary: CORS proxy for the sermon API (web builds)
+      description: |
+        Forwards GET `sermons/`, `series/`, `playlists/` to the sermon API with a browser User-Agent and
+        rewrites absolute upstream links (`next`, `previous`) to the proxy. CORS is limited to the hosted
+        app and Studio origins plus localhost. Not deployed as of 2026-10-05 (live request returned 404 HTML).
+      parameters:
+        - name: resource
+          in: path
+          required: true
+          schema: { type: string, enum: [sermons, series, playlists] }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Upstream page, links rewritten to the proxy
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheFiveMinutes' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SermonPage' }
+        '404':
+          description: Path is not one of the forwarded resources
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Only sermons/, series/ and playlists/ are proxied' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '502':
+          description: Upstream fetch failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /feedProxy:
+    servers:
+      - url: https://europe-west1-kharis-app-47c49.cloudfunctions.net
+        description: Cloud Functions, europe-west1
+    get:
+      tags: [Functions]
+      operationId: feedProxy
+      summary: CORS-safe SoundCloud RSS / YouTube Atom pass-through
+      description: Not called by the current app.
+      parameters:
+        - name: source
+          in: query
+          description: '`youtube` for the channel Atom feed; anything else (or absent) for SoundCloud RSS.'
+          schema: { type: string, enum: [youtube, soundcloud] }
+      responses:
+        '200':
+          description: Upstream XML
+          headers:
+            Cache-Control:
+              description: '`public, max-age=60, s-maxage=300`'
+              schema: { type: string }
+          content:
+            text/xml:
+              schema: { type: string }
+            application/rss+xml:
+              schema: { type: string }
+        '502':
+          description: Upstream fetch failed (plain text)
+          content:
+            text/plain:
+              schema: { type: string }
+  /sermons/:
+    servers:
+      - url: https://yetanothersermon.host/_/kc/public-api/v1
+        description: Public sermon API (third party)
+    get:
+      tags: [Sermon API]
+      operationId: listSermons
+      summary: One page (50) of the sermon archive
+      description: |
+        Third-party API. Walk `next` until null. `audio_link.download_url` and `preachers[].url` are
+        scheme-less; prepend `https://`. The mp3 URL 302-redirects to a signed R2 URL valid for 90 minutes.
+        `series` / `preacher` filters are ignored server-side. No CORS headers.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/BrowserUserAgent'
+      responses:
+        '200':
+          description: Page of sermons
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SermonPage' }
+              examples:
+                live:
+                  summary: Live, 2026-10-05 (first of 50 results)
+                  value:
+                    count: 1489
+                    next: https://yetanothersermon.host/_/kc/public-api/v1/sermons/?page=2
+                    previous: null
+                    results:
+                      - id: 101897
+                        title: 'Christ: The Eternally Blessed God'
+                        time: null
+                        date: '2026-09-27'
+                        passages: ['1 Timothy 3:16']
+                        series: null
+                        preachers:
+                          - id: 1880
+                            name: David Antwi
+                            url: yetanothersermon.host/_/kc/preachers/1880/david-antwi/
+                            bio: null
+                            image_id: null
+                        audio_link:
+                          id: 99934
+                          duration: 2945
+                          filesize: 47138066
+                          download_url: yetanothersermon.host/_/kc/media/mp3/99934.mp3
+                          name: e7574957-d9ba-4650-8d8a-3aa7ca6aca61-211a7718-5b1b-4bf0-8924-0cdc2058d2_71dvhpb.mp3
+                          mp3_etag: null
+                        video_link: https://www.youtube.com/watch?v=VdGcMD4Rwy8&t=487s
+                        image: https://yash.b-cdn.net/media/images/Kharis_resized_H6Mr63b.jpeg?width=256
+                        image_id: null
+                        podcast_artwork_id: null
+                        description: Christianity is often shrouded in mysticism, but the truth of the Gospel is meant to be understood.
+                        transcription_id: 96162
+                        attachments: []
+                        tags: [David Antwi, Kharis Church, PDAK]
+                        meeting_type: Sunday Morning
+                        bible_version: null
+        '403':
+          description: Cloudflare bot protection rejected a non-browser User-Agent
+  /series/:
+    servers:
+      - url: https://yetanothersermon.host/_/kc/public-api/v1
+        description: Public sermon API (third party)
+    get:
+      tags: [Sermon API]
+      operationId: listSeries
+      summary: Sermon series (used by the import Worker)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/BrowserUserAgent'
+      responses:
+        '200':
+          description: Page of series
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            name: { type: [string, 'null'] }
+        '403':
+          description: Cloudflare bot protection rejected a non-browser User-Agent
+  /playlists/:
+    servers:
+      - url: https://yetanothersermon.host/_/kc/public-api/v1
+        description: Public sermon API (third party)
+    get:
+      tags: [Sermon API]
+      operationId: listPlaylists
+      summary: Sermon playlists (used by the import Worker; record shape unconfirmed)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/BrowserUserAgent'
+      responses:
+        '200':
+          description: Page of playlists
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items: { type: object }
+        '403':
+          description: Cloudflare bot protection rejected a non-browser User-Agent
+  /_/kc/media/mp3/{audioId}.mp3:
+    servers:
+      - url: https://yetanothersermon.host
+        description: Sermon host (media)
+    get:
+      tags: [Sermon API]
+      operationId: getSermonAudio
+      summary: Sermon audio; redirects to a signed CDN URL
+      parameters:
+        - name: audioId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: '#/components/parameters/BrowserUserAgent'
+      responses:
+        '302':
+          description: Redirect to a time-limited (X-Amz-Expires=5400) signed R2 URL
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        '403':
+          description: Cloudflare bot protection rejected a non-browser User-Agent
+  /messages.json:
+    servers:
+      - url: https://pub-1cfba9da59dd4e03b1f867b35e26a1a4.r2.dev
+        description: R2 bucket kharis-messages (public)
+    get:
+      tags: [R2]
+      operationId: getMessagesMirror
+      summary: Full sermon catalogue mirrored by the import Worker
+      description: About 1.5 MB, rewritten Monday and Thursday 06:00 UTC. No CORS headers (see docs/API.md section 8).
+      responses:
+        '200':
+          description: Catalogue
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheFiveMinutes' }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessagesFile' }
+              examples:
+                live:
+                  summary: Live, 2026-10-05 (first of 1489 records)
+                  value:
+                    messages:
+                      - id: '101897'
+                        external_id: '101897'
+                        title: 'Christ: The Eternally Blessed God'
+                        speaker: David Antwi
+                        date_preached: '2026-09-27'
+                        series: null
+                        topics: []
+                        keywords: []
+                        scripture_refs: ['1 Timothy 3:16']
+                        audio_url: https://yetanothersermon.host/_/kc/media/mp3/99934.mp3
+                        image_url: https://yash.b-cdn.net/media/images/Kharis_resized_H6Mr63b.jpeg?width=256
+                        duration: 2945
+                        description: Christianity is often shrouded in mysticism, but the truth of the Gospel is meant to be understood.
+                        transcript_available: true
+                        video_url: https://www.youtube.com/watch?v=VdGcMD4Rwy8&t=487s
+                        tags: [PDAK, Kharis Church, David Antwi]
+                        related_message_ids: ['100220', '100239', '100513', '101138', '101139']
+                        transcript_url: transcripts/101897.txt
+                        previous_id: '101139'
+                        next_id: null
+        '404':
+          description: Object missing (the Worker has not run against this bucket)
+  /playlists.json:
+    servers:
+      - url: https://pub-1cfba9da59dd4e03b1f867b35e26a1a4.r2.dev
+        description: R2 bucket kharis-messages (public)
+    get:
+      tags: [R2]
+      operationId: getPlaylistsMirror
+      summary: Playlists mirrored by the import Worker (not read by the app)
+      responses:
+        '200':
+          description: Playlists
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [playlists]
+                properties:
+                  playlists:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, message_ids]
+                      properties:
+                        id: { type: string }
+                        title: { type: [string, 'null'] }
+                        message_ids:
+                          type: array
+                          items: { type: string }
+              example:
+                playlists:
+                  - { id: '6', title: Catch The Glory Messages, message_ids: [] }
+        '404':
+          description: Object missing (the Worker has not run against this bucket)
+  /transcripts/{sermonId}.txt:
+    servers:
+      - url: https://pub-1cfba9da59dd4e03b1f867b35e26a1a4.r2.dev
+        description: R2 bucket kharis-messages (public)
+    get:
+      tags: [R2]
+      operationId: getTranscript
+      summary: Machine transcript for one sermon
+      parameters:
+        - name: sermonId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Plain text with `[m:ss]` timestamps
+          content:
+            text/plain:
+              schema: { type: string }
+              example: '[0:00] Welcome and thank you for joining this message by ...'
+        '404':
+          description: No transcript for this sermon
+components:
+  securitySchemes:
+    firebaseIdToken:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+  headers:
+    CacheFiveMinutes:
+      description: '`public, max-age=300`'
+      schema: { type: string }
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number (50 per page).
+      schema: { type: integer, minimum: 1 }
+    Search:
+      name: search
+      in: query
+      description: Full-text search; `next` carries it forward.
+      schema: { type: string }
+    BrowserUserAgent:
+      name: User-Agent
+      in: header
+      description: Native clients send a browser UA (`kBrowserUserAgent`); non-browser agents can be rejected with 403.
+      schema: { type: string }
+  responses:
+    MethodNotAllowed:
+      description: Only GET is accepted
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Method Not Allowed }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    FirestoreTimestampJson:
+      type: object
+      description: Admin SDK JSON form of a Firestore Timestamp.
+      properties:
+        _seconds: { type: integer }
+        _nanoseconds: { type: integer }
+    Announcement:
+      type: object
+      required: [id, title, body, type, branch, imageUrl, publishedAt, expiresAt, eventId, linkUrl, ctaLabel]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        body: { type: string }
+        type:
+          type: string
+          description: Announcement, Ministry, Notice or Update. Never Event.
+        branch:
+          type: [string, 'null']
+          description: Branch name; null = church-wide.
+        imageUrl: { type: [string, 'null'] }
+        publishedAt: { type: [string, 'null'], format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+          description: null = never expires.
+        eventId: { type: [string, 'null'] }
+        linkUrl: { type: [string, 'null'], format: uri }
+        ctaLabel:
+          type: [string, 'null']
+          description: Defaults to `Learn more` when linkUrl is set.
+    AnnouncementsResponse:
+      type: object
+      required: [announcements, count, timestamp]
+      properties:
+        announcements:
+          type: array
+          items: { $ref: '#/components/schemas/Announcement' }
+        count: { type: integer }
+        timestamp: { type: string, format: date-time }
+    Contact:
+      type: object
+      properties:
+        email: { type: string }
+        phone: { type: string }
+    Venue:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        addressLine1: { type: string }
+        addressLine2: { type: string }
+        city: { type: string }
+        postcode: { type: string }
+        country: { type: string }
+        latitude: { type: [number, 'null'] }
+        longitude: { type: [number, 'null'] }
+        parkingInfo: { type: string }
+        publicTransportInfo: { type: string }
+        directionsText: { type: string }
+    Service:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string }
+        day: { type: string }
+        startTime:
+          type: string
+          description: '`10:00 AM` or `15:00`.'
+        endTime: { type: string }
+        venueId: { type: [string, 'null'] }
+        description: { type: string }
+        order: { type: integer }
+        isActive: { type: boolean }
+    Giving:
+      type: object
+      properties:
+        url: { type: string, format: uri }
+        bankName: { type: string }
+        accountName: { type: string }
+        sortCode: { type: string }
+        accountNumber: { type: string }
+        swiftBic: { type: string }
+        iban: { type: string }
+        reference: { type: string }
+        note: { type: string }
+    HomeLayout:
+      type: object
+      required: [sections]
+      properties:
+        sections:
+          type: array
+          items:
+            type: object
+            required: [id, enabled]
+            properties:
+              id:
+                type: string
+                enum: [profileCompletion, live, reading, announcements, events, campus, continueListening, giving]
+              enabled: { type: boolean }
+    Branch:
+      type: object
+      description: A `branches` document verbatim plus `id`. Older Branches carry only identity fields.
+      required: [id, name]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        name: { type: string }
+        group: { type: string, enum: [Kharis, KP2] }
+        order: { type: integer }
+        isActive: { type: boolean }
+        subtitle: { type: string }
+        shortDescription: { type: string }
+        description: { type: string }
+        imageUrl: { type: string }
+        gradientStart: { type: string }
+        gradientEnd: { type: string }
+        address: { type: string }
+        meetingDays: { type: string }
+        meetingTime: { type: string }
+        instagram: { type: string }
+        contact: { $ref: '#/components/schemas/Contact' }
+        venues:
+          type: array
+          items: { $ref: '#/components/schemas/Venue' }
+        services:
+          type: array
+          items: { $ref: '#/components/schemas/Service' }
+        giving: { $ref: '#/components/schemas/Giving' }
+        home: { $ref: '#/components/schemas/HomeLayout' }
+        updatedAt: { $ref: '#/components/schemas/FirestoreTimestampJson' }
+        createdAt: { $ref: '#/components/schemas/FirestoreTimestampJson' }
+    BranchesResponse:
+      type: object
+      required: [branches, count]
+      properties:
+        branches:
+          type: array
+          items: { $ref: '#/components/schemas/Branch' }
+        count: { type: integer }
+    Event:
+      type: object
+      required: [id, title, description, location, branch, imageUrl, isFeatured, startTime, endTime]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: [string, 'null'] }
+        location:
+          type: [string, 'null']
+          description: Venue name.
+        address:
+          type: [string, 'null']
+          description: Street address (present in source; not yet in the deployed build).
+        branch:
+          type: [string, 'null']
+          description: Branch name; null = church-wide.
+        imageUrl: { type: [string, 'null'] }
+        isFeatured: { type: boolean }
+        startTime: { type: [string, 'null'], format: date-time }
+        endTime: { type: [string, 'null'], format: date-time }
+    EventsResponse:
+      type: object
+      required: [events, count]
+      properties:
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/Event' }
+        count: { type: integer }
+    ResolvedReading:
+      type: object
+      required: [date, reading, prayer, prayerReference, source, planId, planTitle]
+      properties:
+        date: { type: string, format: date }
+        reading:
+          type: object
+          required: [book, chapter, verse]
+          properties:
+            book: { type: string }
+            chapter: { type: integer }
+            verse:
+              type: string
+              description: Verse range, e.g. `1-end` or `4-9`.
+        prayer: { type: string }
+        prayerReference: { type: string }
+        source: { type: string, enum: [day, plan, plan-last-day] }
+        planId: { type: [string, 'null'] }
+        planTitle: { type: [string, 'null'] }
+        planDay:
+          type: [integer, 'null']
+          description: 1-based plan day (source only; not yet deployed).
+        planDays:
+          type: [integer, 'null']
+          description: Plan length in days (source only; not yet deployed).
+    DailyReadingResponse:
+      type: object
+      required: [readings, count]
+      properties:
+        readings:
+          type: array
+          items: { $ref: '#/components/schemas/ResolvedReading' }
+        count: { type: integer }
+    YouTubeVideo:
+      type: object
+      required: [videoId, title, description, thumbnailUrl, publishedAt, duration, inLibrary, isFeatured]
+      properties:
+        videoId: { type: string }
+        title: { type: string }
+        description: { type: string }
+        thumbnailUrl: { type: [string, 'null'] }
+        publishedAt: { type: string, format: date-time }
+        duration:
+          type: integer
+          description: Seconds; 0 when unknown.
+        inLibrary:
+          type: boolean
+          description: '`sermons/yt_<videoId>` exists.'
+        isFeatured: { type: boolean }
+    YouTubeSearchResponse:
+      type: object
+      required: [videos, nextPageToken, totalResults, count]
+      properties:
+        videos:
+          type: array
+          items: { $ref: '#/components/schemas/YouTubeVideo' }
+        nextPageToken: { type: [string, 'null'] }
+        totalResults: { type: [integer, 'null'] }
+        count: { type: integer }
+    PageEnvelope:
+      type: object
+      required: [count, next, previous, results]
+      properties:
+        count: { type: integer }
+        next: { type: [string, 'null'], format: uri }
+        previous: { type: [string, 'null'], format: uri }
+        results: { type: array }
+    Preacher:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        url:
+          type: string
+          description: Scheme-less.
+        bio: { type: [string, 'null'] }
+        image_id: { type: [integer, 'null'] }
+    ApiSermon:
+      type: object
+      required: [id, title, date]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        time: { type: [string, 'null'] }
+        date: { type: string, format: date }
+        passages:
+          type: array
+          items: { type: string }
+        series:
+          type: [object, 'null']
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        preachers:
+          type: array
+          items: { $ref: '#/components/schemas/Preacher' }
+        audio_link:
+          type: [object, 'null']
+          properties:
+            id: { type: integer }
+            duration:
+              type: [integer, 'null']
+              description: Seconds.
+            filesize: { type: [integer, 'null'] }
+            download_url:
+              type: string
+              description: Scheme-less; 302-redirects to a signed URL.
+            name: { type: string }
+            mp3_etag: { type: [string, 'null'] }
+        video_link: { type: [string, 'null'] }
+        image: { type: [string, 'null'] }
+        image_id: { type: [integer, 'null'] }
+        podcast_artwork_id: { type: [integer, 'null'] }
+        description: { type: [string, 'null'] }
+        transcription_id: { type: [integer, 'null'] }
+        attachments: { type: array }
+        tags:
+          type: array
+          items: { type: string }
+        meeting_type: { type: [string, 'null'] }
+        bible_version: { type: [string, 'null'] }
+    SermonPage:
+      allOf:
+        - $ref: '#/components/schemas/PageEnvelope'
+        - type: object
+          properties:
+            results:
+              type: array
+              items: { $ref: '#/components/schemas/ApiSermon' }
+    MirrorMessage:
+      type: object
+      required: [id, external_id, title, speaker, date_preached, series, audio_url, transcript_available, transcript_url, previous_id, next_id]
+      properties:
+        id: { type: string }
+        external_id: { type: string }
+        title: { type: [string, 'null'] }
+        speaker: { type: [string, 'null'] }
+        date_preached: { type: [string, 'null'], format: date }
+        series:
+          type: [object, 'null']
+          properties:
+            id: { type: string }
+            name: { type: [string, 'null'] }
+        topics:
+          type: array
+          items: { type: string }
+        keywords:
+          type: array
+          items: { type: string }
+        scripture_refs:
+          type: array
+          items: { type: string }
+        audio_url: { type: [string, 'null'] }
+        image_url: { type: [string, 'null'] }
+        duration: { type: [integer, 'null'] }
+        description: { type: [string, 'null'] }
+        transcript_available: { type: boolean }
+        video_url: { type: [string, 'null'] }
+        tags:
+          type: array
+          items: { type: string }
+        related_message_ids:
+          type: array
+          items: { type: string }
+        transcript_url:
+          type: [string, 'null']
+          description: Bucket-relative, e.g. `transcripts/101897.txt`.
+        previous_id: { type: [string, 'null'] }
+        next_id: { type: [string, 'null'] }
+    MessagesFile:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/MirrorMessage' }
