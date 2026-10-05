@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/onboarding/presentation/widgets/splash_dove.dart';
 
-/// Splash / brand entry (design-handoff v3).
+/// Splash / brand entry.
 ///
-/// Full-bleed worship photo in its own colours under a neutral legibility
-/// scrim, centred dove
-/// + "Kharis" wordmark + serif tagline, then a gold **Get started** CTA and an
-/// "I already have an account" sign-in row. Button-driven (no auto-advance) so returning
-/// users are routed by the auth redirect and new users choose to begin.
+/// Solid ink, the dove centred exactly where the native launch screen draws
+/// it. The dove's outline draws itself in and fills, the "Kharis" wordmark
+/// and tagline fade up beneath it, then the gold **Get started** CTA and the
+/// "I already have an account" row appear. Button-driven (no auto-advance)
+/// so returning users are routed by the auth redirect and new users choose
+/// to begin. With reduce motion on, the first frame is the final state.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -19,10 +21,36 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
+  // One timeline, about 2.1 s: pen trace ~0.95 s, fill 0.35 s, wordmark and
+  // tagline 0.45 s, then the actions 0.4 s, each beat ease-out and slightly
+  // overlapping the last so the sequence reads as one gesture.
   late final AnimationController _entry = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 700),
-  )..forward();
+    duration: const Duration(milliseconds: 2100),
+  );
+  late final Animation<double> _trace = _beat(0.05, 0.5, Curves.easeInOut);
+  late final Animation<double> _fill = _beat(0.48, 0.65, Curves.easeOut);
+  late final Animation<double> _title = _beat(0.6, 0.82, Curves.easeOut);
+  late final Animation<double> _actions = _beat(0.8, 1, Curves.easeOut);
+  bool _started = false;
+
+  Animation<double> _beat(double begin, double end, Curve curve) =>
+      CurvedAnimation(
+        parent: _entry,
+        curve: Interval(begin, end, curve: curve),
+      );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _entry.value = 1;
+    } else {
+      _entry.forward();
+    }
+  }
 
   @override
   void dispose() {
@@ -32,101 +60,150 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Deliberately theme-invariant: the splash is a full-bleed photo, so this
-      // is only the base beneath the image — a light scaffold would flash white
-      // before the asset decodes. Everything on top of the photo stays
-      // white/light in both themes for the same reason.
-      backgroundColor: AppColors.ink,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Full-bleed congregation photo, natural colours, no tint. Same
-          // pre-cropped asset the native splash uses, so launch hands over to
-          // this screen without a visible change.
-          Image.asset(AppAssets.splashBg, fit: BoxFit.cover),
-
-          // Neutral scrim only — no purple tint. The congregation photo is the
-          // splash, so it reads in its own colours; these stops exist purely so
-          // the dove, wordmark and CTAs stay legible over it. This also matches
-          // the native splash, which is the same photo with no wash, making the
-          // handover to Flutter invisible.
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x730B0A10), // ink ~45% behind status bar + wordmark
-                  Color(0x260B0A10), // ink ~15%, fading out
-                  Color(0x00000000), // clear — the photo's own colours
-                  Color(0x9E0B0A10), // ink ~62% anchoring the CTA block
-                ],
-                stops: [0.0, 0.26, 0.5, 1.0],
-              ),
+    final dark = KharisColors.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        // Theme-invariant: it must equal the native launch colour
+        // (flutter_native_splash `color` in pubspec.yaml), which cannot
+        // follow the in-app theme.
+        backgroundColor: AppColors.ink,
+        body: CustomMultiChildLayout(
+          delegate: _SplashLayout(safeArea: MediaQuery.paddingOf(context)),
+          children: [
+            LayoutId(
+              id: _Slot.dove,
+              child: SplashDove(trace: _trace, fill: _fill),
             ),
-          ),
-
-          SafeArea(
-            child: FadeTransition(
-              opacity: _entry,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(26, 24, 26, 30),
-                child: Column(
-                  children: [
-                    const Spacer(flex: 3),
-                    Image.asset(AppAssets.doveWhite, width: 96, height: 96),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Kharis',
-                      style: AppTypography.display(
-                        size: 44,
-                        weight: FontWeight.w700,
-                      ).copyWith(color: Colors.white),
+            LayoutId(
+              id: _Slot.title,
+              child: FadeTransition(
+                opacity: _title,
+                child: SlideTransition(
+                  position: _title.drive(
+                    Tween(begin: const Offset(0, 0.12), end: Offset.zero),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Changing the world with a touch of His Grace',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.serif(
-                        size: 17,
-                        italic: true,
-                        height: 1.4,
-                      ).copyWith(color: const Color(0xFFE6DDFF)),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Kharis',
+                          style: AppTypography.display(
+                            size: 44,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Changing the world with a touch of His Grace',
+                          textAlign: TextAlign.center,
+                          style: AppTypography.serif(
+                            size: 17,
+                            italic: true,
+                            height: 1.4,
+                            color: dark.onBg,
+                          ),
+                        ),
+                      ],
                     ),
-                    const Spacer(flex: 4),
-
-                    // Gold primary CTA.
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => context.go('/role-selection'),
-                        child: const Text('Get started'),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Returning members sign in with their Kharis app account.
-                    _SignInRow(onTap: () => context.go('/login')),
-                    const SizedBox(height: 20),
-
-                    Text(
-                      'Establishing believers · Strengthening churches',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.labelMd.copyWith(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+            LayoutId(
+              id: _Slot.actions,
+              child: FadeTransition(
+                opacity: _actions,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    0,
+                    AppSpacing.md,
+                    AppSpacing.md + MediaQuery.paddingOf(context).bottom,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => context.go('/role-selection'),
+                          child: const Text('Get started'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Returning members sign in with their Kharis app
+                      // account.
+                      _SignInRow(onTap: () => context.go('/login')),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Establishing believers · Strengthening churches',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.labelMd.copyWith(
+                          color: dark.muted,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+enum _Slot { dove, title, actions }
+
+/// Dove at the exact screen centre (where the native launch screen puts it),
+/// wordmark and tagline below it, actions pinned to the bottom. If the text
+/// would run into the actions (short phones, large text), the dove and text
+/// move up together rather than overlap.
+class _SplashLayout extends MultiChildLayoutDelegate {
+  _SplashLayout({required this.safeArea});
+
+  final EdgeInsets safeArea;
+
+  static const double _doveToTitle = 20;
+  static const double _minTitleToActions = 24;
+
+  @override
+  void performLayout(Size size) {
+    final dove = layoutChild(_Slot.dove, BoxConstraints.tight(SplashDove.size));
+    final width = BoxConstraints.tightFor(width: size.width);
+    final title = layoutChild(_Slot.title, width);
+    final actions = layoutChild(_Slot.actions, width);
+
+    final actionsTop = size.height - actions.height;
+    var doveTop = (size.height - dove.height) / 2;
+    final overflow =
+        doveTop +
+        dove.height +
+        _doveToTitle +
+        title.height +
+        _minTitleToActions -
+        actionsTop;
+    if (overflow > 0) {
+      final room = doveTop - safeArea.top - AppSpacing.md;
+      doveTop -= overflow.clamp(0, room > 0 ? room : 0);
+    }
+
+    positionChild(_Slot.dove, Offset((size.width - dove.width) / 2, doveTop));
+    positionChild(_Slot.title, Offset(0, doveTop + dove.height + _doveToTitle));
+    positionChild(_Slot.actions, Offset(0, actionsTop));
+  }
+
+  @override
+  bool shouldRelayout(_SplashLayout oldDelegate) =>
+      oldDelegate.safeArea != safeArea;
 }
 
 class _SignInRow extends StatelessWidget {
@@ -140,7 +217,7 @@ class _SignInRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: AppRadius.buttonBorder,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -155,7 +232,8 @@ class _SignInRow extends StatelessWidget {
               style: AppTypography.ui(
                 size: 15,
                 weight: FontWeight.w600,
-              ).copyWith(color: Colors.white),
+                color: Colors.white,
+              ),
             ),
           ],
         ),

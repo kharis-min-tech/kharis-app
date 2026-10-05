@@ -11,15 +11,12 @@ abstract final class AppAssets {
   static const String doveGold = '$_base/dove-gold.png';
   static const String doveInk = '$_base/dove-ink.png';
 
-  // ── Onboarding photos ───────────────────────────────────────────────────────
-  static const String splashWorship = '$_base/splash-worship.png';
-  static const String splashPink = '$_base/splash-pink.jpg';
+  /// Splash dove: the white line-art dove at 4x (468x440, drawn at 117x110),
+  /// without the drop shadow of [doveWhite]. The native launch screen shows
+  /// the same artwork at the same size and position (see pubspec.yaml).
+  static const String splashDove = '$_base/splash-dove.png';
 
-  /// Full-bleed splash background: [splashPink] pre-cropped to the same
-  /// BoxFit.cover framing at 1242x2688. Generated for the native splash, and
-  /// used by SplashScreen too so both show identical pixels — the source jpg
-  /// is only 206x206 and visibly softens when the widget upscales it.
-  static const String splashBg = '$_base/splash-bg.png';
+  // ── Onboarding photos ───────────────────────────────────────────────────────
   static const String communityRole = '$_base/community-role.jpg';
 
   // ── Sermon / series art ─────────────────────────────────────────────────────
