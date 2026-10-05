@@ -654,7 +654,7 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 | `testimonies/{id}` | super admin | Create: anyone. Needs `text` (1..2000 chars) and `createdAt`. |
 | `app_feedback/{id}` | super admin | Create: any signed-in user. Keys are limited to `uid, rating, comment, source, platform, createdAt`. `uid` must be the caller, `rating` an int 1..5, `comment` ≤2000 chars, `source` `prompt` or `settings`, `platform` ≤20 chars, `createdAt == request.time`. |
 | `rsvps/{uid}_{eventId}` | get: owner (by id prefix) or super admin. list: queries constrained to `userId == auth.uid`, or super admin. | Create: signed-in user, `userId == uid`, id `{uid}_{eventId}`. Update: never. Delete: owner or super admin. |
-| `notifications/{id}` (**new**) | see [7.3](#73-studio-notification-service-new-in-this-release) | see [7.3](#73-studio-notification-service-new-in-this-release) |
+| `notifications/{id}` (**new**) | Super admin or any Branch admin: all docs. Everyone else: only `status == 'sent'` with `audience.type` `all` or `branch`. | Create: `draft` or `scheduled`, closed keys, `createdBy == uid`, and an audience the caller manages. Update: only from `draft` or `scheduled`, to `draft`, `scheduled` or `cancelled`, with `createdBy` and `createdAt` unchanged and both audiences managed. Delete: never. See [7.3](#73-studio-notification-service-new-in-this-release). |
 | `pushLog`, `dailyReadingPushes` | nobody | Admin SDK only |
 | `birthdayPushes` | nobody (default deny) | Admin SDK only |
 
@@ -772,26 +772,41 @@ The data payload's `type` selects the screen (`notificationTargetFor`):
 | `service_reminder`, `venue` | `/home` (Branch card) |
 | `reading` | `/reading` |
 | `sermon` | `/messages` |
-| `studio` (**new**) | the doc's `link` (in-app path or URL), carried with `notificationId` |
+| `studio` (**new**) | The payload's `link` (`notificationLinkTarget`). In-app paths open in the app, and so does a shared link on the app's own host. Any other http(s) address is launched externally. With no link, the tap opens `/notifications`. |
 | anything else | `/home` |
 
 ### 7.3 Studio notification service (new in this release)
 
-Content Studio admins compose these pushes in the web Studio "Notifications" section and the in-app Studio. Source: `backend/functions/src/notifications.ts`.
+Content Studio admins compose these pushes in the web Studio "Notifications" section (`admin/index.html`) and the in-app Studio. Sources:
 
-Collection `notifications/{id}`:
+- `backend/functions/src/notifications.ts` (sending)
+- the `notifications` block in `backend/firestore.rules`
+- `app/lib/features/home/data/studio_notification_repository.dart` (app reads and writes)
+- `app/lib/shared/providers/notification_feed_provider.dart` (inbox)
+
+Collection `notifications/{id}`. Keys are closed: a client write may contain only the client fields below.
 
 | Field | Type | Written by | Notes |
 |---|---|---|---|
-| `title` | string 1..65 | client | |
-| `body` | string 1..240 | client | |
-| `link` | string, optional | client | An in-app path (`/m/<sermonId>`, `/e/<eventId>`, `/a/<newsId>`, `/giving`, `/reading`, `/calendar`, `/messages`) or an `http(s)` URL. ≤500 chars, no whitespace, not `//host`. |
-| `audience` | `{type:'all'}` \| `{type:'branch', branch:<Branch name>}` \| `{type:'test'}` | client | `test` goes to Studio staff devices only |
+| `title` | string, non-blank, ≤65 | client | |
+| `body` | string, non-blank, ≤240 | client | |
+| `link` | string or null, optional, ≤500 | client | See "Link format" below. |
+| `audience` | `{type:'all'}` \| `{type:'branch', branch:<Branch name>}` \| `{type:'test'}` | client | Closed keys. `branch` must be non-blank. `test` goes to Studio staff devices only. |
 | `status` | `draft` \| `scheduled` \| `sending` \| `sent` \| `failed` \| `cancelled` | client: `draft`, `scheduled`, `cancelled`. Server: `sending`, `sent`, `failed`. | |
-| `sendAt` | timestamp | client | "Send now" uses `request.time` / `serverTimestamp()`. Scheduled times are picked in Europe/London. |
-| `createdAt`, `createdBy` (uid), `createdByName`, `updatedAt` | | client | |
+| `sendAt` | timestamp | client | Required when `scheduled`. For "Send now", the app writes `serverTimestamp()` (`StudioNotificationRepository.schedule` with `sendAt == null`). Scheduled times are picked in Europe/London. |
+| `createdAt` | timestamp | client | Immutable after create |
+| `createdBy` | string (uid) | client | Must equal the caller on create. Immutable after create. |
+| `createdByName` | string ≤200, optional | client | |
+| `updatedAt` | timestamp | client and server | |
 | `sentAt` | timestamp | server | |
-| `result` | `{messageId?}` or `{error?}` | server | |
+| `result` | `{messageId}` or `{error}` (error text ≤500 chars) | server | |
+
+Link format:
+
+- **Rules:** a path starting with a single `/`, or an `http(s)://` URL.
+- **Function (`isValidLink`):** the same, and also rejects whitespace.
+- **App and web Studio composers:** only accept web addresses that start with `https://`.
+- **App routing:** in-app paths such as `/m/<sermonId>`, `/e/<eventId>`, `/a/<newsId>`, `/giving`, `/reading`, `/calendar` and `/messages` are resolved by `notificationLinkTarget` in `notification_service.dart`.
 
 Lifecycle:
 
@@ -833,12 +848,47 @@ FCM message (`buildMessage`):
 
 The topic is `all`, `branch_<slug(branch)>` or `studio_test`.
 
-Rules, per the release contract:
+Rules (`backend/firestore.rules`, `match /notifications/{notificationId}`):
 
-- **Create and update.** A super admin may write any audience. A Branch admin may only write `audience.type` `branch` or `test`, with `branch` in their `adminBranchNames`, and only on docs they could manage under both the stored and the new audience. Clients may only write status `draft`, `scheduled` (with `sendAt`) or `cancelled`, and may only cancel from `draft` or `scheduled`.
-- **Read.** Anyone may read docs with `status == 'sent'` and `audience.type` in `all` or `branch`. Queries must constrain on `status`. Admins read all.
+- **Read.**
+  - Super admins and Branch admins (`campus_admin`) can read every doc. The rule is `isCampusAdmin()` with no Branch check, so Branch admins see the whole Studio history.
+  - Anyone else, signed in or not, can read only docs with `status == 'sent'` and `audience.type` `all` or `branch`. List queries must therefore filter on both fields, as `watchSent` does.
+  - `test` and unsent docs are never public.
+- **Create.**
+  - Allowed shapes: the doc passes the shape check (closed keys, field limits as above), `status` is `draft` or `scheduled`, and `createdBy == request.auth.uid`.
+  - Allowed audiences: a super admin may use any audience. A Branch admin may use `branch` with a Branch in their `adminBranchNames`, or `test` if their `adminBranchNames` is non-empty.
+- **Update.**
+  - Allowed only while the stored status is `draft` or `scheduled`.
+  - The new doc must pass the same shape check, so the new status is `draft`, `scheduled` or `cancelled`.
+  - `createdBy` and `createdAt` must stay unchanged.
+  - The caller must be allowed to manage both the stored and the new audience, so a Branch admin cannot take over or retarget another Branch's notification.
+  - Once a doc is `sending`, `sent`, `failed` or `cancelled`, clients cannot change it.
+- **Delete.** Denied to everyone. Cancel instead.
 
-App inbox: the Notifications screen shows sent notifications for `all` plus the member's Branch, newest first, limit 50, merged with the existing feed. Tapping one opens its `link`.
+Composite indexes (`backend/firestore.indexes.json`), one per query:
+
+| Fields | Query |
+|---|---|
+| `status` ASC, `sendAt` ASC | `sendDueNotifications` |
+| `status` ASC, `audience.type` ASC, `sentAt` DESC | app inbox, Everyone |
+| `status` ASC, `audience.type` ASC, `audience.branch` ASC, `sentAt` DESC | app inbox, one Branch |
+
+Studio history (`watchHistory`) orders by `createdAt` DESC, limit 50, and uses the automatic single-field index.
+
+App writes (`StudioNotificationRepository`):
+
+- `schedule()` always creates the doc as `scheduled`. `sendAt` is `serverTimestamp()` for "Send now", or the chosen time. It also writes `createdAt`/`updatedAt` with `serverTimestamp()`.
+- `cancel()` sets `status: 'cancelled'` and `updatedAt`.
+- Neither the app nor the web Studio creates `draft` docs today, although the rules allow it.
+
+App inbox:
+
+- `inboxNotificationsProvider` merges two `watchSent` streams: one for `{type:'all'}` and, when the member has picked a Branch, one for `{type:'branch', branch:<name>}`. Each stream runs `status == 'sent'`, ordered by `sentAt` DESC, limit 50.
+- `mergeSentNotifications` de-duplicates by id, sorts newest `sentAt` first, and caps the result at 50.
+- Members on "All Branches" see only church-wide notifications, which matches the pushes they receive.
+- The Notifications screen shows these rows next to the existing announcement and event rows. Row ids are `studio:<id>`, which is what the dismissed set uses.
+- `hasPendingNotificationsProvider` counts undismissed Studio rows for the Home bell.
+- Tapping a row opens its `link`.
 
 ---
 
