@@ -46,6 +46,10 @@ export {
   purgePushLog,
 } from './content-notifications';
 
+// Studio notifications (`notifications/{id}`): sent on write when due, and by
+// a 5-minute schedule for future-dated ones. See `notifications.ts`.
+export { onNotificationWritten, sendDueNotifications } from './notifications';
+
 const ANNOUNCEMENT_PAGE_SIZE = 20;
 
 /** The newest published `news` docs, optionally for one campus. */

@@ -34,6 +34,7 @@ import '../../features/admin/presentation/screens/admin_reading_plans_screen.dar
 import '../../features/admin/presentation/screens/admin_sermons_screen.dart';
 import '../../features/admin/presentation/screens/admin_branch_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_app_settings_screen.dart';
+import '../../features/admin/presentation/screens/admin_notifications_screen.dart';
 import '../../features/shared_links/presentation/shared_link_screens.dart';
 import '../../shared/providers/auth_provider.dart';
 
@@ -215,6 +216,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/events',
         builder: (context, state) => const AdminEventsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/notifications',
+        builder: (context, state) => const AdminNotificationsScreen(),
       ),
       GoRoute(
         path: '/admin/branches',

@@ -103,6 +103,14 @@ class AdminHubScreen extends ConsumerWidget {
             : 'Giving, contact, service times and Home layout',
         route: '/admin/branches',
       ),
+      _HubCard(
+        icon: Icons.notifications_rounded,
+        title: 'Notifications',
+        subtitle: superAdmin
+            ? 'Send a push to everyone, one branch or staff phones'
+            : 'Send a push to your branch or staff phones',
+        route: '/admin/notifications',
+      ),
       if (superAdmin) ...const [
         _HubCard(
           icon: Icons.tune_rounded,
@@ -163,7 +171,8 @@ class _CampusHeader extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'You manage announcements, events and branch details for '
+          'You manage announcements, events, notifications and branch '
+          'details for '
           '${names.length == 1 ? 'this branch' : 'these branches'}.',
           style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
         ),
