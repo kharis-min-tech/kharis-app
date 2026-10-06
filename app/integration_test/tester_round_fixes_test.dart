@@ -646,6 +646,11 @@ void main() {
       }
       verified.add('KA-003 More has My Notes + My Playlists');
       await hostShot(tester, 'ka003-more-menu');
+      // Scrolling down to 'My playlists' can push 'My notes' above the
+      // viewport (the More rows are 44 px+ tap targets), and a tap there
+      // misses silently.
+      await tester.ensureVisible(find.text('My notes'));
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('My notes'), warnIfMissed: false);
       await pumpUntilFound(
         tester,
