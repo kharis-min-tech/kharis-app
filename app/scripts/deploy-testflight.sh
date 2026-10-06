@@ -44,16 +44,28 @@ KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 BUILD_NUMBER="${1:-$(date +%s)}"
 ARCHIVE="build/ios/archive/Runner.xcarchive"
 
-echo "==> Archiving release build $BUILD_NUMBER (flutter)"
-# `flutter build ipa` archives and then tries to export the IPA itself. That
-# export uses Xcode automatic signing, which has no Apple ID here and therefore
-# fails — but the .xcarchive it produces first is exactly what we need, so the
-# export failure is expected and ignored. The signed IPA is produced by the
-# xcodebuild step below, which authenticates with the ASC API key instead.
+echo "==> Archiving release build $BUILD_NUMBER"
+# `flutter build ipa` archives with Xcode automatic signing, which needs an
+# Apple ID in Xcode > Settings > Accounts; without one it fails before any
+# archive exists ("No Accounts", "No profiles for 'com.kharis.church'").
+# Flutter only writes the build configuration here; xcodebuild archives with
+# the same App Store Connect API key the export and upload below use, so no
+# Apple ID is ever needed on this machine.
 rm -rf "$ARCHIVE"
-flutter build ipa --release \
+flutter build ios --release --config-only \
   --dart-define-from-file=env.json \
-  --build-number="$BUILD_NUMBER" || true
+  --build-number="$BUILD_NUMBER"
+xcodebuild archive \
+  -workspace ios/Runner.xcworkspace \
+  -scheme Runner \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath "$ARCHIVE" \
+  DEVELOPMENT_TEAM="$TEAM_ID" \
+  -allowProvisioningUpdates \
+  -authenticationKeyID "$ASC_KEY_ID" \
+  -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+  -authenticationKeyPath "$KEY_PATH"
 [[ -d "$ARCHIVE" ]] || { echo "ERROR: archive not produced at $ARCHIVE"; exit 1; }
 
 # Guard: some Info.plist omissions pass `altool` validation and upload fine,
