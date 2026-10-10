@@ -44,7 +44,10 @@ class NotesScreen extends ConsumerWidget {
         error: (_, _) => _buildMessage(
           context,
           Icons.cloud_off_outlined,
-          "Your notes couldn't be loaded",
+          'Your notes couldn\u2019t be loaded. Check your connection and try '
+          'again.',
+          actionLabel: 'Retry',
+          onAction: () => ref.invalidate(notesProvider),
         ),
         data: (notes) => notes.isEmpty
             ? _buildMessage(
@@ -55,6 +58,7 @@ class NotesScreen extends ConsumerWidget {
             : _buildList(context, ref, notes),
       ),
       floatingActionButton: FloatingActionButton(
+        tooltip: 'New note',
         backgroundColor: context.kc.accent,
         foregroundColor: context.kc.onAccent,
         onPressed: () => _openEditor(context),
@@ -63,7 +67,13 @@ class NotesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMessage(BuildContext context, IconData icon, String message) {
+  Widget _buildMessage(
+    BuildContext context,
+    IconData icon,
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -77,6 +87,20 @@ class NotesScreen extends ConsumerWidget {
               textAlign: TextAlign.center,
               style: AppTypography.ui(size: 16, color: context.kc.muted),
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: onAction,
+                child: Text(
+                  actionLabel,
+                  style: AppTypography.ui(
+                    size: 14,
+                    weight: FontWeight.w700,
+                    color: context.kc.accentInk,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -196,19 +220,24 @@ class _NoteCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              // Footer row
+              const SizedBox(height: AppSpacing.xs),
+              // Footer row. The chip region takes the free width (the chip
+              // caps itself at 220): fixed, it overflowed a 360 px phone.
               Row(
                 children: [
-                  if (note.sermonTitle != null) ...[
-                    NoteAnchorChip(
-                      title: note.sermonTitle!,
-                      positionMs: note.positionMs,
-                      onTap: onPlay,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                  ],
-                  const Spacer(),
+                  Expanded(
+                    child: note.sermonTitle == null
+                        ? const SizedBox.shrink()
+                        : Align(
+                            alignment: Alignment.centerLeft,
+                            child: NoteAnchorChip(
+                              title: note.sermonTitle!,
+                              positionMs: note.positionMs,
+                              onTap: onPlay,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
                   Text(
                     _relativeDate(note.updatedAt),
                     style: AppTypography.ui(size: 12, color: context.kc.muted),

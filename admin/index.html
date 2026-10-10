@@ -359,7 +359,7 @@
     }
 
     @media (max-width: 760px) {
-      #admin-panel { grid-template-columns: 1fr; }
+      #admin-panel { grid-template-columns: minmax(0, 1fr); }
       .sidebar { position: static; height: auto; }
       .tab-nav { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
       .tab-btn { width: auto; }
@@ -742,6 +742,69 @@
       color: var(--text);
     }
     .team-campuses input[type="checkbox"] { width: auto; margin: 0; }
+
+    /* ── Notifications composer + history ──────────────────────────────── */
+    .nf-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .nf-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+    .nf-count.full { color: var(--orange); }
+    .nf-audience { border: none; margin: 0 0 16px; padding: 0; min-width: 0; }
+    .nf-audience legend {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 6px;
+      padding: 0;
+    }
+    .nf-radio {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 32px;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .nf-radio input { width: 18px; height: 18px; margin: 0; accent-color: var(--orange); }
+    .nf-preview {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+    }
+    .nf-preview-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .nf-preview-head img { border-radius: 4px; }
+    .nf-preview-head .nf-app { color: var(--text); font-weight: 600; }
+    .nf-preview-when { margin-left: auto; }
+    .nf-preview-title { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+    .nf-preview-body { font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .nf-preview .empty { color: var(--muted); font-weight: 400; }
+    .nf-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    .nf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .nf-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: var(--surface);
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .nf-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .nf-table tr:last-child td { border-bottom: none; }
+    .nf-table .nf-title-cell { min-width: 180px; max-width: 280px; font-weight: 600; overflow-wrap: anywhere; }
+    .nf-table .nf-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+    .nf-table .nf-error { display: block; margin-top: 4px; max-width: 240px; font-size: 12px; color: var(--danger); overflow-wrap: anywhere; }
+    .nf-table .nf-when { min-width: 150px; }
   </style>
 </head>
 <body>
@@ -800,6 +863,10 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8a4 4 0 0 1 0 8"/><path d="M17.5 5a8 8 0 0 1 0 14"/></svg>
       Announcements
       <span class="count-badge" id="news-count">…</span>
+    </button>
+    <button class="tab-btn" data-tab="notifications">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Notifications
     </button>
     <button class="tab-btn" data-tab="daily" data-scope="super">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -907,7 +974,7 @@
             <div class="field">
               <label for="ev-branch">Branch</label>
               <select id="ev-branch" disabled>
-                <option value="">All campuses</option>
+                <option value="">All branches</option>
               </select>
             </div>
             <div class="inline-error" id="ev-branch-error" style="display:none;"></div>
@@ -986,7 +1053,7 @@
               <div class="field">
                 <label for="nw-branch">Branch</label>
                 <select id="nw-branch" disabled>
-                  <option value="">All campuses</option>
+                  <option value="">All branches</option>
                 </select>
               </div>
             </div>
@@ -1041,11 +1108,140 @@
           </div>
           <p style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">
             A member sees an announcement on the app home screen when it is set to
-            their branch or to All campuses, its publish time has arrived, and it
+            their branch or to All branches, its publish time has arrived, and it
             has not expired. Each row says exactly where it stands.
           </p>
           <div id="news-list">
             <div class="loading-row"><span class="spinner"></span> Loading announcements…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Notifications Tab ───────────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-notifications">
+      <div class="pane-layout">
+
+        <!-- Composer -->
+        <div class="card">
+          <div class="card-title"><span class="dot"></span> New notification</div>
+          <p style="font-size:12px;color:var(--muted);margin:-4px 0 14px;">
+            A push notification goes to the phones of members who allow notifications from the app.
+            Once sent, notifications to Everyone or a branch also appear on the app's Notifications screen.
+          </p>
+          <form id="nf-form" novalidate>
+            <div class="field">
+              <div class="nf-label-row">
+                <label for="nf-title">Title *</label>
+                <span class="nf-count" id="nf-title-count" aria-live="polite">0/65</span>
+              </div>
+              <input type="text" id="nf-title" maxlength="65" placeholder="What it is about, in a few words" />
+            </div>
+            <div class="inline-error" id="nf-title-error" hidden></div>
+            <div class="field">
+              <div class="nf-label-row">
+                <label for="nf-body">Message *</label>
+                <span class="nf-count" id="nf-body-count" aria-live="polite">0/240</span>
+              </div>
+              <textarea id="nf-body" maxlength="240" placeholder="The details people need, in one or two sentences" style="min-height:90px;"></textarea>
+            </div>
+            <div class="inline-error" id="nf-body-error" hidden></div>
+            <div class="field">
+              <label for="nf-link-type">Tapping opens</label>
+              <select id="nf-link-type">
+                <option value="none">None (just opens the app)</option>
+                <option value="home">Home</option>
+                <option value="messages">Messages</option>
+                <option value="sermon">A sermon</option>
+                <option value="event">An event</option>
+                <option value="news">An announcement</option>
+                <option value="giving">Giving</option>
+                <option value="reading">Today's reading</option>
+                <option value="calendar">Calendar</option>
+                <option value="url">Custom web link</option>
+              </select>
+            </div>
+            <div class="field" id="nf-sermon-field" hidden>
+              <label for="nf-sermon">Sermon</label>
+              <select id="nf-sermon">
+                <option value="">Loading sermons…</option>
+              </select>
+            </div>
+            <div class="field" id="nf-sermon-id-field" hidden>
+              <label for="nf-sermon-id">Sermon id</label>
+              <input type="text" id="nf-sermon-id" placeholder="Sermon id" autocomplete="off" />
+            </div>
+            <div class="field" id="nf-event-field" hidden>
+              <label for="nf-event">Event</label>
+              <select id="nf-event">
+                <option value="">Loading events…</option>
+              </select>
+            </div>
+            <div class="field" id="nf-news-field" hidden>
+              <label for="nf-news">Announcement</label>
+              <select id="nf-news">
+                <option value="">Loading announcements…</option>
+              </select>
+            </div>
+            <div class="field" id="nf-url-field" hidden>
+              <label for="nf-url">Web address</label>
+              <input type="url" id="nf-url" maxlength="500" placeholder="https://…" />
+            </div>
+            <div class="inline-error" id="nf-link-error" hidden></div>
+            <fieldset class="nf-audience">
+              <legend>Send to</legend>
+              <label class="nf-radio" data-scope="super"><input type="radio" name="nf-audience" value="all" id="nf-audience-all" /> Everyone</label>
+              <label class="nf-radio"><input type="radio" name="nf-audience" value="branch" id="nf-audience-branch" /> One branch</label>
+              <label class="nf-radio"><input type="radio" name="nf-audience" value="test" id="nf-audience-test" checked /> Test to staff devices</label>
+            </fieldset>
+            <div class="field" id="nf-branch-field" hidden>
+              <label for="nf-branch">Branch</label>
+              <select id="nf-branch" disabled>
+                <option value="">Loading branches…</option>
+              </select>
+            </div>
+            <div class="inline-error" id="nf-audience-error" hidden></div>
+            <div class="field">
+              <label for="nf-send-at">Schedule for (UK time)</label>
+              <input type="datetime-local" id="nf-send-at" />
+            </div>
+            <div class="inline-error" id="nf-send-at-error" hidden></div>
+            <p class="muted-line">Only Schedule uses this time. Send now sends straight away.</p>
+
+            <label>Preview</label>
+            <div class="nf-preview">
+              <div class="nf-preview-head">
+                <img src="dove.png" alt="" width="18" height="18" />
+                <span class="nf-app">Kharis</span>
+                <span class="nf-preview-when" id="nf-preview-when">now</span>
+              </div>
+              <div class="nf-preview-title empty" id="nf-preview-title">Title</div>
+              <div class="nf-preview-body empty" id="nf-preview-body">Message</div>
+            </div>
+            <p class="muted-line" id="nf-preview-meta" style="margin:0 0 16px;"></p>
+
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn btn-primary" id="nf-send-btn" style="flex:1;">Send now</button>
+              <button type="button" class="btn btn-secondary" id="nf-schedule-btn" style="flex:1;">Schedule</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- History -->
+        <div>
+          <div class="list-header">
+            <span class="list-section-title">Sent and scheduled</span>
+            <button class="btn btn-secondary" id="refresh-notifications" style="font-size:12px;padding:6px 12px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">
+            The latest 50, newest first. Times are UK time. You can cancel a
+            notification until it starts sending.
+          </p>
+          <div id="nf-history">
+            <div class="loading-row"><span class="spinner"></span> Loading notifications…</div>
           </div>
         </div>
       </div>
@@ -1284,7 +1480,7 @@
       <div class="pane-layout">
         <div class="card">
           <div class="card-title"><span class="dot"></span> <span id="branch-form-title">Add / Edit Branch</span></div>
-          <p class="repeat-empty" id="br-scope-note" hidden>Choose Edit on your campus to update its details. Name, order, group and visibility are managed by the church office.</p>
+          <p class="repeat-empty" id="br-scope-note" hidden>Choose Edit on your branch to update its details. Name, order, group and visibility are managed by the church office.</p>
           <form id="branch-form">
             <div class="section-label">Basic information</div>
             <div class="field">
@@ -1426,7 +1622,7 @@
             <div id="br-giving"></div>
 
             <div class="section-label">Home layout</div>
-            <p class="repeat-empty">Order of the blocks on the app Home screen for members of this campus.</p>
+            <p class="repeat-empty">Order of the blocks on the app Home screen for members of this branch.</p>
             <div id="br-home"></div>
 
             <button type="submit" class="btn btn-primary btn-full" id="branch-submit-btn" style="margin-top:22px;">Save Branch</button>
@@ -1448,7 +1644,7 @@
         <div class="card">
           <div class="card-title"><span class="dot"></span> Church-wide giving</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
-            Shown on the Giving screen for every campus without its own giving
+            Shown on the Giving screen for every branch without its own giving
             details. Leave every field blank to fall back to the church details
             built into the app.
           </p>
@@ -1461,7 +1657,7 @@
         <div class="card">
           <div class="card-title"><span class="dot"></span> Church-wide Home layout</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
-            Order of the blocks on the app Home screen for every campus without
+            Order of the blocks on the app Home screen for every branch without
             its own layout. Live now, Complete your profile and Continue
             listening only appear when they apply to the member.
           </p>
@@ -1480,8 +1676,8 @@
           <div class="card-title"><span class="dot"></span> Team access</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
             Find someone by the email they signed up with, then choose what they
-            can manage. Admins manage everything. Campus admins manage only their
-            campuses' announcements, events and branch details.
+            can manage. Admins manage everything. Branch admins manage only their
+            branches' announcements, events and branch details.
           </p>
           <form id="team-search-form">
             <div class="field">
@@ -1539,9 +1735,11 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  connectAuthEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
 import {
   getFirestore,
+  connectFirestoreEmulator,
   collection,
   addDoc,
   getDocs,
@@ -1560,9 +1758,22 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-const app  = initializeApp(firebaseConfig);
+// Local testing against the Firebase emulators: serve this folder on
+// localhost and open it with `?emulators=1` (see backend/SETUP.md). Only
+// honoured on localhost, so the hosted Studio can never be pointed away from
+// production data. The demo- project id keeps the emulators fully offline.
+const useEmulators =
+  ['localhost', '127.0.0.1'].includes(location.hostname) &&
+  new URLSearchParams(location.search).has('emulators');
+const app  = initializeApp(
+  useEmulators ? { ...firebaseConfig, projectId: 'demo-kharis' } : firebaseConfig,
+);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+if (useEmulators) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8181);
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  TOAST
@@ -1628,8 +1839,8 @@ function applyScope() {
   const chip = document.getElementById('scope-chip');
   const names = [...(adminScope?.branchNames || [])];
   chip.textContent = superAdmin
-    ? 'Super admin · all campuses'
-    : `Campus admin · ${names.join(', ') || 'your campus'}`;
+    ? 'Super admin · all branches'
+    : `Branch admin · ${names.join(', ') || 'your branch'}`;
   chip.title = chip.textContent;
   chip.hidden = !adminScope;
   const active = document.querySelector('.tab-btn.active');
@@ -1664,6 +1875,7 @@ onAuthStateChanged(auth, async (user) => {
   resetEventForm();
   resetNewsForm();
   resetBranchForm();
+  resetNotifyForm();
   applyScope();
   loginScreen.style.display = 'none';
   adminPanel.style.display  = 'grid';
@@ -1731,6 +1943,7 @@ function selectTab(name) {
   if (name === 'daily') loadPlans();
   if (name === 'settings') loadAppSettings();
   if (name === 'team') loadTeam();
+  if (name === 'notifications') loadNotifications();
 }
 
 document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -1859,7 +2072,7 @@ document.getElementById('event-form').addEventListener('submit', async (e) => {
   const form = e.target;
   const editId = form.dataset.editId;
   if (!canManageCampusNamed(document.getElementById('ev-branch').value)) {
-    toast('Choose one of your campuses for this event', 'error');
+    toast('Choose one of your branches for this event', 'error');
     return;
   }
   const btn = document.getElementById('event-submit-btn');
@@ -1910,10 +2123,16 @@ async function loadLinkableEvents() {
       limit(100),
     ));
     const cur = sel.value;
-    sel.innerHTML = '<option value="">None</option>' + snap.docs
+    const options = snap.docs
       .filter(d => d.data().hidden !== true)
       .map(d => `<option value="${escHtml(d.id)}">${escHtml(linkableEventLabel(d.data()))}</option>`).join('');
+    sel.innerHTML = '<option value="">None</option>' + options;
     setLinkedEventValue(sel, cur);
+    // The notification link picker offers the same events.
+    const nfSel = document.getElementById('nf-event');
+    const nfCur = nfSel.value;
+    nfSel.innerHTML = `<option value="">${options ? 'Choose an event' : 'No upcoming events'}</option>` + options;
+    nfSel.value = [...nfSel.options].some(o => o.value === nfCur) ? nfCur : '';
   } catch (err) {
     toast('Could not load events to link: ' + err.message, 'error');
   }
@@ -1924,7 +2143,7 @@ function linkableEventLabel(ev) {
   const day = start
     ? start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: LONDON_TZ })
     : 'No date';
-  return `${ev.title || 'Untitled'} · ${day} · ${ev.branch || 'All campuses'}`;
+  return `${ev.title || 'Untitled'} · ${day} · ${ev.branch || 'All branches'}`;
 }
 
 // Keeps a link to an event that has dropped out of the upcoming list.
@@ -2052,6 +2271,7 @@ async function loadNews() {
     newsById = new Map(items.map(nw => [nw.id, nw]));
     document.getElementById('news-count').textContent = items.length;
     renderNewsList(items);
+    renderNotifyNewsOptions();
   } catch (err) {
     listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${err.message}</div>`;
   }
@@ -2074,7 +2294,7 @@ function toJsDate(value) {
 }
 
 function homeAudience(branch) {
-  return (branch || '').trim() || 'All campuses';
+  return (branch || '').trim() || 'All branches';
 }
 
 function homeVisibility(branch, expiresAt, publishedAt) {
@@ -2208,9 +2428,9 @@ function updateNewsWherePreview() {
   if (!el) return;
   const branch = document.getElementById('nw-branch').value;
   const visibility = homeVisibility(branch, newsExpiryDate(), newsPublishDate());
-  const audienceLine = visibility.audience === 'All campuses'
+  const audienceLine = visibility.audience === 'All branches'
     ? 'Seen by <strong>everyone, at every branch</strong>.'
-    : `Seen <strong>only by members whose campus is ${escHtml(visibility.audience)}</strong>.`;
+    : `Seen <strong>only by members whose branch is ${escHtml(visibility.audience)}</strong>.`;
   const publishLine = visibility.scheduled
     ? `Appears, and its notification goes out, at <strong>${escHtml(formatLondonDateTime(visibility.publish))}</strong> UK time.`
     : 'Shows on the home screen as soon as it is saved.';
@@ -2289,7 +2509,7 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
   const form = e.target;
   const editId = form.dataset.editId;
   if (!canManageCampusNamed(document.getElementById('nw-branch').value)) {
-    toast('Choose one of your campuses for this announcement', 'error');
+    toast('Choose one of your branches for this announcement', 'error');
     return;
   }
   const linkUrl = normaliseLink(document.getElementById('nw-link').value);
@@ -2347,6 +2567,383 @@ document.getElementById('news-form').addEventListener('submit', async (e) => {
 });
 
 document.getElementById('refresh-news').addEventListener('click', loadNews);
+
+// ════════════════════════════════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ════════════════════════════════════════════════════════════════════════════
+// notifications/{id} is the push queue. The Studio creates docs only with
+// status 'scheduled' (Send now = sendAt serverTimestamp) and may move them to
+// 'cancelled'; the backend claims due docs, sends to the audience's FCM topic
+// and records sent/failed. The rules check the exact key set, so a doc
+// carries nothing beyond the fields written here.
+const NF_TITLE_MAX = 65;
+const NF_BODY_MAX = 240;
+const NF_LINK_MAX = 500;
+const NF_FIXED_LINKS = {
+  home:     { path: '/home',     target: 'the Home screen' },
+  messages: { path: '/messages', target: 'Messages' },
+  giving:   { path: '/giving',   target: 'Giving' },
+  reading:  { path: '/reading',  target: "today's reading" },
+  calendar: { path: '/calendar', target: 'the calendar' },
+};
+const NF_SERMON_OTHER = '__id';
+const NF_STATUS = {
+  draft:     { label: 'Draft',     cls: 'meta-chip' },
+  scheduled: { label: 'Scheduled', cls: 'home-chip scheduled' },
+  sending:   { label: 'Sending',   cls: 'home-chip scheduled' },
+  sent:      { label: 'Sent',      cls: 'home-chip live' },
+  failed:    { label: 'Failed',    cls: 'home-chip hidden' },
+  cancelled: { label: 'Cancelled', cls: 'meta-chip' },
+};
+let notifySermonsLoaded = false;
+
+const nf = (id) => document.getElementById(`nf-${id}`);
+
+function nfSetError(key, message) {
+  const el = nf(`${key}-error`);
+  el.textContent = message || '';
+  el.hidden = !message;
+}
+
+function nfClearErrors() {
+  ['title', 'body', 'link', 'audience', 'send-at'].forEach(k => nfSetError(k, ''));
+}
+
+function nfAudienceType() {
+  return document.querySelector('input[name="nf-audience"]:checked')?.value || '';
+}
+
+// { link, target } with link undefined for None, or { error }.
+function readNotifyLink() {
+  const type = nf('link-type').value;
+  let link;
+  let target;
+  if (type === 'none') return { link: undefined, target: 'the app' };
+  if (NF_FIXED_LINKS[type]) return { link: NF_FIXED_LINKS[type].path, target: NF_FIXED_LINKS[type].target };
+  if (type === 'sermon') {
+    let id = nf('sermon').value;
+    if (id === NF_SERMON_OTHER) id = nf('sermon-id').value.trim();
+    if (!id) return { error: 'Choose a sermon or enter its id.' };
+    if (!/^[^\s/?#]+$/.test(id)) return { error: 'A sermon id has no spaces, slashes, ? or #.' };
+    link = `/m/${id}`;
+    target = 'that sermon';
+  } else if (type === 'event') {
+    const id = nf('event').value;
+    if (!id) return { error: 'Choose an event.' };
+    link = `/e/${id}`;
+    target = 'that event';
+  } else if (type === 'news') {
+    const id = nf('news').value;
+    if (!id) return { error: 'Choose an announcement.' };
+    link = `/a/${id}`;
+    target = 'that announcement';
+  } else if (type === 'url') {
+    const url = normaliseLink(nf('url').value);
+    if (!url) return { error: 'Enter a web address.' };
+    if (!url.startsWith('https://') || !isHttpUrl(url)) return { error: 'Web links must start with https://' };
+    link = url;
+    target = url;
+  } else {
+    return { error: 'Choose where tapping goes.' };
+  }
+  if (link.length > NF_LINK_MAX) return { error: `That link is too long (${NF_LINK_MAX} characters at most).` };
+  return { link, target };
+}
+
+// { audience, label } as stored and as shown, or { error }. Branch admins may
+// send only to their own branches or to staff devices.
+function readNotifyAudience() {
+  const type = nfAudienceType();
+  if (type === 'all') {
+    if (!adminScope?.superAdmin) return { error: 'Only super admins can send to Everyone.' };
+    return { audience: { type: 'all' }, label: 'Everyone' };
+  }
+  if (type === 'branch') {
+    const branch = nf('branch').value.trim();
+    if (!branch) return { error: 'Choose a branch.' };
+    if (!canManageCampusNamed(branch)) return { error: 'You can only send to your own branches.' };
+    return { audience: { type: 'branch', branch }, label: branch };
+  }
+  if (type === 'test') return { audience: { type: 'test' }, label: 'Staff test' };
+  return { error: 'Choose who gets this.' };
+}
+
+// The schedule input read as a UK wall-clock time, or { error }.
+function readNotifySendAt() {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(nf('send-at').value);
+  if (!m) return { error: 'Choose a date and time.' };
+  const at = londonWallTimeToDate(m[1], Number(m[2]), Number(m[3]));
+  if (at.getTime() <= Date.now()) return { error: 'Choose a time in the future.' };
+  return { at };
+}
+
+function updateNotifyPreview() {
+  [['title', NF_TITLE_MAX], ['body', NF_BODY_MAX]].forEach(([key, max]) => {
+    const len = nf(key).value.length;
+    const count = nf(`${key}-count`);
+    count.textContent = `${len}/${max}`;
+    count.classList.toggle('full', len >= max);
+  });
+  const title = nf('title').value.trim();
+  const body = nf('body').value.trim();
+  nf('preview-title').textContent = title || 'Title';
+  nf('preview-title').classList.toggle('empty', !title);
+  nf('preview-body').textContent = body || 'Message';
+  nf('preview-body').classList.toggle('empty', !body);
+  const sendAt = nf('send-at').value ? readNotifySendAt() : null;
+  nf('preview-when').textContent = sendAt?.at ? formatLondonDateTime(sendAt.at) : 'now';
+
+  const type = nfAudienceType();
+  const branch = nf('branch').value;
+  const who = type === 'all' ? 'Goes to every member.'
+    : type === 'branch' ? (branch ? `Goes to members of ${branch}.` : 'Choose a branch.')
+    : type === 'test' ? 'Goes to Studio staff devices only.'
+    : 'Choose who gets this.';
+  const link = readNotifyLink();
+  nf('preview-meta').textContent = `${who} ${link.error ? 'Choose where tapping goes.' : `Tapping opens ${link.target}.`}`;
+}
+
+function syncNotifyLinkFields() {
+  const type = nf('link-type').value;
+  nf('sermon-field').hidden = type !== 'sermon';
+  nf('sermon-id-field').hidden = !(type === 'sermon' && nf('sermon').value === NF_SERMON_OTHER);
+  nf('event-field').hidden = type !== 'event';
+  nf('news-field').hidden = type !== 'news';
+  nf('url-field').hidden = type !== 'url';
+  if (type === 'sermon') loadNotifySermons();
+}
+
+function syncNotifyAudience() {
+  nf('branch-field').hidden = nfAudienceType() !== 'branch';
+}
+
+// Branch choices come from populateBranchPickers: every branch for a super
+// admin, only their own for a branch admin. There is no All branches option
+// here; Everyone is its own audience.
+function populateNotifyBranches(names) {
+  const sel = nf('branch');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Choose a branch</option>' +
+    names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  sel.value = names.includes(cur) ? cur : (names.length === 1 ? names[0] : '');
+  sel.disabled = false;
+  updateNotifyPreview();
+}
+
+// Recent sermons for the link picker, loaded the first time it is opened.
+async function loadNotifySermons() {
+  if (notifySermonsLoaded) return;
+  notifySermonsLoaded = true;
+  const sel = nf('sermon');
+  try {
+    const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
+    sel.innerHTML = '<option value="">Choose a sermon</option>' + snap.docs.map(d => {
+      const s = d.data();
+      const date = toJsDate(s.publishedAt);
+      const label = decodeEntities(s.title || 'Untitled') + (date ? ` · ${formatLondonDate(date)}` : '');
+      return `<option value="${escHtml(d.id)}">${escHtml(label)}</option>`;
+    }).join('') + `<option value="${NF_SERMON_OTHER}">Another sermon (enter its id)</option>`;
+  } catch (err) {
+    sel.innerHTML = `<option value="${NF_SERMON_OTHER}">Enter a sermon id</option>`;
+    nfSetError('link', `Could not load sermons: ${err.message}`);
+  }
+  syncNotifyLinkFields();
+  updateNotifyPreview();
+}
+
+// Announcements still showing or yet to show; an expired one has no page to open.
+function renderNotifyNewsOptions() {
+  const sel = nf('news');
+  const cur = sel.value;
+  const items = [...newsById.values()].filter(nw => {
+    const v = homeVisibility(nw.branch, nw.expiresAt, nw.publishedAt);
+    return v.live || v.scheduled;
+  });
+  sel.innerHTML = `<option value="">${items.length ? 'Choose an announcement' : 'No current announcements'}</option>` +
+    items.map(nw => `<option value="${escHtml(nw.id)}">${escHtml(`${nw.title || 'Untitled'} · ${homeAudience(nw.branch)}`)}</option>`).join('');
+  sel.value = items.some(nw => nw.id === cur) ? cur : '';
+}
+
+function resetNotifyForm() {
+  nf('form').reset();
+  nf('audience-test').checked = true;
+  nfClearErrors();
+  syncNotifyAudience();
+  syncNotifyLinkFields();
+  updateNotifyPreview();
+}
+
+function setNotifyBusy(busyMode) {
+  const send = nf('send-btn');
+  const schedule = nf('schedule-btn');
+  send.disabled = schedule.disabled = !!busyMode;
+  send.textContent = busyMode === 'now' ? 'Sending…' : 'Send now';
+  schedule.textContent = busyMode === 'schedule' ? 'Scheduling…' : 'Schedule';
+}
+
+async function submitNotification(mode) {
+  nfClearErrors();
+  const title = nf('title').value.trim();
+  const body = nf('body').value.trim();
+  let ok = true;
+  const fail = (key, message) => { nfSetError(key, message); ok = false; };
+  if (!title) fail('title', 'Add a title.');
+  else if (title.length > NF_TITLE_MAX) fail('title', `Keep the title to ${NF_TITLE_MAX} characters.`);
+  if (!body) fail('body', 'Add a message.');
+  else if (body.length > NF_BODY_MAX) fail('body', `Keep the message to ${NF_BODY_MAX} characters.`);
+  const link = readNotifyLink();
+  if (link.error) fail('link', link.error);
+  const audience = readNotifyAudience();
+  if (audience.error) fail('audience', audience.error);
+  const sendAt = mode === 'schedule' ? readNotifySendAt() : null;
+  if (sendAt?.error) fail('send-at', sendAt.error);
+  if (!ok) return;
+
+  if (audience.audience.type === 'all' && !confirm(sendAt
+    ? `This goes to every member of the app on ${formatLondonDateTime(sendAt.at)} (UK time). Schedule it?`
+    : 'This goes to every member of the app straight away. Send it?')) return;
+
+  const user = auth.currentUser;
+  if (!user) {
+    toast('You are signed out. Sign in again to send.', 'error');
+    return;
+  }
+  const data = {
+    title,
+    body,
+    audience: audience.audience,
+    status: 'scheduled',
+    sendAt: sendAt ? Timestamp.fromDate(sendAt.at) : serverTimestamp(),
+    createdAt: serverTimestamp(),
+    createdBy: user.uid,
+    createdByName: user.displayName || user.email || user.uid,
+    updatedAt: serverTimestamp(),
+  };
+  if (link.link) data.link = link.link;
+
+  setNotifyBusy(mode);
+  try {
+    await addDoc(collection(db, 'notifications'), data);
+    resetNotifyForm();
+    toast(sendAt
+      ? `Scheduled for ${formatLondonDateTime(sendAt.at)} to ${audience.label}`
+      : `Sending to ${audience.label}`);
+    loadNotifications();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setNotifyBusy(null);
+  }
+}
+
+function notifyAudienceLabel(audience) {
+  if (audience?.type === 'all') return 'Everyone';
+  if (audience?.type === 'branch') return audience.branch || 'Unknown branch';
+  if (audience?.type === 'test') return 'Staff test';
+  return 'Unknown';
+}
+
+function canManageNotification(n) {
+  if (adminScope?.superAdmin) return true;
+  return n.audience?.type === 'test' ||
+    (n.audience?.type === 'branch' && canManageCampusNamed(n.audience.branch));
+}
+
+function notifyWhen(n) {
+  const sent = toJsDate(n.sentAt);
+  const due = toJsDate(n.sendAt);
+  if (sent && n.status === 'sent') return `Sent ${formatLondonDateTime(sent)}`;
+  if (!due) return 'Not set';
+  if (n.status === 'failed' || n.status === 'cancelled') return `Was due ${formatLondonDateTime(due)}`;
+  return `Due ${formatLondonDateTime(due)}`;
+}
+
+function renderNotificationHistory(items) {
+  const listEl = nf('history');
+  if (!items.length) {
+    listEl.innerHTML = '<div class="empty-state"><p>Nothing sent yet. Notifications you send or schedule show here.</p></div>';
+    return;
+  }
+  const rows = items.map(n => {
+    const status = NF_STATUS[n.status] || { label: n.status || 'Unknown', cls: 'meta-chip' };
+    const error = n.status === 'failed' ? (n.result?.error || 'No reason recorded') : '';
+    const cancellable = (n.status === 'scheduled' || n.status === 'draft') && canManageNotification(n);
+    const preview = n.body ? n.body.slice(0, 80) + (n.body.length > 80 ? '…' : '') : '';
+    return `<tr>
+      <td class="nf-title-cell" title="${escHtml(n.body || '')}">${escHtml(n.title || 'Untitled')}${preview ? `<span class="nf-sub">${escHtml(preview)}</span>` : ''}</td>
+      <td>${escHtml(notifyAudienceLabel(n.audience))}</td>
+      <td><span class="${status.cls}"${error ? ` title="${escHtml(error)}"` : ''}>${escHtml(status.label)}</span>${error ? `<span class="nf-error">${escHtml(error)}</span>` : ''}</td>
+      <td class="nf-when">${escHtml(notifyWhen(n))}</td>
+      <td>${escHtml(n.createdByName || 'Unknown')}</td>
+      <td>${cancellable ? `<button class="btn btn-danger" data-nf-cancel="${escHtml(n.id)}" style="font-size:12px;padding:6px 12px;">Cancel</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  listEl.innerHTML = `<div class="nf-table-wrap"><table class="nf-table">
+    <thead><tr><th>Title</th><th>Audience</th><th>Status</th><th>When (UK)</th><th>By</th><th aria-label="Actions"></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+async function loadNotifications() {
+  renderNotifyNewsOptions();
+  const listEl = nf('history');
+  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading notifications…</div>';
+  try {
+    const snap = await getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)));
+    renderNotificationHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${escHtml(err.message)}</div>`;
+  }
+}
+
+// Typing clears that field's message; every change redraws the preview.
+const NF_INPUT_ERRORS = { title: 'title', body: 'body', 'sermon-id': 'link', url: 'link', 'send-at': 'send-at' };
+Object.entries(NF_INPUT_ERRORS).forEach(([field, errorKey]) => {
+  nf(field).addEventListener('input', () => {
+    nfSetError(errorKey, '');
+    updateNotifyPreview();
+  });
+});
+['link-type', 'sermon', 'event', 'news'].forEach(field => {
+  nf(field).addEventListener('change', () => {
+    nfSetError('link', '');
+    syncNotifyLinkFields();
+    updateNotifyPreview();
+  });
+});
+document.querySelectorAll('input[name="nf-audience"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    nfSetError('audience', '');
+    syncNotifyAudience();
+    updateNotifyPreview();
+  });
+});
+nf('branch').addEventListener('change', () => {
+  nfSetError('audience', '');
+  updateNotifyPreview();
+});
+nf('form').addEventListener('submit', (e) => e.preventDefault());
+nf('send-btn').addEventListener('click', () => submitNotification('now'));
+nf('schedule-btn').addEventListener('click', () => submitNotification('schedule'));
+document.getElementById('refresh-notifications').addEventListener('click', loadNotifications);
+
+nf('history').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-nf-cancel]');
+  if (!btn) return;
+  if (!confirm('Cancel this notification? It will not be sent.')) return;
+  btn.disabled = true;
+  try {
+    await updateDoc(doc(db, 'notifications', btn.dataset.nfCancel), {
+      status: 'cancelled',
+      updatedAt: serverTimestamp(),
+    });
+    toast('Notification cancelled');
+    loadNotifications();
+  } catch (err) {
+    btn.disabled = false;
+    toast(`Could not cancel: ${err.message}`, 'error');
+  }
+});
 
 // ════════════════════════════════════════════════════════════════════════════
 //  DAILY CONTENT
@@ -3240,7 +3837,7 @@ function populateBranchPickers(names) {
   const choices = campus
     ? [...new Set([...names.filter(n => adminScope.branchNames.has(n)), ...adminScope.branchNames])]
     : names;
-  const options = (campus ? '' : '<option value="">All campuses</option>') +
+  const options = (campus ? '' : '<option value="">All branches</option>') +
     choices.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
   BRANCH_PICKERS.forEach(({ select, error, submit }) => {
     const sel = document.getElementById(select);
@@ -3253,6 +3850,7 @@ function populateBranchPickers(names) {
     if (!branchesLoaded) document.getElementById(submit).disabled = false;
   });
   branchesLoaded = true;
+  populateNotifyBranches(choices);
 }
 
 function showBranchPickerError(message) {
@@ -3262,6 +3860,7 @@ function showBranchPickerError(message) {
       <button type="button" class="btn btn-secondary branch-retry-btn" style="font-size:12px;padding:4px 10px;">Retry</button>`;
     el.style.display = '';
   });
+  nf('branch').innerHTML = '<option value="">Branches did not load. Open Branches to retry.</option>';
 }
 
 BRANCH_PICKERS.forEach(({ error }) => {
@@ -3289,7 +3888,7 @@ async function loadBranches() {
     updateNewsWherePreview();
     if (!docs.length) {
       list.innerHTML = isCampusScope()
-        ? '<p style="color:var(--muted);">None of your campuses were found. Ask the church office to check your access.</p>'
+        ? '<p style="color:var(--muted);">None of your branches were found. Ask the church office to check your access.</p>'
         : '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
       return;
     }
@@ -3727,7 +4326,7 @@ document.getElementById('branch-form').addEventListener('submit', async (e) => {
   const editId = e.target.dataset.editId;
   // Campus admins only ever update one of their own branches.
   if (isCampusScope() && !(editId && canManageBranchId(editId))) {
-    toast('You can only update your own campus', 'error');
+    toast('You can only update your own branch', 'error');
     return;
   }
   const val = (id) => document.getElementById(id).value.trim();
@@ -3910,7 +4509,7 @@ const HOME_SECTIONS = [
   { id: 'reading',           label: 'Bible reading of the day' },
   { id: 'announcements',     label: 'Announcements' },
   { id: 'events',            label: 'Upcoming events' },
-  { id: 'campus',            label: 'Your campus' },
+  { id: 'campus',            label: 'Your branch' },
   { id: 'continueListening', label: 'Continue listening' },
   { id: 'giving',            label: 'Giving' },
 ];
@@ -4033,7 +4632,7 @@ function syncBranchFormScope() {
   document.getElementById('br-name').disabled = campus;
   form.hidden = campus && !editing;
   document.getElementById('br-scope-note').hidden = !(campus && !editing);
-  document.getElementById('branch-form-title').textContent = campus ? 'Edit Campus Details' : 'Add / Edit Branch';
+  document.getElementById('branch-form-title').textContent = campus ? 'Edit Branch Details' : 'Add / Edit Branch';
 }
 
 mountGivingForm('br');
@@ -4046,7 +4645,7 @@ mountHomeEditor('st');
 // absent doc means the app's built-in fallback, so clearing deletes the doc.
 function renderGivingStatus(isSet) {
   document.getElementById('st-giving-status').innerHTML = isSet
-    ? '<span class="where-title">Church-wide details set</span>Campuses without their own giving details show these.'
+    ? '<span class="where-title">Church-wide details set</span>Branches without their own giving details show these.'
     : '<span class="where-title">Not set</span>The app falls back to its built-in church details until you save some here.';
 }
 
@@ -4117,7 +4716,7 @@ document.getElementById('settings-home-form').addEventListener('submit', async (
 // changes away from campus_admin. Nobody may change their own access.
 const TEAM_ROLES = [
   { value: 'member', label: 'Member (no Studio access)' },
-  { value: 'campus_admin', label: 'Campus admin' },
+  { value: 'campus_admin', label: 'Branch admin' },
   { value: 'admin', label: 'Admin (everything)' },
 ];
 let teamRowSeq = 0;
@@ -4138,7 +4737,7 @@ function teamRowHtml(uid, u) {
   ];
   const chosen = new Set(ids);
   const roleLabel = role === 'campus_admin'
-    ? `Campus admin · ${names.join(', ') || 'no campuses'}`
+    ? `Branch admin · ${names.join(', ') || 'no branches'}`
     : (roles.find(r => r.value === role)?.label || role);
   const name = u.displayName || 'Member';
   const roleId = `tm-role-${++teamRowSeq}`;
@@ -4150,7 +4749,7 @@ function teamRowHtml(uid, u) {
           `<option value="${escAttr(r.value)}" ${r.value === role ? 'selected' : ''}>${escHtml(r.label)}</option>`).join('')}</select>
       </div>
       <div data-team-campuses ${role === 'campus_admin' ? '' : 'hidden'}>
-        <div class="team-campuses" role="group" aria-label="Campuses ${escAttr(name)} manages">
+        <div class="team-campuses" role="group" aria-label="Branches ${escAttr(name)} manages">
           ${choices.length ? choices.map(b => `<label><input type="checkbox" data-team-branch value="${escAttr(b.id)}" data-name="${escAttr(b.name)}" ${chosen.has(b.id) ? 'checked' : ''} /> ${escHtml(b.name)}${b.missing ? ' (deleted branch)' : ''}</label>`).join('')
             : '<span class="repeat-empty">No branches loaded.</span>'}
         </div>
@@ -4219,7 +4818,7 @@ async function onTeamSave(e) {
   let update;
   if (role === 'campus_admin') {
     const picked = [...row.querySelectorAll('[data-team-branch]:checked')];
-    if (!picked.length) { toast('Pick at least one campus for a campus admin', 'error'); return; }
+    if (!picked.length) { toast('Pick at least one branch for a branch admin', 'error'); return; }
     update = {
       role,
       adminBranchIds: picked.map(c => c.value),

@@ -136,13 +136,13 @@ await getAuth().setCustomUserClaims('USER_UID_HERE', { admin: true });
 or set `role: 'admin'` on the user's `users/{uid}` profile (Content Studio does
 this; only an existing super admin can change a role).
 
-### Campus admins
+### Branch admins
 
-A campus admin manages only their own campuses: the `news` and `events` whose
-`branch` is one of their campuses, and the non-identity fields of those
+A branch admin manages only their own branches: the `news` and `events` whose
+`branch` is one of their branches, and the non-identity fields of those
 `branches/{id}` docs (contact, services, venues, giving, Home layout, …). They
-cannot write all-campus (null/blank `branch`) items, move an item to another
-campus, change a branch's `name`, `order`, `group` or `isActive`, create or
+cannot write all-branch (null/blank `branch`) items, move an item to another
+branch, change a branch's `name`, `order`, `group` or `isActive`, create or
 delete branches, or touch `config/*`, sermons, reading plans, daily content,
 users or submissions.
 
@@ -156,7 +156,7 @@ A super admin assigns one by setting all three fields together on
 | `adminBranchNames` | the matching branch **names**, e.g. `['North']` — news/events store `branch` as the name |
 
 Keep the two lists in step (and update `adminBranchNames` if a branch is
-renamed). Users can never set their own `role` or campus lists.
+renamed). Users can never set their own `role` or branch lists.
 
 ### Testing the rules
 
@@ -197,6 +197,29 @@ firebase emulators:start
 ```
 
 The emulator UI is available at [http://localhost:4000](http://localhost:4000).
+
+### Content Studio against the emulators
+
+`admin/index.html` connects to the Auth emulator (`127.0.0.1:9099`) and the
+Firestore emulator (`127.0.0.1:8181`) under the offline project `demo-kharis`
+when it is opened on localhost with `?emulators=1`. The hosted Studio ignores
+the flag, so it can never be pointed away from production.
+
+```bash
+# firebase.json for the emulators: {"firestore":{"rules":"<repo>/backend/firestore.rules"},
+#   "emulators":{"auth":{"port":9099},"firestore":{"port":8181},"singleProjectMode":true}}
+firebase emulators:start --only auth,firestore --project demo-kharis
+cd ~/Workspace/kharis-org/admin && python3 -m http.server 5055 --bind 127.0.0.1
+open 'http://localhost:5055/?emulators=1'
+```
+
+The emulators start empty: create test users through the Auth emulator REST API
+(`/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`) and write their
+`users/{uid}` docs (role `admin` or `campus_admin` with `adminBranchIds` and
+`adminBranchNames`) plus sample `branches`, `news` (`publishedAt`, `expiresAt`)
+and `events` through the Firestore emulator REST API with
+`Authorization: Bearer owner`, which bypasses the rules. Notifications can be
+composed but are not delivered: the functions are not emulated.
 
 ---
 
@@ -267,7 +290,7 @@ Document ID is the date string in `YYYY-MM-DD` format.
 | `publishedAt` | Timestamp | |
 | `expiresAt` | Timestamp? | Auto-hide after this date |
 
-### `branches` collection — campus customisation
+### `branches` collection — branch customisation
 
 Besides name, services, venues and contact details, each branch may carry:
 

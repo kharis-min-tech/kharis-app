@@ -7,7 +7,7 @@ import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 
 /// Label for the unscoped choice (`branch == null`).
-const String kAllCampusesLabel = 'All campuses';
+const String kAllCampusesLabel = 'All branches';
 
 /// A campus picked from [BranchPickerSheet]. Wraps the name so "All campuses"
 /// (`name == null`) is distinguishable from dismissing the sheet.
@@ -45,9 +45,9 @@ Future<void> pickActiveBranch(BuildContext context, WidgetRef ref) async {
         behavior: SnackBarBehavior.floating,
         content: Text(
           result.syncFailed
-              ? 'Your campus is now $label on this device. We could not '
+              ? 'Your branch is now $label on this device. We could not '
                     'reach your profile, so it will sync automatically.'
-              : 'Your campus is now $label.',
+              : 'Your branch is now $label.',
         ),
       ),
     );
@@ -135,7 +135,7 @@ class BranchPickerSheet extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 2),
                 child: Text(
-                  'Choose your campus',
+                  'Choose your branch',
                   style: AppTypography.display(
                     size: 18,
                     weight: FontWeight.w700,

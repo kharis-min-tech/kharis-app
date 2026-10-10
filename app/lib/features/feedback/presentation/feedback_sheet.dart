@@ -210,9 +210,12 @@ class _FeedbackSheetState extends ConsumerState<FeedbackSheet> {
                     rating != null && n <= rating
                         ? Icons.star_rounded
                         : Icons.star_outline_rounded,
+                    // accentInk, not the gold fill: raw gold is 1.9:1 on the
+                    // light sheet. The empty star uses full muted (60% gave
+                    // 2.4 to 2.9:1) because it is the control.
                     color: rating != null && n <= rating
-                        ? kc.accent
-                        : kc.muted.withValues(alpha: 0.6),
+                        ? kc.accentInk
+                        : kc.muted,
                   ),
                 ),
               ),
@@ -251,7 +254,7 @@ class _FeedbackSheetState extends ConsumerState<FeedbackSheet> {
           const SizedBox(height: 10),
           Text(
             _error!,
-            style: AppTypography.bodySm.copyWith(color: AppColors.danger),
+            style: AppTypography.bodySm.copyWith(color: context.kc.danger),
           ),
         ],
         const SizedBox(height: 16),
@@ -319,7 +322,7 @@ class _FeedbackSheetState extends ConsumerState<FeedbackSheet> {
         ),
         const SizedBox(height: 4),
         Text(
-          'We read every note. It shapes what we build next.',
+          'Your feedback has been sent to the Kharis team.',
           textAlign: TextAlign.center,
           style: AppTypography.bodySm.copyWith(color: kc.muted),
         ),

@@ -110,23 +110,33 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: context.kc.muted, size: 22),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            style: AppTypography.ui(
-              size: 10,
-              weight: FontWeight.w600,
-              color: context.kc.muted,
-            ),
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        // Icon + label is ~40 px; the box makes the target 56 x 48.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 56, minHeight: 48),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: context.kc.muted, size: 22),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                label,
+                style: AppTypography.ui(
+                  size: 10,
+                  weight: FontWeight.w600,
+                  color: context.kc.muted,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

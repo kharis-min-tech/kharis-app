@@ -188,21 +188,30 @@ class _SpeedPill extends StatelessWidget {
       excludeSemantics: true,
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(
-              color: context.kc.accentInk.withValues(alpha: 0.5),
-              width: 1.5,
-            ),
-          ),
-          child: Text(
-            _label,
-            style: AppTypography.ui(
-              size: 12.5,
-              weight: FontWeight.w700,
-              color: context.kc.accentInk,
+        behavior: HitTestBehavior.opaque,
+        // The ~32 px pill sits centred in a 44 px target.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          child: Center(
+            widthFactor: 1,
+            heightFactor: 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: context.kc.accentInk.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+              ),
+              child: Text(
+                _label,
+                style: AppTypography.ui(
+                  size: 12.5,
+                  weight: FontWeight.w700,
+                  color: context.kc.accentInk,
+                ),
+              ),
             ),
           ),
         ),
@@ -345,8 +354,8 @@ class _RepeatButton extends StatelessWidget {
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           child: Stack(
             alignment: Alignment.center,
             children: [

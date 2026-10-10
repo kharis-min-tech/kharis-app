@@ -4,20 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/features/home/data/studio_notification_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
 import 'package:kharis_app/shared/providers/dismissed_notifications_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// What a feed row came from. Carries its own iconography and eyebrow label so
 /// a member can tell an announcement from an event at a glance.
 enum _NotifKind {
   announcement(Icons.campaign_rounded, 'Announcement'),
-  event(Icons.event_rounded, 'Event');
+  event(Icons.event_rounded, 'Event'),
+  studio(Icons.notifications_rounded, 'Notification');
 
   const _NotifKind(this.icon, this.label);
 
@@ -36,6 +40,7 @@ class _NotifItem {
     this.body,
     this.event,
     this.news,
+    this.link,
   });
 
   /// [id] is namespaced by source so a news item and an event that happen to
@@ -58,6 +63,16 @@ class _NotifItem {
     event: e,
   );
 
+  /// A push sent from Content Studio, dated when it went out.
+  factory _NotifItem.studio(StudioNotification n) => _NotifItem(
+    id: studioNotificationId(n.id),
+    kind: _NotifKind.studio,
+    title: n.title,
+    body: n.body,
+    date: n.sentAt ?? n.sendAt ?? n.createdAt ?? DateTime.now(),
+    link: n.link,
+  );
+
   final String id;
   final _NotifKind kind;
   final String title;
@@ -69,6 +84,12 @@ class _NotifItem {
 
   /// Source announcement when [kind] is [_NotifKind.announcement].
   final NewsItem? news;
+
+  /// Where a [_NotifKind.studio] row opens: an app path or a web address.
+  final String? link;
+
+  /// Whether tapping the row opens anything.
+  bool get opens => event != null || news != null || link != null;
 }
 
 /// Sign-aware relative label.
@@ -94,22 +115,24 @@ String _relativeLabel(DateTime dt, DateTime now) {
   return diff.isNegative ? '$amount ago' : 'in $amount';
 }
 
-/// Merges announcements and upcoming events into one feed, drops rows the
-/// member has dismissed, and pins reminders on top.
+/// Merges announcements, Studio notifications and upcoming events into one
+/// feed, drops rows the member has dismissed, and pins reminders on top.
 ///
 /// Upcoming events are reminders — things a member can still act on — so they
-/// outrank announcements, which are informational and already published. A
-/// service starting tomorrow must not sit under this morning's news post.
-/// Within the reminder block the soonest event leads; within announcements
-/// the freshest post leads.
+/// outrank announcements and notifications, which are informational and
+/// already out. A service starting tomorrow must not sit under this morning's
+/// news post. Within the reminder block the soonest event leads; below it the
+/// newest announcement or notification leads.
 List<_NotifItem> _buildFeed({
   required List<NewsItem> news,
   required List<Event> events,
+  required List<StudioNotification> studio,
   required Set<String> dismissed,
 }) {
   final items = <_NotifItem>[
     for (final n in news) _NotifItem.announcement(n),
     for (final e in events) _NotifItem.event(e),
+    for (final n in studio) _NotifItem.studio(n),
   ]..removeWhere((i) => dismissed.contains(i.id));
   int rank(_NotifItem i) => i.kind == _NotifKind.event ? 0 : 1;
   items.sort((a, b) {
@@ -117,7 +140,7 @@ List<_NotifItem> _buildFeed({
     if (byKind != 0) return byKind;
     return a.kind == _NotifKind.event
         ? a.date.compareTo(b.date) // soonest reminder first
-        : b.date.compareTo(a.date); // freshest announcement first
+        : b.date.compareTo(a.date); // newest announcement/notification first
   });
   return items;
 }
@@ -125,12 +148,16 @@ List<_NotifItem> _buildFeed({
 /// The member's notification feed, or (via [NotificationsScreen.announcements])
 /// the full announcements list behind Home's "See all".
 ///
-/// Both sources are scoped to the member's campus plus all-campus content by
-/// [campusNewsProvider] / [campusUpcomingEventsProvider]. Rows open what they
-/// are about: an event row (or an announcement promoting an event) opens the
-/// event; a plain announcement opens its full text and call-to-action.
+/// News and events are scoped to the member's campus plus all-campus content
+/// by [campusNewsProvider] / [campusUpcomingEventsProvider]; Studio
+/// notifications (sent to everyone or the member's branch) come from
+/// [inboxNotificationsProvider]. Rows open what they are about: an event row
+/// (or an announcement promoting an event) opens the event; a plain
+/// announcement opens its full text and call-to-action; a notification opens
+/// its link.
 class NotificationsScreen extends ConsumerStatefulWidget {
-  /// Unified feed: upcoming events plus announcements, dismissible.
+  /// Unified feed: upcoming events, announcements and Studio notifications,
+  /// dismissible.
   const NotificationsScreen({super.key})
     : announcementsOnly = false,
       focusId = null;
@@ -158,25 +185,33 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final eventsAsync = widget.announcementsOnly
         ? const AsyncData<List<Event>>([])
         : ref.watch(campusUpcomingEventsProvider);
+    final studioAsync = widget.announcementsOnly
+        ? const AsyncData<List<StudioNotification>>([])
+        : ref.watch(inboxNotificationsProvider);
     final dismissed = widget.announcementsOnly
         ? const <String>{}
         : ref.watch(dismissedNotificationsProvider);
 
     _maybeOpenFocused(newsAsync);
 
+    // Studio notifications never hold the feed back: they join it when their
+    // query answers, and a failed query just leaves them out.
     final loading =
         (newsAsync.isLoading && !newsAsync.hasValue) ||
         (eventsAsync.isLoading && !eventsAsync.hasValue);
+    final studio = studioAsync.valueOrNull ?? const <StudioNotification>[];
     final failed =
         !loading &&
         !newsAsync.hasValue &&
         !eventsAsync.hasValue &&
+        studio.isEmpty &&
         (newsAsync.hasError || eventsAsync.hasError);
     final items = loading
         ? const <_NotifItem>[]
         : _buildFeed(
             news: newsAsync.valueOrNull ?? const [],
             events: eventsAsync.valueOrNull ?? const [],
+            studio: studio,
             dismissed: dismissed,
           );
 
@@ -268,7 +303,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         return const _Empty(
           icon: Icons.campaign_outlined,
           title: 'No announcements right now',
-          subtitle: 'News from your campus will show up here.',
+          subtitle: 'News from your branch will show up here.',
         );
       }
       return _Empty(
@@ -280,7 +315,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             : 'No notifications yet',
         subtitle: hasDismissed
             ? 'Dismissed notifications stay hidden on this device.'
-            : 'Announcements and upcoming events will show up here.',
+            : 'Announcements, church notifications and upcoming events '
+                  'will show up here.',
         action: hasDismissed
             ? _EmptyAction(
                 label: 'Restore dismissed',
@@ -304,7 +340,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       ),
       itemBuilder: (context, index) {
         final item = items[index];
-        final row = _NotifRow(item: item, onTap: () => _open(item));
+        final row = _NotifRow(
+          item: item,
+          onTap: item.opens ? () => _open(item) : null,
+        );
         if (widget.announcementsOnly) return row;
         return Dismissible(
           key: ValueKey(item.id),
@@ -326,7 +365,33 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
     final news = item.news;
-    if (news != null) unawaited(openAnnouncement(context, news));
+    if (news != null) {
+      unawaited(openAnnouncement(context, news));
+      return;
+    }
+    final link = item.link;
+    if (link != null) _openLink(link);
+  }
+
+  /// A notification's link: app paths open above this feed (tab roots are
+  /// switched to), web addresses in the browser.
+  void _openLink(String link) {
+    final target = notificationLinkTarget(link);
+    if (target != null) {
+      final router = GoRouter.of(context);
+      target.overlay
+          ? router.push(target.location)
+          : router.go(target.location);
+      return;
+    }
+    final uri = externalNotificationUri(link);
+    if (uri == null) return;
+    unawaited(
+      launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      ).catchError((Object _) => false),
+    );
   }
 
   void _dismiss(_NotifItem item) {
@@ -461,14 +526,15 @@ class _NotifRow extends ConsumerWidget {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(top: 10, left: 8),
-              child: Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: context.kc.faint,
+            if (onTap != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 10, left: 8),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: context.kc.faint,
+                ),
               ),
-            ),
           ],
         ),
       ),

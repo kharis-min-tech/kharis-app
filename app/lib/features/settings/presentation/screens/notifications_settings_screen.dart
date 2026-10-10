@@ -118,8 +118,8 @@ class _NotificationsSettingsScreenState
             const SizedBox(height: 14),
           ],
           _ToggleRow(
-            label: 'Service Reminders',
-            subtitle: 'Reminders before services start',
+            label: 'Service reminders',
+            subtitle: 'An hour before your branch\u2019s service starts',
             value: prefs['serviceReminders'] ?? true,
             onChanged: (v) => _onToggle('serviceReminders', v),
           ),
@@ -132,8 +132,8 @@ class _NotificationsSettingsScreenState
           ),
           const SizedBox(height: 14),
           _ToggleRow(
-            label: 'Daily Reading',
-            subtitle: 'Your daily scripture notification',
+            label: 'Daily reading',
+            subtitle: 'Today\u2019s Bible reading at 7am (UK time)',
             value: prefs['dailyReading'] ?? true,
             onChanged: (v) => _onToggle('dailyReading', v),
           ),

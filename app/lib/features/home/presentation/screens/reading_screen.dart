@@ -83,12 +83,12 @@ final readingMarksProvider =
     );
 
 /// Warm superscript verse-number accent for the reading surface. Light mode
-/// uses a warm brown against the paper background; dark mode lifts it to a
-/// warm tan so it still separates from the serif body.
+/// uses a warm brown against the paper background (4.8:1 on `kc.bg`); dark
+/// mode lifts it to a warm tan so it still separates from the serif body.
 Color _verseAccent(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
     ? const Color(0xFFD1A57C)
-    : const Color(0xFFB8875F);
+    : const Color(0xFF8F6440);
 
 /// Warm ink for long-form serif scripture — deliberately softer than primary
 /// text so long passages read calmly. Dark mode uses a warm off-white.
@@ -155,9 +155,8 @@ class ReadingScreen extends ConsumerWidget {
         centerTitle: true,
       ),
       body: contentAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: context.kc.onChip)),
         error: (_, _) => _ErrorView(
           title: 'Couldn\u2019t load today\u2019s reading',
           message: 'Check your connection and try again.',
@@ -234,10 +233,10 @@ class _PassageView extends ConsumerWidget {
               final selected = sheetRef.watch(selectedBibleProvider);
 
               return biblesAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(24),
+                loading: () => Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
+                    child: CircularProgressIndicator(color: context.kc.onChip),
                   ),
                 ),
                 error: (_, _) => Padding(
@@ -261,7 +260,7 @@ class _PassageView extends ConsumerWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.1,
-                          color: AppColors.primary,
+                          color: context.kc.onChip,
                         ),
                       ),
                     ),
@@ -277,7 +276,7 @@ class _PassageView extends ConsumerWidget {
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                             color: b.id == selected.id
-                                ? AppColors.primary
+                                ? context.kc.onChip
                                 : context.kc.onBg,
                           ),
                         ),
@@ -291,9 +290,9 @@ class _PassageView extends ConsumerWidget {
                           ),
                         ),
                         trailing: b.id == selected.id
-                            ? const Icon(
+                            ? Icon(
                                 Icons.check_rounded,
-                                color: AppColors.primary,
+                                color: context.kc.onChip,
                                 size: 20,
                               )
                             : null,
@@ -325,9 +324,8 @@ class _PassageView extends ConsumerWidget {
     );
 
     return passageAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      ),
+      loading: () =>
+          Center(child: CircularProgressIndicator(color: context.kc.onChip)),
       error: (error, _) {
         debugPrint('ReadingScreen: passage $usfmId failed: $error');
         final notFound =
@@ -367,7 +365,7 @@ class _PassageView extends ConsumerWidget {
                 size: 11,
                 weight: FontWeight.w600,
                 letterSpacing: 11 * 0.09,
-                color: AppColors.primary,
+                color: context.kc.onChip,
               ),
             ),
             const SizedBox(height: 8),
@@ -426,35 +424,41 @@ class _VersionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final purple = context.kc.onChip;
     return Semantics(
       button: true,
       label: 'Change Bible version',
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.primary, width: 1),
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: AppTypography.ui(
-                  size: 12,
-                  weight: FontWeight.w700,
-                  color: AppColors.primary,
+        // 44 px tall hit area around the 30 px pill.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: purple, width: 1),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: AppTypography.ui(
+                    size: 12,
+                    weight: FontWeight.w700,
+                    color: purple,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 3),
-              const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: AppColors.primary,
-                size: 16,
-              ),
-            ],
+                const SizedBox(width: 3),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: purple,
+                  size: 16,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -576,9 +580,9 @@ class _DailyPrayer extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.self_improvement_rounded,
-                color: AppColors.hqStroke,
+                color: context.kc.accentInk,
                 size: 16,
               ),
               const SizedBox(width: 7),
@@ -588,7 +592,7 @@ class _DailyPrayer extends StatelessWidget {
                   size: 11,
                   weight: FontWeight.w700,
                   letterSpacing: 11 * 0.09,
-                  color: AppColors.hqStroke,
+                  color: context.kc.accentInk,
                 ),
               ),
             ],
@@ -650,7 +654,7 @@ class _ReadingActions extends ConsumerWidget {
             children: [
               Icon(
                 read ? Icons.check_circle_rounded : Icons.check_rounded,
-                color: read ? AppColors.onPrimary : AppColors.primary,
+                color: read ? AppColors.onPrimary : context.kc.onChip,
                 size: 19,
               ),
               const SizedBox(width: 8),
@@ -692,7 +696,7 @@ class _ErrorView extends StatelessWidget {
     final actionLabel = this.actionLabel;
     final buttonStyle = AppTypography.ui(
       weight: FontWeight.w600,
-      color: AppColors.primary,
+      color: context.kc.onChip,
     );
     return Center(
       child: Padding(

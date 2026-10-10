@@ -224,7 +224,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Text(
                     _errorMessage!,
                     textAlign: TextAlign.center,
-                    style: AppTypography.ui(size: 14, color: AppColors.danger),
+                    style: AppTypography.ui(size: 14, color: kc.danger),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -302,7 +302,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     child: Text(
-                      'Continue as Guest',
+                      'Continue as guest',
                       style: AppTypography.ui(
                         size: 15,
                         weight: FontWeight.w600,
@@ -339,12 +339,12 @@ InputDecoration authFieldDecoration(
     fillColor: kc.surfaceAlt,
     hintText: hint,
     hintStyle: AppTypography.ui(size: 15, color: kc.muted),
-    errorStyle: AppTypography.ui(size: 12, color: AppColors.danger),
+    errorStyle: AppTypography.ui(size: 12, color: kc.danger),
     border: border(null),
     enabledBorder: border(null),
     focusedBorder: border(kc.accentInk, 2),
-    errorBorder: border(AppColors.danger),
-    focusedErrorBorder: border(AppColors.danger, 1.5),
+    errorBorder: border(kc.danger),
+    focusedErrorBorder: border(kc.danger, 1.5),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
   );
 }
@@ -447,7 +447,7 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
               const SizedBox(height: 10),
               Text(
                 _error!,
-                style: AppTypography.ui(size: 13, color: AppColors.danger),
+                style: AppTypography.ui(size: 13, color: kc.danger),
               ),
             ],
           ],

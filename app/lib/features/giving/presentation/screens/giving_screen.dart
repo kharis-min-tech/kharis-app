@@ -60,7 +60,7 @@ class GivingScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(22, 8, 22, 0),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: Text(
                   'Giving',
                   style: AppTypography.headlineLgMobile.copyWith(
@@ -198,7 +198,7 @@ class _BranchSelector extends StatelessWidget {
     final kc = context.kc;
     return Semantics(
       button: true,
-      label: 'Giving to $recipient from $branch. Change campus',
+      label: 'Giving to $recipient from $branch. Change branch',
       excludeSemantics: true,
       child: GestureDetector(
         key: const ValueKey('giving-branch-selector'),
@@ -410,19 +410,22 @@ class _BankTransferCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: AppTypography.ui(size: 13.5, color: kc.muted),
-                    ),
+                  Text(
+                    label,
+                    style: AppTypography.ui(size: 13.5, color: kc.muted),
                   ),
                   const SizedBox(width: 12),
-                  SelectableText(
-                    value,
-                    style: AppTypography.ui(
-                      size: 13.5,
-                      weight: FontWeight.w600,
-                      color: kc.onBg,
+                  // The value takes the rest and wraps: a 22-character IBAN
+                  // at 1.3x text no longer pushes the row off a small phone.
+                  Expanded(
+                    child: SelectableText(
+                      value,
+                      textAlign: TextAlign.end,
+                      style: AppTypography.ui(
+                        size: 13.5,
+                        weight: FontWeight.w600,
+                        color: kc.onBg,
+                      ),
                     ),
                   ),
                 ],

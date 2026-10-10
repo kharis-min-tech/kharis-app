@@ -218,11 +218,22 @@ Dark background (#0D0D0D). The Kharis dove logo centred and large, rendered in w
 
 ## METADATA NOTES
 
-- **Bundle ID (iOS):** org.kharis.app (confirm with dev team)
-- **Package Name (Android):** org.kharis.app (confirm with dev team)
-- **Version for this submission:** 2.0.0
-- **Copyright:** 2025 Kharis Ministries
+- **App Store Connect record:** "Kharis App", Apple ID 6802862406, primary language English (U.K.)
+- **Bundle ID (iOS):** com.kharis.church (confirmed in App Store Connect)
+- **Package Name (Android):** com.kharis.church
+- **Version for this submission:** 1.0 (App Store Connect version 1.0; `pubspec.yaml` 1.0.0)
+- **Copyright:** 2026 Kharis Ministries
 - **Developer/Seller name:** Kharis Ministries
 - **Website:** https://kharis.org
 - **Privacy Policy:** https://kharis.org/privacy-policy
 - **Support email:** app@kharis.org (confirm with team)
+
+### Copy that does not match the current app (decide before submitting)
+
+Apple rejects listings that describe features the app does not have (Guideline 2.3.1). These lines need rewriting or removing:
+- "Pray With Us" (iOS description, Play description, screenshot 4): the app has no such button.
+- "Listen anywhere, even offline" (screenshot 3 caption): there is no offline download.
+- "keep your giving history in one place" (iOS description): giving opens the secure web page; no history is stored.
+- Branch list naming Medway and omitting others: the app lists 16 Kharis branches plus 6 KP2 branches.
+- "What's New -- v2.0": the App Store version is 1.0.
+- Screenshot and feature-graphic briefs ask for purple glows, gradient borders and gradient artwork, which the app no longer uses (DESIGN.md).

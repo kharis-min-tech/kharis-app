@@ -21,7 +21,7 @@ String _roleLabel(String role) {
     case 'new_here':
       return 'New Here';
     case _campusAdmin:
-      return 'Campus admin';
+      return 'Branch admin';
     case 'admin':
       return 'Admin';
     default:
@@ -313,7 +313,7 @@ class _UserTile extends StatelessWidget {
                     if (campuses != null)
                       Text(
                         campuses.isEmpty
-                            ? 'No campuses assigned'
+                            ? 'No branches assigned'
                             : 'Manages ${campuses.join(', ')}',
                         style: AppTypography.labelMd.copyWith(
                           color: AppColors.secondary,
@@ -472,7 +472,7 @@ class _RoleOption extends StatelessWidget {
               if (isCurrentRole && role == _campusAdmin) ...[
                 const SizedBox(width: AppSpacing.xs),
                 Text(
-                  'Change campuses',
+                  'Change branches',
                   style: AppTypography.labelMd.copyWith(
                     color: AppColors.secondary,
                   ),
@@ -546,12 +546,12 @@ class _CampusPickerSheetState extends ConsumerState<_CampusPickerSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Campuses for ${widget.user.displayName}',
+                'Branches for ${widget.user.displayName}',
                 style: AppTypography.titleMd.copyWith(color: AppColors.heading),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'They manage these campuses’ announcements, events and campus '
+                'They manage these branches’ announcements, events and branch '
                 'details. Pick at least one.',
                 style: AppTypography.bodySm.copyWith(
                   color: AppColors.textMuted,
@@ -613,7 +613,7 @@ class _CampusPickerSheetState extends ConsumerState<_CampusPickerSheet> {
                     ),
                   ),
                   child: Text(
-                    'Make campus admin',
+                    'Make branch admin',
                     style: AppTypography.bodyLg.copyWith(
                       fontWeight: FontWeight.w600,
                       color: AppColors.onSecondary,

@@ -103,7 +103,7 @@ class CampusCard extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  'YOUR CAMPUS',
+                  'YOUR BRANCH',
                   style: AppTypography.ui(
                     size: 11,
                     weight: FontWeight.w700,
@@ -111,20 +111,25 @@ class CampusCard extends ConsumerWidget {
                   ).copyWith(color: kc.muted, height: 1),
                 ),
                 const Spacer(),
-                TextButton(
-                  onPressed: () => pickActiveBranch(context, ref),
-                  style: TextButton.styleFrom(
-                    foregroundColor: kc.onChip,
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'Change',
-                    style: AppTypography.ui(
-                      size: 12.5,
-                      weight: FontWeight.w600,
-                    ).copyWith(color: kc.onChip, height: 1),
+                Semantics(
+                  label: 'Change branch',
+                  button: true,
+                  excludeSemantics: true,
+                  child: TextButton(
+                    onPressed: () => pickActiveBranch(context, ref),
+                    style: TextButton.styleFrom(
+                      foregroundColor: kc.onChip,
+                      minimumSize: const Size(48, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Change',
+                      style: AppTypography.ui(
+                        size: 12.5,
+                        weight: FontWeight.w600,
+                      ).copyWith(color: kc.onChip, height: 1),
+                    ),
                   ),
                 ),
               ],
@@ -156,7 +161,7 @@ class CampusCard extends ConsumerWidget {
               Divider(height: 1, thickness: 1, color: kc.divider),
               for (final v in venues) _VenueRow(venue: v),
             ] else if (hasLegacyAddress) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 2),
               _AddressLink(
                 key: const Key('campus-directions'),
                 text: legacyAddress,
@@ -320,7 +325,6 @@ class _VenueRow extends StatelessWidget {
               ).copyWith(color: kc.onBg, height: 1.25),
             ),
           if (query != null) ...[
-            const SizedBox(height: 4),
             _AddressLink(
               key: Key('campus-directions-${venue.id}'),
               text: venue.address.isNotEmpty ? venue.address : 'Get directions',
@@ -359,8 +363,9 @@ class _AddressLink extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
+        // 10 px above and below lifts a one-line address to a 44 px target.
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

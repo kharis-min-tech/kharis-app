@@ -111,7 +111,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
             Icon(Icons.check_circle, color: context.kc.accentInk, size: 56),
             const SizedBox(height: 24),
             Text(
-              'Welcome to the family!',
+              'Welcome to Kharis',
               textAlign: TextAlign.center,
               style: AppTypography.display(
                 size: 22,
@@ -121,7 +121,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Your branch team will reach out soon.',
+              'Someone from your branch will be in touch soon.',
               textAlign: TextAlign.center,
               style: AppTypography.ui(size: 15, color: context.kc.muted),
             ),
@@ -134,7 +134,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
                   foregroundColor: context.kc.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppRadius.buttonBorder,
                   ),
                   elevation: 0,
                 ),
@@ -162,7 +162,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'New Here?',
+                'New here?',
                 style: AppTypography.display(
                   size: 28,
                   weight: FontWeight.w700,
@@ -179,7 +179,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
               // Name
               ConnectFormField(
                 controller: _nameController,
-                label: 'Full Name *',
+                label: 'Full name *',
                 textInputAction: TextInputAction.next,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Name is required';
@@ -191,7 +191,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
               // Phone
               ConnectFormField(
                 controller: _phoneController,
-                label: 'Phone Number',
+                label: 'Phone number',
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
               ),
@@ -200,7 +200,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
               // Email
               ConnectFormField(
                 controller: _emailController,
-                label: 'Email Address *',
+                label: 'Email address *',
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 validator: (v) {
@@ -227,7 +227,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
                     controller: TextEditingController(
                       text: DateFormat('dd MMM yyyy').format(_firstVisitDate),
                     ),
-                    label: 'First Visit Date',
+                    label: 'First visit date',
                     suffixIcon: Icon(
                       Icons.calendar_today_outlined,
                       color: context.kc.muted,
@@ -248,7 +248,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
                       foregroundColor: context.kc.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.buttonBorder,
                       ),
                       elevation: 0,
                     ),

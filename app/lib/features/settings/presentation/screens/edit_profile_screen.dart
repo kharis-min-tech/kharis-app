@@ -142,7 +142,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   (v == null || v.trim().isEmpty) ? 'Name is required' : null,
             ),
             const SizedBox(height: 20),
-            _label('Home campus'),
+            _label('Home branch'),
             _CampusRow(
               label: branch ?? kAllCampusesLabel,
               onTap: () => pickActiveBranch(context, ref),
@@ -281,11 +281,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.danger),
+          borderSide: BorderSide(color: context.kc.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: AppRadius.inputBorder,
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.4),
+          borderSide: BorderSide(color: context.kc.danger, width: 1.4),
         ),
       ),
     );

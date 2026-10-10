@@ -30,7 +30,7 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
 
   static String _region(String subtitle) => subtitle.split('·').first.trim();
   static bool _isHq(String subtitle) =>
-      subtitle.toLowerCase().contains('main campus');
+      subtitle.toLowerCase().contains(RegExp('main (campus|branch)'));
 
   @override
   Widget build(BuildContext context) {

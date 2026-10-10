@@ -124,9 +124,8 @@ class PlaylistsScreen extends ConsumerWidget {
                         icon: Icons.queue_music_rounded,
                         headline: 'Build your first playlist',
                         body:
-                            'Group messages your way, by theme, season or '
-                            'series. They save to your account and are '
-                            'waiting after every relaunch.',
+                            'Group messages by theme, season or series. '
+                            'Playlists are saved to your account.',
                         onCreate: () => _createPlaylist(context, ref),
                       ),
                     ),

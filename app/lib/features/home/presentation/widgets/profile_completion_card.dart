@@ -50,7 +50,8 @@ class _ProfileCompletionCardState extends ConsumerState<ProfileCompletionCard> {
         ),
         child: Row(
           children: [
-            Icon(Icons.cake_outlined, size: 22, color: context.kc.accent),
+            // accentInk: raw gold is 1.9:1 on the light card.
+            Icon(Icons.cake_outlined, size: 22, color: context.kc.accentInk),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -80,11 +81,11 @@ class _ProfileCompletionCardState extends ConsumerState<ProfileCompletionCard> {
                 style: AppTypography.ui(
                   size: 13,
                   weight: FontWeight.w700,
-                ).copyWith(color: context.kc.accent),
+                ).copyWith(color: context.kc.accentInk),
               ),
             ),
             IconButton(
-              visualDensity: VisualDensity.compact,
+              tooltip: 'Dismiss',
               onPressed: () => setState(() => _dismissed = true),
               icon: Icon(Icons.close, size: 18, color: context.kc.muted),
             ),

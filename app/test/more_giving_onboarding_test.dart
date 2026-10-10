@@ -63,6 +63,15 @@ class _FakeAuth implements AuthRepository {
   Future<User> loginAsGuest() => throw UnimplementedError();
 
   @override
+  bool get usesPasswordSignIn => false;
+
+  @override
+  Future<void> reauthenticate(String password) => throw UnimplementedError();
+
+  @override
+  Future<void> deleteAccount() => throw UnimplementedError();
+
+  @override
   User? get currentUser => null;
 
   @override
@@ -234,11 +243,11 @@ void main() {
 
   group('More', () {
     for (final (label, route) in [
-      ('Daily Reading', '/reading'),
-      ('My Notes', '/notes'),
-      ('Favorites', '/favorites'),
-      ('My Playlists', '/playlists'),
-      ('Switch Branch', '/branch-selection'),
+      ('Daily reading', '/reading'),
+      ('My notes', '/notes'),
+      ('Favourites', '/favorites'),
+      ('My playlists', '/playlists'),
+      ('Switch branch', '/branch-selection'),
       ('Give', '/giving'),
     ]) {
       testWidgets('"$label" opens $route', (tester) async {
@@ -248,11 +257,11 @@ void main() {
       });
     }
 
-    testWidgets('Favorites sits directly above My Playlists', (tester) async {
+    testWidgets('Favourites sits directly above My playlists', (tester) async {
       await _pumpMore(tester, user: _member);
-      final notes = tester.getTopLeft(find.text('My Notes')).dy;
-      final favorites = tester.getTopLeft(find.text('Favorites')).dy;
-      final playlists = tester.getTopLeft(find.text('My Playlists')).dy;
+      final notes = tester.getTopLeft(find.text('My notes')).dy;
+      final favorites = tester.getTopLeft(find.text('Favourites')).dy;
+      final playlists = tester.getTopLeft(find.text('My playlists')).dy;
       expect(favorites, lessThan(playlists));
       // Adjacent rows: the gap to My Playlists is one row, the same step as
       // My Notes to Favorites, so nothing sits between them.
@@ -287,15 +296,15 @@ void main() {
       expect(find.byType(TestimonyScreen), findsOneWidget);
     });
 
-    testWidgets('Help & Support opens the live contact page', (tester) async {
+    testWidgets('Help & support opens the live contact page', (tester) async {
       await _pumpMore(tester, user: _member);
-      await _tapRow(tester, 'Help & Support');
+      await _tapRow(tester, 'Help & support');
       expect(_launched, ['https://kharis.org/contact-us/']);
     });
 
-    testWidgets('Privacy Policy opens the live privacy page', (tester) async {
+    testWidgets('Privacy policy opens the live privacy page', (tester) async {
       await _pumpMore(tester, user: _member);
-      await _tapRow(tester, 'Privacy Policy');
+      await _tapRow(tester, 'Privacy policy');
       expect(_launched, ['https://kharis.org/privacy-policy/']);
     });
 
@@ -308,7 +317,14 @@ void main() {
     testWidgets('a guest gets Sign in, which opens login', (tester) async {
       await _pumpMore(tester, user: _guest);
       expect(find.text('Sign out'), findsNothing);
-      await _tapRow(tester, 'Sign in');
+      // The signed-out card's button and the menu row both read "Sign in"
+      // (sentence case); either opens login, so tap the menu row.
+      expect(find.text('Sign in'), findsNWidgets(2));
+      final row = find.text('Sign in').last;
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
       expect(find.text('route:/login'), findsOneWidget);
     });
 
@@ -387,7 +403,7 @@ void main() {
       final prefs = await pumpGiving(tester);
       await tester.tap(find.byKey(const ValueKey('giving-branch-selector')));
       await tester.pumpAndSettle();
-      expect(find.text('Choose your campus'), findsOneWidget);
+      expect(find.text('Choose your branch'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('branch-choice-Manchester')));
       await tester.pumpAndSettle();
@@ -652,8 +668,8 @@ void main() {
       expect(find.text('English (UK)'), findsNothing);
       expect(find.byIcon(Icons.language_rounded), findsNothing);
 
-      await tester.ensureVisible(find.text('Privacy Policy'));
-      await tester.tap(find.text('Privacy Policy'));
+      await tester.ensureVisible(find.text('Privacy policy'));
+      await tester.tap(find.text('Privacy policy'));
       await tester.pumpAndSettle();
       expect(_launched, ['https://kharis.org/privacy-policy/']);
     });

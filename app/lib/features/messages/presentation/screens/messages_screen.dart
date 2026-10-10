@@ -196,7 +196,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Sermons & teachings · streamed from Kharis',
+                          'Sermons and teaching from Kharis Church',
                           style: AppTypography.bodySm.copyWith(
                             fontSize: 13,
                             color: context.kc.muted,
@@ -240,28 +240,31 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 // ── Search results (when searching) ────────────────────────
                 if (isSearching) ...[
                   const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              searchLoading && searchResults.isEmpty
-                                  ? 'Searching the archive for "${searchQuery.trim()}"'
-                                  : '${_count.format(searchResults.length)} result${searchResults.length == 1 ? '' : 's'} for "${searchQuery.trim()}"',
-                              style: AppTypography.bodySm.copyWith(
-                                color: context.kc.muted,
-                                fontWeight: FontWeight.w600,
+                  // The count line is dropped for zero results: the empty
+                  // state below already says "No messages match".
+                  if (searchLoading || searchResults.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                searchLoading && searchResults.isEmpty
+                                    ? 'Searching the archive for "${searchQuery.trim()}"'
+                                    : '${_count.format(searchResults.length)} result${searchResults.length == 1 ? '' : 's'} for "${searchQuery.trim()}"',
+                                style: AppTypography.bodySm.copyWith(
+                                  color: context.kc.muted,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
-                          if (searchLoading && searchResults.isNotEmpty)
-                            const _SmallSpinner(),
-                        ],
+                            if (searchLoading && searchResults.isNotEmpty)
+                              const _SmallSpinner(),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                   if (searchResults.isEmpty && searchLoading)
                     const SliverToBoxAdapter(
                       child: Padding(
@@ -408,39 +411,37 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   ],
 
                   // ── 4. Topics ────────────────────────────────────────────
-                  const SliverToBoxAdapter(child: SizedBox(height: 28)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 18)),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 14, 4),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Text(
-                            'Find encouragement',
-                            style: AppTypography.bodyLg.copyWith(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: context.kc.onBg,
-                              letterSpacing: -0.18,
-                            ),
-                          ),
-                          const Spacer(),
-                          GestureDetector(
-                            // Root-navigator route: overlays the shell with
-                            // its own back affordance.
-                            onTap: () => context.push('/playlists'),
-                            behavior: HitTestBehavior.opaque,
+                          Expanded(
                             child: Text(
-                              'Playlists',
-                              style: AppTypography.labelMd.copyWith(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: context.kc.accentInk,
+                              'Browse by topic',
+                              style: AppTypography.bodyLg.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: context.kc.onBg,
+                                letterSpacing: -0.18,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          GestureDetector(
+                          _HeaderLink(
+                            label: 'Playlists',
+                            color: context.kc.accentInk,
+                            weight: FontWeight.w700,
+                            // Root-navigator route: overlays the shell with
+                            // its own back affordance.
+                            onTap: () => context.push('/playlists'),
+                          ),
+                          const SizedBox(width: 4),
+                          _HeaderLink(
+                            label: 'See all',
+                            color: context.kc.muted,
+                            weight: FontWeight.w600,
                             onTap: () {
                               ref
                                       .read(selectedCategoryProvider.notifier)
@@ -448,15 +449,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                   'All';
                               _scrollToList();
                             },
-                            behavior: HitTestBehavior.opaque,
-                            child: Text(
-                              'See all',
-                              style: AppTypography.labelMd.copyWith(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: context.kc.muted,
-                              ),
-                            ),
                           ),
                         ],
                       ),
@@ -555,7 +547,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                     else if (isFiltered)
                                       selectedCategory
                                     else
-                                      'All Messages',
+                                      'All messages',
                                     if (selectedYear != null) '$selectedYear',
                                   ].join(' \u00b7 '),
                                   maxLines: 1,
@@ -769,6 +761,50 @@ class _SectionTitle extends StatelessWidget {
 
 // ── Small spinner ──────────────────────────────────────────────────────────────
 
+/// A small text link in a section header ("Playlists", "See all"). The
+/// label stays 12 px but the hit area is 44 px tall.
+class _HeaderLink extends StatelessWidget {
+  const _HeaderLink({
+    required this.label,
+    required this.color,
+    required this.weight,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final FontWeight weight;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Center(
+              widthFactor: 1,
+              child: Text(
+                label,
+                style: AppTypography.labelMd.copyWith(
+                  fontSize: 12,
+                  fontWeight: weight,
+                  color: color,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SmallSpinner extends StatelessWidget {
   const _SmallSpinner({this.size = 18});
 
@@ -922,7 +958,7 @@ class _ArchiveFooter extends StatelessWidget {
       );
     } else if (walked && shown > 20) {
       child = Text(
-        'You\'ve reached the beginning \u2022 $held messages',
+        'You\'ve reached the beginning \u00b7 $held messages',
         style: muted,
       );
     } else {
@@ -1258,12 +1294,16 @@ class _FeaturedCard extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    isPlaying ? Icons.equalizer_rounded : Icons.star_rounded,
-                    size: 12,
-                    color: context.kc.onAccent,
-                  ),
-                  const SizedBox(width: 4),
+                  // The label says "Featured"; only the playing state earns
+                  // a glyph (the equaliser marks live playback).
+                  if (isPlaying) ...[
+                    Icon(
+                      Icons.equalizer_rounded,
+                      size: 12,
+                      color: context.kc.onAccent,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Text(
                     isPlaying ? 'NOW PLAYING' : 'FEATURED',
                     style: AppTypography.labelMd.copyWith(
@@ -1544,30 +1584,45 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onClear,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 7, 10, 7),
-        decoration: BoxDecoration(
-          color: context.kc.accent.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: context.kc.accent.withValues(alpha: 0.5)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$label · $count',
-              style: AppTypography.labelMd.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: context.kc.accentInk,
+    // 7 px of slack above and below lifts the 31 px chip to a 45 px target.
+    return Semantics(
+      button: true,
+      label: 'Clear filter: $label',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onClear,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 7, 10, 7),
+            decoration: BoxDecoration(
+              color: context.kc.accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(
+                color: context.kc.accent.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(width: 6),
-            Icon(Icons.close_rounded, size: 16, color: context.kc.accentInk),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$label · $count',
+                  style: AppTypography.labelMd.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.kc.accentInk,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: context.kc.accentInk,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1589,22 +1644,31 @@ class _SortPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? context.kc.accent : context.kc.surfaceMuted,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.labelMd.copyWith(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: active ? context.kc.onAccent : context.kc.muted,
+    // Selection is announced, not only coloured. 8 px of slack above and
+    // below lifts the 29 px pill to a 45 px target.
+    return Semantics(
+      button: true,
+      selected: active,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: active ? context.kc.accent : context.kc.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              label,
+              style: AppTypography.labelMd.copyWith(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: active ? context.kc.onAccent : context.kc.muted,
+              ),
+            ),
           ),
         ),
       ),

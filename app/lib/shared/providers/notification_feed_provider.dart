@@ -2,15 +2,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/calendar/data/event_repository.dart';
 import '../../features/home/data/news_repository.dart';
+import '../../features/home/data/studio_notification_repository.dart';
 import 'branch_provider.dart';
 import 'dismissed_notifications_provider.dart';
 import 'sermon_provider.dart';
 
-/// Row ids the notifications feed assigns to announcements and event
-/// reminders. Kept here — not inside the screen — so the Home bell and the
-/// feed can never disagree about what "dismissed" means.
+/// Row ids the notifications feed assigns to announcements, event reminders
+/// and Studio notifications. Kept here — not inside the screen — so the Home
+/// bell and the feed can never disagree about what "dismissed" means.
 String announcementNotificationId(String newsId) => 'news:$newsId';
 String eventNotificationId(String eventId) => 'event:$eventId';
+String studioNotificationId(String id) => 'studio:$id';
 
 // ── Campus scoping ────────────────────────────────────────────────────────────
 //
@@ -92,6 +94,67 @@ Future<void> settleRefresh(Future<Object?> pending) => pending
     .timeout(const Duration(seconds: 15))
     .then<void>((_) {}, onError: (Object _) {});
 
+// ── Studio notifications ──────────────────────────────────────────────────────
+
+final studioNotificationRepositoryProvider =
+    Provider<StudioNotificationRepository>(
+      (ref) =>
+          StudioNotificationRepository(firestore: ref.watch(firestoreProvider)),
+    );
+
+/// Sent Studio notifications for one audience (everyone, or one branch).
+final sentNotificationsProvider = StreamProvider.autoDispose
+    .family<List<StudioNotification>, NotificationAudience>(
+      (ref, audience) =>
+          ref.watch(studioNotificationRepositoryProvider).watchSent(audience),
+    );
+
+/// Merges per-audience lists into one inbox: each notification once, newest
+/// send first, at most [kNotificationPageSize].
+List<StudioNotification> mergeSentNotifications(
+  Iterable<List<StudioNotification>> lists,
+) {
+  final byId = <String, StudioNotification>{
+    for (final list in lists)
+      for (final n in list) n.id: n,
+  };
+  final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+  final merged = byId.values.toList()
+    ..sort((a, b) => (b.sentAt ?? epoch).compareTo(a.sentAt ?? epoch));
+  return merged.take(kNotificationPageSize).toList(growable: false);
+}
+
+/// What Studio sent to this member: everything sent to everyone plus their
+/// branch's, newest first. A member on "All branches" follows no branch
+/// topic, so they get the church-wide ones only, matching their pushes.
+final inboxNotificationsProvider =
+    Provider<AsyncValue<List<StudioNotification>>>((ref) {
+      final campus = ref.watch(currentBranchProvider);
+      if (!campus.hasValue && !campus.hasError) return const AsyncLoading();
+      final branch = campus.valueOrNull?.trim() ?? '';
+      final sources = [
+        ref.watch(sentNotificationsProvider(const NotificationAudience.all())),
+        if (branch.isNotEmpty)
+          ref.watch(
+            sentNotificationsProvider(NotificationAudience.branch(branch)),
+          ),
+      ];
+      final loaded = [
+        for (final s in sources)
+          if (s.hasValue) s.requireValue,
+      ];
+      if (loaded.isEmpty) {
+        final failed = sources.where((s) => s.hasError).firstOrNull;
+        return failed == null
+            ? const AsyncLoading()
+            : AsyncError(
+                failed.error!,
+                failed.stackTrace ?? StackTrace.current,
+              );
+      }
+      return AsyncData(mergeSentNotifications(loaded));
+    });
+
 // ── Bell ──────────────────────────────────────────────────────────────────────
 
 /// True while the notifications feed holds at least one row the member has
@@ -104,8 +167,10 @@ final hasPendingNotificationsProvider = Provider<bool>((ref) {
   final events =
       ref.watch(campusUpcomingEventsProvider).valueOrNull ?? const [];
   final dismissed = ref.watch(dismissedNotificationsProvider);
+  final studio = ref.watch(inboxNotificationsProvider).valueOrNull ?? const [];
   return news.any(
         (n) => !dismissed.contains(announcementNotificationId(n.id)),
       ) ||
-      events.any((e) => !dismissed.contains(eventNotificationId(e.id)));
+      events.any((e) => !dismissed.contains(eventNotificationId(e.id))) ||
+      studio.any((n) => !dismissed.contains(studioNotificationId(n.id)));
 });

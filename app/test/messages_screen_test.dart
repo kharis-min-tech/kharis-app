@@ -236,7 +236,7 @@ void main() {
     expect(repo.requested.where((u) => u == null), hasLength(pageOnes + 1));
     expect(short, findsNothing);
     expect(
-      find.text('You\'ve reached the beginning \u2022 25 messages'),
+      find.text('You\'ve reached the beginning \u00b7 25 messages'),
       findsOneWidget,
     );
   });
@@ -296,7 +296,7 @@ void main() {
       expect(tester.getTopLeft(newest).dy, greaterThan(latest.dy));
       expect(
         tester.getTopLeft(newest).dy,
-        lessThan(tester.getTopLeft(find.text('Find encouragement')).dy),
+        lessThan(tester.getTopLeft(find.text('Browse by topic')).dy),
       );
     });
   });

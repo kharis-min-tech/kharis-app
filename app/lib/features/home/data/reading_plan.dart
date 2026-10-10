@@ -193,16 +193,19 @@ class ReadingPlan {
       verse = range.isEmpty ? '1-end' : range;
     }
     final reference = formatReadingReference(book, chapter, verse);
+    // No authored prayer means no prayer block: the card and reader hide it
+    // rather than show a sentence generated from the reference.
+    final authoredPrayer = prayer.trim();
     return PlanDayReading(
       book: book,
       chapter: chapter,
       verse: verse,
-      prayer: prayer.trim().isEmpty
-          ? 'Lord, speak to us through $reference today.'
-          : prayer.trim(),
-      prayerReference: prayerReference.trim().isEmpty
-          ? reference
-          : prayerReference.trim(),
+      prayer: authoredPrayer,
+      prayerReference: authoredPrayer.isEmpty
+          ? ''
+          : (prayerReference.trim().isEmpty
+                ? reference
+                : prayerReference.trim()),
     );
   }
 

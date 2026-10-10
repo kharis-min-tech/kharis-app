@@ -131,7 +131,8 @@ final notificationPermissionAnsweredProvider =
 // ── Preference enforcement ────────────────────────────────────────────────────
 
 /// Keeps this device's preference-gated FCM topics in step with the user's
-/// saved notification preferences.
+/// saved notification preferences, and the staff test topic in step with
+/// Studio access.
 ///
 /// Without this the toggles in Notification settings would only ever write to
 /// Firestore. Watched by `KharisApp` so it applies on launch and on every
@@ -146,6 +147,17 @@ final notificationTopicSyncProvider = Provider<void>((ref) {
     final prefs = next.valueOrNull;
     if (prefs != null) service.applyPreferences(prefs);
   }, fireImmediately: true);
+  // Studio test pushes reach staff devices only: subscribe once the scope
+  // says this user may use Studio, unsubscribe when that stops (role removed,
+  // signed out). Null while the scope loads, which changes nothing.
+  ref.listen<bool?>(
+    adminScopeProvider.select((scope) => scope.valueOrNull?.canUseStudio),
+    (previous, next) {
+      if (next == null || next == previous) return;
+      service.syncStudioTestTopic(canUseStudio: next);
+    },
+    fireImmediately: true,
+  );
 });
 
 // ── Permission ────────────────────────────────────────────────────────────────

@@ -24,14 +24,6 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 enum _EventTab { upcoming, past, rsvps }
 
-/// Date-chip accent colours cycled per card (mirrors the prototype palette).
-const List<Color> _accentPalette = [
-  AppColors.primary, // purple
-  Color(0xFFB91C5C), // rose
-  Color(0xFFE09B1F), // gold-deep
-  Color(0xFF137A6D), // teal
-];
-
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   _EventTab _tab = _EventTab.upcoming;
 
@@ -103,6 +95,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           emptyIcon: Icons.event_busy_outlined,
           emptyTitle: 'No upcoming events',
           emptySubtitle: 'Check back soon for events at $branchLabel.',
+          // Not a dead end: past events are one tap away.
+          emptyActionLabel: 'See past events',
+          onEmptyAction: () => setState(() => _tab = _EventTab.past),
         );
       case _EventTab.past:
         return _eventsSliver(
@@ -137,16 +132,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     required String emptyTitle,
     required String emptySubtitle,
     String? capNote,
+    String? emptyActionLabel,
+    VoidCallback? onEmptyAction,
   }) {
     return async.when(
       skipLoadingOnRefresh: true,
-      loading: () => _kLoadingSliver,
+      loading: () => const _LoadingSliver(),
       error: (_, _) => _messageSliver(
         context,
         icon: Icons.error_outline_rounded,
         title: 'Unable to load events',
         subtitle: 'Please check your connection and try again.',
-        onRetry: _refresh,
+        actionLabel: 'Retry',
+        onAction: _refresh,
       ),
       data: (events) {
         if (events.isEmpty) {
@@ -155,6 +153,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             icon: emptyIcon,
             title: emptyTitle,
             subtitle: emptySubtitle,
+            actionLabel: emptyActionLabel,
+            onAction: onEmptyAction,
           );
         }
         final note = events.length >= EventRepository.pastEventLimit
@@ -167,10 +167,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               if (index == events.length) return _CapNote(text: note!);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 14),
-                child: EventCard(
-                  event: events[index],
-                  accent: _accentPalette[index % _accentPalette.length],
-                ),
+                child: EventCard(event: events[index]),
               );
             }, childCount: events.length + (note == null ? 0 : 1)),
           ),
@@ -185,13 +182,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget _rsvpSliver(AsyncValue<RsvpEvents> async) {
     return async.when(
       skipLoadingOnRefresh: true,
-      loading: () => _kLoadingSliver,
+      loading: () => const _LoadingSliver(),
       error: (_, _) => _messageSliver(
         context,
         icon: Icons.error_outline_rounded,
         title: 'Unable to load your RSVPs',
         subtitle: 'Please check your connection and try again.',
-        onRetry: _refresh,
+        actionLabel: 'Retry',
+        onAction: _refresh,
       ),
       data: (grouped) {
         if (grouped.isEmpty) {
@@ -200,6 +198,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             icon: Icons.check_circle_outline_rounded,
             title: 'No RSVPs yet',
             subtitle: 'Events you RSVP to will show up here.',
+            actionLabel: 'See upcoming events',
+            onAction: () => setState(() => _tab = _EventTab.upcoming),
           );
         }
         final rows = _rsvpRows(grouped);
@@ -209,9 +209,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) => switch (rows[index]) {
                 _RsvpHeaderRow(:final label) => _GroupHeader(label: label),
-                _RsvpCardRow(:final event, :final accent) => Padding(
+                _RsvpCardRow(:final event) => Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: EventCard(event: event, accent: accent),
+                  child: EventCard(event: event),
                 ),
                 _RsvpNoteRow(:final text) => _CapNote(text: text),
               },
@@ -249,10 +249,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 18),
+            // DESIGN.md: one CTA style, gold with gold ink.
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
+                backgroundColor: context.kc.accent,
+                foregroundColor: context.kc.onAccent,
+                minimumSize: const Size(0, 44),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 28,
                   vertical: 12,
@@ -279,7 +281,8 @@ Widget _messageSliver(
   required IconData icon,
   required String title,
   required String subtitle,
-  VoidCallback? onRetry,
+  String? actionLabel,
+  VoidCallback? onAction,
 }) {
   return SliverToBoxAdapter(
     child: Padding(
@@ -302,12 +305,12 @@ Widget _messageSliver(
             style: AppTypography.ui(size: 13).copyWith(color: context.kc.muted),
             textAlign: TextAlign.center,
           ),
-          if (onRetry != null) ...[
+          if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 12),
             TextButton(
-              onPressed: onRetry,
+              onPressed: onAction,
               child: Text(
-                'Retry',
+                actionLabel,
                 style: AppTypography.ui(
                   size: 14,
                   weight: FontWeight.w700,
@@ -321,17 +324,24 @@ Widget _messageSliver(
   );
 }
 
-const Widget _kLoadingSliver = SliverToBoxAdapter(
-  child: Padding(
-    padding: EdgeInsets.symmetric(vertical: 60),
-    child: Center(
-      child: CircularProgressIndicator(
-        color: AppColors.primary,
-        strokeWidth: 2,
+class _LoadingSliver extends StatelessWidget {
+  const _LoadingSliver();
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 60),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: context.kc.onChip,
+            strokeWidth: 2,
+          ),
+        ),
       ),
-    ),
-  ),
-);
+    );
+  }
+}
 
 // ── My RSVPs sections ─────────────────────────────────────────────────────────
 
@@ -347,10 +357,9 @@ class _RsvpHeaderRow extends _RsvpRow {
 }
 
 class _RsvpCardRow extends _RsvpRow {
-  const _RsvpCardRow(this.event, this.accent);
+  const _RsvpCardRow(this.event);
 
   final Event event;
-  final Color accent;
 }
 
 class _RsvpNoteRow extends _RsvpRow {
@@ -359,23 +368,19 @@ class _RsvpNoteRow extends _RsvpRow {
   final String text;
 }
 
-/// Flattens [grouped] into header + card rows. The accent palette continues
-/// across both groups so no two adjacent cards share a colour.
+/// Flattens [grouped] into header + card rows.
 ///
 /// The Past group is capped at [EventRepository.pastEventLimit] by
 /// [myRsvpEventsProvider]; when it is full, a closing note says so rather
 /// than letting a truncated list pass for the member's whole RSVP history.
 List<_RsvpRow> _rsvpRows(RsvpEvents grouped) {
   final rows = <_RsvpRow>[];
-  var accent = 0;
 
   void addGroup(String label, List<Event> events) {
     if (events.isEmpty) return;
     rows.add(_RsvpHeaderRow(label));
     for (final event in events) {
-      rows.add(
-        _RsvpCardRow(event, _accentPalette[accent++ % _accentPalette.length]),
-      );
+      rows.add(_RsvpCardRow(event));
     }
   }
 
@@ -406,7 +411,7 @@ class _CapNote extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: AppTypography.ui(size: 12).copyWith(color: context.kc.faint),
+        style: AppTypography.ui(size: 12).copyWith(color: context.kc.muted),
       ),
     );
   }
@@ -435,8 +440,8 @@ class _GroupHeader extends StatelessWidget {
 
 // ── Header ───────────────────────────────────────────────────────────────────
 
-/// Screen title plus the campus chip. The chip is captioned "YOUR CAMPUS"
-/// because tapping it changes the member's campus everywhere — it is not a
+/// Screen title plus the branch chip. The chip is captioned "YOUR BRANCH"
+/// because tapping it changes the member's branch everywhere; it is not a
 /// throwaway filter over this list.
 class _Header extends StatelessWidget {
   const _Header({required this.branchLabel, required this.onTapBranch});
@@ -460,52 +465,63 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Flexible(
-          child: GestureDetector(
-            onTap: onTapBranch,
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: context.kc.surface,
-                borderRadius: AppRadius.pillBorder,
-                boxShadow: AppShadows.card,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'YOUR CAMPUS',
-                    style: AppTypography.ui(
-                      size: 9,
-                      weight: FontWeight.w700,
-                      letterSpacing: 0.7,
-                    ).copyWith(color: context.kc.muted),
+          child: Semantics(
+            button: true,
+            label: 'Your branch: $branchLabel. Change branch',
+            excludeSemantics: true,
+            child: GestureDetector(
+              onTap: onTapBranch,
+              behavior: HitTestBehavior.opaque,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
                   ),
-                  const SizedBox(height: 1),
-                  Row(
+                  decoration: BoxDecoration(
+                    color: context.kc.surface,
+                    borderRadius: AppRadius.pillBorder,
+                    boxShadow: AppShadows.card,
+                  ),
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                        child: Text(
-                          branchLabel,
-                          style: AppTypography.ui(
-                            size: 13,
-                            weight: FontWeight.w600,
-                          ).copyWith(color: AppColors.primary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      Text(
+                        'YOUR BRANCH',
+                        style: AppTypography.ui(
+                          size: 9,
+                          weight: FontWeight.w700,
+                          letterSpacing: 0.7,
+                        ).copyWith(color: context.kc.muted),
                       ),
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: AppColors.primary,
+                      const SizedBox(height: 1),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              branchLabel,
+                              style: AppTypography.ui(
+                                size: 13,
+                                weight: FontWeight.w600,
+                              ).copyWith(color: context.kc.onChip),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: context.kc.onChip,
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -561,20 +577,33 @@ class _TabChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: active ? AppColors.primary : context.kc.surfaceMuted,
-          borderRadius: AppRadius.pillBorder,
-        ),
-        child: Text(
-          label,
-          style: AppTypography.ui(
-            size: 13,
-            weight: active ? FontWeight.w700 : FontWeight.w600,
-          ).copyWith(color: active ? AppColors.onPrimary : context.kc.muted),
+    // Selection is announced, not only coloured. 5 px of slack above and
+    // below lifts the 35 px chip to a 45 px target.
+    return Semantics(
+      button: true,
+      selected: active,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(
+              color: active ? AppColors.primary : context.kc.surfaceMuted,
+              borderRadius: AppRadius.pillBorder,
+            ),
+            child: Text(
+              label,
+              style:
+                  AppTypography.ui(
+                    size: 13,
+                    weight: active ? FontWeight.w700 : FontWeight.w600,
+                  ).copyWith(
+                    color: active ? AppColors.onPrimary : context.kc.muted,
+                  ),
+            ),
+          ),
         ),
       ),
     );

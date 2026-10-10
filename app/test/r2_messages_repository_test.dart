@@ -92,6 +92,25 @@ void main() {
   });
 
   test(
+    'a bucket that never answers falls back to the API by the deadline',
+    () async {
+      // Never resolves: a stalled connection trickling no complete response.
+      final dio = Dio()
+        ..interceptors.add(InterceptorsWrapper(onRequest: (_, _) {}));
+      final repo = R2MessagesRepository(
+        dio: dio,
+        api: _FakeApi(head: [_apiSermon('21')]),
+        mirrorDeadline: const Duration(milliseconds: 50),
+      );
+
+      final page = await repo.fetchPage().timeout(const Duration(seconds: 2));
+
+      expect(page.sermons.map((s) => s.id), ['21']);
+      expect(page.nextUrl, 'https://x.test/sermons/?page=2');
+    },
+  );
+
+  test(
     'the mirror alone still serves the archive when the API is down',
     () async {
       final (dio, _) = _bucket(messages: [_record('20'), _record('19')]);

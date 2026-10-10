@@ -40,7 +40,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: const Text('Removed from Favorites'),
+          content: const Text('Removed from Favourites'),
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
             label: 'Undo',
@@ -70,7 +70,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 color: sheetContext.kc.onBg,
               ),
               title: Text(
-                'Remove from Favorites',
+                'Remove from Favourites',
                 style: AppTypography.ui(
                   size: 15,
                   weight: FontWeight.w600,
@@ -135,17 +135,16 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     } else if (favoritesAsync.hasError && !favoritesAsync.hasValue) {
       body = const _FavoritesMessage(
         icon: Icons.cloud_off_outlined,
-        headline: "Your Favorites couldn't be loaded",
+        headline: 'Your Favourites couldn\u2019t be loaded',
         body: 'Check your connection and try again.',
       );
     } else if (storedCount == 0) {
       body = const _FavoritesMessage(
         icon: Icons.favorite_border_rounded,
-        headline: 'No favorites yet',
+        headline: 'No Favourites yet',
         body:
             'While a message plays, tap the heart beside its title to save '
-            'it here. Favorites are your quick go-to, kept apart from your '
-            'playlists.',
+            'it here. Favourites are kept separate from your playlists.',
       );
     } else {
       body = _FavoritesList(
@@ -164,7 +163,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         scrolledUnderElevation: 0,
         centerTitle: false,
         title: Text(
-          'Favorites',
+          'Favourites',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: AppTypography.display(

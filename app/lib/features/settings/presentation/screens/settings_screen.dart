@@ -11,6 +11,7 @@ import 'package:kharis_app/features/connect/presentation/screens/new_here_screen
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
+import 'package:kharis_app/features/settings/presentation/widgets/delete_account_flow.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
@@ -94,7 +95,7 @@ class SettingsScreen extends ConsumerWidget {
                   children: [
                     _MoreMenuItem(
                       icon: Icons.shield_outlined,
-                      label: 'Admin Console',
+                      label: 'Admin console',
                       accent: context.kc.accentInk,
                       onTap: () => context.push('/admin'),
                       isLast: true,
@@ -116,27 +117,27 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _MoreMenuItem(
                     icon: Icons.auto_stories,
-                    label: 'Daily Reading',
+                    label: 'Daily reading',
                     onTap: () => context.push('/reading'),
                   ),
                   _MoreMenuItem(
                     icon: Icons.edit_note_rounded,
-                    label: 'My Notes',
+                    label: 'My notes',
                     onTap: () => context.push('/notes'),
                   ),
                   _MoreMenuItem(
                     icon: Icons.favorite_border_rounded,
-                    label: 'Favorites',
+                    label: 'Favourites',
                     onTap: () => context.push('/favorites'),
                   ),
                   _MoreMenuItem(
                     icon: Icons.queue_music_rounded,
-                    label: 'My Playlists',
+                    label: 'My playlists',
                     onTap: () => context.push('/playlists'),
                   ),
                   _MoreMenuItem(
                     icon: Icons.sync_alt,
-                    label: 'Switch Branch',
+                    label: 'Switch branch',
                     value: branch ?? kAllCampusesLabel,
                     onTap: () => context.push('/branch-selection'),
                   ),
@@ -185,7 +186,7 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _MoreMenuItem(
                     icon: Icons.star_border_rounded,
-                    label: 'Rate & Feedback',
+                    label: 'Rate & feedback',
                     accent: context.kc.accentInk,
                     onTap: () => unawaited(
                       showFeedbackSheet(
@@ -197,13 +198,13 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   _MoreMenuItem(
                     icon: Icons.help_outline,
-                    label: 'Help & Support',
+                    label: 'Help & support',
                     external: true,
                     onTap: () => unawaited(_openExternal(kHelpUrl)),
                   ),
                   _MoreMenuItem(
                     icon: Icons.privacy_tip_outlined,
-                    label: 'Privacy Policy',
+                    label: 'Privacy policy',
                     external: true,
                     isLast: true,
                     onTap: () => unawaited(_openExternal(kPrivacyPolicyUrl)),
@@ -219,10 +220,18 @@ class SettingsScreen extends ConsumerWidget {
                     _MoreMenuItem(
                       icon: Icons.logout,
                       label: 'Sign out',
-                      accent: AppColors.danger,
+                      accent: context.kc.danger,
+                      danger: true,
+                      onTap: () => _confirmSignOut(context, ref),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.person_remove_outlined,
+                      label: 'Delete account',
+                      accent: context.kc.danger,
                       danger: true,
                       isLast: true,
-                      onTap: () => _confirmSignOut(context, ref),
+                      onTap: () =>
+                          unawaited(confirmDeleteAccount(context, user)),
                     ),
                   ],
                 )
@@ -291,7 +300,7 @@ class SettingsScreen extends ConsumerWidget {
               style: AppTypography.ui(
                 size: 14,
                 weight: FontWeight.w700,
-              ).copyWith(color: AppColors.danger),
+              ).copyWith(color: context.kc.danger),
             ),
           ),
         ],
@@ -387,21 +396,30 @@ class _EditButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: context.kc.chipBg,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-        child: Text(
-          'Edit',
-          style: AppTypography.ui(
-            size: 13,
-            weight: FontWeight.w700,
-          ).copyWith(color: context.kc.onChip),
+    // 44 px tall hit area around the 34 px pill.
+    return Semantics(
+      button: true,
+      label: 'Edit profile',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: context.kc.chipBg,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              'Edit',
+              style: AppTypography.ui(
+                size: 13,
+                weight: FontWeight.w700,
+              ).copyWith(color: context.kc.onChip),
+            ),
+          ),
         ),
       ),
     );
@@ -475,7 +493,7 @@ class _SignedOutCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Sign in to keep your notes, playlists and campus on every device.',
+            'Sign in to keep your notes, playlists and branch on every device.',
             style: AppTypography.ui(
               size: 13,
               height: 1.5,
@@ -486,7 +504,7 @@ class _SignedOutCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _PillButton(
-                  label: 'Sign In',
+                  label: 'Sign in',
                   filled: true,
                   onTap: () => context.push('/login'),
                 ),
@@ -494,7 +512,7 @@ class _SignedOutCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _PillButton(
-                  label: 'Create Account',
+                  label: 'Create account',
                   filled: false,
                   onTap: () => context.push('/register'),
                 ),
@@ -520,24 +538,27 @@ class _PillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 46,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: filled ? context.kc.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.button),
-          border: filled
-              ? null
-              : Border.all(color: context.kc.outline, width: 1.5),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.ui(
-            size: 14,
-            weight: FontWeight.w700,
-          ).copyWith(color: filled ? context.kc.onAccent : context.kc.onBg),
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 46,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: filled ? context.kc.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: filled
+                ? null
+                : Border.all(color: context.kc.outline, width: 1.5),
+          ),
+          child: Text(
+            label,
+            style: AppTypography.ui(
+              size: 14,
+              weight: FontWeight.w700,
+            ).copyWith(color: filled ? context.kc.onAccent : context.kc.onBg),
+          ),
         ),
       ),
     );
@@ -651,7 +672,7 @@ class _MoreMenuItem extends StatelessWidget {
                   style: AppTypography.ui(
                     size: 15,
                     weight: FontWeight.w600,
-                  ).copyWith(color: danger ? AppColors.danger : kc.onBg),
+                  ).copyWith(color: danger ? kc.danger : kc.onBg),
                 ),
               ),
               if (value != null) ...[
@@ -792,33 +813,38 @@ class _ThemeOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final kc = context.kc;
     final fg = selected ? kc.onAccent : kc.muted;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? kc.accent : kc.surfaceMuted,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: fg),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.ui(
-                  size: 13,
-                  weight: FontWeight.w700,
-                ).copyWith(color: fg),
+    // Selection is announced, not only coloured; 44 px meets the tap target.
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? kc.accent : kc.surfaceMuted,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: fg),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.ui(
+                    size: 13,
+                    weight: FontWeight.w700,
+                  ).copyWith(color: fg),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

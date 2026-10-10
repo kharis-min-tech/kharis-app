@@ -81,17 +81,16 @@ Map<String, dynamic> _announcementJson({
   String id = 'welcome-new-app',
   String title = 'Welcome to the new Kharis app',
   String? expiresAt,
-}) =>
-    {
-      'id': id,
-      'title': title,
-      'body': 'Announcements from your campus now appear here — stay tuned.',
-      'type': 'Announcement',
-      'branch': null,
-      'imageUrl': null,
-      'publishedAt': '2026-08-04T20:19:05.000Z',
-      'expiresAt': expiresAt,
-    };
+}) => {
+  'id': id,
+  'title': title,
+  'body': 'Announcements from your campus now appear here — stay tuned.',
+  'type': 'Announcement',
+  'branch': null,
+  'imageUrl': null,
+  'publishedAt': '2026-08-04T20:19:05.000Z',
+  'expiresAt': expiresAt,
+};
 
 KharisApiAnnouncementRepository _repository(HttpClientAdapter adapter) =>
     KharisApiAnnouncementRepository(
@@ -108,9 +107,7 @@ Widget _homeHarness(
       announcementApiRepositoryProvider.overrideWithValue(repository),
       currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
     ],
-    child: const MaterialApp(
-      home: Scaffold(body: AnnouncementsCarousel()),
-    ),
+    child: const MaterialApp(home: Scaffold(body: AnnouncementsCarousel())),
   );
 }
 
@@ -127,26 +124,31 @@ Future<void> _settle(WidgetTester tester) async {
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  test('repository maps the live getAnnouncements JSON onto NewsItem',
-      () async {
-    final repo = _repository(
-      _StubAdapter([_announcementJson(expiresAt: '2036-01-01T00:00:00.000Z')]),
-    );
+  test(
+    'repository maps the live getAnnouncements JSON onto NewsItem',
+    () async {
+      final repo = _repository(
+        _StubAdapter([
+          _announcementJson(expiresAt: '2036-01-01T00:00:00.000Z'),
+        ]),
+      );
 
-    final items = await repo.getAnnouncements();
+      final items = await repo.getAnnouncements();
 
-    final item = items.single;
-    expect(item.id, 'welcome-new-app');
-    expect(item.title, 'Welcome to the new Kharis app');
-    expect(item.type, 'Announcement');
-    expect(item.branch, isNull);
-    expect(item.publishedAt.toUtc().year, 2026);
-    expect(item.expiresAt?.toUtc().year, 2036);
-    expect(item.isExpired, isFalse);
-  });
+      final item = items.single;
+      expect(item.id, 'welcome-new-app');
+      expect(item.title, 'Welcome to the new Kharis app');
+      expect(item.type, 'Announcement');
+      expect(item.branch, isNull);
+      expect(item.publishedAt.toUtc().year, 2026);
+      expect(item.expiresAt?.toUtc().year, 2036);
+      expect(item.isExpired, isFalse);
+    },
+  );
 
-  testWidgets('seeded announcements render on the homepage carousel',
-      (tester) async {
+  testWidgets('seeded announcements render on the homepage carousel', (
+    tester,
+  ) async {
     final adapter = _StubAdapter([
       _announcementJson(),
       _announcementJson(
@@ -159,11 +161,10 @@ void main() {
 
     expect(find.text('Welcome to the new Kharis app'), findsOneWidget);
     expect(find.text('Listen to messages on the go'), findsOneWidget);
-    expect(find.text('No announcements'), findsNothing);
+    expect(find.textContaining('No announcements'), findsNothing);
   });
 
-  testWidgets('expired announcements never reach the carousel',
-      (tester) async {
+  testWidgets('expired announcements never reach the carousel', (tester) async {
     final adapter = _StubAdapter([
       _announcementJson(),
       _announcementJson(
@@ -179,8 +180,9 @@ void main() {
     expect(find.text('Old expired notice'), findsNothing);
   });
 
-  testWidgets('member branch is forwarded to the API for server-side scoping',
-      (tester) async {
+  testWidgets('member branch is forwarded to the API for server-side scoping', (
+    tester,
+  ) async {
     final adapter = _StubAdapter([_announcementJson()]);
     await tester.pumpWidget(
       _homeHarness(_repository(adapter), branch: 'london-hq'),
@@ -222,6 +224,6 @@ void main() {
     await tester.pumpWidget(_homeHarness(_repository(_StubAdapter([]))));
     await _settle(tester);
 
-    expect(find.text('No announcements'), findsOneWidget);
+    expect(find.textContaining('No announcements'), findsOneWidget);
   });
 }

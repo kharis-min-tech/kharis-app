@@ -149,7 +149,7 @@ const EVENT_CHANGE_LABEL: Record<string, string> = {
   endTime: 'time',
   location: 'venue',
   address: 'venue',
-  branch: 'campus',
+  branch: 'branch',
 };
 
 /**
@@ -257,7 +257,7 @@ export const onEventWritten = onDocumentWritten(
     // key, and a body that leads with where the event went.
     const from = prev && changed.includes('branch') ? branchTopic(prev.branch) : topic;
     if (from === topic) return;
-    const movedTo = (next.branch ?? '').toString().trim() || 'all campuses';
+    const movedTo = (next.branch ?? '').toString().trim() || 'all branches';
     await sendPush(
       `${event.id}_${from}`,
       prefAudience(PREF_TOPIC.events, prev?.branch),

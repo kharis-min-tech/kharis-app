@@ -198,15 +198,26 @@ class _HomeHeader extends ConsumerWidget {
     return 'Good evening';
   }
 
+  /// The account's real first name, or null for the placeholder names the
+  /// auth layer gives guests and nameless sign-ins ("Guest", "Member").
+  static String? _firstName(String? displayName) {
+    final name = displayName?.trim() ?? '';
+    if (name.isEmpty || name == 'Guest' || name == 'Member') return null;
+    return name.split(RegExp(r'\s+')).first;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
+    // Small line: where the member belongs. Big line: the greeting, with
+    // their name only when they have told us one.
     final branch = (user?.branch != null && user!.branch!.isNotEmpty)
         ? user.branch!
-        : 'Kharis';
-    final name = (user != null && user.displayName.isNotEmpty)
-        ? user.displayName
-        : 'Welcome';
+        : 'Kharis Church';
+    final firstName = _firstName(user?.displayName);
+    final greeting = firstName == null
+        ? _greeting()
+        : '${_greeting()}, $firstName';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -228,7 +239,7 @@ class _HomeHeader extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${_greeting()}, $branch',
+                branch,
                 style: AppTypography.ui(
                   size: 12.5,
                   weight: FontWeight.w500,
@@ -238,7 +249,7 @@ class _HomeHeader extends ConsumerWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                name,
+                greeting,
                 style: AppTypography.display(
                   size: 22,
                   weight: FontWeight.w700,
@@ -251,45 +262,59 @@ class _HomeHeader extends ConsumerWidget {
         ),
 
         // Bell button with pink notification dot. Same route as a push tap,
-        // so Back behaves identically however the feed was reached.
-        GestureDetector(
-          key: const Key('home-bell'),
-          onTap: () => context.push('/notifications'),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.kc.surface,
-                  boxShadow: AppShadows.card,
-                ),
-                child: Icon(
-                  Icons.notifications_none_rounded,
-                  color: context.kc.onBg,
-                  size: 21,
-                ),
-              ),
-              // KA-023: the dot only lights when the feed actually holds
-              // something the member hasn't dismissed.
-              if (ref.watch(hasPendingNotificationsProvider))
-                Positioned(
-                  key: const Key('home-bell-unread-dot'),
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    width: 8,
-                    height: 8,
+        // so Back behaves identically however the feed was reached. The
+        // 48 px hit area surrounds the 42 px visual circle.
+        Semantics(
+          button: true,
+          label: ref.watch(hasPendingNotificationsProvider)
+              ? 'Notifications, new items'
+              : 'Notifications',
+          child: GestureDetector(
+            key: const Key('home-bell'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => context.push('/notifications'),
+            child: Padding(
+              padding: const EdgeInsets.all(3),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: AppColors.accentPink,
                       shape: BoxShape.circle,
-                      border: Border.all(color: context.kc.surface, width: 1.5),
+                      color: context.kc.surface,
+                      boxShadow: AppShadows.card,
+                    ),
+                    child: Icon(
+                      Icons.notifications_none_rounded,
+                      color: context.kc.onBg,
+                      size: 21,
                     ),
                   ),
-                ),
-            ],
+                  // KA-023: the dot only lights when the feed actually holds
+                  // something the member hasn't dismissed.
+                  if (ref.watch(hasPendingNotificationsProvider))
+                    Positioned(
+                      key: const Key('home-bell-unread-dot'),
+                      top: 2,
+                      right: 2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppColors.accentPink,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: context.kc.surface,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ],

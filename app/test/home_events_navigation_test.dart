@@ -501,12 +501,12 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.byKey(const Key('announcements-skeleton')), findsOneWidget);
-      expect(find.text('No announcements'), findsNothing);
+      expect(find.textContaining('No announcements'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 150));
       await tester.pump();
       expect(find.text('Couldn\u2019t load announcements.'), findsOneWidget);
-      expect(find.text('No announcements'), findsNothing);
+      expect(find.textContaining('No announcements'), findsNothing);
 
       await tester.tap(find.text('Retry'));
       await tester.pump();

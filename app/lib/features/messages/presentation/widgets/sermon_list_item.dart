@@ -180,22 +180,30 @@ class _SermonListItemState extends State<SermonListItem>
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            // ── 3-dot button (34px circle, inset fill) ────────────────────────
-            GestureDetector(
-              onTap: widget.onMoreTap,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: context.kc.surfaceAlt,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Icon(
-                  Icons.more_vert_rounded,
-                  color: context.kc.muted,
-                  size: 18,
+            const SizedBox(width: 3),
+            // ── 3-dot button (34px circle in a 44px hit area) ─────────────────
+            Semantics(
+              button: true,
+              label: 'More options',
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: widget.onMoreTap,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(5),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: context.kc.surfaceAlt,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                    ),
+                    child: Icon(
+                      Icons.more_vert_rounded,
+                      color: context.kc.muted,
+                      size: 18,
+                    ),
+                  ),
                 ),
               ),
             ),

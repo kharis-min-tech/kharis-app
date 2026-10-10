@@ -75,17 +75,26 @@ class _ModeChip extends StatelessWidget {
               ? context.kc.muted
               : context.kc.muted.withValues(alpha: 0.4));
 
+    // 5 px of slack above and below lifts the 34 px pill to a 44 px target.
     final chip = GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.ui(size: 13, weight: FontWeight.w600, color: fg),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
+          child: Text(
+            label,
+            style: AppTypography.ui(
+              size: 13,
+              weight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
         ),
       ),
     );

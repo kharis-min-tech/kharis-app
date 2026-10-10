@@ -17,15 +17,25 @@ import 'sermon_repository_base.dart';
 /// the small API request brings anything uploaded since the Worker last ran.
 ///
 /// Everything else delegates to [KharisApiSermonRepository]: searches, `next`
-/// links, and page 1 itself whenever R2 is unreachable or empty, so a dead
-/// bucket degrades to the paged API walk rather than an empty library.
+/// links, and page 1 itself whenever R2 is unreachable, empty or slower than
+/// [mirrorDeadline], so a dead or stalled bucket degrades to the paged API
+/// walk rather than an empty library.
 class R2MessagesRepository extends AbstractSermonRepository {
-  R2MessagesRepository({Dio? dio, KharisApiSermonRepository? api})
-    : _dio = dio ?? Dio(),
-      _api = api ?? KharisApiSermonRepository();
+  R2MessagesRepository({
+    Dio? dio,
+    KharisApiSermonRepository? api,
+    this.mirrorDeadline = const Duration(seconds: 25),
+  }) : _dio =
+           dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 10))),
+       _api = api ?? KharisApiSermonRepository();
 
   final Dio _dio;
   final KharisApiSermonRepository _api;
+
+  /// Longest the whole mirror download may take. Dio's receive timeout only
+  /// trips on silence, so on a lossy connection that trickles bytes the
+  /// ~1.5 MB file could otherwise hold page 1 (and the library) for minutes.
+  final Duration mirrorDeadline;
 
   @override
   Future<SermonPage> fetchPage({String? url, String? search}) async {
@@ -39,7 +49,7 @@ class R2MessagesRepository extends AbstractSermonRepository {
     );
     final List<Sermon> mirror;
     try {
-      mirror = await _fetchMirror();
+      mirror = await _fetchMirror().timeout(mirrorDeadline);
     } catch (_) {
       // No mirror: the paged API walk, with its errors propagating so the
       // notifier can tell "failed" from "empty".

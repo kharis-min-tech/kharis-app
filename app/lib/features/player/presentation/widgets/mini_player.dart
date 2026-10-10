@@ -145,7 +145,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                   size: 11,
                                   height: 1.25,
                                   color: failed
-                                      ? AppColors.danger
+                                      ? context.kc.danger
                                       : context.kc.muted,
                                 ),
                                 maxLines: 1,
@@ -165,6 +165,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                               : (isPlaying ? 'Pause' : 'Play'),
                           excludeSemantics: true,
                           child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: () {
                               if (failed) {
                                 if (sermon.hasAudio) service.retry();
@@ -176,8 +177,9 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                 service.resume();
                               }
                             },
+                            // 9 + 26 + 9: a 44 px target.
                             child: Padding(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(9),
                               child: isBuffering && !failed
                                   ? SizedBox(
                                       width: 26,
@@ -197,7 +199,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                                 ? Icons.pause_rounded
                                                 : Icons.play_arrow_rounded),
                                       color: failed
-                                          ? AppColors.danger
+                                          ? context.kc.danger
                                           : context.kc.onBg,
                                       size: 26,
                                     ),

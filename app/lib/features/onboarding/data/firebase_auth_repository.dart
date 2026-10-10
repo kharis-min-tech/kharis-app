@@ -137,6 +137,49 @@ class FirebaseAuthRepository implements AuthRepository {
     }
   }
 
+  @override
+  bool get usesPasswordSignIn =>
+      _auth.currentUser?.providerData.any(
+        (p) => p.providerId == fb.EmailAuthProvider.PROVIDER_ID,
+      ) ??
+      false;
+
+  @override
+  Future<void> reauthenticate(String password) async {
+    final fbUser = _auth.currentUser;
+    final email = fbUser?.email;
+    if (fbUser == null || email == null || email.isEmpty) {
+      throw const InvalidCredentialsException('Not signed in');
+    }
+    try {
+      await fbUser.reauthenticateWithCredential(
+        fb.EmailAuthProvider.credential(email: email, password: password),
+      );
+    } on fb.FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        throw const InvalidCredentialsException('That password is not correct');
+      }
+      throw _mapError(e);
+    }
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    final fbUser = _auth.currentUser;
+    if (fbUser == null) {
+      throw const InvalidCredentialsException('Not signed in');
+    }
+    try {
+      await fbUser.delete();
+      _cached = null;
+    } on fb.FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        throw const RecentLoginRequiredException();
+      }
+      throw _mapError(e);
+    }
+  }
+
   /// Updates the signed-in user's editable profile fields and refreshes cache.
   Future<User> updateProfile({
     String? displayName,

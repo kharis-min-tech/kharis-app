@@ -73,7 +73,8 @@ class KharisApiAnnouncementRepository {
       expiresAt: expiry != null ? DateTime.tryParse(expiry)?.toLocal() : null,
       eventId: _text(j['eventId']),
       linkUrl: linkUrl,
-      ctaLabel: linkUrl == null ? null : (_text(j['ctaLabel']) ?? 'Learn more'),
+      // No label means the detail sheet's own 'Open link'.
+      ctaLabel: linkUrl == null ? null : _text(j['ctaLabel']),
     );
   }
 

@@ -350,8 +350,9 @@ class _TimelineNoteTile extends StatelessWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: AppSpacing.lg),
+        // White on danger is 4.7:1; the old pale error tint gave 1.7:1.
         decoration: BoxDecoration(
-          color: AppColors.error,
+          color: AppColors.danger,
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Icon(Icons.delete_outline, color: Colors.white),
@@ -407,30 +408,35 @@ class _SeekPill extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.play_arrow_rounded,
-                size: 14,
-                color: AppColors.primary,
-              ),
-              const SizedBox(width: 2),
-              Text(
-                formatNotePosition(positionMs),
-                style: AppTypography.ui(
-                  size: 11,
-                  weight: FontWeight.w600,
-                  color: AppColors.primary,
+        // Slack below only (so the pill stays level with the note's first
+        // line) lifts the 22 px pill to a 46 px target.
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: context.kc.chipBg,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.play_arrow_rounded,
+                  size: 14,
+                  color: context.kc.onChip,
                 ),
-              ),
-            ],
+                const SizedBox(width: 2),
+                Text(
+                  formatNotePosition(positionMs),
+                  style: AppTypography.ui(
+                    size: 11,
+                    weight: FontWeight.w600,
+                    color: context.kc.onChip,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

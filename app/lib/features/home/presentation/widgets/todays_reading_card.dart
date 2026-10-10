@@ -64,7 +64,7 @@ class TodaysReadingCard extends ConsumerWidget {
                 size: 13.5,
               ).copyWith(color: Colors.white.withValues(alpha: .8)),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             _Pill(
               label: 'Retry',
               icon: Icons.refresh_rounded,
@@ -151,26 +151,31 @@ class _Pill extends StatelessWidget {
     return Semantics(
       button: true,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-          decoration: BoxDecoration(
-            color: AppColors.secondary,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: AppTypography.ui(
-                  size: 13.5,
-                  weight: FontWeight.w800,
-                ).copyWith(color: ink, height: 1),
-              ),
-              const SizedBox(width: 6),
-              Icon(icon, color: ink, size: 15),
-            ],
+        // Vertical slack lifts the ~36 px pill to a 44 px tap target.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+            decoration: BoxDecoration(
+              color: AppColors.secondary,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: AppTypography.ui(
+                    size: 13.5,
+                    weight: FontWeight.w800,
+                  ).copyWith(color: ink, height: 1),
+                ),
+                const SizedBox(width: 6),
+                Icon(icon, color: ink, size: 15),
+              ],
+            ),
           ),
         ),
       ),
@@ -338,7 +343,7 @@ class _ReadingCard extends StatelessWidget {
                 ),
               ],
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
 
               _Pill(
                 label: 'Read now',

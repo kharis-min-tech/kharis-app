@@ -130,6 +130,7 @@ service cloud.firestore {
     // profiles and are the only ones who may set `role`, `adminBranchIds` or
     // `adminBranchNames` (no self-promotion, no self-assigned campuses). A
     // self-created profile starts as a plain member role with no campus lists.
+    // A member may delete their own profile (in-app account deletion).
     match /users/{uid} {
       allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
       allow create: if isAuthenticated() && request.auth.uid == uid
@@ -139,7 +140,7 @@ service cloud.firestore {
                     || (isAuthenticated() && request.auth.uid == uid
                         && !request.resource.data.diff(resource.data).affectedKeys()
                               .hasAny(['role', 'adminBranchIds', 'adminBranchNames']));
-      allow delete: if isSuperAdmin();
+      allow delete: if isSuperAdmin() || (isAuthenticated() && request.auth.uid == uid);
 
       // notes — the member's private notebook. Owner-only: nobody else, not
       // even an admin, may read what a member wrote. Anchored notes also
@@ -356,6 +357,69 @@ service cloud.firestore {
       // RSVPs are create-or-delete only; there is nothing to mutate in place.
       allow update: if false;
       allow delete: if ownsRsvpId(rsvpId) || isSuperAdmin();
+    }
+
+    // notifications — Studio pushes (see functions/src/notifications.ts).
+    // Clients write only `draft`, `scheduled` (with `sendAt`; "Send now" is
+    // `sendAt == request.time`) and `cancelled` (from draft/scheduled). The
+    // Admin SDK moves a due doc to `sending` -> `sent`/`failed` and alone
+    // writes `sentAt` and `result`, so keys are closed to clients.
+    // Audience: super admins any; a campus (branch) admin only one of their
+    // own branches, or `test` (staff devices) — for both the stored and the
+    // new doc, so they cannot take over or retarget anyone else's push.
+    // Members read only what was actually sent to everyone or a branch, so the
+    // app inbox query must constrain on `status == 'sent'` and audience type.
+    function notificationAudienceShape(a) {
+      return a is map
+             && (((a.type == 'all' || a.type == 'test') && a.keys().hasOnly(['type']))
+                 || (a.type == 'branch'
+                     && a.keys().hasOnly(['type', 'branch'])
+                     && a.branch is string
+                     && a.branch.trim().size() > 0));
+    }
+
+    function managesNotificationAudience(a) {
+      return isSuperAdmin()
+             || (a.type == 'branch' && managesCampusNamed(a.branch))
+             || (a.type == 'test'
+                 && isCampusAdmin()
+                 && callerProfile().data.get('adminBranchNames', []).size() > 0);
+    }
+
+    function notificationShape(d) {
+      return d.keys().hasOnly(['title', 'body', 'link', 'audience', 'status', 'sendAt',
+                               'createdAt', 'createdBy', 'createdByName', 'updatedAt'])
+             && d.title is string && d.title.trim().size() > 0 && d.title.size() <= 65
+             && d.body is string && d.body.trim().size() > 0 && d.body.size() <= 240
+             && (!('link' in d) || d.link == null
+                 || (d.link is string && d.link.size() <= 500
+                     && d.link.matches('(/[^/].*|[Hh][Tt][Tt][Pp][Ss]?://.+)')))
+             && notificationAudienceShape(d.audience)
+             && d.status in ['draft', 'scheduled', 'cancelled']
+             && (d.status != 'scheduled' || d.sendAt is timestamp)
+             && (!('sendAt' in d) || d.sendAt == null || d.sendAt is timestamp)
+             && d.createdAt is timestamp
+             && d.createdBy is string
+             && optionalText(d, 'createdByName', 200)
+             && d.updatedAt is timestamp;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSuperAdmin()
+                  || isCampusAdmin()
+                  || (resource.data.status == 'sent'
+                      && resource.data.audience.type in ['all', 'branch']);
+      allow create: if notificationShape(request.resource.data)
+                    && request.resource.data.status in ['draft', 'scheduled']
+                    && request.resource.data.createdBy == request.auth.uid
+                    && managesNotificationAudience(request.resource.data.audience);
+      allow update: if resource.data.status in ['draft', 'scheduled']
+                    && notificationShape(request.resource.data)
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && managesNotificationAudience(resource.data.audience)
+                    && managesNotificationAudience(request.resource.data.audience);
+      allow delete: if false;
     }
 
     // pushLog — one document per FCM notification the Firestore triggers in

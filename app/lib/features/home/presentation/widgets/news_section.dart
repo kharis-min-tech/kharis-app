@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
 
@@ -37,9 +38,12 @@ class AnnouncementsCarousel extends ConsumerWidget {
     }
 
     if (items.isEmpty) {
-      return const _CarouselMessage(
+      final branch = ref.watch(currentBranchProvider).valueOrNull;
+      return _CarouselMessage(
         icon: Icons.campaign_outlined,
-        text: 'No announcements',
+        text: branch == null
+            ? 'No announcements yet.'
+            : 'No announcements for $branch yet.',
       );
     }
 

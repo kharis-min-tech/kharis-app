@@ -42,13 +42,14 @@ void openEventDetail(BuildContext context, Event event) {
 /// and a split RSVP | Add-to-calendar footer. The whole card opens the event
 /// detail; the footer buttons keep their own actions.
 ///
-/// [accent] tints the date chip and fills the banner when there is no photo;
-/// the caller cycles a palette so no two adjacent cards match.
+/// The date chip is brand purple on a fixed light plate (6.7:1), and the
+/// banner falls back to the deep brand purple when there is no photo. One
+/// colour on purpose: a rotating rainbow carried no meaning, and its gold
+/// step failed contrast on the plate.
 class EventCard extends ConsumerWidget {
-  const EventCard({super.key, required this.event, required this.accent});
+  const EventCard({super.key, required this.event});
 
   final Event event;
-  final Color accent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -88,7 +89,7 @@ class EventCard extends ConsumerWidget {
                   Positioned(
                     top: 11,
                     left: 11,
-                    child: _DateChip(day: day, month: month, color: accent),
+                    child: _DateChip(day: day, month: month),
                   ),
                   if (event.isFeatured)
                     const Positioned(
@@ -144,7 +145,7 @@ class EventCard extends ConsumerWidget {
                                 label: isRsvped ? 'Going \u2713' : 'RSVP',
                                 color: isRsvped
                                     ? context.kc.muted
-                                    : AppColors.primary,
+                                    : context.kc.onChip,
                                 onTap: () =>
                                     toggleEventRsvp(context, ref, event),
                               ),
@@ -173,7 +174,7 @@ class EventCard extends ConsumerWidget {
   }
 
   Widget _banner() {
-    final fallback = ColoredBox(color: accent);
+    const fallback = ColoredBox(color: AppColors.primaryDeep);
     final url = event.imageUrl;
     if (url == null || url.isEmpty) return fallback;
     return CachedNetworkImage(
@@ -209,7 +210,7 @@ Future<void> toggleEventRsvp(
       ..showSnackBar(
         eventToast(
           going
-              ? 'You\u2019re going to ${event.title} \ud83c\udf89'
+              ? 'You\u2019re going to ${event.title}.'
               : 'RSVP cancelled for ${event.title}.',
         ),
       );
@@ -267,48 +268,36 @@ class _FeaturedPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 55% black over the brightest photo still gives white text 4.7:1.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.55),
         borderRadius: AppRadius.pillBorder,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.star_rounded, size: 12, color: AppColors.gold),
-          const SizedBox(width: 4),
-          Text(
-            'Featured',
-            style: AppTypography.ui(
-              size: 10,
-              weight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ).copyWith(color: Colors.white),
-          ),
-        ],
+      child: Text(
+        'Featured',
+        style: AppTypography.ui(
+          size: 10,
+          weight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ).copyWith(color: Colors.white),
       ),
     );
   }
 }
 
 class _DateChip extends StatelessWidget {
-  const _DateChip({
-    required this.day,
-    required this.month,
-    required this.color,
-  });
+  const _DateChip({required this.day, required this.month});
 
   final String day;
   final String month;
-  final Color color;
+  static const Color color = AppColors.primary;
 
   @override
   Widget build(BuildContext context) {
-    // Fixed light plate in both themes. The chip sits on the photo banner, and
-    // the accent palette it carries is calibrated for a light plate over
-    // photography — tinting it with the active surface drops those accents to
-    // roughly 2:1 in dark mode.
+    // Fixed light plate in both themes: the chip sits on the photo banner,
+    // so it keeps one plate and one ink whatever the active theme.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -391,8 +380,9 @@ class _FooterAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      // 14 + 16 line + 14: a 44 px target across the half-width footer.
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         child: Center(
           child: Text(
             label,

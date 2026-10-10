@@ -84,7 +84,11 @@ class NoteAnchorChip extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: chip,
+        // 12 px above and below lift the 20 px chip to a 44 px target.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: chip,
+        ),
       ),
     );
   }

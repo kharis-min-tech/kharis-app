@@ -432,6 +432,11 @@ Signed iOS builds and store uploads are still done locally
 **`minSdk` errors**
 - `flutter.minSdkVersion` resolves to 21. If a plugin requires higher, set `minSdk = 23` (or required value) explicitly in `defaultConfig`
 
+**"Release app bundle failed to strip debug symbols from native libraries"**
+- AGP strips the native libraries; this message comes from Flutter's post-build check, which needs `apkanalyzer` from the Android SDK command-line tools. Install them (Android Studio → SDK Manager → SDK Tools → "Android SDK Command-line Tools", or `sdkmanager "cmdline-tools;latest"`). GitHub's `ubuntu-latest` runners already have them
+- Confirm with `unzip -l build/app/outputs/bundle/release/app-release.aab | grep libflutter`: `base/lib/arm64-v8a/libflutter.so` should be ~11 MB, with the symbols under `BUNDLE-METADATA/…/libflutter.so.sym`
+- Never add `packaging.jniLibs.keepDebugSymbols` back: Play does not strip what you upload, so every install grows to ~530 MB
+
 ---
 
 ### iOS

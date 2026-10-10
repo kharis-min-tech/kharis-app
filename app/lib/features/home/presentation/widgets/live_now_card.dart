@@ -28,7 +28,7 @@ class LiveNowCard extends ConsumerWidget {
     }
     final title = live.title?.trim().isNotEmpty == true
         ? live.title!.trim()
-        : 'Live Stream';
+        : 'Live stream';
 
     void open() => startPlayback(
       context,
@@ -141,39 +141,11 @@ class LiveNowCard extends ConsumerWidget {
   }
 }
 
-/// "LIVE NOW" badge with a slow pulse on its dot; still when the platform
-/// asks for reduced motion. Ink on the pink live colour keeps 4.5:1.
-class _LiveBadge extends StatefulWidget {
+/// "LIVE NOW" badge. The dot marks a real state (the stream is on), so it
+/// stays, but still: an endless pulse adds motion without adding meaning.
+/// Ink on the pink live colour keeps 4.5:1.
+class _LiveBadge extends StatelessWidget {
   const _LiveBadge();
-
-  @override
-  State<_LiveBadge> createState() => _LiveBadgeState();
-}
-
-class _LiveBadgeState extends State<_LiveBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _ctrl
-        ..stop()
-        ..value = 1;
-    } else if (!_ctrl.isAnimating) {
-      _ctrl.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,18 +158,12 @@ class _LiveBadgeState extends State<_LiveBadge>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FadeTransition(
-            opacity: Tween<double>(
-              begin: 0.45,
-              end: 1,
-            ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut)),
-            child: Container(
-              width: 6,
-              height: 6,
-              decoration: const BoxDecoration(
-                color: AppColors.ink,
-                shape: BoxShape.circle,
-              ),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: AppColors.ink,
+              shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 5),

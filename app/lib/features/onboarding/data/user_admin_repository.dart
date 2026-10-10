@@ -56,7 +56,7 @@ class UserAdminRepository {
     final campusAdmin = role == AdminScope.campusAdminRole;
     if (campusAdmin &&
         (branchIds.isEmpty || branchIds.length != branchNames.length)) {
-      throw ArgumentError('A campus admin needs 1+ campuses (ids and names).');
+      throw ArgumentError('A branch admin needs 1+ branches (ids and names).');
     }
     return _firestore.collection('users').doc(uid).update({
       'role': role,

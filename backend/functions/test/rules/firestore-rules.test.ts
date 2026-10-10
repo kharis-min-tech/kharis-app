@@ -12,7 +12,21 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  Timestamp,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 
 const PROJECT_ID = 'demo-kharis-rules';
 const RULES_PATH = resolve(__dirname, '../../../../firestore.rules');
@@ -278,6 +292,98 @@ describe('users', () => {
   });
 });
 
+describe('account deletion', () => {
+  const NOW = Timestamp.now();
+
+  /** The member's own data, plus another member's to prove isolation. */
+  const seed = async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, 'users/other'), { role: 'member', displayName: 'O' });
+      for (const uid of ['member', 'other']) {
+        await setDoc(doc(d, `users/${uid}/notes/n1`), { body: 'note', updatedAt: NOW });
+        await setDoc(doc(d, `users/${uid}/playlists/favorites`), {
+          name: 'Favourites',
+          sermonIds: ['s1'],
+          createdAt: NOW,
+          updatedAt: NOW,
+        });
+        await setDoc(doc(d, `rsvps/${uid}_e1`), { userId: uid, eventId: 'e1' });
+      }
+    });
+  };
+
+  test('owner can delete their own profile', async () => {
+    await assertSucceeds(deleteDoc(doc(db(member()), 'users/member')));
+  });
+
+  test("a member cannot delete another member's profile", async () => {
+    await seed();
+    await assertFails(deleteDoc(doc(db(member()), 'users/other')));
+    await assertFails(deleteDoc(doc(env.unauthenticatedContext().firestore(), 'users/member')));
+  });
+
+  test('super admin can still delete any profile', async () => {
+    await assertSucceeds(deleteDoc(doc(db(superAdmin()), 'users/member')));
+    await assertSucceeds(deleteDoc(doc(db(claimAdmin()), 'users/campus')));
+  });
+
+  test('owner deletes own notes, playlists and RSVPs but not anyone else’s', async () => {
+    await seed();
+    const d = db(member());
+    await assertSucceeds(deleteDoc(doc(d, 'users/member/notes/n1')));
+    await assertSucceeds(deleteDoc(doc(d, 'users/member/playlists/favorites')));
+    await assertSucceeds(deleteDoc(doc(d, 'rsvps/member_e1')));
+    await assertFails(deleteDoc(doc(d, 'users/other/notes/n1')));
+    await assertFails(deleteDoc(doc(d, 'users/other/playlists/favorites')));
+    await assertFails(deleteDoc(doc(d, 'rsvps/other_e1')));
+    // Not even an admin may touch a member's notes or playlists.
+    await assertFails(deleteDoc(doc(db(superAdmin()), 'users/other/notes/n1')));
+    await assertFails(deleteDoc(doc(db(superAdmin()), 'users/other/playlists/favorites')));
+  });
+
+  test('the in-app deletion sequence succeeds and leaves others intact', async () => {
+    await seed();
+    const d = db(member());
+    // Same order as AccountDataRepository.deleteUserData.
+    const notes = await assertSucceeds(getDocs(collection(d, 'users/member/notes')));
+    const playlists = await assertSucceeds(getDocs(collection(d, 'users/member/playlists')));
+    const rsvps = await assertSucceeds(
+      getDocs(query(collection(d, 'rsvps'), where('userId', '==', 'member'))),
+    );
+    for (const snap of [...notes.docs, ...playlists.docs, ...rsvps.docs]) {
+      await assertSucceeds(deleteDoc(snap.ref));
+    }
+    await assertSucceeds(deleteDoc(doc(d, 'users/member')));
+
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      for (const path of [
+        'users/member',
+        'users/member/notes/n1',
+        'users/member/playlists/favorites',
+        'rsvps/member_e1',
+      ]) {
+        if ((await getDoc(doc(admin, path))).exists()) throw new Error(`${path} survived`);
+      }
+      for (const path of [
+        'users/other',
+        'users/other/notes/n1',
+        'users/other/playlists/favorites',
+        'rsvps/other_e1',
+      ]) {
+        if (!(await getDoc(doc(admin, path))).exists()) throw new Error(`${path} was removed`);
+      }
+    });
+  });
+
+  test('a deleted profile cannot be recreated without a role', async () => {
+    await assertSucceeds(deleteDoc(doc(db(member()), 'users/member')));
+    // e.g. a late FCM token merge from the deleted session.
+    await assertFails(setDoc(doc(db(member()), 'users/member'), { fcmToken: 't' }, { merge: true }));
+  });
+});
+
 describe('other collections', () => {
   test('motdSchedule is denied to everyone', async () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'motdSchedule/2026-10-04')));
@@ -298,5 +404,199 @@ describe('other collections', () => {
     );
     await assertFails(getDoc(doc(d, 'visitors/v1')));
     await assertSucceeds(setDoc(doc(db(superAdmin()), 'sermons/s1'), { title: 'x' }));
+  });
+});
+
+describe('notifications', () => {
+  /** A client-written notification by [uid]: "Send now" to [audience]. */
+  const compose = (uid: string, audience: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+    title: 'Prayer night',
+    body: 'Friday at 8pm.',
+    link: '/e/ev1',
+    audience,
+    status: 'scheduled',
+    sendAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+    createdBy: uid,
+    createdByName: uid,
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+
+  /** Stored docs, as the server would hold them. */
+  const stored = (audience: Record<string, unknown>, status: string, createdBy = 'super') => ({
+    title: 't',
+    body: 'b',
+    audience,
+    status,
+    sendAt: Timestamp.fromMillis(Date.now() + 3_600_000),
+    createdAt: Timestamp.now(),
+    createdBy,
+    updatedAt: Timestamp.now(),
+  });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, 'notifications/north'), stored({ type: 'branch', branch: 'North' }, 'scheduled', 'campus'));
+      await setDoc(doc(d, 'notifications/south'), stored({ type: 'branch', branch: 'South' }, 'scheduled'));
+      await setDoc(doc(d, 'notifications/all'), stored({ type: 'all' }, 'scheduled'));
+      await setDoc(doc(d, 'notifications/test'), stored({ type: 'test' }, 'draft'));
+      await setDoc(doc(d, 'notifications/sentAll'), {
+        ...stored({ type: 'all' }, 'sent'),
+        sentAt: Timestamp.now(),
+        result: { messageId: 'm1' },
+      });
+      await setDoc(doc(d, 'notifications/sentNorth'), {
+        ...stored({ type: 'branch', branch: 'North' }, 'sent'),
+        sentAt: Timestamp.now(),
+      });
+      await setDoc(doc(d, 'notifications/sentTest'), stored({ type: 'test' }, 'sent'));
+      await setDoc(doc(d, 'notifications/failed'), {
+        ...stored({ type: 'all' }, 'failed'),
+        result: { error: 'x' },
+      });
+    });
+  });
+
+  test('super admin (role or claim) sends to any audience', async () => {
+    for (const audience of [{ type: 'all' }, { type: 'test' }, { type: 'branch', branch: 'South' }]) {
+      await assertSucceeds(setDoc(doc(db(superAdmin()), `notifications/s_${audience.type}`), compose('super', audience)));
+    }
+    await assertSucceeds(setDoc(doc(db(claimAdmin()), 'notifications/c1'), compose('claim', { type: 'all' })));
+  });
+
+  test('branch admin sends to own branch and test only', async () => {
+    const d = db(campusAdmin());
+    await assertSucceeds(setDoc(doc(d, 'notifications/n1'), compose('campus', { type: 'branch', branch: 'North' })));
+    await assertSucceeds(setDoc(doc(d, 'notifications/n2'), compose('campus', { type: 'test' })));
+    await assertFails(setDoc(doc(d, 'notifications/n3'), compose('campus', { type: 'all' })));
+    await assertFails(setDoc(doc(d, 'notifications/n4'), compose('campus', { type: 'branch', branch: 'South' })));
+  });
+
+  test('a branch admin without branches, and members, send nothing', async () => {
+    await assertFails(setDoc(doc(db(member()), 'notifications/m1'), compose('member', { type: 'branch', branch: 'North' })));
+    await assertFails(setDoc(doc(db(member()), 'notifications/m2'), compose('member', { type: 'test' })));
+    await assertFails(
+      setDoc(doc(env.unauthenticatedContext().firestore(), 'notifications/u1'), compose('anon', { type: 'all' })),
+    );
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/campus'), { role: 'campus_admin' });
+    });
+    await assertFails(setDoc(doc(db(campusAdmin()), 'notifications/n5'), compose('campus', { type: 'test' })));
+  });
+
+  test('createdBy must be the caller', async () => {
+    await assertFails(setDoc(doc(db(superAdmin()), 'notifications/x'), compose('someone-else', { type: 'all' })));
+  });
+
+  test('clients cannot write server statuses or server fields', async () => {
+    const d = db(superAdmin());
+    for (const status of ['sending', 'sent', 'failed']) {
+      await assertFails(setDoc(doc(d, `notifications/st_${status}`), compose('super', { type: 'all' }, { status })));
+    }
+    await assertFails(setDoc(doc(d, 'notifications/c1'), compose('super', { type: 'all' }, { status: 'cancelled' })));
+    await assertFails(setDoc(doc(d, 'notifications/sa'), compose('super', { type: 'all' }, { sentAt: serverTimestamp() })));
+    await assertFails(
+      setDoc(doc(d, 'notifications/rs'), compose('super', { type: 'all' }, { result: { messageId: 'fake' } })),
+    );
+    await assertFails(updateDoc(doc(d, 'notifications/all'), { status: 'sent' }));
+    await assertFails(updateDoc(doc(d, 'notifications/all'), { sentAt: serverTimestamp() }));
+  });
+
+  test('shape: title/body lengths, link, audience, sendAt', async () => {
+    const d = db(superAdmin());
+    const all = { type: 'all' };
+    await assertSucceeds(setDoc(doc(d, 'notifications/ok65'), compose('super', all, { title: 'x'.repeat(65), body: 'y'.repeat(240) })));
+    await assertSucceeds(setDoc(doc(d, 'notifications/nolink'), compose('super', all, { link: null })));
+    await assertSucceeds(setDoc(doc(d, 'notifications/https'), compose('super', all, { link: 'https://kharis.org/x' })));
+    const bad: Record<string, unknown>[] = [
+      { title: '' },
+      { title: '   ' },
+      { title: 'x'.repeat(66) },
+      { body: '' },
+      { body: 'y'.repeat(241) },
+      { link: 'javascript:alert(1)' },
+      { link: '//evil.example' },
+      { link: `/${'x'.repeat(500)}` },
+      { link: 42 },
+      { audience: { type: 'everyone' } },
+      { audience: { type: 'branch' } },
+      { audience: { type: 'branch', branch: ' ' } },
+      { audience: { type: 'all', branch: 'North' } },
+      { audience: 'all' },
+      { sendAt: null },
+      { extra: true },
+    ];
+    for (const [i, change] of bad.entries()) {
+      await assertFails(setDoc(doc(d, `notifications/bad${i}`), compose('super', all, change)));
+    }
+    await assertSucceeds(setDoc(doc(d, 'notifications/draft'), compose('super', all, { status: 'draft', sendAt: null })));
+  });
+
+  test('cancel: only from draft/scheduled, by someone who manages the audience', async () => {
+    const cancel = { status: 'cancelled', updatedAt: serverTimestamp() };
+    const c = db(campusAdmin());
+    await assertSucceeds(updateDoc(doc(c, 'notifications/north'), cancel));
+    await assertSucceeds(updateDoc(doc(c, 'notifications/test'), cancel));
+    await assertFails(updateDoc(doc(c, 'notifications/south'), cancel));
+    await assertFails(updateDoc(doc(c, 'notifications/all'), cancel));
+    const s = db(superAdmin());
+    await assertSucceeds(updateDoc(doc(s, 'notifications/all'), cancel));
+    await assertFails(updateDoc(doc(s, 'notifications/sentAll'), cancel));
+    await assertFails(updateDoc(doc(s, 'notifications/failed'), cancel));
+    // Once cancelled it stays cancelled.
+    await assertFails(updateDoc(doc(s, 'notifications/all'), { status: 'scheduled', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db(member()), 'notifications/south'), cancel));
+  });
+
+  test('branch admin cannot retarget a notification off their branches', async () => {
+    const c = db(campusAdmin());
+    await assertFails(updateDoc(doc(c, 'notifications/north'), { audience: { type: 'branch', branch: 'South' } }));
+    await assertFails(updateDoc(doc(c, 'notifications/north'), { audience: { type: 'all' } }));
+    await assertSucceeds(updateDoc(doc(c, 'notifications/north'), { audience: { type: 'test' } }));
+    await assertFails(updateDoc(doc(c, 'notifications/south'), { audience: { type: 'branch', branch: 'North' } }));
+  });
+
+  test('creator and creation time are immutable; nobody deletes', async () => {
+    const s = db(superAdmin());
+    await assertFails(updateDoc(doc(s, 'notifications/all'), { createdBy: 'campus' }));
+    await assertFails(updateDoc(doc(s, 'notifications/all'), { createdAt: Timestamp.fromMillis(0) }));
+    await assertFails(deleteDoc(doc(s, 'notifications/all')));
+  });
+
+  test('members read only sent pushes to everyone or a branch', async () => {
+    for (const d of [db(member()), env.unauthenticatedContext().firestore()]) {
+      await assertSucceeds(getDoc(doc(d, 'notifications/sentAll')));
+      await assertSucceeds(getDoc(doc(d, 'notifications/sentNorth')));
+      for (const id of ['sentTest', 'all', 'north', 'test', 'failed']) {
+        await assertFails(getDoc(doc(d, `notifications/${id}`)));
+      }
+    }
+  });
+
+  test('inbox queries must constrain status and audience; admins list everything', async () => {
+    const d = db(member());
+    const col = collection(d, 'notifications');
+    await assertSucceeds(
+      getDocs(query(col, where('status', '==', 'sent'), where('audience.type', '==', 'all'), orderBy('sentAt', 'desc'), limit(50))),
+    );
+    await assertSucceeds(
+      getDocs(
+        query(
+          col,
+          where('status', '==', 'sent'),
+          where('audience.type', '==', 'branch'),
+          where('audience.branch', '==', 'North'),
+          orderBy('sentAt', 'desc'),
+          limit(50),
+        ),
+      ),
+    );
+    await assertFails(getDocs(query(col, where('status', '==', 'sent'), limit(50))));
+    await assertFails(getDocs(query(col, limit(50))));
+    for (const ctx of [superAdmin(), campusAdmin()]) {
+      await assertSucceeds(getDocs(query(collection(db(ctx), 'notifications'), orderBy('createdAt', 'desc'), limit(50))));
+    }
   });
 });
