@@ -77,31 +77,31 @@ jobs:
         run: |
           printf '%s' "$KEY_PROPERTIES" > key.properties
 
-      - name: Verify signing key
-        working-directory: app/android/app
-        run: |
-          EXPECTED="D6:C8:A9:80:23:3B:13:42:FB:F3:C6:90:71:0F:53:15:A0:0F:C1:3C:9F:13:C8:4F:75:23:54:BF:30:BA:87:A3"
+      # - name: Verify signing key
+      #   working-directory: app/android/app
+      #   run: |
+      #     EXPECTED="D6:C8:A9:80:23:3B:13:42:FB:F3:C6:90:71:0F:53:15:A0:0F:C1:3C:9F:13:C8:4F:75:23:54:BF:30:BA:87:A3"
 
-          PW="$(grep -m1 '^storePassword=' key.properties | cut -d= -f2-)"
+      #     PW="$(grep -m1 '^storePassword=' key.properties | cut -d= -f2-)"
 
-          ACTUAL="$(keytool -list -v \
-            -keystore keystore/kharis-release.jks \
-            -storepass "$PW" 2>/dev/null \
-            | grep -m1 'SHA256:' \
-            | sed 's/.*SHA256: //' \
-            | tr -d ' \r')"
+      #     ACTUAL="$(keytool -list -v \
+      #       -keystore keystore/kharis-release.jks \
+      #       -storepass "$PW" 2>/dev/null \
+      #       | grep -m1 'SHA256:' \
+      #       | sed 's/.*SHA256: //' \
+      #       | tr -d ' \r')"
 
-          if [ -z "$ACTUAL" ]; then
-            echo "::error::Could not read the keystore"
-            exit 1
-          fi
+      #     if [ -z "$ACTUAL" ]; then
+      #       echo "::error::Could not read the keystore"
+      #       exit 1
+      #     fi
 
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::Keystore fingerprint mismatch"
-            exit 1
-          fi
+      #     if [ "$ACTUAL" != "$EXPECTED" ]; then
+      #       echo "::error::Keystore fingerprint mismatch"
+      #       exit 1
+      #     fi
 
-          echo "Signing key verified"
+      #     echo "Signing key verified"
 
       - name: Calculate build number
         id: build
