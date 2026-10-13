@@ -96,7 +96,9 @@ jobs:
       - name: Install CocoaPods
         working-directory: app/ios
         run: pod install
-
+      - name: Verify provisioning profile
+        run: |
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles
       - name: Build IPA
         working-directory: app
         run: |
