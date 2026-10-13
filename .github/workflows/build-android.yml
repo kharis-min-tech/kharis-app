@@ -63,9 +63,9 @@ jobs:
         run: |
           mkdir -p keystore
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > keystore/kharis-release.jks
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > keystore/upload-keystore.jks
 
-          test -s keystore/kharis-release.jks || {
+          test -s keystore/upload-keystore.jks || {
             echo "::error::Decoded keystore is empty"
             exit 1
           }
@@ -78,14 +78,14 @@ jobs:
           printf '%s' "$KEY_PROPERTIES" > key.properties
 
       - name: Verify signing key
-        working-directory: app/android
+        working-directory: app/android/app
         run: |
           EXPECTED="D6:C8:A9:80:23:3B:13:42:FB:F3:C6:90:71:0F:53:15:A0:0F:C1:3C:9F:13:C8:4F:75:23:54:BF:30:BA:87:A3"
 
           PW="$(grep -m1 '^storePassword=' key.properties | cut -d= -f2-)"
 
           ACTUAL="$(keytool -list -v \
-            -keystore keystore/kharis-release.jks \
+            -keystore keystore/upload-keystore.jks \
             -storepass "$PW" 2>/dev/null \
             | grep -m1 'SHA256:' \
             | sed 's/.*SHA256: //' \
@@ -130,4 +130,4 @@ jobs:
         run: |
           rm -f app/env.json
           rm -f app/android/key.properties
-          rm -f app/android/keystore/kharis-release.jks
+          rm -f app/android/keystore/upload-keystore.jks
