@@ -78,7 +78,7 @@ jobs:
       - name: Calculate build number
         id: build
         run: |
-          BUILD_NUMBER=$(( ${{ github.run_number }} + 4 ))
+          BUILD_NUMBER=$(( ${{ github.run_number }}  ))
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "Using build number: $BUILD_NUMBER"
       - name: Verify signing files
