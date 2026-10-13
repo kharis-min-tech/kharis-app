@@ -63,9 +63,9 @@ jobs:
         run: |
           mkdir -p keystore
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > keystore/upload-keystore.jks
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > keystore/kharis-release.jks
 
-          test -s keystore/upload-keystore.jks || {
+          test -s keystore/kharis-release.jks || {
             echo "::error::Decoded keystore is empty"
             exit 1
           }
@@ -85,7 +85,7 @@ jobs:
           PW="$(grep -m1 '^storePassword=' key.properties | cut -d= -f2-)"
 
           ACTUAL="$(keytool -list -v \
-            -keystore keystore/upload-keystore.jks \
+            -keystore keystore/kharis-release.jks \
             -storepass "$PW" 2>/dev/null \
             | grep -m1 'SHA256:' \
             | sed 's/.*SHA256: //' \
@@ -130,4 +130,4 @@ jobs:
         run: |
           rm -f app/env.json
           rm -f app/android/key.properties
-          rm -f app/android/keystore/upload-keystore.jks
+          rm -f app/android/keystore/kharis-release.jks
