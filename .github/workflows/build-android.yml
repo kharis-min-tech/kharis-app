@@ -80,7 +80,7 @@ jobs:
       - name: Verify signing key
         working-directory: app/android
         run: |
-          EXPECTED="A8:B6:7B:79:C3:18:CB:81:B2:E0:73:1D:A3:7D:61:82:E6:94:AB:F2:75:86:1E:FC:8C:C2:23:18:B7:47:61:93"
+          EXPECTED="D6:C8:A9:80:23:3B:13:42:FB:F3:C6:90:71:0F:53:15:A0:0F:C1:3C:9F:13:C8:4F:75:23:54:BF:30:BA:87:A3"
 
           PW="$(grep -m1 '^storePassword=' key.properties | cut -d= -f2-)"
 
