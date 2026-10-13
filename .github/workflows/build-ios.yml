@@ -1,45 +1,41 @@
-name: Build iOS
+name: Build iOS IPA
 
-# Builds an unsigned release archive (smoke test that the iOS release build
-# compiles exactly like a local one). Signed IPAs for App Store Connect are
-# still produced locally with app/scripts/deploy-testflight.sh.
-#
-# Required repository secret (Settings -> Secrets and variables -> Actions):
-#
-#   ENV_JSON   Verbatim copy of app/env.json (YOUVERSION_API_KEY,
-#              YOUTUBE_API_KEY). Same secret build-android.yml and ci.yml use.
-
-'on':
+on:
   workflow_dispatch:
-    inputs:
-      build_number:
-        description: Build number (optional override)
-        required: false
-        default: ''
+
+  schedule:
+    - cron: '0 9 * * 5'
 
 jobs:
   build-ios:
-    name: Build iOS archive (unsigned)
+    name: Build iOS Release IPA
     runs-on: macos-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
 
       - name: Check required secrets are present
         env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           ENV_JSON: ${{ secrets.ENV_JSON }}
         run: |
-          if [ -z "$ENV_JSON" ]; then
-            echo "::error::Missing repository secret ENV_JSON (see the header of .github/workflows/build-ios.yml)"
+          missing=""
+
+          [ -n "$IOS_CERTIFICATE_BASE64" ] || missing="$missing IOS_CERTIFICATE_BASE64"
+          [ -n "$IOS_CERTIFICATE_PASSWORD" ] || missing="$missing IOS_CERTIFICATE_PASSWORD"
+          [ -n "$IOS_PROVISIONING_PROFILE_BASE64" ] || missing="$missing IOS_PROVISIONING_PROFILE_BASE64"
+          [ -n "$ENV_JSON" ] || missing="$missing ENV_JSON"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
             exit 1
           fi
 
-      - name: Set up Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      # Same Flutter as local development: the single pin is app/.fvmrc.
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version-file: app/.fvmrc
           channel: stable
@@ -53,34 +49,72 @@ jobs:
         working-directory: app
         env:
           ENV_JSON: ${{ secrets.ENV_JSON }}
-        run: printf '%s' "$ENV_JSON" > env.json
-
-      # --no-codesign stops after the archive (no IPA is exported without
-      # signing), so the archive is the artifact.
-      - name: Build iOS archive
-        working-directory: app
-        # The input reaches the shell as data, never as script text.
-        env:
-          BUILD_NUMBER: ${{ github.event.inputs.build_number }}
         run: |
-          EXTRA=()
-          if [ -n "$BUILD_NUMBER" ]; then
-            if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-              echo "::error::build_number must be digits only"
-              exit 1
-            fi
-            EXTRA=(--build-number="$BUILD_NUMBER")
-          fi
-          flutter build ipa --release --no-codesign --dart-define-from-file=env.json "${EXTRA[@]}"
+          printf '%s' "$ENV_JSON" > env.json
 
-      - name: Upload archive artifact
+      - name: Install Apple Certificate
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "$IOS_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+
+          security create-keychain -p build build.keychain
+
+          security default-keychain -s build.keychain
+          security unlock-keychain -p build build.keychain
+
+          security import certificate.p12 \
+            -k build.keychain \
+            -P "$IOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k build \
+            build.keychain
+
+      - name: Install Provisioning Profile
+        env:
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > profile.mobileprovision
+
+          cp profile.mobileprovision \
+            ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Calculate build number
+        id: build
+        run: |
+          BUILD_NUMBER=$(( ${{ github.run_number }} + 4 ))
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Using build number: $BUILD_NUMBER"
+
+      - name: Install CocoaPods
+        working-directory: app/ios
+        run: pod install
+
+      - name: Build IPA
+        working-directory: app
+        run: |
+          flutter build ipa \
+            --release \
+            --build-number=${{ steps.build.outputs.build_number }} \
+            --dart-define-from-file=env.json
+
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-release-xcarchive
-          path: app/build/ios/archive/Runner.xcarchive
-          if-no-files-found: error
+          name: ios-release-ipa-${{ steps.build.outputs.build_number }}
+          path: app/build/ios/ipa/*.ipa
           retention-days: 30
 
-      - name: Scrub env.json
+      - name: Scrub credentials
         if: always()
-        run: rm -f app/env.json
+        run: |
+          rm -f app/env.json
+          rm -f certificate.p12
+          rm -f profile.mobileprovision
