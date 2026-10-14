@@ -407,7 +407,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         // Forget the last tick too: later saves (dispose, switch, skip) must
         // not write the finished point back over the cleared one.
         _videoPosition = Duration.zero;
-        _history.clearPosition(_sermon);
+        _history.markFinished(_sermon);
         if (_audio.repeatOne) {
           final controller = _youtubeController;
           if (controller != null) {
