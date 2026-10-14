@@ -31,7 +31,7 @@ import {
 initializeApp();
 
 // Re-export scheduled functions
-export { syncYouTube, searchYouTube } from './sync-youtube';
+export { syncYouTube } from './sync-youtube';
 export { syncWebsiteEvents } from './sync-website-events';
 export { feedProxy } from './feed-proxy';
 export { sermonApiProxy } from './sermon-proxy';
@@ -45,10 +45,6 @@ export {
   pushServiceReminders,
   purgePushLog,
 } from './content-notifications';
-
-// Studio notifications (`notifications/{id}`): sent on write when due, and by
-// a 5-minute schedule for future-dated ones. See `notifications.ts`.
-export { onNotificationWritten, sendDueNotifications } from './notifications';
 
 const ANNOUNCEMENT_PAGE_SIZE = 20;
 

@@ -28,6 +28,7 @@ import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_audio_player_service.dart';
+import 'support/fake_sermon_repository.dart';
 import 'support/fake_cache_service.dart';
 
 /// Favorites (the player's heart) live at `users/{uid}/playlists/liked` but
@@ -88,6 +89,12 @@ void main() {
     firestoreProvider.overrideWithValue(db),
     currentUserProvider.overrideWith((ref) => Stream.value(member)),
     sermonsProvider.overrideWith((ref) async => library),
+    // Playlist artwork resolves messages by id through the library; keep it
+    // off the network so no retry timer outlives the test.
+    sermonRepositoryProvider.overrideWithValue(
+      FakePagedSermonRepository([library]),
+    ),
+    sermonArchiveAutoHydrateProvider.overrideWithValue(false),
     videosProvider.overrideWith((ref) async => const <Sermon>[]),
     currentSermonProvider.overrideWith((ref) => null),
     playerStateProvider.overrideWith(

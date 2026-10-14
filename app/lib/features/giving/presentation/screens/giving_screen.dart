@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/features/giving/presentation/screens/giving_webview_screen.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
-import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
-import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
 /// The bank-transfer rows of [giving], in display order. The card renders
 /// these rows and "Copy bank details" copies the same rows, so what the
@@ -32,22 +29,33 @@ String _rowsText(List<(String, String)> rows) =>
 
 /// Giving tab.
 ///
-/// A calm, single-column giving landing: a scripture card, the campus the
-/// gift is directed to, a full-width gold **Give securely** call to action
-/// that opens the secure giving page, and the bank-transfer details below.
-///
-/// The details are [effectiveGivingProvider]: the campus account when the
-/// campus has one, else the church-wide account. "Give securely" only shows
-/// when there is a giving page to open.
-class GivingScreen extends ConsumerWidget {
+/// A calm, single-column giving landing: a scripture card, a full-width gold
+/// **Give securely** call to action that opens the church giving page
+/// ([kGivingUrl]) in the phone's browser, and the church-wide bank-transfer
+/// details ([kBuiltInGiving]) below.
+class GivingScreen extends StatelessWidget {
   const GivingScreen({super.key});
 
+  Future<void> _give(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = await launchUrl(
+      Uri.parse(kGivingUrl),
+      mode: LaunchMode.externalApplication,
+    ).catchError((Object _) => false);
+    if (opened) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Could not open kharis.org. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final branch = ref.watch(currentBranchProvider).valueOrNull;
-    final giving = ref.watch(effectiveGivingProvider);
-    final recipient = ref.watch(givingRecipientProvider);
-    final url = giving.url;
+  Widget build(BuildContext context) {
+    const giving = kBuiltInGiving;
     final rows = givingBankRows(giving);
     final note = giving.note;
 
@@ -75,24 +83,15 @@ class GivingScreen extends ConsumerWidget {
                   children: [
                     const _ScriptureCard(),
                     const SizedBox(height: 18),
-                    const _SectionLabel('GIVING TO'),
+                    _GiveSecurelyButton(onTap: () => _give(context)),
                     const SizedBox(height: 9),
-                    _BranchSelector(
-                      branch: branch ?? kAllCampusesLabel,
-                      recipient: recipient,
-                      onTap: () => pickActiveBranch(context, ref),
-                    ),
-                    if (url != null) ...[
-                      const SizedBox(height: 14),
-                      _GiveSecurelyButton(
-                        onTap: () => openGivingFlow(context, url),
-                      ),
-                      const SizedBox(height: 9),
-                      _SecureNote(recipient: recipient),
-                    ],
+                    const _SecureNote(),
                     if (rows.isNotEmpty) ...[
                       const SizedBox(height: 22),
-                      _BankTransferCard(rows: rows, recipient: recipient),
+                      _BankTransferCard(
+                        rows: rows,
+                        recipient: kChurchWideRecipient,
+                      ),
                     ],
                     if (note != null) ...[
                       const SizedBox(height: 14),
@@ -177,93 +176,6 @@ class _ScriptureCard extends StatelessWidget {
   }
 }
 
-// ── Branch selector ─────────────────────────────────────────────────────────
-
-class _BranchSelector extends StatelessWidget {
-  const _BranchSelector({
-    required this.branch,
-    required this.recipient,
-    required this.onTap,
-  });
-
-  /// The member's campus choice (or "All campuses").
-  final String branch;
-
-  /// Whose account receives the gift: the campus, or the church.
-  final String recipient;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Semantics(
-      button: true,
-      label: 'Giving to $recipient from $branch. Change branch',
-      excludeSemantics: true,
-      child: GestureDetector(
-        key: const ValueKey('giving-branch-selector'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: kc.surface,
-            borderRadius: AppRadius.cardBorder,
-            boxShadow: AppShadows.card,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: kc.chipBg,
-                  borderRadius: AppRadius.tileBorder,
-                ),
-                child: Icon(
-                  Icons.location_on_outlined,
-                  size: 19,
-                  color: kc.onChip,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      branch,
-                      style: AppTypography.ui(
-                        size: 15,
-                        weight: FontWeight.w700,
-                        color: kc.onBg,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$recipient account',
-                      key: const ValueKey('giving-recipient'),
-                      style: AppTypography.ui(size: 12.5, color: kc.muted),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                'Change',
-                style: AppTypography.ui(
-                  size: 13,
-                  weight: FontWeight.w600,
-                  color: kc.onChip,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ── Give securely CTA ─────────────────────────────────────────────────────────
 
 class _GiveSecurelyButton extends StatelessWidget {
@@ -308,9 +220,7 @@ class _GiveSecurelyButton extends StatelessWidget {
 // ── Secure note ───────────────────────────────────────────────────────────────
 
 class _SecureNote extends StatelessWidget {
-  const _SecureNote({required this.recipient});
-
-  final String recipient;
+  const _SecureNote();
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +231,7 @@ class _SecureNote extends StatelessWidget {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            'Opens the secure $recipient giving page',
+            'Opens kharis.org in your browser',
             style: AppTypography.ui(size: 12, color: context.kc.muted),
           ),
         ),
@@ -447,26 +357,6 @@ class _BankTransferCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Shared section label ──────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: AppTypography.ui(
-        size: 11,
-        weight: FontWeight.w700,
-        letterSpacing: 1.1,
-        color: context.kc.muted,
       ),
     );
   }

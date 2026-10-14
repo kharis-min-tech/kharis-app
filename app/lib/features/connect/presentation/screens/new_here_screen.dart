@@ -21,6 +21,7 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _dateController = TextEditingController();
   final _shakeKey = GlobalKey<ShakeEffectState>();
 
   String? _selectedBranch;
@@ -28,10 +29,20 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
   _FormState _state = _FormState.form;
 
   @override
+  void initState() {
+    super.initState();
+    _dateController.text = _formatDate(_firstVisitDate);
+  }
+
+  static String _formatDate(DateTime date) =>
+      DateFormat('dd MMM yyyy').format(date);
+
+  @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _dateController.dispose();
     super.dispose();
   }
 
@@ -51,7 +62,12 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
         child: child!,
       ),
     );
-    if (picked != null) setState(() => _firstVisitDate = picked);
+    if (picked != null) {
+      setState(() {
+        _firstVisitDate = picked;
+        _dateController.text = _formatDate(picked);
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -64,19 +80,23 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
       await ref
           .read(connectRepositoryProvider)
           .submitVisitor(
-            name: _nameController.text.trim(),
-            phone: _phoneController.text.trim(),
-            email: _emailController.text.trim(),
-            branch: _selectedBranch ?? '',
-            firstVisitDate: _firstVisitDate,
+            VisitorSubmission(
+              name: _nameController.text.trim(),
+              phone: _phoneController.text.trim(),
+              email: _emailController.text.trim(),
+              branchName: _selectedBranch,
+              firstVisitDate: _firstVisitDate,
+            ),
           );
       if (mounted) setState(() => _state = _FormState.success);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() => _state = _FormState.form);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Something went wrong. Please try again.'),
+            content: Text(
+              'Your details were not sent. Please try again later.',
+            ),
             backgroundColor: AppColors.errorContainer,
           ),
         );
@@ -176,31 +196,29 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Name
               ConnectFormField(
                 controller: _nameController,
                 label: 'Full name *',
+                hint: 'Your name',
                 textInputAction: TextInputAction.next,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Name is required';
                   return null;
                 },
               ),
-              const SizedBox(height: 14),
-
-              // Phone
+              const SizedBox(height: 16),
               ConnectFormField(
                 controller: _phoneController,
                 label: 'Phone number',
+                hint: 'Optional',
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 14),
-
-              // Email
+              const SizedBox(height: 16),
               ConnectFormField(
                 controller: _emailController,
                 label: 'Email address *',
+                hint: 'you@example.com',
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 validator: (v) {
@@ -210,30 +228,22 @@ class _NewHereScreenState extends ConsumerState<NewHereScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 14),
-
-              // Branch dropdown
+              const SizedBox(height: 16),
               ConnectBranchDropdown(
+                label: 'Branch',
                 value: _selectedBranch,
                 onChanged: (v) => setState(() => _selectedBranch = v),
               ),
-              const SizedBox(height: 14),
-
-              // First visit date
-              GestureDetector(
+              const SizedBox(height: 16),
+              ConnectFormField(
+                controller: _dateController,
+                label: 'First visit date',
+                readOnly: true,
                 onTap: _pickDate,
-                child: AbsorbPointer(
-                  child: ConnectFormField(
-                    controller: TextEditingController(
-                      text: DateFormat('dd MMM yyyy').format(_firstVisitDate),
-                    ),
-                    label: 'First visit date',
-                    suffixIcon: Icon(
-                      Icons.calendar_today_outlined,
-                      color: context.kc.muted,
-                      size: 18,
-                    ),
-                  ),
+                suffixIcon: Icon(
+                  Icons.calendar_today_outlined,
+                  color: context.kc.muted,
+                  size: 18,
                 ),
               ),
               const SizedBox(height: 32),

@@ -213,10 +213,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                               ref.read(recentSearchesProvider.notifier).add(v),
                           onCleared: () => _setQuery(''),
                         ),
-                        if (library.usedFallback || library.offline) ...[
+                        if (library.offline) ...[
                           const SizedBox(height: 12),
                           _OfflineBanner(
-                            fallback: library.usedFallback,
+                            empty: library.sermons.isEmpty,
                             onRetry: libraryNotifier.refresh,
                           ),
                         ],
@@ -455,75 +455,50 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                       ),
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 196,
-                      child: categories.isEmpty
-                          ? const SizedBox.shrink()
-                          : ListView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.marginMobile,
-                              ),
-                              scrollDirection: Axis.horizontal,
-                              itemCount: categories.length,
-                              itemBuilder: (context, index) {
-                                final cat = categories[index];
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    right: index < categories.length - 1
-                                        ? 12
-                                        : 0,
-                                  ),
-                                  child: _TopicCard(
-                                    category: cat,
-                                    count: categoryCounts[cat] ?? 0,
-                                    active: selectedCategory == cat,
-                                    onTap: () {
-                                      ref
-                                          .read(
-                                            selectedCategoryProvider.notifier,
-                                          )
-                                          .state = selectedCategory == cat
-                                          ? 'All'
-                                          : cat;
-                                      _scrollToList();
-                                    },
-                                  ),
-                                );
+                  if (categories.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _PillRow(
+                        spacing: 12,
+                        children: [
+                          for (final cat in categories)
+                            _TopicCard(
+                              category: cat,
+                              count: categoryCounts[cat] ?? 0,
+                              active: selectedCategory == cat,
+                              onTap: () {
+                                ref
+                                    .read(selectedCategoryProvider.notifier)
+                                    .state = selectedCategory == cat
+                                    ? 'All'
+                                    : cat;
+                                _scrollToList();
                               },
                             ),
+                        ],
+                      ),
                     ),
-                  ),
 
                   // ── 4b. Series ───────────────────────────────────────────
                   if (seriesList.isNotEmpty) ...[
                     const SliverToBoxAdapter(child: SizedBox(height: 24)),
                     SliverToBoxAdapter(child: _SectionTitle('Series')),
                     SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 36,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: seriesList.length,
-                          separatorBuilder: (_, _) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final series = seriesList[index];
-                            final active = selectedSeries == series.name;
-                            return _SortPill(
+                      child: _PillRow(
+                        children: [
+                          for (final series in seriesList)
+                            _SortPill(
                               label: '${series.name} (${series.count})',
-                              active: active,
+                              active: selectedSeries == series.name,
                               onTap: () {
                                 ref
                                     .read(selectedSeriesProvider.notifier)
-                                    .state = active
+                                    .state = selectedSeries == series.name
                                     ? null
                                     : series.name;
                                 _scrollToList();
                               },
-                            );
-                          },
-                        ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -628,33 +603,23 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 16),
-                        child: SizedBox(
-                          height: 36,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: archiveYears.length + 1,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(width: 8),
-                            itemBuilder: (context, index) {
-                              if (index == 0) {
-                                return _SortPill(
-                                  label: 'All years',
-                                  active: selectedYear == null,
-                                  onTap: () =>
-                                      ref
-                                              .read(
-                                                selectedArchiveYearProvider
-                                                    .notifier,
-                                              )
-                                              .state =
-                                          null,
-                                );
-                              }
-                              final year = archiveYears[index - 1];
-                              final count = archiveYearCounts[year] ?? 0;
-                              return _SortPill(
-                                label: '$year ($count)',
+                        child: _PillRow(
+                          children: [
+                            _SortPill(
+                              label: 'All years',
+                              active: selectedYear == null,
+                              onTap: () =>
+                                  ref
+                                          .read(
+                                            selectedArchiveYearProvider
+                                                .notifier,
+                                          )
+                                          .state =
+                                      null,
+                            ),
+                            for (final year in archiveYears)
+                              _SortPill(
+                                label: '$year (${archiveYearCounts[year] ?? 0})',
                                 active: selectedYear == year,
                                 onTap: () {
                                   ref
@@ -666,9 +631,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                       : year;
                                   _scrollToList();
                                 },
-                              );
-                            },
-                          ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -687,7 +651,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           vertical: 40,
                         ),
                         child: Text(
-                          'No messages for this filter.',
+                          library.offline && library.sermons.isEmpty
+                              ? 'Messages will appear here once you are '
+                                    'back online.'
+                              : 'No messages for this filter.',
                           textAlign: TextAlign.center,
                           style: AppTypography.bodySm.copyWith(
                             color: context.kc.muted,
@@ -826,12 +793,12 @@ class _SmallSpinner extends StatelessWidget {
 
 // ── Offline banner ─────────────────────────────────────────────────────────────
 
-/// Shown when the live library could not be reached: either the bundled
-/// offline archive or last session's saved copy is on screen.
+/// Shown when the live library could not be reached: either last session's
+/// saved copy is on screen, or ([empty]) nothing could be loaded at all.
 class _OfflineBanner extends StatelessWidget {
-  const _OfflineBanner({required this.fallback, required this.onRetry});
+  const _OfflineBanner({required this.empty, required this.onRetry});
 
-  final bool fallback;
+  final bool empty;
   final Future<void> Function() onRetry;
 
   @override
@@ -853,7 +820,7 @@ class _OfflineBanner extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Offline archive',
+                  empty ? 'You are offline' : 'Offline archive',
                   style: AppTypography.labelMd.copyWith(
                     fontWeight: FontWeight.w700,
                     color: context.kc.onBg,
@@ -861,8 +828,8 @@ class _OfflineBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  fallback
-                      ? 'Showing a saved copy. Newer messages may be missing.'
+                  empty
+                      ? 'Messages could not load. Check your connection.'
                       : 'Showing messages saved on this device.',
                   style: AppTypography.bodySm.copyWith(
                     fontSize: 12,
@@ -1625,6 +1592,34 @@ class _FilterChip extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Horizontal row that takes its children's height ──────────────────────────
+
+/// A horizontally scrolling row whose height is its tallest child's, so pills
+/// and cards are never clipped by a fixed row height at any text scale.
+class _PillRow extends StatelessWidget {
+  const _PillRow({required this.children, this.spacing = 8});
+
+  final List<Widget> children;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) SizedBox(width: spacing),
+            children[i],
+          ],
+        ],
       ),
     );
   }

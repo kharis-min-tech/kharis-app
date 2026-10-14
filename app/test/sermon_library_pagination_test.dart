@@ -26,11 +26,6 @@ class _FakePagedRepo extends AbstractSermonRepository {
   bool failNext = false;
 
   @override
-  Future<List<Sermon>> loadCatalogue() async => [
-    _sermon('99', 'Bundled Fallback'),
-  ];
-
-  @override
   Future<SermonPage> fetchPage({String? url, String? search}) async {
     requested.add(url);
     if (failFirstLoad && url == null) throw StateError('offline');
@@ -148,16 +143,16 @@ void main() {
     expect(lib.sermons.length, 3);
   });
 
-  test('falls back to the bundled catalogue when page 1 fails', () async {
+  test('page 1 failing with nothing saved settles empty and offline', () async {
     final (container, _) = harness(failFirstLoad: true);
     final notifier = container.read(sermonLibraryProvider.notifier);
     await notifier.firstLoad;
 
     final lib = container.read(sermonLibraryProvider);
-    expect(lib.loaded, isTrue);
-    expect(lib.usedFallback, isTrue);
-    expect(lib.sermons.single.title, 'Bundled Fallback');
-    expect(lib.hasMore, isFalse, reason: 'no paging over the bundled asset');
+    expect(lib.loaded, isTrue, reason: 'no endless spinner');
+    expect(lib.offline, isTrue);
+    expect(lib.sermons, isEmpty, reason: 'no bundled catalogue');
+    expect(lib.hasMore, isFalse);
   });
 
   test('refresh refetches page 1 without blanking the list', () async {

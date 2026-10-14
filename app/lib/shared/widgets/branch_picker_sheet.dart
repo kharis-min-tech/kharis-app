@@ -64,8 +64,7 @@ class BranchPickerSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final kc = context.kc;
     final branches =
-        ref.watch(branchesProvider).valueOrNull ??
-        BranchRepository.seedBranches;
+        ref.watch(branchesProvider).valueOrNull ?? const <Branch>[];
     final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
 
     Widget row(String? name, {String? subtitle}) {

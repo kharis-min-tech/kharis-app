@@ -32,12 +32,10 @@ const REGION = 'us-central1';
 /** `sermons/`, `series/`, `playlists/` and sub-resources such as `sermons/123/`. */
 const ALLOWED_PATH = /^\/(sermons|series|playlists)\/(?:[A-Za-z0-9_-]+\/)*$/;
 
-/** Web origins allowed to call the proxy: the app and the Content Studio. */
+/** Web origins allowed to call the proxy: the hosted app and local dev. */
 export const SERMON_PROXY_ORIGINS: Array<string | RegExp> = [
   'https://kharis-app-47c49.web.app',
   'https://kharis-app-47c49.firebaseapp.com',
-  'https://kharis-app-admin.web.app',
-  'https://kharis-app-admin.firebaseapp.com',
   /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
 ];
 
