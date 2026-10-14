@@ -30,8 +30,8 @@ class HomeScreen extends ConsumerWidget {
 
   /// Pull-to-refresh reloads everything Home shows and holds the spinner
   /// until it has all answered: today's reading, the campus announcements and
-  /// events, and the campus settings (branches, `config/home`,
-  /// `config/giving`) behind the layout and the campus card.
+  /// events, and the branch settings (branches with services and giving, and
+  /// the live stream) behind the layout and the campus card.
   Future<void> _refresh(WidgetRef ref) {
     ref.invalidate(dailyContentProvider);
     return Future.wait<void>([
@@ -67,7 +67,7 @@ class HomeScreen extends ConsumerWidget {
 
             for (final id in sections)
               SliverToBoxAdapter(
-                key: ValueKey('home-section-${id.id}'),
+                key: ValueKey('home-section-${id.name}'),
                 child: _HomeSection(id),
               ),
 

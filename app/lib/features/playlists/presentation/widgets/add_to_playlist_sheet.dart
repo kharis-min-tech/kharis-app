@@ -7,7 +7,6 @@ import 'package:kharis_app/features/playlists/presentation/widgets/playlist_card
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/playlist_name_dialog.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
-import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 /// Bottom sheet that files a message into the member's playlists.
 ///
@@ -175,10 +174,10 @@ class AddToPlaylistSheet extends ConsumerWidget {
                           leading: SizedBox(
                             width: 44,
                             height: 44,
-                            child: ArtworkImage(
-                              url: null,
-                              gradientIndex: playlistGradientIndex(playlist.id),
+                            child: PlaylistArt(
+                              playlist: playlist,
                               radius: AppRadius.md,
+                              glyphSize: 22,
                             ),
                           ),
                           title: Text(

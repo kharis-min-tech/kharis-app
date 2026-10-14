@@ -80,8 +80,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Future<void> _refresh() {
     switch (_tab) {
       case _EventTab.upcoming:
+        return refreshCampusContent(ref);
       case _EventTab.past:
-        return refreshCampusContent(ref, pastEvents: _tab == _EventTab.past);
+        return refreshCampusContent(ref, pastEvents: true);
       case _EventTab.rsvps:
         return settleRefresh(ref.refresh(myRsvpEventsProvider.future));
     }
@@ -131,9 +132,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     required IconData emptyIcon,
     required String emptyTitle,
     required String emptySubtitle,
-    String? capNote,
     String? emptyActionLabel,
     VoidCallback? onEmptyAction,
+    String? capNote,
   }) {
     return async.when(
       skipLoadingOnRefresh: true,

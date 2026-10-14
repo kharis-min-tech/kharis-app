@@ -121,6 +121,11 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () => context.push('/reading'),
                   ),
                   _MoreMenuItem(
+                    icon: Icons.menu_book_rounded,
+                    label: 'Bible',
+                    onTap: () => context.push('/bible'),
+                  ),
+                  _MoreMenuItem(
                     icon: Icons.edit_note_rounded,
                     label: 'My notes',
                     onTap: () => context.push('/notes'),

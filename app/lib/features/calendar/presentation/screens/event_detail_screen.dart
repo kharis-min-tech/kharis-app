@@ -27,8 +27,8 @@ final eventByIdProvider = FutureProvider.autoDispose.family<Event?, String>((
 
 /// "Starts in 3 days" style status for [event] relative to [now].
 ///
-/// Events carry no recurrence rule, so the next occurrence IS the event: the
-/// label says how far away it is, that it is on now, or that it has ended.
+/// A weekly event is dated at its next occurrence, so this is about that
+/// occurrence: the label says how far away it is, that it is on now, or that it has ended.
 String eventStatusLabel(Event event, DateTime now) {
   if (event.isPastAt(now)) return 'This event has ended';
   if (!event.startTime.isAfter(now)) return 'Happening now';
@@ -73,9 +73,11 @@ String eventShareText(Event event) {
     return value == null || value.isEmpty ? null : value;
   }
 
-  final when =
+  final next =
       '${DateFormat('EEEE d MMMM yyyy').format(event.startTime)}, '
       '${eventTimeRange(event)}';
+  final repeats = event.recurrenceLabel;
+  final when = repeats == null ? next : '$repeats (next: $next)';
   final place = [
     clean(event.location),
     clean(event.address),
@@ -231,9 +233,20 @@ class _EventBody extends ConsumerWidget {
                   ).copyWith(color: context.kc.onBg, height: 1.15),
                 ),
                 const SizedBox(height: 20),
+                if (event.recurrenceLabel case final repeats?) ...[
+                  _InfoBlock(
+                    key: const Key('event-detail-recurrence'),
+                    icon: Icons.repeat_rounded,
+                    title: repeats,
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _InfoBlock(
                   icon: Icons.calendar_today_rounded,
-                  title: DateFormat('EEEE d MMMM yyyy').format(event.startTime),
+                  title: [
+                    if (event.isWeekly) 'Next:',
+                    DateFormat('EEEE d MMMM yyyy').format(event.startTime),
+                  ].join(' '),
                   subtitle: eventTimeRange(event),
                 ),
                 const SizedBox(height: 16),

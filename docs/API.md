@@ -1,6 +1,6 @@
 # Kharis API reference
 
-Every remote surface the Flutter app (`app/`) and the Content Studio (`admin/index.html` plus the in-app Studio under `app/lib/features/admin`) read from or write to.
+Every remote surface the Flutter app (`app/`) and the Studio (`admin/index.html` plus the in-app Studio under `app/lib/features/admin`) read from or write to. The Studio now only sends notifications and manages Team access; branches, events, announcements and live are managed in the Kharis Content Studio (https://kharis-content.itadmin-a94.workers.dev).
 
 Related documents:
 
@@ -240,7 +240,7 @@ Field notes:
 
 ### 1.5 GET /searchYouTube (admin only)
 
-The Content Studio's channel browser (`admin/index.html`, `YT_SEARCH_URL`) uses this endpoint. It runs a live search over all uploads on the Kharis Church channel (`UC4l8WmdF9ivMDQHHVOdYKqQ`). Source: `sync-youtube.ts`.
+No client calls this endpoint since the Studio's YouTube channel browser was removed. It runs a live search over all uploads on the Kharis Church channel (`UC4l8WmdF9ivMDQHHVOdYKqQ`). Source: `sync-youtube.ts`.
 
 Auth:
 
@@ -554,7 +554,7 @@ Page 1 (no `url`, no `search`):
    This is returned as a single page with `nextUrl = null` and `totalCount` set to the merged length.
 4. When the mirror fails, times out, is empty or is malformed, page 1 falls back to the sermon API. The app awaits the API head request (or retries it) and continues the normal paged walk through `next`. On web this is always the path today, because the bucket sends no CORS headers. **Web builds therefore show no transcripts.**
 
-Searches and `next` links always go to the API. With no network at all, `loadCatalogue()` serves the bundled archive `app/assets/data/kharis_sermons.json`.
+Searches and `next` links always go to the API. With no network and no saved archive, the library is empty and marked offline; the Messages screen offers Retry. No sermon catalogue is bundled with the app.
 
 Transcript URLs are resolved against `kR2BucketBaseUrl`, giving `https://pub-…r2.dev/transcripts/<id>.txt`.
 
@@ -572,7 +572,7 @@ Two callers. Both use YouTube Data API v3 at `https://www.googleapis.com/youtube
 
 The quota figures use the standard costs: `search.list` is 100 units, and `playlistItems.list` and `videos.list` are 1 unit each. The default project quota is 10,000 units per day.
 
-The hourly sync uses about a quarter of that. Each Studio search uses about 1%, so roughly 75 searches per day fit alongside the sync. `searchYouTube` is gated to super admins for this reason.
+The hourly sync uses about a quarter of that. Each `searchYouTube` call uses about 1%, so roughly 75 searches per day would fit alongside the sync. `searchYouTube` is gated to super admins for this reason.
 
 `syncYouTube` writes `sermons/yt_<videoId>` with `{merge: true}`:
 
@@ -658,6 +658,8 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 | `pushLog`, `dailyReadingPushes` | nobody | Admin SDK only |
 | `birthdayPushes` | nobody (default deny) | Admin SDK only |
 
+The member app no longer reads `branches`, `news`, `events` or `config/live|giving|home` (6.2 to 6.5): branches with their services and venues, events, announcements and the live stream come from the Kharis Content Studio (Supabase tables `branches`, `services`, `venues`, `events`, `news`, `app_config`), as described in [MOBILE-INTEGRATION.md §1](MOBILE-INTEGRATION.md#1-repository-map). The collections below remain for the Cloud Functions that still use them.
+
 ### 6.2 branches
 
 The doc id is a slug (e.g. `london-hq`) or an auto id. Fields as written by the Studio and the seed data (live example in [1.2](#12-getbranches)):
@@ -669,19 +671,15 @@ The doc id is a slug (e.g. `london-hq`) or an auto id. Fields as written by the 
 | `group` | `Kharis` \| `KP2` | |
 | `isActive` | bool | |
 | `subtitle`, `shortDescription`, `description` | string | The app shows `subtitle`, falling back to the others in that order |
-| `imageUrl` | string | Asset path or URL |
+| `imageUrl` | string | URL |
 | `gradientStart`, `gradientEnd` | `#RRGGBB` | Also under `branding` |
 | `address`, `meetingDays`, `meetingTime` | string | Venue summary. These drive service reminders and venue pushes. `meetingTime` is `2:00 PM` or `14:00`. |
-| `contact` | `{email, phone}` | `CampusContact` |
+| `contact` | `{email, phone}` | |
 | `instagram` | string | |
-| `venues[]` | `{id, name, addressLine1, addressLine2, city, postcode, country, latitude, longitude, parkingInfo, publicTransportInfo, directionsText}` | `CampusVenue` |
-| `services[]` | `{id, name, type, day, startTime, endTime, venueId, description, order, isActive}` | `CampusService`. Only active services are shown, sorted by `order`. |
-| `giving` | `{url?, bankName?, accountName?, sortCode?, accountNumber?, swiftBic?, iban?, reference?, note?}` | `GivingDetails`. Absent means `config/giving` is used. |
-| `home` | `{sections: [{id, enabled}]}` | `HomeLayout`. Valid ids: `profileCompletion, live, reading, announcements, events, campus, continueListening, giving`. Absent means `config/home` is used. |
-| `hero`, `featuredVideo`, `pastor`, `galleryImages` | map / list | Written by the web Studio |
+| `venues[]` | `{id, name, addressLine1, addressLine2, city, postcode, country, latitude, longitude, parkingInfo, publicTransportInfo, directionsText}` | |
+| `services[]` | `{id, name, type, day, startTime, endTime, venueId, description, order, isActive}` | |
+| `hero`, `featuredVideo`, `pastor`, `galleryImages` | map / list | Written by the former web Studio |
 | `updatedAt`, `createdAt` | timestamp | |
-
-The models are in `app/lib/shared/models/campus_config.dart`.
 
 ### 6.3 news
 
@@ -695,16 +693,16 @@ Fields: `title`, `description`, `location` (venue name), `address`, `branch` (na
 
 Website imports add `source: 'website'`, `sourceId`, `sourceUrl` and `syncedAt`.
 
-A Studio delete of a `web_*` doc writes `{hidden: true, hiddenAt}` instead of deleting it.
+A removed `web_*` doc carries `{hidden: true, hiddenAt}` instead of being deleted, so the hourly sync does not recreate it.
 
 ### 6.5 config
 
 | Doc | Shape | Reader | Writer |
 |---|---|---|---|
-| `config/featured` | `{mode: 'auto'\|'pinned'\|'off', setAt}` | `CurationRepository` (missing or error → `auto`) | `ContentConfigRepository.setFeaturedMode` |
-| `config/live` | `{isLive: bool, videoId, title}` | `LiveRepository` | web Studio / console |
-| `config/giving` | `GivingDetails` | `ChurchConfigRepository` | `ContentConfigRepository.setChurchGiving`. Empty deletes the doc. |
-| `config/home` | `{sections: [{id, enabled}]}` | `ChurchConfigRepository` | `ContentConfigRepository.setChurchHome` |
+| `config/featured` | `{mode: 'auto'\|'pinned'\|'off', setAt}` | `CurationRepository` (missing or error → `auto`) | Firebase console |
+| `config/live` | `{isLive: bool, videoId, title}` | not read by the app (live comes from the Content Studio `app_config`) | Firebase console |
+| `config/giving` | `{url?, bankName?, accountName?, sortCode?, accountNumber?, swiftBic?, iban?, reference?, note?}` | not read by the app | none |
+| `config/home` | `{sections: [{id, enabled}]}` | not read by the app | none |
 
 ### 6.6 readingPlans and dailyContent
 
@@ -786,7 +784,7 @@ The data payload's `type` selects the screen (`notificationTargetFor`):
 
 ### 7.3 Studio notification service (new in this release)
 
-Content Studio admins compose these pushes in the web Studio "Notifications" section (`admin/index.html`) and the in-app Studio. Sources:
+Studio admins compose these pushes in the web Studio "Notifications" section (`admin/index.html`) and the in-app Studio. The Branch list comes from the Kharis Content Studio's active `branches` (Supabase, by name). Sources:
 
 - `backend/functions/src/notifications.ts` (sending)
 - the `notifications` block in `backend/firestore.rules`

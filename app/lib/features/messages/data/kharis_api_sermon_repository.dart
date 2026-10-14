@@ -6,7 +6,6 @@ import 'package:kharis_app/core/constants/http_constants.dart';
 import 'package:kharis_app/core/utils/sermon_categorizer.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'sermon_repository_base.dart';
-import 'sermon_repository.dart';
 
 /// Reads sermons from the Kharis public API (yetanothersermon.host).
 ///
@@ -69,10 +68,6 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
     if (url == null || url.isEmpty) return null;
     return _absolutise(url);
   }
-
-  /// Offline fallback: the bundled archive, never the network.
-  @override
-  Future<List<Sermon>> loadCatalogue() => SermonRepository().loadCatalogue();
 }
 
 /// Maps one page of API sermon records. Top-level so [compute] can run it in

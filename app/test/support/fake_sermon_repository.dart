@@ -9,13 +9,11 @@ class FakePagedSermonRepository extends AbstractSermonRepository {
   FakePagedSermonRepository(
     this.pages, {
     this.failFirstLoad = false,
-    this.catalogue = const [],
     this.searchPages = const {},
   });
 
   List<List<Sermon>> pages;
   bool failFirstLoad;
-  final List<Sermon> catalogue;
 
   /// Server search hits per query, paged like [pages].
   final Map<String, List<List<Sermon>>> searchPages;
@@ -33,9 +31,6 @@ class FakePagedSermonRepository extends AbstractSermonRepository {
   Completer<void>? holdFirstPage;
 
   int get total => pages.fold(0, (n, p) => n + p.length);
-
-  @override
-  Future<List<Sermon>> loadCatalogue() async => catalogue;
 
   @override
   Future<SermonPage> fetchPage({String? url, String? search}) async {

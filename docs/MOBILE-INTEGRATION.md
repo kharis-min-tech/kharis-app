@@ -23,20 +23,16 @@ Most providers live in `app/lib/shared/providers/sermon_provider.dart`. Other pr
 
 | Area | Repository (file) | Provider | Remote source | Fallbacks, in order |
 |---|---|---|---|---|
-| Sermon library | `R2MessagesRepository` (`features/messages/data/r2_messages_repository.dart`) | `sermonRepositoryProvider` | R2 `messages.json` plus page 1 of the sermon API, merged ([API.md 3.4](API.md#34-how-the-app-merges-r2-with-the-api)) | 1. paged sermon API<br>2. Hive archive<br>3. bundled `assets/data/kharis_sermons.json` |
-| Sermon API paging and search | `KharisApiSermonRepository` (`kharis_api_sermon_repository.dart`) | used by the R2 repository | `ApiConfig.sermonApiBase` + `sermons/` ([API.md 2](API.md#2-public-sermon-api-yetanothersermonhost)) | bundled archive (`SermonRepository`) |
-| Offline archive | `SermonRepository` (`sermon_repository.dart`) | none | `assets/data/kharis_sermons.json`; ids are `archive_<trackId>` | none |
+| Sermon library | `R2MessagesRepository` (`features/messages/data/r2_messages_repository.dart`) | `sermonRepositoryProvider` | R2 `messages.json` plus page 1 of the sermon API, merged ([API.md 3.4](API.md#34-how-the-app-merges-r2-with-the-api)) | 1. paged sermon API<br>2. Hive archive<br>3. empty library marked offline, with Retry |
+| Sermon API paging and search | `KharisApiSermonRepository` (`kharis_api_sermon_repository.dart`) | used by the R2 repository | `ApiConfig.sermonApiBase` + `sermons/` ([API.md 2](API.md#2-public-sermon-api-yetanothersermonhost)) | none (the library notifier retries) |
 | Studio sermons, pinned featured | `FirestoreSermonRepository` (`firestore_sermon_repository.dart`) | `adminSermonRepositoryProvider`, `adminSermonsProvider`, `cmsSermonsProvider`, `pinnedFeaturedProvider` | Firestore `sermons` | none |
 | Featured mode | `CurationRepository` (`curation_repository.dart`) | `curationRepositoryProvider`, `featuredModeProvider` | `config/featured.mode` | `auto` when the doc is missing or on error |
 | Videos | `VideoRepository` (`video_repository.dart`) | `videoRepositoryProvider`, `videosProvider` | YouTube Data API `playlistItems` + `videos` ([API.md 4](API.md#4-youtube-data-api)) | 1. channel Atom feed<br>2. embedded `kharisVideos` (`kharis_content.dart`) |
-| Live banner | `LiveRepository` (`features/home/data/live_repository.dart`) | `liveRepositoryProvider` | `config/live` | not live |
-| Branches | `BranchRepository` (`features/onboarding/data/branch_repository.dart`) | `branchRepositoryProvider` (`admin_provider.dart`) | `GET getBranches` | 1. Firestore `branches` stream merged over `seedBranches`<br>2. `seedBranches` alone |
-| Branch settings (Studio) | `BranchSettingsRepository` (`features/admin/data/branch_settings_repository.dart`) | `branchSettingsRepositoryProvider` | `branches/{id}`: `giving`, `home`, `contact`, `instagram`, `services`, venue summary | none |
-| Church config | `ChurchConfigRepository` (`features/home/data/church_config_repository.dart`) | `churchConfigRepositoryProvider`, `churchGivingProvider`, `churchHomeLayoutProvider` (`campus_config_provider.dart`) | `config/giving`, `config/home` | built-in giving details, `HomeLayout.fallback` |
-| Studio config writes | `ContentConfigRepository` (`features/admin/data/content_config_repository.dart`) | `contentConfigRepositoryProvider` | writes `config/featured`, `config/giving`, `config/home` | none |
-| Announcements | `KharisApiAnnouncementRepository` (`features/home/data/kharis_api_announcement_repository.dart`) | `announcementApiRepositoryProvider` | `GET getAnnouncements?limit=20&branch=` | `NewsRepository.watchNews(...).first` (Firestore, can come from the SDK cache) |
-| Announcements (stream, Studio writes) | `NewsRepository` (`news_repository.dart`) | `newsRepositoryProvider` | Firestore `news`, filtered in memory by live and Branch | empty list |
-| Events | `EventRepository` (`features/calendar/data/event_repository.dart`) | `eventRepositoryProvider` | `GET getEvents` (`branch`, `when`, `limit`) | 1. Firestore `events` window queries<br>2. empty list |
+| Live banner | `LiveRepository` (`features/home/data/live_repository.dart`) | `liveRepositoryProvider`, `liveStatusProvider` | Content Studio `app_config` row `key = liveStream`: `{url, title, enabled \| is_live}` (network only, never cached) | not live |
+| Branches | `BranchRepository` (`features/onboarding/data/branch_repository.dart`) | `branchRepositoryProvider`, `branchesProvider` (`admin_provider.dart`); `weeklyServicesProvider` (`campus_config_provider.dart`) | Content Studio `branches` (`is_active`), `services` (`is_active`) and `venues`, joined by `branch_id`; `Branch.id` is the slug, ordered main group then KP2, each by `sort_order` | last good response saved in Hive (`ContentApi`); error when nothing is saved |
+| Giving and Home layout | none (`campus_config_provider.dart`) | `effectiveGivingProvider`, `effectiveHomeLayoutProvider` | Branch `giving_link` | `kBuiltInGiving` (kharis.org/giving); Home always uses `HomeLayout.fallback` |
+| Announcements | `NewsRepository` (`features/home/data/news_repository.dart`) | `newsRepositoryProvider`, `newsProvider` | Content Studio `news`, mapped defensively, filtered on the device to published, unexpired and the member's Branch | last good response saved in Hive; empty list when the table is empty |
+| Events | `EventRepository` (`features/calendar/data/event_repository.dart`) | `eventRepositoryProvider`, `upcomingEventsProvider`, `pastEventsProvider` | Content Studio `events`. `branch_name` null means every Branch. `recurrence = weekly` expands into one event per `recurrence_days` date (0 = Sunday) until `recurrence_until`, at most 8 weeks ahead; occurrence ids are `<id>~<yyyymmdd>` | last good response saved in Hive |
 | RSVPs | `RsvpRepository` (`rsvp_repository.dart`) | `rsvpRepositoryProvider` | Firestore `rsvps/{uid}_{eventId}` | none |
 | Daily reading | `DailyContentRepository` (`features/home/data/daily_content_repository.dart`) | `dailyContentRepositoryProvider` | `GET getDailyReading` | 1. `dailyContent/{date}`<br>2. `readingPlans` resolved on the device (same rules as the server)<br>3. built-in Psalm 23 |
 | Reading plans (Studio) | `ReadingPlanRepository` (`reading_plan_repository.dart`) | `readingPlanRepositoryProvider` (`reading_plan_provider.dart`) | Firestore `readingPlans` | none |
@@ -53,16 +49,17 @@ Most providers live in `app/lib/shared/providers/sermon_provider.dart`. Other pr
 | Connect forms | `ConnectRepository` (`features/connect/data/connect_repository.dart`) | `connectRepositoryProvider` | `visitors`, `testimonies` | none; errors are thrown |
 | Audio | `AudioPlayerService` (`features/player/data/audio_player_service.dart`) | `audioPlayerServiceProvider` | sermon `audioUrl`, which 302-redirects to signed R2 | manual retry only |
 
-The Studio role gate (`AdminScope`, `shared/models/campus_config.dart`) works like this:
+The in-app Studio (`features/admin`) has two sections: Notifications (composer and history) and Team access (roles and Branch admins). Branches, events, announcements and live are managed in the Kharis Content Studio (https://kharis-content.itadmin-a94.workers.dev). The Studio role gate (`AdminScope`, `shared/models/campus_config.dart`) works like this:
 
-- `role == 'admin'` or the `admin` claim makes the user a super admin.
-- `role == 'campus_admin'` with a non-empty `adminBranchIds` makes the user a Branch admin, scoped to `adminBranchNames`.
+- `role == 'admin'` or the `admin` claim makes the user a super admin: every notification audience and Team access.
+- `role == 'campus_admin'` with a non-empty `adminBranchIds` (Branch slugs) makes the user a Branch admin, who sends notifications to `adminBranchNames` or staff test devices.
 
 ## 2. Timeouts, retries and offline behaviour
 
 | Client | Connect | Receive | Retry |
 |---|---|---|---|
-| Cloud Functions reads (`BranchRepository`, `EventRepository`, `DailyContentRepository`, `KharisApiAnnouncementRepository`) | 12 s | 15 s | None. A failed call goes to the Firestore fallback. |
+| Content Studio reads (`ContentApi`: branches, services, venues, events, news, app_config) | 10 s | 20 s | None. A failed call serves the last good response saved in Hive (live status excepted). |
+| `DailyContentRepository` (`getDailyReading`) | 12 s | 15 s | None. A failed call goes to the Firestore fallback. |
 | `KharisApiSermonRepository` | 15 s | 20 s | Handled by the library notifier (below). |
 | `R2MessagesRepository` mirror | 10 s | 20 s per request | None. An overall `mirrorDeadline` of **25 s** applies, after which page 1 falls back to the sermon API. |
 | `BibleRepository` | Dio default | Dio default | One retry after 800 ms, only for connection errors (no response). |
@@ -131,7 +128,7 @@ Build-time secrets come from `app/env.json`, passed with `--dart-define-from-fil
 
 Every build and run script passes the file:
 
-- `scripts/build-web.sh`, `build-android.sh`, `build-ios.sh`, `deploy-testflight.sh`, `deploy-ministries.sh`, and the `run_*_walkthrough.sh` runners
+- `scripts/build-web.sh`, `build-android.sh`, `build-ios.sh`, `deploy-testflight.sh`, `deploy-ministries.sh`, and the `run_e2e.sh` journey runner
 - CI restores it from the `ENV_JSON` secret
 - local development: `flutter run --dart-define-from-file=env.json`
 
@@ -185,24 +182,20 @@ Backend:
 - Functions unit tests are in `backend/functions/test`.
 - Firestore rules tests are in `backend/functions/test/rules/firestore-rules.test.ts`, run with `npm run test:rules`.
 
-**Integration walkthroughs** run on a device against the live backend, with no mocks. Run them from `app/`:
+**On-device journeys** (`app/integration_test/e2e_test.dart`) run the real app on a simulator or emulator against the live backends. Run them from `app/`:
 
 ```sh
-scripts/run_app_polish_walkthrough.sh ios      # or: android [device-id]
+scripts/run_e2e.sh ios                      # every journey
+scripts/run_e2e.sh android events player    # only these journeys
 ```
 
-- Defaults: iOS simulator `F7F25682-…`, Android `emulator-5554`. The device must already be booted.
-- The script does a fresh install, grants notification permission, and runs `flutter test integration_test/app_polish_walkthrough_test.dart --dart-define-from-file=env.json`.
-- It takes host screenshots on each `KSHOT:<name>` log line into `/tmp/kharis-shots-polish-<platform>`.
-- It writes `summary.txt` from the `KSTEP`, `KCHECK:FAIL` and `KNOTE` lines.
-- Optional defines are `EXPECTED_SERMONS` (default 1489), `EXPECTED_2014` and `EXPECTED_2013`.
-
-Other runners:
-
-| Runner | Test |
-|---|---|
-| `scripts/run_release_walkthrough.sh` | `release_walkthrough_test.dart` |
-| `scripts/run_tester_round_fixes.sh` | `tester_round_fixes_test.dart` |
+- Journeys: `onboarding`, `branch_switch`, `events`, `messages`, `player`, `playlists`, `bible`, `giving`, `forms`, `deep_links`, `display`, `account`, `more_menu`, `notifications`. Each is its own `testWidgets` in `integration_test/journeys/`, launches the app in a fresh `ProviderContainer` after clearing SharedPreferences and playback history, and never depends on another journey. A failing journey does not stop the rest.
+- Expectations come from the live sources at run time (`integration_test/support/live_data.dart`): Content Studio rows over Supabase REST, the sermon API count, the R2 catalogue (transcripts) and YouVersion (books, versions). When live data is empty the journey checks the empty state and logs a `DATA:` note. Nothing is pinned to a branch: random choices (branch, book, message, version) are seeded by the date and logged, so a day's runs repeat and the next day's differ. Override with `E2E_SEED=YYYYMMDD`.
+- Platform hand-offs are answered in Dart (`integration_test/support/channels.dart`): url_launcher (the journeys assert the URL and external mode), the OS share sheet (a headless iOS simulator cannot dismiss it) and add_2_calendar (nothing is added). Firebase Messaging calls pass through and are recorded.
+- Writes stay on the test's own anonymous account and are undone in the same journey (an RSVP, a playlist, a like, a note). The forms journey posts to a stubbed Dio adapter, never to the Studio. The account journey uses a fake signed-in member and a recording deletion service: no real account is deleted.
+- The script boots the device if needed (iOS `F7F25682-…` or `E2E_DEVICE`; Android: the running emulator, else AVD `E2E_AVD`, default `Pixel_10_Pro_XL`), does a fresh install, pre-grants notification permission, and runs `flutter test integration_test/e2e_test.dart --dart-define-from-file=env.json`.
+- Output in `/tmp/kharis-e2e-<platform>/`: one folder of screenshots per journey (`KSHOT:<journey>/<name>`), `run.log`, `findings.txt` (`KCHECK:FAIL` and `KNOTE` lines) and `summary.txt`, the table of journey, `PASS`/`FAIL`/`SKIP (reason)` and duration. The script exits non-zero on any `FAIL`.
+- Every `FlutterError` during a journey (a `RenderFlex` overflow included) fails that journey. When the error is a framework invariant (duplicate `GlobalKey`, build-scope or layout assertions), the process's widget tree is no longer usable: the journeys after it report `DEFER` and the script reruns them in a fresh `flutter test` process (listed in `reruns.txt`).
 
 **Manual checks against production** (read-only):
 

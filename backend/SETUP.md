@@ -133,30 +133,32 @@ import { getAuth } from 'firebase-admin/auth';
 await getAuth().setCustomUserClaims('USER_UID_HERE', { admin: true });
 ```
 
-or set `role: 'admin'` on the user's `users/{uid}` profile (Content Studio does
-this; only an existing super admin can change a role).
+or set `role: 'admin'` on the user's `users/{uid}` profile (the Studio's Team
+access does this; only an existing super admin can change a role).
 
 ### Branch admins
 
-A branch admin manages only their own branches: the `news` and `events` whose
-`branch` is one of their branches, and the non-identity fields of those
-`branches/{id}` docs (contact, services, venues, giving, Home layout, …). They
-cannot write all-branch (null/blank `branch`) items, move an item to another
-branch, change a branch's `name`, `order`, `group` or `isActive`, create or
-delete branches, or touch `config/*`, sermons, reading plans, daily content,
-users or submissions.
+The Studio (`admin/index.html` and the in-app Studio) only sends
+notifications and manages Team access. Branches, events, announcements and
+live are managed in the Kharis Content Studio
+(https://kharis-content.itadmin-a94.workers.dev).
+
+A branch admin may send notifications to their own branches or to staff test
+devices, and read the notification history. They cannot send to Everyone or
+change anyone's access.
 
 A super admin assigns one by setting all three fields together on
-`users/{uid}` (Content Studio's user editor does this):
+`users/{uid}` (the Studio's Team access does this):
 
 | Field | Value |
 |---|---|
 | `role` | `'campus_admin'` |
-| `adminBranchIds` | branch doc ids, e.g. `['north']` |
-| `adminBranchNames` | the matching branch **names**, e.g. `['North']` — news/events store `branch` as the name |
+| `adminBranchIds` | Content Studio branch slugs, e.g. `['london']` |
+| `adminBranchNames` | the matching branch **names**, e.g. `['London']`; a notification's branch audience holds the name |
 
 Keep the two lists in step (and update `adminBranchNames` if a branch is
-renamed). Users can never set their own `role` or branch lists.
+renamed in the Content Studio). Users can never set their own `role` or
+branch lists.
 
 ### Testing the rules
 
@@ -198,12 +200,14 @@ firebase emulators:start
 
 The emulator UI is available at [http://localhost:4000](http://localhost:4000).
 
-### Content Studio against the emulators
+### Studio against the emulators
 
 `admin/index.html` connects to the Auth emulator (`127.0.0.1:9099`) and the
 Firestore emulator (`127.0.0.1:8181`) under the offline project `demo-kharis`
 when it is opened on localhost with `?emulators=1`. The hosted Studio ignores
-the flag, so it can never be pointed away from production.
+the flag, so it can never be pointed away from production. Branch, event and
+announcement pickers always read the live Kharis Content Studio (Supabase,
+read-only).
 
 ```bash
 # firebase.json for the emulators: {"firestore":{"rules":"<repo>/backend/firestore.rules"},
@@ -216,8 +220,7 @@ open 'http://localhost:5055/?emulators=1'
 The emulators start empty: create test users through the Auth emulator REST API
 (`/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`) and write their
 `users/{uid}` docs (role `admin` or `campus_admin` with `adminBranchIds` and
-`adminBranchNames`) plus sample `branches`, `news` (`publishedAt`, `expiresAt`)
-and `events` through the Firestore emulator REST API with
+`adminBranchNames`) through the Firestore emulator REST API with
 `Authorization: Bearer owner`, which bypasses the rules. Notifications can be
 composed but are not delivered: the functions are not emulated.
 

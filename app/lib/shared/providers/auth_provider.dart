@@ -124,14 +124,8 @@ final isAdminProvider = FutureProvider<bool>((ref) async {
 });
 
 /// Studio routes only a super admin may open; campus admins are sent back
-/// to the Studio hub. `/admin/branches/:id` is checked per campus.
-const _superAdminRoutes = [
-  '/admin/users',
-  '/admin/sermons',
-  '/admin/reading-plans',
-  '/admin/bible-reading',
-  '/admin/settings',
-];
+/// to the Studio hub.
+const _superAdminRoutes = ['/admin/users'];
 
 // ── Notification preferences ──────────────────────────────────────────────────
 
@@ -194,8 +188,7 @@ class RouterNotifier extends ChangeNotifier {
     // More entry is only rendered once [isAdminProvider] has resolved true,
     // so an admin never hits the unresolved case through the UI; a deep link
     // that arrives before the check resolves is bounced rather than shown.
-    // Campus admins are kept to their campuses' screens: super-admin-only
-    // areas and other campuses' branch pages return them to the hub.
+    // Campus admins are kept out of super-admin-only areas (Team access).
     if (location == '/admin' || location.startsWith('/admin/')) {
       final isAdmin = _ref.read(isAdminProvider).valueOrNull ?? false;
       if (!isAdmin) return '/home';
@@ -205,11 +198,6 @@ class RouterNotifier extends ChangeNotifier {
         (r) => location == r || location.startsWith('$r/'),
       );
       if (superOnly) return '/admin';
-      const branchPrefix = '/admin/branches/';
-      if (location.startsWith(branchPrefix)) {
-        final id = location.substring(branchPrefix.length).split('/').first;
-        if (!scope.canManageBranchId(id)) return '/admin';
-      }
       return null;
     }
 

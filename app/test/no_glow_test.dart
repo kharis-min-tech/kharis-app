@@ -434,6 +434,9 @@ void main() {
               currentBranchProvider.overrideWith(
                 (ref) => Stream.value('London'),
               ),
+              branchesProvider.overrideWith(
+                (ref) => Stream.value(const <Branch>[]),
+              ),
             ],
             child: MaterialApp(theme: theme(), home: const GivingScreen()),
           ),

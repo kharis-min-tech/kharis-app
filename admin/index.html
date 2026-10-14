@@ -153,41 +153,6 @@
 
     .field { margin-bottom: 16px; }
 
-    .field-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 16px;
-    }
-
-    /* datetime-local/date inputs have a large intrinsic min-width that
-       overflows 2-col rows; clamp them to their grid track. */
-    .field-row input {
-      width: 100%;
-      min-width: 0;
-    }
-
-    .checkbox-field {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-
-    .checkbox-field input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: var(--orange);
-      cursor: pointer;
-    }
-
-    .checkbox-field label {
-      margin-bottom: 0;
-      text-transform: none;
-      letter-spacing: 0;
-      font-size: 14px;
-      color: var(--text);
-      cursor: pointer;
-    }
 
     /* ── Buttons ──────────────────────────────────────────────────────── */
     .btn {
@@ -307,19 +272,6 @@
     }
     .tab-btn.active svg { color: var(--purple-soft); }
 
-    .tab-btn .count-badge {
-      margin-left: auto;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: 10.5px;
-      font-weight: 600;
-      color: var(--muted);
-      padding: 1px 7px;
-      min-width: 22px;
-      text-align: center;
-    }
-    .tab-btn.active .count-badge { color: var(--purple-soft); border-color: rgba(107, 52, 250, 0.4); }
 
     .sidebar-foot {
       border-top: 1px solid var(--border);
@@ -407,34 +359,6 @@
       transition: border-color 0.18s;
       overflow: hidden;
     }
-
-
-    /* ── Segmented source control ─────────────────────────────────────── */
-    .seg {
-      display: inline-flex;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 3px;
-      gap: 2px;
-      margin-bottom: 14px;
-    }
-
-    .seg-btn {
-      border: none;
-      background: none;
-      color: var(--muted);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 12.5px;
-      font-weight: 600;
-      padding: 6px 14px;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: background-color 0.18s, color 0.18s;
-    }
-
-    .seg-btn:not(.active):hover { color: var(--text); }
-    .seg-btn.active { background: var(--purple); color: #fff; }
     .item-card:hover { border-color: #3A3A46; }
 
     .item-card-body { flex: 1; min-width: 0; }
@@ -464,11 +388,7 @@
       font-weight: 500;
     }
 
-    .meta-chip.featured { background: rgba(107, 52, 250, 0.25); color: #a47cff; }
-
-    .meta-chip.warn { background: rgba(253, 127, 32, 0.18); color: var(--orange); }
-
-    /* Inline form problems: unloaded branch list, reading plan out of bounds. */
+    /* Inline form problems under a field. */
     .inline-error {
       display: flex;
       align-items: center;
@@ -481,8 +401,7 @@
 
     .muted-line { color: var(--muted); font-size: 12px; margin: -8px 0 14px; }
 
-    /* Home-screen verdict for an announcement: is it actually showing, and
-       to whom. Loud on purpose — it is the first thing to read on the row. */
+    /* Notification status chips in the history table. */
     .home-chip {
       display: inline-flex;
       align-items: center;
@@ -495,26 +414,6 @@
     .home-chip.live   { background: rgba(34, 197, 94, 0.16);  color: var(--success); }
     .home-chip.hidden { background: rgba(255, 87, 87, 0.16);  color: var(--danger); }
     .home-chip.scheduled { background: rgba(253, 127, 32, 0.16); color: var(--orange); }
-
-    /* "Where this shows" panel under the compose form's branch/expiry fields. */
-    .where-panel {
-      background: var(--border);
-      border-radius: var(--radius);
-      padding: 10px 12px;
-      margin-bottom: 14px;
-      font-size: 12px;
-      line-height: 1.55;
-      color: var(--muted);
-    }
-    .where-panel strong { color: var(--text); font-weight: 600; }
-    .where-panel .where-title {
-      display: block;
-      color: var(--text);
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .where-panel ul { margin: 0; padding-left: 16px; }
-    .where-panel .warn { color: var(--danger); }
 
     .empty-state {
       text-align: center;
@@ -595,24 +494,6 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Daily content special ─────────────────────────────────────────── */
-    .daily-existing {
-      background: rgba(107, 52, 250, 0.08);
-      border: 1px solid rgba(107, 52, 250, 0.25);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 16px;
-      font-size: 13px;
-    }
-
-    .daily-existing strong { color: #a47cff; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
-
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 20px 0;
-    }
-
     /* ── A11y + motion ─────────────────────────────────────────────────── */
     .btn:focus-visible,
     .tab-btn:focus-visible,
@@ -635,49 +516,9 @@
     @media (max-width: 600px) {
       .content-area { padding: 16px 16px 48px; }
       .card { padding: 18px; }
-      .field-row { grid-template-columns: 1fr; gap: 0; }
     }
 
-    /* ── Repeatable sub-forms (branch venues / services / gallery) ────────── */
-    .section-label {
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 1.1px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin: 26px 0 10px;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-    }
-    .section-label:first-of-type { border-top: none; padding-top: 0; margin-top: 6px; }
-    .repeat-row {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
-      margin-bottom: 12px;
-      background: rgba(255,255,255,0.02);
-    }
-    .repeat-row-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--muted);
-    }
-    .repeat-remove {
-      background: none;
-      border: none;
-      color: var(--danger);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 700;
-    }
     .repeat-empty { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
-    .field-inline { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-    .field-inline input[type="checkbox"] { width: auto; margin: 0; }
-    .field-inline label { margin: 0; }
 
     /* ── Access scope + Home layout editor ─────────────────────────────── */
     [hidden] { display: none !important; }
@@ -695,40 +536,16 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .home-list {
-      list-style: none;
-      margin: 0 0 16px;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .home-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+    .studio-note {
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 8px 10px;
-      background: var(--surface2);
-    }
-    .home-row label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0;
+      padding: 12px 16px;
+      margin-bottom: 24px;
       font-size: 13px;
-      font-weight: 500;
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--text);
+      color: var(--muted);
     }
-    .home-row input[type="checkbox"] { width: auto; margin: 0; }
-    .home-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
-    .home-move { font-size: 12px; padding: 4px 9px; }
-    .home-list.locked .home-row { opacity: 0.6; }
-    .team-row .field-row { margin-top: 10px; }
+    .studio-note a { color: var(--purple-soft); font-weight: 600; }
     .team-campuses { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 4px; }
     .team-campuses label {
       display: flex;
@@ -821,7 +638,7 @@
         <p style="color:var(--muted);font-size:12px;margin-top:2px;">Admin Panel</p>
       </div>
     </div>
-    <p class="subtitle">Sign in with your admin account to manage content.</p>
+    <p class="subtitle">Sign in with your admin account to send notifications and manage team access.</p>
     <div id="login-error"></div>
     <form id="login-form">
       <div class="field">
@@ -845,51 +662,13 @@
   <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="logo-icon"><img src="dove.png" alt="" /></div>
-      <div class="brand-text"><span>Kharis Church</span><em>Content Studio</em></div>
+      <div class="brand-text"><span>Kharis Church</span><em>Admin</em></div>
     </div>
 
     <nav class="tab-nav">
-    <button class="tab-btn" data-tab="sermons" data-scope="super">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-      Sermons
-      <span class="count-badge" id="sermons-count">…</span>
-    </button>
-    <button class="tab-btn active" data-tab="events">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      Events
-      <span class="count-badge" id="events-count">…</span>
-    </button>
-    <button class="tab-btn" data-tab="news">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8a4 4 0 0 1 0 8"/><path d="M17.5 5a8 8 0 0 1 0 14"/></svg>
-      Announcements
-      <span class="count-badge" id="news-count">…</span>
-    </button>
     <button class="tab-btn" data-tab="notifications">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       Notifications
-    </button>
-    <button class="tab-btn" data-tab="daily" data-scope="super">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      Daily Content
-    </button>
-    <button class="tab-btn" data-tab="live" data-scope="super">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-      Live
-      <span class="count-badge" id="live-indicator">OFF</span>
-    </button>
-    <button class="tab-btn" data-tab="submissions" data-scope="super">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Submissions
-      <span class="count-badge" id="subs-count">…</span>
-    </button>
-    <button class="tab-btn" data-tab="branches">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
-      Branches
-      <span class="count-badge" id="branches-count">…</span>
-    </button>
-    <button class="tab-btn" data-tab="settings" data-scope="super">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-      App settings
     </button>
     <button class="tab-btn" data-tab="team" data-scope="super">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -906,217 +685,10 @@
 
   <div class="content-area">
 
-    <!-- ── Sermons Tab ──────────────────────────────────────────────────────── -->
-    <div class="tab-pane" id="tab-sermons">
-      <div>
-        <div class="card" style="max-width:100%">
-          <div class="card-title"><span class="dot"></span> Sermon Library</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Library holds synced sermons (auto-synced hourly). Switch to YouTube Channel to search everything on the Kharis Church / David Antwi channel and feature any video on the app's Messages page.</p>
-          <div style="margin-bottom:14px;">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span style="font-size:12px;font-weight:600;color:var(--muted);">Featured:</span>
-              <div class="seg" role="radiogroup" aria-label="Featured sermons" style="margin-bottom:0;">
-                <button type="button" class="seg-btn" role="radio" data-featured-mode="auto" disabled>Auto (latest uploads)</button>
-                <button type="button" class="seg-btn" role="radio" data-featured-mode="pinned" disabled>Pinned</button>
-                <button type="button" class="seg-btn" role="radio" data-featured-mode="off" disabled>Off</button>
-              </div>
-            </div>
-            <p id="featured-hint" style="display:none;color:var(--muted);font-size:12px;margin-top:6px;"></p>
-          </div>
-          <div class="seg" role="tablist" aria-label="Sermon source">
-            <button type="button" class="seg-btn active" id="src-library">Library</button>
-            <button type="button" class="seg-btn" id="src-youtube">YouTube Channel</button>
-          </div>
-          <div style="display:flex;gap:8px;margin-bottom:16px;">
-            <input type="text" id="sermon-search" placeholder="Search by title, speaker…" style="flex:1;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:14px;" />
-            <button class="btn btn-secondary" id="refresh-sermons" style="font-size:12px;padding:6px 12px;">Refresh</button>
-          </div>
-          <div id="sermons-list"></div>
-          <div style="display:flex;justify-content:center;margin-top:14px;">
-            <button class="btn btn-secondary" id="yt-load-more" style="display:none;font-size:13px;">Load more</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Events Tab ──────────────────────────────────────────────────────── -->
-    <div class="tab-pane active" id="tab-events">
-      <div class="pane-layout">
-
-        <!-- Form -->
-        <div class="card">
-          <div class="card-title"><span class="dot"></span> <span id="event-form-title">Create Event</span></div>
-          <div class="where-panel" id="ev-sync-warning" style="display:none;">
-            <span class="where-title">From website</span>
-            This event is imported from kharis.org. Branch, featured and image edits stay, but title, time and venue edits may be overwritten by the next sync. Remove hides it from the app for good (the sync keeps it hidden); to cancel it everywhere, remove it on the website.
-          </div>
-          <form id="event-form">
-            <div class="field">
-              <label for="ev-title">Title *</label>
-              <input type="text" id="ev-title" placeholder="Sunday Service" required />
-            </div>
-            <div class="field">
-              <label for="ev-desc">Description</label>
-              <textarea id="ev-desc" placeholder="Brief description of the event…" style="min-height:80px;"></textarea>
-            </div>
-            <div class="field">
-              <label for="ev-location">Venue name</label>
-              <input type="text" id="ev-location" placeholder="e.g. Main Auditorium" />
-            </div>
-            <div class="field">
-              <label for="ev-address">Address</label>
-              <input type="text" id="ev-address" placeholder="e.g. 12 High Street, Chatham ME4 4AA" />
-            </div>
-            <div class="field">
-              <label for="ev-image">Image URL</label>
-              <input type="url" id="ev-image" placeholder="https://…" />
-            </div>
-            <div class="field">
-              <label for="ev-branch">Branch</label>
-              <select id="ev-branch" disabled>
-                <option value="">All branches</option>
-              </select>
-            </div>
-            <div class="inline-error" id="ev-branch-error" style="display:none;"></div>
-            <div class="field-row">
-              <div class="field">
-                <label for="ev-start">Start Date &amp; Time *</label>
-                <input type="datetime-local" id="ev-start" required />
-              </div>
-              <div class="field">
-                <label for="ev-end">End Date &amp; Time *</label>
-                <input type="datetime-local" id="ev-end" required />
-              </div>
-            </div>
-            <div class="checkbox-field">
-              <input type="checkbox" id="ev-featured" />
-              <label for="ev-featured">Mark as Featured</label>
-            </div>
-            <div style="display:flex;gap:8px;">
-              <button type="submit" class="btn btn-primary" id="event-submit-btn" style="flex:1;" disabled>Create Event</button>
-              <button type="button" class="btn btn-secondary" id="ev-cancel-btn" style="display:none;">Cancel</button>
-            </div>
-          </form>
-        </div>
-
-        <!-- List -->
-        <div>
-          <div class="list-header">
-            <span class="list-section-title">Upcoming Events</span>
-            <button class="btn btn-secondary" id="refresh-events" style="font-size:12px;padding:6px 12px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Refresh
-            </button>
-          </div>
-          <div id="events-list">
-            <div class="loading-row"><span class="spinner"></span> Loading events…</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── News Tab ────────────────────────────────────────────────────────── -->
-    <div class="tab-pane" id="tab-news">
-      <div class="pane-layout">
-
-        <!-- Form -->
-        <div class="card">
-          <div class="card-title"><span class="dot"></span> <span id="news-form-title">Publish Announcement</span></div>
-          <p style="font-size:12px;color:var(--muted);margin:-4px 0 14px;">
-            An announcement is a message to the church: headline, body, optional image, optional expiry.
-            It shows in the announcements carousel on the <strong>app home screen</strong>.
-            Anything with a date and a venue that people RSVP to belongs in the <strong>Events</strong> tab.
-          </p>
-          <form id="news-form">
-            <div class="field">
-              <label for="nw-title">Title *</label>
-              <input type="text" id="nw-title" placeholder="Announcement headline" required />
-            </div>
-            <div class="field">
-              <label for="nw-body">Body *</label>
-              <textarea id="nw-body" placeholder="Full article or announcement text…" style="min-height:140px;" required></textarea>
-            </div>
-            <div class="field">
-              <label for="nw-image">Image URL</label>
-              <input type="url" id="nw-image" placeholder="https://…" />
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="nw-type">Type</label>
-                <select id="nw-type">
-                  <option value="Announcement">Announcement</option>
-                  <option value="Ministry">Ministry</option>
-                  <option value="Notice">Notice</option>
-                  <option value="Update">Update</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="nw-branch">Branch</label>
-                <select id="nw-branch" disabled>
-                  <option value="">All branches</option>
-                </select>
-              </div>
-            </div>
-            <div class="inline-error" id="nw-branch-error" style="display:none;"></div>
-            <div class="field">
-              <label for="nw-event">Linked event</label>
-              <select id="nw-event">
-                <option value="">None</option>
-              </select>
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="nw-link">Button link</label>
-                <input type="url" id="nw-link" placeholder="https://…" />
-              </div>
-              <div class="field">
-                <label for="nw-cta">Button label</label>
-                <input type="text" id="nw-cta" maxlength="24" placeholder="Learn more" />
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="nw-publish">Publish Date *</label>
-                <input type="date" id="nw-publish" required />
-              </div>
-              <div class="field">
-                <label for="nw-publish-time">Publish Time (UK)</label>
-                <input type="time" id="nw-publish-time" />
-              </div>
-            </div>
-            <p class="muted-line">Leave the time blank to publish now when the date is today, or at 09:00 UK time on a later date.</p>
-            <div class="field">
-              <label for="nw-expiry">Last Day Shown</label>
-              <input type="date" id="nw-expiry" />
-            </div>
-            <div class="where-panel" id="nw-where"></div>
-            <div style="display:flex;gap:8px;">
-              <button type="submit" class="btn btn-primary" id="news-submit-btn" style="flex:1;" disabled>Publish</button>
-              <button type="button" class="btn btn-secondary" id="nw-cancel-btn" style="display:none;">Cancel</button>
-            </div>
-          </form>
-        </div>
-
-        <!-- List -->
-        <div>
-          <div class="list-header">
-            <span class="list-section-title">Published Announcements</span>
-            <button class="btn btn-secondary" id="refresh-news" style="font-size:12px;padding:6px 12px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Refresh
-            </button>
-          </div>
-          <p style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">
-            A member sees an announcement on the app home screen when it is set to
-            their branch or to All branches, its publish time has arrived, and it
-            has not expired. Each row says exactly where it stands.
-          </p>
-          <div id="news-list">
-            <div class="loading-row"><span class="spinner"></span> Loading announcements…</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <p class="studio-note">
+      Content (branches, events, announcements, live) is managed in the
+      <a href="https://kharis-content.itadmin-a94.workers.dev" target="_blank" rel="noopener">Kharis Content Studio</a>.
+    </p>
 
     <!-- ── Notifications Tab ───────────────────────────────────────────────── -->
     <div class="tab-pane" id="tab-notifications">
@@ -1247,428 +819,6 @@
       </div>
     </div>
 
-    <!-- ── Daily Content Tab ───────────────────────────────────────────────── -->
-    <div class="tab-pane" id="tab-daily">
-      <div class="pane-layout">
-
-        <!-- Form -->
-        <div class="card">
-          <div class="card-title"><span class="dot"></span> Daily Content</div>
-
-          <div id="daily-existing-banner" class="daily-existing" style="display:none;">
-            <strong>✓ Content exists for this date</strong>
-            <p style="margin-top:6px;color:var(--text);font-size:13px;">Submitting will overwrite the existing entry.</p>
-          </div>
-
-          <form id="daily-form">
-            <div class="field">
-              <label for="dc-date">Date *</label>
-              <input type="date" id="dc-date" required />
-            </div>
-
-            <div class="divider"></div>
-            <div class="card-title" style="margin-bottom:14px;font-size:13px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-              Bible Reading
-            </div>
-
-            <div class="field-row">
-              <div class="field">
-                <label for="dc-book">Book *</label>
-                <input type="text" id="dc-book" placeholder="e.g. John" required />
-              </div>
-              <div class="field">
-                <label for="dc-chapter">Chapter *</label>
-                <input type="number" id="dc-chapter" placeholder="3" min="1" required />
-              </div>
-            </div>
-            <div class="field">
-              <label for="dc-verse">Verse / Range</label>
-              <input type="text" id="dc-verse" placeholder="e.g. 16 or 1-6" />
-            </div>
-
-            <div class="divider"></div>
-            <div class="card-title" style="margin-bottom:14px;font-size:13px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-              Prayer
-            </div>
-
-            <div class="field">
-              <label for="dc-prayer">Prayer Text *</label>
-              <textarea id="dc-prayer" placeholder="Lord, thank You for…" style="min-height:120px;" required></textarea>
-            </div>
-            <div class="field">
-              <label for="dc-ref">Prayer Reference *</label>
-              <input type="text" id="dc-ref" placeholder="e.g. Psalm 23:1" required />
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-full" id="daily-submit-btn">
-              Save Daily Content
-            </button>
-          </form>
-        </div>
-
-        <!-- What the app actually serves for the selected date -->
-        <div>
-          <div class="list-header">
-            <span class="list-section-title">What Members See</span>
-          </div>
-          <div id="daily-resolved" style="margin-bottom:22px;">
-            <div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
-              Select a date to see what resolves for it.
-            </div>
-          </div>
-          <div class="list-header">
-            <span class="list-section-title">Saved Entry</span>
-          </div>
-          <div id="daily-preview">
-            <div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
-              Select a date to preview existing content.
-            </div>
-          </div>
-        </div>
-
-        <!-- Reading plan: authored once, resolves every date in its range -->
-        <div class="card">
-          <div class="card-title"><span class="dot"></span> Reading Plan</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:18px;line-height:1.5;">
-            A plan covers a range of dates and advances on its own: Proverbs 1
-            on day 1, Proverbs 2 on day 2. A saved day above always overrides
-            the plan for that one date, and when a plan ends with no successor
-            members keep seeing its last day.
-          </p>
-
-          <form id="plan-form">
-            <div class="field">
-              <label for="pl-title">Plan Name *</label>
-              <input type="text" id="pl-title" placeholder="January – Proverbs" required />
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="pl-book">Book *</label>
-                <input type="text" id="pl-book" list="bible-books" placeholder="Proverbs" autocomplete="off" required />
-                <datalist id="bible-books"></datalist>
-              </div>
-              <div class="field">
-                <label for="pl-start">Start Date *</label>
-                <input type="date" id="pl-start" required />
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="pl-mode">Advances By</label>
-                <select id="pl-mode">
-                  <option value="chapter">A chapter a day</option>
-                  <option value="verse">Verses a day</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="pl-days">Length In Days *</label>
-                <input type="number" id="pl-days" min="1" max="400" placeholder="31" required />
-              </div>
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="pl-chapter">Starting Chapter *</label>
-                <input type="number" id="pl-chapter" min="1" value="1" required />
-              </div>
-              <div class="field" id="pl-verses-field">
-                <label for="pl-verses">Verse Range Each Day</label>
-                <input type="text" id="pl-verses" placeholder="Whole chapter" />
-              </div>
-            </div>
-            <div class="inline-error" id="pl-bounds-error" style="display:none;"></div>
-            <p class="muted-line" id="pl-last-reading" style="display:none;"></p>
-            <div class="field-row" id="pl-verse-fields" style="display:none;">
-              <div class="field">
-                <label for="pl-start-verse">First Verse</label>
-                <input type="number" id="pl-start-verse" min="1" value="1" />
-              </div>
-              <div class="field">
-                <label for="pl-verses-per-day">Verses Per Day</label>
-                <input type="number" id="pl-verses-per-day" min="1" value="1" />
-              </div>
-            </div>
-            <div class="field">
-              <label for="pl-prayer">Prayer Shown Each Day</label>
-              <textarea id="pl-prayer" placeholder="Generated from the reading if left blank"></textarea>
-            </div>
-            <div class="where-panel" id="pl-preview"></div>
-            <button type="submit" class="btn btn-primary btn-full" id="plan-submit-btn">
-              Save Reading Plan
-            </button>
-          </form>
-        </div>
-
-        <!-- Plan list -->
-        <div>
-          <div class="list-header">
-            <span class="list-section-title">Reading Plans</span>
-            <button class="btn btn-secondary" id="refresh-plans" style="font-size:12px;padding:6px 12px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Refresh
-            </button>
-          </div>
-          <div id="plans-list">
-            <div class="loading-row"><span class="spinner"></span> Loading plans…</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Live Tab ────────────────────────────────────────────────────────── -->
-    <div class="tab-pane" id="tab-live">
-      <div class="pane-layout">
-        <div class="card">
-          <h2 class="card-title"><span class="dot"></span> Live Broadcast</h2>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:18px;line-height:1.5;">
-            Toggle this ON while the service streams on YouTube. The app's
-            Home screen shows a LIVE NOW banner instantly, and it disappears
-            the moment you turn it off.
-          </p>
-          <form id="live-form">
-            <div class="checkbox-field">
-              <input type="checkbox" id="lv-on" />
-              <label for="lv-on">We are live right now</label>
-            </div>
-            <div class="field">
-              <label for="lv-video">YouTube Video ID *</label>
-              <input type="text" id="lv-video" placeholder="e.g. dQw4w9WgXcQ (from the stream URL)" />
-            </div>
-            <div class="field">
-              <label for="lv-title">Stream Title</label>
-              <input type="text" id="lv-title" placeholder="Sunday Service - Live" />
-            </div>
-            <button type="submit" class="btn btn-primary btn-full" id="live-submit-btn">
-              Update Live Status
-            </button>
-          </form>
-        </div>
-        <div>
-          <div class="list-header">
-            <span class="list-section-title">Current Status</span>
-          </div>
-          <div id="live-preview">
-            <div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
-              Loading status…
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Submissions Tab ─────────────────────────────────────────────────── -->
-    <div class="tab-pane" id="tab-submissions">
-      <div class="pane-layout" style="grid-template-columns: 1fr 1fr;">
-        <div>
-          <div class="list-header">
-            <span class="list-section-title">New Here - Visitors</span>
-          </div>
-          <div id="visitors-list"></div>
-        </div>
-        <div>
-          <div class="list-header">
-            <span class="list-section-title">Testimonies</span>
-          </div>
-          <div id="testimonies-list"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Branches Tab ──────────────────────────────────────────────────────── -->
-    <div class="tab-pane" id="tab-branches">
-      <div class="pane-layout">
-        <div class="card">
-          <div class="card-title"><span class="dot"></span> <span id="branch-form-title">Add / Edit Branch</span></div>
-          <p class="repeat-empty" id="br-scope-note" hidden>Choose Edit on your branch to update its details. Name, order, group and visibility are managed by the church office.</p>
-          <form id="branch-form">
-            <div class="section-label">Basic information</div>
-            <div class="field">
-              <label for="br-name">Branch Name *</label>
-              <input type="text" id="br-name" placeholder="Brighton" required />
-            </div>
-            <div class="field">
-              <label for="br-subtitle">Subtitle / Country</label>
-              <input type="text" id="br-subtitle" placeholder="United Kingdom" />
-            </div>
-            <div data-scope="super">
-              <div class="field-row">
-                <div class="field">
-                  <label for="br-group">Group</label>
-                  <input type="text" id="br-group" placeholder="Kharis" />
-                </div>
-                <div class="field">
-                  <label for="br-order">Display Order</label>
-                  <input type="number" id="br-order" placeholder="2" min="0" />
-                </div>
-              </div>
-              <div class="field-inline">
-                <input type="checkbox" id="br-active" checked />
-                <label for="br-active">Active (visible in the app)</label>
-              </div>
-            </div>
-
-            <div class="section-label">Branding</div>
-            <div class="field-row">
-              <div class="field">
-                <label for="br-gradient-start">Gradient Start (hex)</label>
-                <input type="text" id="br-gradient-start" placeholder="#3B2A6B" />
-              </div>
-              <div class="field">
-                <label for="br-gradient-end">Gradient End (hex)</label>
-                <input type="text" id="br-gradient-end" placeholder="#7C3AED" />
-              </div>
-            </div>
-
-            <div class="section-label">Hero</div>
-            <div class="field">
-              <label for="br-hero-subtitle">Hero Subtitle</label>
-              <input type="text" id="br-hero-subtitle" placeholder="A thriving, multicultural congregation serving Brighton…" />
-            </div>
-            <div class="field">
-              <label for="br-hero-image">Hero / Landmark Image</label>
-              <input type="text" id="br-hero-image" placeholder="assets/design/city-brighton.jpg" />
-            </div>
-
-            <div class="section-label">About the branch</div>
-            <div class="field">
-              <label for="br-short-desc">Short Description</label>
-              <input type="text" id="br-short-desc" placeholder="Welcome to Kharis Brighton." />
-            </div>
-            <div class="field">
-              <label for="br-description">Full Description</label>
-              <textarea id="br-description" rows="3" placeholder="Kharis Brighton is a growing family passionate about Jesus Christ…"></textarea>
-            </div>
-
-            <div class="section-label">Branch pastor</div>
-            <div class="field">
-              <label for="br-pastor-name">Pastor Name</label>
-              <input type="text" id="br-pastor-name" placeholder="Pastor John Smith" />
-            </div>
-            <div class="field">
-              <label for="br-pastor-image">Pastor Image</label>
-              <input type="text" id="br-pastor-image" placeholder="assets/pastors/john-smith.jpg" />
-            </div>
-            <div class="field">
-              <label for="br-pastor-bio">Pastor Bio</label>
-              <textarea id="br-pastor-bio" rows="2" placeholder="Pastor John leads Kharis Brighton with a passion for discipleship…"></textarea>
-            </div>
-
-            <div class="section-label">Contact</div>
-            <div class="field-row">
-              <div class="field">
-                <label for="br-contact-email">Email</label>
-                <input type="email" id="br-contact-email" placeholder="brighton@kharis.org" />
-              </div>
-              <div class="field">
-                <label for="br-contact-phone">Phone</label>
-                <input type="text" id="br-contact-phone" placeholder="+44 0000 000000" />
-              </div>
-            </div>
-
-            <div class="section-label">App card summary</div>
-            <p class="repeat-empty">Shown on the branch card in the app. Usually the Sunday venue and main service.</p>
-            <div class="field">
-              <label for="br-address">Meeting Address</label>
-              <input type="text" id="br-address" placeholder="123 Example Road, Brighton BN1 1AA" />
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="br-meeting-days">Meeting Day(s)</label>
-                <input type="text" id="br-meeting-days" placeholder="e.g. Sunday" />
-              </div>
-              <div class="field">
-                <label for="br-meeting-time">Meeting Time</label>
-                <input type="time" id="br-meeting-time" />
-              </div>
-            </div>
-
-            <div class="section-label">Venues</div>
-            <div id="br-venues"></div>
-            <button type="button" class="btn btn-secondary" id="br-add-venue" style="font-size:12px;padding:6px 12px;">+ Add venue</button>
-
-            <div class="section-label">Services</div>
-            <div id="br-services"></div>
-            <button type="button" class="btn btn-secondary" id="br-add-service" style="font-size:12px;padding:6px 12px;">+ Add service</button>
-
-            <div class="section-label">Instagram</div>
-            <div class="field">
-              <label for="br-instagram">Instagram URL</label>
-              <input type="url" id="br-instagram" placeholder="https://instagram.com/…" />
-            </div>
-
-            <div class="section-label">Featured video</div>
-            <div class="field">
-              <label for="br-fv-title">Title</label>
-              <input type="text" id="br-fv-title" placeholder="Latest From Brighton Branch" />
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="br-fv-url">YouTube URL</label>
-                <input type="url" id="br-fv-url" placeholder="https://youtu.be/…" />
-              </div>
-              <div class="field">
-                <label for="br-fv-thumb">Thumbnail URL</label>
-                <input type="text" id="br-fv-thumb" placeholder="https://… or assets/…" />
-              </div>
-            </div>
-
-            <div class="section-label">Gallery</div>
-            <div id="br-gallery"></div>
-            <button type="button" class="btn btn-secondary" id="br-add-gallery" style="font-size:12px;padding:6px 12px;">+ Add image</button>
-
-            <div class="section-label">Giving</div>
-            <p class="repeat-empty">Leave every field blank to use the church-wide giving details (App settings).</p>
-            <div id="br-giving"></div>
-
-            <div class="section-label">Home layout</div>
-            <p class="repeat-empty">Order of the blocks on the app Home screen for members of this branch.</p>
-            <div id="br-home"></div>
-
-            <button type="submit" class="btn btn-primary btn-full" id="branch-submit-btn" style="margin-top:22px;">Save Branch</button>
-          </form>
-        </div>
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <div class="card-title"><span class="dot"></span> Existing Branches</div>
-            <button class="btn btn-secondary" id="refresh-branches" style="font-size:12px;padding:6px 12px;">Refresh</button>
-          </div>
-          <div id="branches-list"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── App Settings Tab ──────────────────────────────────────────────────── -->
-    <div class="tab-pane" id="tab-settings">
-      <div class="pane-layout">
-        <div class="card">
-          <div class="card-title"><span class="dot"></span> Church-wide giving</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
-            Shown on the Giving screen for every branch without its own giving
-            details. Leave every field blank to fall back to the church details
-            built into the app.
-          </p>
-          <form id="settings-giving-form">
-            <div class="where-panel" id="st-giving-status"></div>
-            <div id="st-giving"></div>
-            <button type="submit" class="btn btn-primary btn-full" id="st-giving-submit">Save giving</button>
-          </form>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="dot"></span> Church-wide Home layout</div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
-            Order of the blocks on the app Home screen for every branch without
-            its own layout. Live now, Complete your profile and Continue
-            listening only appear when they apply to the member.
-          </p>
-          <form id="settings-home-form">
-            <div id="st-home"></div>
-            <button type="submit" class="btn btn-primary btn-full" id="st-home-submit">Save Home layout</button>
-          </form>
-        </div>
-      </div>
-    </div>
-
     <!-- ── Team Access Tab ───────────────────────────────────────────────────── -->
     <div class="tab-pane" id="tab-team">
       <div class="pane-layout">
@@ -1676,8 +826,8 @@
           <div class="card-title"><span class="dot"></span> Team access</div>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
             Find someone by the email they signed up with, then choose what they
-            can manage. Admins manage everything. Branch admins manage only their
-            branches' announcements, events and branch details.
+            can do here. Admins send to everyone and manage team access. Branch
+            admins send notifications only to their branches.
           </p>
           <form id="team-search-form">
             <div class="field">
@@ -1743,9 +893,7 @@ import {
   collection,
   addDoc,
   getDocs,
-  deleteDoc,
   doc,
-  setDoc,
   getDoc,
   updateDoc,
   Timestamp,
@@ -1818,19 +966,11 @@ async function resolveAdminScope(user) {
   return { superAdmin: false, branchIds, branchNames: strings(profile.adminBranchNames) };
 }
 
-function isCampusScope() {
-  return !!adminScope && !adminScope.superAdmin;
-}
-
-// Null/blank branch is all-campus content, which only a super admin may touch.
+// Only a super admin may target Everyone; a branch admin only their branches.
 function canManageCampusNamed(name) {
   if (adminScope?.superAdmin) return true;
   const value = (name || '').trim();
   return !!value && !!adminScope?.branchNames.has(value);
-}
-
-function canManageBranchId(id) {
-  return !!adminScope && (adminScope.superAdmin || adminScope.branchIds.has(id));
 }
 
 function applyScope() {
@@ -1844,8 +984,7 @@ function applyScope() {
   chip.title = chip.textContent;
   chip.hidden = !adminScope;
   const active = document.querySelector('.tab-btn.active');
-  if (!active || active.hidden) selectTab('events');
-  syncBranchFormScope();
+  selectTab(active && !active.hidden ? active.dataset.tab : 'notifications');
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -1856,7 +995,7 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
   let scope = null;
-  let problem = 'This account does not have Content Studio access.';
+  let problem = 'This account does not have Studio access.';
   try {
     scope = await resolveAdminScope(user);
   } catch (err) {
@@ -1871,24 +1010,15 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
   adminScope = scope;
-  // A previous session's half-edited item may be outside this scope.
-  resetEventForm();
-  resetNewsForm();
-  resetBranchForm();
+  // A previous session's half-written notification may be outside this scope.
   resetNotifyForm();
   applyScope();
   loginScreen.style.display = 'none';
   adminPanel.style.display  = 'grid';
   document.getElementById('user-email').textContent = user.email;
-  loadEvents();
-  loadNews();
-  loadBranches();
-  loadChurchHome();
-  if (scope.superAdmin) {
-    loadLiveStatus();
-    loadSubmissions();
-    setDefaultDailyDate();
-  }
+  loadNotifyBranches();
+  loadNotifyEvents();
+  loadNotifyNews();
 });
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -1938,10 +1068,6 @@ function selectTab(name) {
   btn.classList.add('active');
   document.getElementById(`tab-${name}`).classList.add('active');
   // Lazy-load data for the tab
-  if (name === 'sermons') loadSermons();
-  if (name === 'branches') loadBranches();
-  if (name === 'daily') loadPlans();
-  if (name === 'settings') loadAppSettings();
   if (name === 'team') loadTeam();
   if (name === 'notifications') loadNotifications();
 }
@@ -1951,622 +1077,112 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  EVENTS
+//  KHARIS CONTENT STUDIO (Supabase, read-only)
 // ════════════════════════════════════════════════════════════════════════════
-let eventsById = new Map();
+// Branches, events and announcements live in the Kharis Content Studio. The
+// pickers here read them with the public publishable key (the same key the
+// Content Studio ships in its own web bundle); nothing here writes to it.
+const SUPABASE_URL = 'https://cqgyiqxhpxwasogpdghx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_fT5_NGYsk0Uh4IO_uYfXvg_ZhR8bl7K';
 
-async function loadEvents() {
-  const listEl = document.getElementById('events-list');
-  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading events…</div>';
-  loadLinkableEvents();
-  try {
-    const q      = query(collection(db, 'events'), orderBy('startTime', 'asc'));
-    const snap   = await getDocs(q);
-    // Hidden docs are removed website events, kept only so the sync does not
-    // re-import them. Campus admins see only their campuses' events.
-    const events = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(ev => ev.hidden !== true && canManageCampusNamed(ev.branch));
-    eventsById = new Map(events.map(ev => [ev.id, ev]));
-    document.getElementById('events-count').textContent = events.length;
-    renderEventList(events);
-  } catch (err) {
-    listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${err.message}</div>`;
-  }
-}
-
-// Docs with this id prefix are imported from kharis.org by the sync job, which
-// rewrites their title, time and venue on every run.
-function isWebEvent(id) {
-  return id.startsWith('web_');
-}
-
-function renderEventList(events) {
-  const listEl = document.getElementById('events-list');
-  if (!events.length) {
-    listEl.innerHTML = `<div class="empty-state">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <p>No events yet. Create one!</p>
-    </div>`;
-    return;
-  }
-  listEl.innerHTML = '';
-  const ul = document.createElement('div');
-  ul.className = 'item-list';
-  events.forEach(ev => {
-    const start = toJsDate(ev.startTime);
-    const address = (ev.address || '').trim();
-    const item  = document.createElement('div');
-    item.className = 'item-card';
-    item.innerHTML = `
-      <div class="item-card-body">
-        <div class="item-card-title">${escHtml(ev.title || 'Untitled')}</div>
-        <div class="item-card-meta">
-          <span>${start ? formatDateTime(start) : 'No start time'}</span>
-          ${ev.branch ? `<span class="meta-chip">${escHtml(ev.branch)}</span>` : ''}
-          ${ev.location ? `<span class="meta-chip">${escHtml(ev.location)}</span>` : ''}
-          ${address ? `<span>${escHtml(address)}</span>` : ''}
-          ${isWebEvent(ev.id) ? '<span class="meta-chip">From website</span>' : ''}
-          ${ev.isFeatured ? `<span class="meta-chip featured" style="display:inline-flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>Featured</span>` : ''}
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;flex-shrink:0;">
-        <button class="btn btn-secondary event-edit-btn" data-id="${escHtml(ev.id)}" style="font-size:12px;padding:6px 12px;">Edit</button>
-        ${isWebEvent(ev.id)
-          ? `<button class="btn btn-danger" data-id="${escHtml(ev.id)}" data-col="events" title="Hides this website event from the app. The hourly sync keeps it hidden.">Remove</button>`
-          : `<button class="btn btn-danger" data-id="${escHtml(ev.id)}" data-col="events">Delete</button>`}
-      </div>
-    `;
-    ul.appendChild(item);
+async function supabaseRows(path) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });
-  listEl.appendChild(ul);
-  ul.querySelectorAll('.event-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => startEventEdit(btn.dataset.id));
-  });
-  attachDeleteListeners(ul);
+  if (!res.ok) throw new Error(`Content Studio returned ${res.status}`);
+  return res.json();
 }
 
-// datetime-local value in the browser's zone, matching how the form reads it.
-function toDateTimeLocalValue(date) {
-  if (!date) return '';
-  const hh = String(date.getHours()).padStart(2, '0');
-  const mm = String(date.getMinutes()).padStart(2, '0');
-  return `${toDateKey(date)}T${hh}:${mm}`;
+// [{ id, name }] for every active branch, in Content Studio order. The id is
+// the branch slug, which is the app's branch id.
+let branchDirectory = [];
+let branchDirectoryLoad = null;
+
+// Fetched once; a failed fetch is retried on the next call.
+function loadBranchDirectory() {
+  branchDirectoryLoad ??= supabaseRows('branches?select=slug,name,group,sort_order&is_active=eq.true&order=sort_order')
+    .then(rows => {
+      branchDirectory = rows
+        .map(b => ({ id: (b.slug || '').trim(), name: (b.name || '').trim() }))
+        .filter(b => b.id && b.name);
+      return branchDirectory;
+    })
+    .catch(err => {
+      branchDirectoryLoad = null;
+      throw err;
+    });
+  return branchDirectoryLoad;
 }
 
-function startEventEdit(id) {
-  const ev = eventsById.get(id);
-  if (!ev) return;
-  const form = document.getElementById('event-form');
-  form.reset();
-  form.dataset.editId = id;
-  document.getElementById('ev-title').value    = ev.title || '';
-  document.getElementById('ev-desc').value     = ev.description || '';
-  document.getElementById('ev-location').value = ev.location || '';
-  document.getElementById('ev-address').value  = ev.address || '';
-  document.getElementById('ev-image').value    = ev.imageUrl || '';
-  setBranchValue(document.getElementById('ev-branch'), ev.branch);
-  document.getElementById('ev-start').value    = toDateTimeLocalValue(toJsDate(ev.startTime));
-  document.getElementById('ev-end').value      = toDateTimeLocalValue(toJsDate(ev.endTime));
-  document.getElementById('ev-featured').checked = ev.isFeatured === true;
-  document.getElementById('event-form-title').textContent = 'Edit Event';
-  document.getElementById('event-submit-btn').textContent = 'Save changes';
-  document.getElementById('ev-cancel-btn').style.display = '';
-  document.getElementById('ev-sync-warning').style.display = isWebEvent(id) ? '' : 'none';
-  form.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function resetEventForm() {
-  const form = document.getElementById('event-form');
-  form.reset();
-  delete form.dataset.editId;
-  document.getElementById('event-form-title').textContent = 'Create Event';
-  document.getElementById('event-submit-btn').textContent = 'Create Event';
-  document.getElementById('ev-cancel-btn').style.display = 'none';
-  document.getElementById('ev-sync-warning').style.display = 'none';
-}
-
-document.getElementById('ev-cancel-btn').addEventListener('click', resetEventForm);
-
-document.getElementById('event-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const editId = form.dataset.editId;
-  if (!canManageCampusNamed(document.getElementById('ev-branch').value)) {
-    toast('Choose one of your branches for this event', 'error');
-    return;
-  }
-  const btn = document.getElementById('event-submit-btn');
-  btn.disabled = true;
-  btn.textContent = editId ? 'Saving…' : 'Creating…';
+// Every branch for a super admin; a branch admin gets only theirs (kept even
+// when the Content Studio no longer lists one).
+async function loadNotifyBranches() {
   try {
-    const startVal = document.getElementById('ev-start').value;
-    const endVal   = document.getElementById('ev-end').value;
-    // Exactly the fields this form owns; createdAt is written once on create.
-    const fields = {
-      title:       document.getElementById('ev-title').value.trim(),
-      description: document.getElementById('ev-desc').value.trim() || null,
-      location:    document.getElementById('ev-location').value.trim() || null,
-      address:     document.getElementById('ev-address').value.trim() || null,
-      branch:      document.getElementById('ev-branch').value.trim() || null,
-      startTime:   Timestamp.fromDate(new Date(startVal)),
-      endTime:     Timestamp.fromDate(new Date(endVal)),
-      imageUrl:    document.getElementById('ev-image').value.trim() || null,
-      isFeatured:  document.getElementById('ev-featured').checked,
-    };
-    if (editId) {
-      await updateDoc(doc(db, 'events', editId), fields);
-    } else {
-      await addDoc(collection(db, 'events'), { ...fields, createdAt: Timestamp.now() });
-    }
-    resetEventForm();
-    toast(editId ? 'Event updated' : 'Event created successfully');
-    loadEvents();
+    const names = (await loadBranchDirectory()).map(b => b.name);
+    populateNotifyBranches(adminScope?.superAdmin
+      ? names
+      : [...new Set([...names.filter(n => canManageCampusNamed(n)), ...(adminScope?.branchNames || [])])]);
   } catch (err) {
-    toast(err.message, 'error');
-  } finally {
-    btn.disabled = !branchesLoaded;
-    btn.textContent = form.dataset.editId ? 'Save changes' : 'Create Event';
-  }
-});
-
-document.getElementById('refresh-events').addEventListener('click', loadEvents);
-
-// Events an announcement can link to: anything starting from two days ago on.
-async function loadLinkableEvents() {
-  const sel = document.getElementById('nw-event');
-  try {
-    const since = Timestamp.fromDate(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
-    const snap = await getDocs(query(
-      collection(db, 'events'),
-      where('startTime', '>=', since),
-      orderBy('startTime'),
-      limit(100),
-    ));
-    const cur = sel.value;
-    const options = snap.docs
-      .filter(d => d.data().hidden !== true)
-      .map(d => `<option value="${escHtml(d.id)}">${escHtml(linkableEventLabel(d.data()))}</option>`).join('');
-    sel.innerHTML = '<option value="">None</option>' + options;
-    setLinkedEventValue(sel, cur);
-    // The notification link picker offers the same events.
-    const nfSel = document.getElementById('nf-event');
-    const nfCur = nfSel.value;
-    nfSel.innerHTML = `<option value="">${options ? 'Choose an event' : 'No upcoming events'}</option>` + options;
-    nfSel.value = [...nfSel.options].some(o => o.value === nfCur) ? nfCur : '';
-  } catch (err) {
-    toast('Could not load events to link: ' + err.message, 'error');
+    nf('branch').innerHTML = '<option value="">Branches did not load. Refresh to retry.</option>';
+    toast(`Could not load branches: ${err.message}`, 'error');
   }
 }
 
-function linkableEventLabel(ev) {
-  const start = toJsDate(ev.startTime);
+function eventLabel(ev) {
+  const start = toJsDate(ev.start_time);
   const day = start
     ? start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: LONDON_TZ })
     : 'No date';
-  return `${ev.title || 'Untitled'} · ${day} · ${ev.branch || 'All branches'}`;
+  const weekly = ev.recurrence === 'weekly' ? ' · weekly' : '';
+  return `${ev.title || 'Untitled'} · ${day}${weekly} · ${ev.branch_name || 'All branches'}`;
 }
 
-// Keeps a link to an event that has dropped out of the upcoming list.
-function setLinkedEventValue(sel, eventId) {
-  const title = eventsById.get(eventId)?.title;
-  ensureSelectOption(sel, eventId, `${title || 'Linked event'} (no longer upcoming)`);
-  sel.value = eventId || '';
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-//  NEWS
-// ════════════════════════════════════════════════════════════════════════════
-//  LIVE STATUS
-// ════════════════════════════════════════════════════════════════════════════
-async function loadLiveStatus() {
-  const preview = document.getElementById('live-preview');
+// Events a notification can open: anything from two days ago on, plus weekly
+// events that have not ended.
+async function loadNotifyEvents() {
+  const sel = nf('event');
   try {
-    const snap = await getDoc(doc(db, 'config', 'live'));
-    const data = snap.exists() ? snap.data() : { isLive: false };
-    document.getElementById('lv-on').checked = !!data.isLive;
-    document.getElementById('lv-video').value = data.videoId || '';
-    document.getElementById('lv-title').value = data.title || '';
-    const badge = document.getElementById('live-indicator');
-    badge.textContent = data.isLive ? 'LIVE' : 'OFF';
-    badge.style.background = data.isLive ? '#e5484d' : '';
-    badge.style.color = data.isLive ? '#fff' : '';
-    preview.innerHTML = data.isLive
-      ? `<div class="item-card"><div class="item-card-body">
-           <div class="item-card-title" style="color:#e5484d;">● LIVE NOW</div>
-           <div class="item-card-meta">${data.title || 'Untitled stream'}</div>
-           <div class="item-card-meta">youtube.com/watch?v=${data.videoId || '?'}</div>
-         </div></div>`
-      : `<div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">
-           Not live. The app shows no banner.
-         </div>`;
-  } catch (err) {
-    preview.innerHTML = `<div class="empty-state" style="color:var(--muted);font-size:13px;">${err.message}</div>`;
-  }
-}
-
-document.getElementById('live-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const isLive = document.getElementById('lv-on').checked;
-  const videoId = document.getElementById('lv-video').value.trim();
-  const title = document.getElementById('lv-title').value.trim();
-  if (isLive && !videoId) { toast('Video ID is required to go live', 'error'); return; }
-  const btn = document.getElementById('live-submit-btn');
-  btn.disabled = true;
-  try {
-    await setDoc(doc(db, 'config', 'live'), {
-      isLive, videoId, title,
-      updatedAt: Timestamp.now(),
+    const rows = await supabaseRows('events?select=id,title,start_time,branch_name,recurrence,recurrence_until&order=start_time');
+    const since = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    const items = rows.filter(ev => {
+      if (ev.recurrence === 'weekly') {
+        const until = toJsDate(ev.recurrence_until);
+        return !until || until.getTime() >= Date.now();
+      }
+      const start = toJsDate(ev.start_time);
+      return !!start && start.getTime() >= since;
     });
-    toast(isLive ? 'You are LIVE - banner is up' : 'Live banner removed');
-    loadLiveStatus();
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${items.length ? 'Choose an event' : 'No upcoming events'}</option>` +
+      items.map(ev => `<option value="${escHtml(ev.id)}">${escHtml(eventLabel(ev))}</option>`).join('');
+    sel.value = items.some(ev => ev.id === cur) ? cur : '';
   } catch (err) {
-    toast(err.message, 'error');
-  } finally {
-    btn.disabled = false;
+    sel.innerHTML = '<option value="">Events did not load</option>';
+    nfSetError('link', `Could not load events: ${err.message}`);
   }
-});
+}
 
-// ════════════════════════════════════════════════════════════════════════════
-//  SUBMISSIONS (visitors + testimonies, read-only)
-// ════════════════════════════════════════════════════════════════════════════
-async function loadSubmissions() {
-  const vEl = document.getElementById('visitors-list');
-  const tEl = document.getElementById('testimonies-list');
-  vEl.innerHTML = tEl.innerHTML =
-    '<div class="loading-row"><span class="spinner"></span> Loading…</div>';
+// Announcements still showing; an expired or unpublished one has no page to
+// open. Field names are read defensively.
+async function loadNotifyNews() {
+  const sel = nf('news');
   try {
-    const [vSnap, tSnap] = await Promise.all([
-      getDocs(query(collection(db, 'visitors'), orderBy('createdAt', 'desc'))),
-      getDocs(query(collection(db, 'testimonies'), orderBy('createdAt', 'desc'))),
-    ]);
-    document.getElementById('subs-count').textContent =
-      vSnap.size + tSnap.size;
-
-    vEl.innerHTML = vSnap.empty
-      ? '<div class="empty-state" style="padding:24px 0;color:var(--muted);font-size:13px;">No visitor submissions yet.</div>'
-      : '';
-    vSnap.forEach((d) => {
-      const v = d.data();
-      const when = v.createdAt?.toDate?.()?.toLocaleDateString('en-GB') || '';
-      vEl.insertAdjacentHTML('beforeend', `
-        <div class="item-card"><div class="item-card-body">
-          <div class="item-card-title">${v.name || 'Unnamed'}</div>
-          <div class="item-card-meta">${v.branch || 'No branch'} · ${v.email || ''} ${v.phone ? '· ' + v.phone : ''}</div>
-          <div class="item-card-meta">Submitted ${when}</div>
-        </div></div>`);
+    const rows = await supabaseRows('news?select=*&limit=100');
+    const now = Date.now();
+    const items = rows.filter(nw => {
+      const status = (nw.status || 'published').toString().toLowerCase();
+      const expires = toJsDate(nw.expires_at);
+      return status === 'published' && (!expires || expires.getTime() > now);
     });
-
-    tEl.innerHTML = tSnap.empty
-      ? '<div class="empty-state" style="padding:24px 0;color:var(--muted);font-size:13px;">No testimonies yet.</div>'
-      : '';
-    tSnap.forEach((d) => {
-      const t = d.data();
-      const when = t.createdAt?.toDate?.()?.toLocaleDateString('en-GB') || '';
-      const snippet = (t.text || '').slice(0, 140) + ((t.text || '').length > 140 ? '…' : '');
-      tEl.insertAdjacentHTML('beforeend', `
-        <div class="item-card"><div class="item-card-body">
-          <div class="item-card-title">${t.name || 'Anonymous'} <span style="color:var(--muted);font-weight:400;font-size:11px;">· ${t.status || 'pending'}</span></div>
-          <div class="item-card-meta" style="white-space:normal;line-height:1.5;">${snippet}</div>
-          <div class="item-card-meta">${t.branch || ''} · ${when}</div>
-        </div></div>`);
-    });
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${items.length ? 'Choose an announcement' : 'No current announcements'}</option>` +
+      items.map(nw => `<option value="${escHtml(nw.id)}">${escHtml(`${nw.title || 'Untitled'} · ${nw.branch_name || 'All branches'}`)}</option>`).join('');
+    sel.value = items.some(nw => String(nw.id) === cur) ? cur : '';
   } catch (err) {
-    vEl.innerHTML = tEl.innerHTML =
-      `<div class="empty-state" style="color:var(--muted);font-size:13px;">${err.message}</div>`;
+    sel.innerHTML = '<option value="">Announcements did not load</option>';
+    nfSetError('link', `Could not load announcements: ${err.message}`);
   }
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-let newsById = new Map();
-
-async function loadNews() {
-  const listEl = document.getElementById('news-list');
-  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading announcements…</div>';
-  try {
-    const q    = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
-    const snap = await getDocs(q);
-    // Campus admins see only their campuses' announcements.
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(nw => canManageCampusNamed(nw.branch));
-    newsById = new Map(items.map(nw => [nw.id, nw]));
-    document.getElementById('news-count').textContent = items.length;
-    renderNewsList(items);
-    renderNotifyNewsOptions();
-  } catch (err) {
-    listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${err.message}</div>`;
-  }
-}
-
-// ── Home-screen visibility ──────────────────────────────────────────────────
-// The app home screen renders announcements through AnnouncementsCarousel ->
-// newsProvider(activeBranch) -> getAnnouncements (selectAnnouncements in
-// backend/functions/src/index.ts). These rules decide what a member sees:
-//   1. nothing shows (or is pushed) until publishedAt has arrived;
-//   2. hidden once expiresAt has passed;
-//   3. reaches a member when its branch is theirs, or it is all-campus.
-// A blank or absent branch is all-campus, which is how the API reads it.
-// Both the published rows and the compose preview below read from here, so
-// they can never disagree with each other or with the app.
-function toJsDate(value) {
-  if (!value) return null;
-  const date = value.toDate ? value.toDate() : new Date(value);
-  return isNaN(date.getTime()) ? null : date;
-}
-
-function homeAudience(branch) {
-  return (branch || '').trim() || 'All branches';
-}
-
-function homeVisibility(branch, expiresAt, publishedAt) {
-  const now = Date.now();
-  const expiry = toJsDate(expiresAt);
-  const publish = toJsDate(publishedAt);
-  const expired = !!expiry && expiry.getTime() <= now;
-  const scheduled = !expired && !!publish && publish.getTime() > now;
-  const audience = homeAudience(branch);
-  return {
-    live: !expired && !scheduled,
-    scheduled,
-    audience,
-    expiry,
-    publish,
-    label: expired
-      ? 'Expired · hidden from home'
-      : scheduled
-        ? `Scheduled for ${formatLondonDateTime(publish)}`
-        : `Live on home · ${audience}`,
-  };
-}
-
-const HOME_ICON_LIVE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>';
-const HOME_ICON_HIDDEN = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-const HOME_ICON_SCHEDULED = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-
-function homeChip(visibility) {
-  const cls = visibility.live ? 'live' : visibility.scheduled ? 'scheduled' : 'hidden';
-  const icon = visibility.live ? HOME_ICON_LIVE : visibility.scheduled ? HOME_ICON_SCHEDULED : HOME_ICON_HIDDEN;
-  return `<span class="home-chip ${cls}">${icon}${escHtml(visibility.label)}</span>`;
-}
-
-function renderNewsList(items) {
-  const listEl = document.getElementById('news-list');
-  if (!items.length) {
-    listEl.innerHTML = `<div class="empty-state">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <p>No announcements yet. Publish one!</p>
-    </div>`;
-    return;
-  }
-  listEl.innerHTML = '';
-  const ul = document.createElement('div');
-  ul.className = 'item-list';
-  items.forEach(nw => {
-    const published = toJsDate(nw.publishedAt) || new Date();
-    const visibility = homeVisibility(nw.branch, nw.expiresAt, nw.publishedAt);
-    const linkedEvent = nw.eventId ? (eventsById.get(nw.eventId)?.title || 'Linked event') : '';
-    const item = document.createElement('div');
-    item.className = 'item-card';
-    const preview = nw.body ? nw.body.slice(0, 80) + (nw.body.length > 80 ? '…' : '') : '';
-    item.innerHTML = `
-      <div class="item-card-body">
-        <div style="margin-bottom:6px;">${homeChip(visibility)}</div>
-        <div class="item-card-title">${escHtml(nw.title || 'Untitled')}</div>
-        <div class="item-card-meta">
-          <span>${visibility.scheduled ? 'Publishes' : 'Published'} ${formatLondonDate(published)}</span>
-          ${nw.type ? `<span class="meta-chip">${escHtml(nw.type)}</span>` : ''}
-          <span class="meta-chip">${visibility.expiry
-            ? `${visibility.expiry.getTime() > Date.now() ? 'Expires' : 'Expired'} ${formatLondonDateTime(visibility.expiry)}`
-            : 'No expiry'}</span>
-          ${linkedEvent ? `<span class="meta-chip">Event: ${escHtml(linkedEvent)}</span>` : ''}
-          ${nw.linkUrl ? `<span class="meta-chip">Button: ${escHtml(nw.ctaLabel || 'Learn more')}</span>` : ''}
-        </div>
-        ${preview ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">${escHtml(preview)}</div>` : ''}
-      </div>
-      <div style="display:flex;gap:6px;flex-shrink:0;">
-        <button class="btn btn-secondary news-edit-btn" data-id="${escHtml(nw.id)}" style="font-size:12px;padding:6px 12px;">Edit</button>
-        <button class="btn btn-danger" data-id="${escHtml(nw.id)}" data-col="news">Delete</button>
-      </div>
-    `;
-    ul.appendChild(item);
-  });
-  listEl.appendChild(ul);
-  ul.querySelectorAll('.news-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => startNewsEdit(btn.dataset.id));
-  });
-  attachDeleteListeners(ul);
-}
-
-// The publishedAt the form would save. Editing with the publish inputs left
-// as loaded keeps the stored instant. Otherwise a blank date, today without a
-// time, or any moment already past means now; anything later is that UK
-// wall-clock time (09:00 when the time is blank).
-function newsPublishDate() {
-  const form = document.getElementById('news-form');
-  const dateVal = document.getElementById('nw-publish').value;
-  const timeVal = document.getElementById('nw-publish-time').value;
-  const original = form.dataset.editId ? newsById.get(form.dataset.editId) : null;
-  if (original && dateVal === form.dataset.publishDate && timeVal === form.dataset.publishTime) {
-    return toJsDate(original.publishedAt) || new Date();
-  }
-  if (!dateVal || (!timeVal && dateVal === londonDateKey(new Date()))) return new Date();
-  const [hh, mm] = (timeVal || '09:00').split(':').map(Number);
-  const at = londonWallTimeToDate(dateVal, hh, mm);
-  return at.getTime() <= Date.now() ? new Date() : at;
-}
-
-// The expiresAt the form would save: the end of the chosen day in UK time, or
-// the stored instant when editing with the date left as loaded.
-function newsExpiryDate() {
-  const form = document.getElementById('news-form');
-  const dateVal = document.getElementById('nw-expiry').value;
-  if (!dateVal) return null;
-  const original = form.dataset.editId ? newsById.get(form.dataset.editId) : null;
-  if (original && dateVal === form.dataset.expiryDate) return toJsDate(original.expiresAt);
-  return londonWallTimeToDate(dateVal, 23, 59, 59, 999);
-}
-
-function isHttpUrl(value) {
-  try {
-    const { protocol } = new URL(value);
-    return protocol === 'http:' || protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
-// isHttpUrl accepts `HTTPS://x`; store the scheme lower-cased so the `news`
-// rule and every reader's scheme check agree. Mirrors the app's
-// normaliseAnnouncementLink.
-function normaliseLink(value) {
-  return value.trim().replace(/^[a-z][a-z0-9+.-]*:/i, (scheme) => scheme.toLowerCase());
-}
-
-// Restates, before publishing, where the announcement lands and who sees it.
-// Driven by the same homeVisibility rules as the rows above.
-function updateNewsWherePreview() {
-  const el = document.getElementById('nw-where');
-  if (!el) return;
-  const branch = document.getElementById('nw-branch').value;
-  const visibility = homeVisibility(branch, newsExpiryDate(), newsPublishDate());
-  const audienceLine = visibility.audience === 'All branches'
-    ? 'Seen by <strong>everyone, at every branch</strong>.'
-    : `Seen <strong>only by members whose branch is ${escHtml(visibility.audience)}</strong>.`;
-  const publishLine = visibility.scheduled
-    ? `Appears, and its notification goes out, at <strong>${escHtml(formatLondonDateTime(visibility.publish))}</strong> UK time.`
-    : 'Shows on the home screen as soon as it is saved.';
-  const expiryLine = !visibility.expiry
-    ? 'No expiry, so it stays on the home screen until you delete it.'
-    : visibility.expiry.getTime() > Date.now()
-      ? `Drops off the home screen at <strong>${escHtml(formatLondonDateTime(visibility.expiry))}</strong> UK time.`
-      : '<span class="warn">That expiry has already passed, so it would be hidden from the home screen immediately.</span>';
-  el.innerHTML = `
-    <span class="where-title">Where this shows</span>
-    <ul>
-      <li>In the announcements carousel on the <strong>app home screen</strong>, not in Events.</li>
-      <li>${audienceLine}</li>
-      <li>${publishLine}</li>
-      <li>${expiryLine}</li>
-      <li>Members see it when they next open the app, or pull to refresh the home screen.</li>
-    </ul>
-  `;
-}
-
-document.getElementById('nw-branch').addEventListener('change', updateNewsWherePreview);
-['nw-publish', 'nw-publish-time', 'nw-expiry'].forEach((id) => {
-  document.getElementById(id).addEventListener('change', updateNewsWherePreview);
-  document.getElementById(id).addEventListener('input', updateNewsWherePreview);
-});
-
-function startNewsEdit(id) {
-  const nw = newsById.get(id);
-  if (!nw) return;
-  const form = document.getElementById('news-form');
-  form.reset();
-  form.dataset.editId = id;
-  document.getElementById('nw-title').value = nw.title || '';
-  document.getElementById('nw-body').value  = nw.body || '';
-  document.getElementById('nw-image').value = nw.imageUrl || '';
-  const typeSel = document.getElementById('nw-type');
-  ensureSelectOption(typeSel, nw.type, nw.type);
-  typeSel.value = nw.type || 'Announcement';
-  setBranchValue(document.getElementById('nw-branch'), nw.branch);
-  setLinkedEventValue(document.getElementById('nw-event'), nw.eventId);
-  document.getElementById('nw-link').value = nw.linkUrl || '';
-  document.getElementById('nw-cta').value  = nw.ctaLabel || '';
-  // Dates are shown as UK wall time, the zone they are authored in.
-  const published = toJsDate(nw.publishedAt);
-  const expiry = toJsDate(nw.expiresAt);
-  form.dataset.publishDate = published ? londonDateKey(published) : '';
-  form.dataset.publishTime = published ? londonTimeValue(published) : '';
-  form.dataset.expiryDate  = expiry ? londonDateKey(expiry) : '';
-  document.getElementById('nw-publish').value      = form.dataset.publishDate;
-  document.getElementById('nw-publish-time').value = form.dataset.publishTime;
-  document.getElementById('nw-expiry').value       = form.dataset.expiryDate;
-  document.getElementById('news-form-title').textContent = 'Edit Announcement';
-  document.getElementById('news-submit-btn').textContent = 'Save changes';
-  document.getElementById('nw-cancel-btn').style.display = '';
-  updateNewsWherePreview();
-  form.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function resetNewsForm() {
-  const form = document.getElementById('news-form');
-  form.reset();
-  delete form.dataset.editId;
-  delete form.dataset.publishDate;
-  delete form.dataset.publishTime;
-  delete form.dataset.expiryDate;
-  document.getElementById('news-form-title').textContent = 'Publish Announcement';
-  document.getElementById('news-submit-btn').textContent = 'Publish';
-  document.getElementById('nw-cancel-btn').style.display = 'none';
-  setDefaultNewsDate();
-}
-
-document.getElementById('nw-cancel-btn').addEventListener('click', resetNewsForm);
-
-document.getElementById('news-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const editId = form.dataset.editId;
-  if (!canManageCampusNamed(document.getElementById('nw-branch').value)) {
-    toast('Choose one of your branches for this announcement', 'error');
-    return;
-  }
-  const linkUrl = normaliseLink(document.getElementById('nw-link').value);
-  if (linkUrl && !isHttpUrl(linkUrl)) {
-    toast('Button link must be an http:// or https:// address', 'error');
-    return;
-  }
-  // Tapping an event-linked announcement opens the event, so a button link
-  // beside it would never be reachable.
-  if (linkUrl && document.getElementById('nw-event').value) {
-    toast('Choose a linked event or a button link, not both', 'error');
-    return;
-  }
-  const ctaLabel = document.getElementById('nw-cta').value.trim().slice(0, 24);
-  const btn = document.getElementById('news-submit-btn');
-  btn.disabled = true;
-  btn.textContent = editId ? 'Saving…' : 'Publishing…';
-  try {
-    const publishedAt = newsPublishDate();
-    const expiresAt = newsExpiryDate();
-    // Exactly the fields this form owns; createdAt and pushedAt are never
-    // touched by an edit.
-    const fields = {
-      title:       document.getElementById('nw-title').value.trim(),
-      body:        document.getElementById('nw-body').value.trim(),
-      type:        document.getElementById('nw-type').value,
-      // Empty select = church-wide. Written as an explicit null (never left
-      // absent or blank) so getAnnouncements' branch-scoped query can see it.
-      branch:      document.getElementById('nw-branch').value.trim() || null,
-      imageUrl:    document.getElementById('nw-image').value.trim() || null,
-      publishedAt: Timestamp.fromDate(publishedAt),
-      expiresAt:   expiresAt ? Timestamp.fromDate(expiresAt) : null,
-      eventId:     document.getElementById('nw-event').value || null,
-      linkUrl:     linkUrl || null,
-      ctaLabel:    ctaLabel || (linkUrl ? 'Learn more' : null),
-    };
-    if (editId) {
-      await updateDoc(doc(db, 'news', editId), fields);
-    } else {
-      await addDoc(collection(db, 'news'), { ...fields, createdAt: Timestamp.now() });
-    }
-    resetNewsForm();
-    toast(editId
-      ? 'Announcement updated'
-      : publishedAt.getTime() > Date.now()
-        ? `Announcement scheduled for ${formatLondonDateTime(publishedAt)}`
-        : 'Announcement published');
-    loadNews();
-  } catch (err) {
-    toast(err.message, 'error');
-  } finally {
-    btn.disabled = !branchesLoaded;
-    btn.textContent = form.dataset.editId ? 'Save changes' : 'Publish';
-  }
-});
-
-document.getElementById('refresh-news').addEventListener('click', loadNews);
 
 // ════════════════════════════════════════════════════════════════════════════
 //  NOTIFICATIONS
@@ -2717,9 +1333,9 @@ function syncNotifyAudience() {
   nf('branch-field').hidden = nfAudienceType() !== 'branch';
 }
 
-// Branch choices come from populateBranchPickers: every branch for a super
-// admin, only their own for a branch admin. There is no All branches option
-// here; Everyone is its own audience.
+// Branch choices come from loadNotifyBranches (the Content Studio's active
+// branches). There is no All branches option here; Everyone is its own
+// audience.
 function populateNotifyBranches(names) {
   const sel = nf('branch');
   const cur = sel.value;
@@ -2749,19 +1365,6 @@ async function loadNotifySermons() {
   }
   syncNotifyLinkFields();
   updateNotifyPreview();
-}
-
-// Announcements still showing or yet to show; an expired one has no page to open.
-function renderNotifyNewsOptions() {
-  const sel = nf('news');
-  const cur = sel.value;
-  const items = [...newsById.values()].filter(nw => {
-    const v = homeVisibility(nw.branch, nw.expiresAt, nw.publishedAt);
-    return v.live || v.scheduled;
-  });
-  sel.innerHTML = `<option value="">${items.length ? 'Choose an announcement' : 'No current announcements'}</option>` +
-    items.map(nw => `<option value="${escHtml(nw.id)}">${escHtml(`${nw.title || 'Untitled'} · ${homeAudience(nw.branch)}`)}</option>`).join('');
-  sel.value = items.some(nw => nw.id === cur) ? cur : '';
 }
 
 function resetNotifyForm() {
@@ -2885,7 +1488,6 @@ function renderNotificationHistory(items) {
 }
 
 async function loadNotifications() {
-  renderNotifyNewsOptions();
   const listEl = nf('history');
   listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading notifications…</div>';
   try {
@@ -2946,478 +1548,31 @@ nf('history').addEventListener('click', async (e) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-//  DAILY CONTENT
-// ════════════════════════════════════════════════════════════════════════════
-function setDefaultDailyDate() {
-  const dateInput = document.getElementById('dc-date');
-  dateInput.value = toDateKey(new Date());
-  loadDailyPreview(dateInput.value);
-}
-
-// Also refreshes the "Where this shows" panel: this runs on load and after
-// every reset, which are exactly the moments the branch/expiry fields change
-// without firing an input event.
-function setDefaultNewsDate() {
-  const el = document.getElementById('nw-publish');
-  if (!el.value) el.value = londonDateKey(new Date());
-  updateNewsWherePreview();
-}
-
-document.getElementById('dc-date').addEventListener('change', (e) => {
-  loadDailyPreview(e.target.value);
-});
-
-async function loadDailyPreview(dateKey) {
-  const previewEl = document.getElementById('daily-preview');
-  const bannerEl  = document.getElementById('daily-existing-banner');
-  if (!dateKey) return;
-  loadResolvedReading(dateKey);
-  previewEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Checking…</div>';
-  try {
-    const snap = await getDoc(doc(db, 'dailyContent', dateKey));
-    if (snap.exists()) {
-      bannerEl.style.display = 'block';
-      const d = snap.data();
-      const reading = d.reading || {};
-      previewEl.innerHTML = `
-        <div class="card" style="background:var(--surface2);">
-          <div style="margin-bottom:14px;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;">Bible Reading</div>
-            <div style="font-size:15px;font-weight:600;">${escHtml(reading.book || '')} ${reading.chapter || ''}:${escHtml(reading.verse || '')}</div>
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px;">Prayer</div>
-            <div style="font-size:13px;line-height:1.6;color:var(--text);">${escHtml(d.prayer || '')}</div>
-            <div style="margin-top:8px;font-size:12px;color:#a47cff;font-style:italic;">${escHtml(d.prayerReference || '')}</div>
-          </div>
-        </div>
-      `;
-      // Pre-fill form with existing values
-      document.getElementById('dc-book').value    = reading.book    || '';
-      document.getElementById('dc-chapter').value = reading.chapter || '';
-      document.getElementById('dc-verse').value   = reading.verse   || '';
-      document.getElementById('dc-prayer').value  = d.prayer        || '';
-      document.getElementById('dc-ref').value     = d.prayerReference || '';
-    } else {
-      bannerEl.style.display = 'none';
-      previewEl.innerHTML = `<div class="empty-state" style="padding:30px 0;text-align:left;color:var(--muted);font-size:13px;">No content saved for <strong style="color:var(--text)">${dateKey}</strong> yet.</div>`;
-    }
-  } catch (err) {
-    bannerEl.style.display = 'none';
-    previewEl.innerHTML = `<div style="color:var(--danger);font-size:13px;">Error: ${err.message}</div>`;
-  }
-}
-
-// Resolution (saved day → covering plan → last day of the most recent expired
-// plan) is done by the getDailyReading function, so the portal, the app and the
-// daily notification can never disagree about what a date means.
-const DAILY_READING_URL =
-  'https://us-central1-kharis-app-47c49.cloudfunctions.net/getDailyReading';
-
-const READING_SOURCE_LABEL = {
-  'day': 'Written by hand for this date. Overrides any plan.',
-  'plan': 'From a reading plan.',
-  'plan-last-day':
-    'That plan has finished. Held on its last day until a new plan starts.',
-};
-
-async function loadResolvedReading(dateKey) {
-  const el = document.getElementById('daily-resolved');
-  el.innerHTML = '<div class="loading-row"><span class="spinner"></span> Resolving…</div>';
-  try {
-    const res = await fetch(`${DAILY_READING_URL}?date=${encodeURIComponent(dateKey)}`);
-    const data = await res.json();
-    const entry = (data.readings || [])[0];
-    if (!entry) {
-      el.innerHTML = `<div class="empty-state" style="padding:24px 0;text-align:left;font-size:13px;color:var(--danger);">
-        Nothing covers <strong>${escHtml(dateKey)}</strong>. Members see the built-in
-        default reading until a plan covers it or a day is saved.</div>`;
-      return;
-    }
-    const r = entry.reading || {};
-    const ref = (!r.verse || r.verse === '1-end')
-      ? `${r.book} ${r.chapter}`
-      : `${r.book} ${r.chapter}:${r.verse}`;
-    const plan = entry.planTitle ? ` · ${escHtml(entry.planTitle)}` : '';
-    el.innerHTML = `
-      <div class="card" style="background:var(--surface2);">
-        <div style="font-size:18px;font-weight:700;">${escHtml(ref)}</div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted);">${READING_SOURCE_LABEL[entry.source] || ''}${plan}</div>
-        <div style="margin-top:10px;font-size:13px;line-height:1.6;color:var(--text);">${escHtml(entry.prayer || '')}</div>
-      </div>`;
-  } catch (err) {
-    el.innerHTML = `<div style="color:var(--danger);font-size:13px;">Could not resolve: ${escHtml(err.message)}</div>`;
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-//  READING PLANS
-// ════════════════════════════════════════════════════════════════════════════
-function syncPlanModeFields() {
-  const byVerse = document.getElementById('pl-mode').value === 'verse';
-  document.getElementById('pl-verse-fields').style.display = byVerse ? '' : 'none';
-  document.getElementById('pl-verses-field').style.display = byVerse ? 'none' : '';
-}
-
-document.getElementById('pl-mode').addEventListener('change', syncPlanModeFields);
-
-// Chapters per book. Must equal the backend and app tables exactly: a
-// chapter-mode plan resolves day N to min(startChapter + N, chapters), so a
-// plan longer than the chapters left would hold on the final chapter.
-const BIBLE_CHAPTERS = {
-  'Genesis': 50, 'Exodus': 40, 'Leviticus': 27, 'Numbers': 36, 'Deuteronomy': 34,
-  'Joshua': 24, 'Judges': 21, 'Ruth': 4, '1 Samuel': 31, '2 Samuel': 24,
-  '1 Kings': 22, '2 Kings': 25, '1 Chronicles': 29, '2 Chronicles': 36, 'Ezra': 10,
-  'Nehemiah': 13, 'Esther': 10, 'Job': 42, 'Psalms': 150, 'Proverbs': 31,
-  'Ecclesiastes': 12, 'Song of Solomon': 8, 'Isaiah': 66, 'Jeremiah': 52, 'Lamentations': 5,
-  'Ezekiel': 48, 'Daniel': 12, 'Hosea': 14, 'Joel': 3, 'Amos': 9,
-  'Obadiah': 1, 'Jonah': 4, 'Micah': 7, 'Nahum': 3, 'Habakkuk': 3,
-  'Zephaniah': 3, 'Haggai': 2, 'Zechariah': 14, 'Malachi': 4,
-  'Matthew': 28, 'Mark': 16, 'Luke': 24, 'John': 21, 'Acts': 28,
-  'Romans': 16, '1 Corinthians': 16, '2 Corinthians': 13, 'Galatians': 6, 'Ephesians': 6,
-  'Philippians': 4, 'Colossians': 4, '1 Thessalonians': 5, '2 Thessalonians': 3, '1 Timothy': 6,
-  '2 Timothy': 4, 'Titus': 3, 'Philemon': 1, 'Hebrews': 13, 'James': 5,
-  '1 Peter': 5, '2 Peter': 3, '1 John': 5, '2 John': 1, '3 John': 1,
-  'Jude': 1, 'Revelation': 22,
-};
-const BIBLE_BOOK_BY_KEY = new Map(Object.keys(BIBLE_CHAPTERS).map(b => [b.toLowerCase(), b]));
-
-document.getElementById('bible-books').innerHTML =
-  Object.keys(BIBLE_CHAPTERS).map(b => `<option value="${b}"></option>`).join('');
-
-// The table's spelling of a typed book name, or null when it is not a book.
-function canonicalBook(name) {
-  return BIBLE_BOOK_BY_KEY.get((name || '').trim().replace(/\s+/g, ' ').toLowerCase()) || null;
-}
-
-function planFormBounds() {
-  const byVerse = document.getElementById('pl-mode').value === 'verse';
-  const rawBook = document.getElementById('pl-book').value.trim();
-  const book = canonicalBook(rawBook);
-  const chapters = book ? BIBLE_CHAPTERS[book] : null;
-  const startChapter = Math.max(1, parseInt(document.getElementById('pl-chapter').value, 10) || 1);
-  const days = parseInt(document.getElementById('pl-days').value, 10);
-  const remaining = chapters ? chapters - startChapter + 1 : null;
-  let error = '';
-  if (!byVerse) {
-    if (rawBook && !book) {
-      error = 'Pick a book from the list so the plan can be checked against its chapters.';
-    } else if (chapters && startChapter > chapters) {
-      error = `${book} has ${chapters} chapter${chapters === 1 ? '' : 's'}.`;
-    } else if (chapters && days > remaining) {
-      error = `${book} ${startChapter} to ${chapters} covers ${remaining} day${remaining === 1 ? '' : 's'} at most. Shorten the plan or start from an earlier chapter.`;
-    }
-  }
-  return { byVerse, book, chapters, startChapter, days, remaining, error };
-}
-
-// Keeps the chapter/length limits, the inline error and the last-reading line
-// in step with the form. Verse mode has no chapter bounds.
-function updatePlanBounds() {
-  const b = planFormBounds();
-  const chapterEl = document.getElementById('pl-chapter');
-  const daysEl = document.getElementById('pl-days');
-  if (!b.byVerse && b.chapters) {
-    chapterEl.max = b.chapters;
-    daysEl.max = Math.max(1, b.remaining);
-  } else {
-    chapterEl.removeAttribute('max');
-    daysEl.max = 400;
-  }
-  const errEl = document.getElementById('pl-bounds-error');
-  errEl.textContent = b.error;
-  errEl.style.display = b.error ? '' : 'none';
-  const lastEl = document.getElementById('pl-last-reading');
-  const startKey = document.getElementById('pl-start').value;
-  if (!b.byVerse && b.chapters && !b.error && b.days >= 1 && /^\d{4}-\d{2}-\d{2}$/.test(startKey)) {
-    const lastChapter = Math.min(b.startChapter + b.days - 1, b.chapters);
-    lastEl.textContent = `Last reading: ${b.book} ${lastChapter} on ${formatDateKey(addDaysToKey(startKey, b.days - 1), { year: 'numeric' })}`;
-    lastEl.style.display = '';
-  } else {
-    lastEl.style.display = 'none';
-  }
-  return b;
-}
-
-// Live day-by-day preview of the plan being authored. The chapter/verse
-// arithmetic mirrors planReading() in backend/functions/src/reading-plans.ts
-// exactly, so what the admin sees here is what getDailyReading serves.
-function updatePlanPreview() {
-  const bounds = updatePlanBounds();
-  const el = document.getElementById('pl-preview');
-  const startKey = document.getElementById('pl-start').value;
-  const days = parseInt(document.getElementById('pl-days').value, 10);
-  const book = bounds.book || document.getElementById('pl-book').value.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startKey) || !book || !(days >= 1)) {
-    el.innerHTML = '<span class="where-title">Day-by-day preview</span>' +
-      'Fill in book, start date and length to see what each date resolves to.';
-    return;
-  }
-  const byVerse = document.getElementById('pl-mode').value === 'verse';
-  const startChapter = Math.max(1, parseInt(document.getElementById('pl-chapter').value, 10) || 1);
-  const constantVerses = document.getElementById('pl-verses').value.trim();
-  const startVerse = Math.max(1, parseInt(document.getElementById('pl-start-verse').value, 10) || 1);
-  const perDay = Math.max(1, parseInt(document.getElementById('pl-verses-per-day').value, 10) || 1);
-  const refAt = (offset) => {
-    let chapter, verse;
-    if (byVerse) {
-      const first = startVerse + offset * perDay;
-      chapter = startChapter;
-      verse = perDay === 1 ? `${first}` : `${first}-${first + perDay - 1}`;
-    } else {
-      chapter = bounds.chapters
-        ? Math.min(startChapter + offset, bounds.chapters)
-        : startChapter + offset;
-      verse = constantVerses || '1-end';
-    }
-    return verse === '1-end' ? `${book} ${chapter}` : `${book} ${chapter}:${verse}`;
-  };
-  const [y, m, d] = startKey.split('-').map(Number);
-  const spansYears = new Date(Date.UTC(y, m - 1, d + days - 1)).getUTCFullYear() !== y;
-  const fmtAt = (offset) => new Date(Date.UTC(y, m - 1, d + offset)).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', ...(spansYears ? { year: 'numeric' } : {}), timeZone: 'UTC',
-  });
-  const row = (offset) => `<li><strong>${escHtml(fmtAt(offset))}</strong> → ${escHtml(refAt(offset))}</li>`;
-  const rows = days <= 4
-    ? Array.from({ length: days }, (_, i) => row(i)).join('')
-    : row(0) + row(1) + '<li style="list-style:none;color:var(--muted);">⋯</li>' + row(days - 1);
-  el.innerHTML = `<span class="where-title">Day-by-day preview</span><ul>${rows}</ul>`;
-}
-
-['pl-book', 'pl-start', 'pl-days', 'pl-chapter', 'pl-verses',
- 'pl-start-verse', 'pl-verses-per-day'].forEach((id) => {
-  document.getElementById(id).addEventListener('input', updatePlanPreview);
-});
-document.getElementById('pl-mode').addEventListener('change', updatePlanPreview);
-updatePlanPreview();
-
-// Inclusive last date of a plan. Pure calendar arithmetic in UTC so a BST
-// switch cannot shift it; the readings themselves are resolved server-side.
-function planEndDateKey(startKey, days) {
-  return addDaysToKey(startKey, days - 1);
-}
-
-async function loadPlans() {
-  const listEl = document.getElementById('plans-list');
-  listEl.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading plans…</div>';
-  try {
-    const snap = await getDocs(query(
-      collection(db, 'readingPlans'),
-      orderBy('startDate', 'desc'),
-      limit(50),
-    ));
-    if (snap.empty) {
-      listEl.innerHTML = '<div class="empty-state" style="padding:24px 0;text-align:left;color:var(--muted);font-size:13px;">No plans yet. Create one to schedule a whole month at once.</div>';
-      return;
-    }
-    listEl.innerHTML = snap.docs.map(d => {
-      const p = d.data();
-      const days = Number(p.days) || 1;
-      const rule = p.mode === 'verse'
-        ? `${escHtml(p.book || '')} ${p.startChapter || 1}, ${Number(p.versesPerDay) || 1} verse(s) a day`
-        : `one chapter a day from ${escHtml(p.book || '')} ${p.startChapter || 1}`;
-      const book = canonicalBook(p.book);
-      const chapters = book ? BIBLE_CHAPTERS[book] : 0;
-      const startChapter = Number(p.startChapter) || 1;
-      // Over-long chapter plans hold on the last chapter from the day after
-      // it is first read.
-      const overrun = p.mode !== 'verse' && chapters && startChapter + days - 1 > chapters &&
-        /^\d{4}-\d{2}-\d{2}$/.test(p.startDate || '')
-        ? `<div style="margin-top:6px;"><span class="meta-chip warn">Runs past ${escHtml(book)} ${chapters}: holds on chapter ${chapters} from ${escHtml(formatDateKey(addDaysToKey(p.startDate, Math.max(0, chapters - startChapter + 1)), { year: 'numeric' }))}</span></div>`
-        : '';
-      return `<div class="item-card" data-id="${d.id}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-          <div>
-            <strong>${escHtml(p.title || p.book || 'Untitled plan')}</strong>
-            <div class="item-card-meta">${escHtml(p.startDate || '')} → ${escHtml(planEndDateKey(p.startDate || '', days))} · ${days} days</div>
-            <div style="color:var(--muted);font-size:12px;margin-top:4px;">${rule}</div>
-            ${overrun}
-          </div>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-secondary plan-edit-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;">Edit</button>
-            <button class="btn btn-secondary plan-delete-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;color:var(--danger);">Delete</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-
-    listEl.querySelectorAll('.plan-edit-btn').forEach(btn => {
-      btn.addEventListener('click', () => editPlan(btn.dataset.id));
-    });
-    listEl.querySelectorAll('.plan-delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Delete this reading plan?')) return;
-        try {
-          await deleteDoc(doc(db, 'readingPlans', btn.dataset.id));
-          toast('Plan deleted');
-          loadPlans();
-          loadResolvedReading(document.getElementById('dc-date').value);
-        } catch (err) {
-          toast(err.message, 'error');
-        }
-      });
-    });
-  } catch (err) {
-    listEl.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load: ${escHtml(err.message)}</div>`;
-  }
-}
-
-async function editPlan(id) {
-  const snap = await getDoc(doc(db, 'readingPlans', id));
-  if (!snap.exists()) return;
-  const p = snap.data();
-  document.getElementById('pl-title').value = p.title || '';
-  document.getElementById('pl-book').value = p.book || '';
-  document.getElementById('pl-start').value = p.startDate || '';
-  document.getElementById('pl-days').value = p.days || 1;
-  document.getElementById('pl-mode').value = p.mode === 'verse' ? 'verse' : 'chapter';
-  document.getElementById('pl-chapter').value = p.startChapter || 1;
-  document.getElementById('pl-verses').value = p.verses || '';
-  document.getElementById('pl-start-verse').value = p.startVerse || 1;
-  document.getElementById('pl-verses-per-day').value = p.versesPerDay || 1;
-  document.getElementById('pl-prayer').value = p.prayer || '';
-  document.getElementById('plan-form').dataset.editId = id;
-  document.getElementById('plan-submit-btn').textContent = 'Update Reading Plan';
-  syncPlanModeFields();
-  updatePlanPreview();
-}
-
-document.getElementById('plan-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const btn = document.getElementById('plan-submit-btn');
-  const editId = form.dataset.editId;
-  const bounds = updatePlanBounds();
-  if (bounds.error) {
-    document.getElementById('pl-bounds-error').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  try {
-    const byVerse = document.getElementById('pl-mode').value === 'verse';
-    const verses = document.getElementById('pl-verses').value.trim();
-    const payload = {
-      title: document.getElementById('pl-title').value.trim(),
-      book: bounds.book || document.getElementById('pl-book').value.trim(),
-      startDate: document.getElementById('pl-start').value,
-      days: parseInt(document.getElementById('pl-days').value, 10),
-      mode: byVerse ? 'verse' : 'chapter',
-      startChapter: parseInt(document.getElementById('pl-chapter').value, 10) || 1,
-      verses: byVerse || !verses ? null : verses,
-      startVerse: parseInt(document.getElementById('pl-start-verse').value, 10) || 1,
-      versesPerDay: parseInt(document.getElementById('pl-verses-per-day').value, 10) || 1,
-      prayer: document.getElementById('pl-prayer').value.trim(),
-      prayerReference: '',
-    };
-    if (editId) {
-      await setDoc(doc(db, 'readingPlans', editId), payload);
-    } else {
-      await addDoc(collection(db, 'readingPlans'), payload);
-    }
-    form.reset();
-    delete form.dataset.editId;
-    syncPlanModeFields();
-    updatePlanPreview();
-    toast(editId ? 'Reading plan updated' : 'Reading plan created');
-    loadPlans();
-    loadResolvedReading(document.getElementById('dc-date').value);
-  } catch (err) {
-    toast(err.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Save Reading Plan';
-  }
-});
-
-document.getElementById('refresh-plans').addEventListener('click', loadPlans);
-
-document.getElementById('daily-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const btn = document.getElementById('daily-submit-btn');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  const dateKey = document.getElementById('dc-date').value;
-  if (!dateKey) { toast('Select a date first', 'error'); btn.disabled = false; btn.textContent = 'Save Daily Content'; return; }
-  try {
-    const payload = {
-      reading: {
-        book:    document.getElementById('dc-book').value.trim(),
-        chapter: parseInt(document.getElementById('dc-chapter').value, 10),
-        verse:   document.getElementById('dc-verse').value.trim() || '1',
-      },
-      prayer:          document.getElementById('dc-prayer').value.trim(),
-      prayerReference: document.getElementById('dc-ref').value.trim(),
-      updatedAt:       Timestamp.now(),
-    };
-    // Document ID = "YYYY-MM-DD" — matches Flutter's _dateKey() exactly
-    await setDoc(doc(db, 'dailyContent', dateKey), payload);
-    toast('Daily content saved');
-    loadDailyPreview(dateKey);
-  } catch (err) {
-    toast(err.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Save Daily Content';
-  }
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-//  DELETE (shared)
-// ════════════════════════════════════════════════════════════════════════════
-// Scoped to one rendered list so a re-render never stacks a second listener
-// on another list's buttons.
-function attachDeleteListeners(root) {
-  root.querySelectorAll('[data-col]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const colName = btn.dataset.col;
-      const id      = btn.dataset.id;
-      // The hourly sync recreates any missing web_ event, so a website event
-      // is hidden with a tombstone the sync preserves instead of deleted.
-      const tombstone = colName === 'events' && isWebEvent(id);
-      const label = btn.textContent;
-      if (!confirm(tombstone
-        ? 'Remove this website event from the app? It stays hidden after every sync. To cancel it everywhere, remove it on kharis.org.'
-        : 'Delete this item?')) return;
-      btn.disabled = true;
-      btn.textContent = '…';
-      try {
-        if (tombstone) {
-          await updateDoc(doc(db, colName, id), { hidden: true, hiddenAt: Timestamp.now() });
-          toast('Removed from the app');
-        } else {
-          await deleteDoc(doc(db, colName, id));
-          toast('Deleted');
-        }
-        if (colName === 'events') {
-          if (document.getElementById('event-form').dataset.editId === id) resetEventForm();
-          loadEvents();
-        }
-        if (colName === 'news') {
-          if (document.getElementById('news-form').dataset.editId === id) resetNewsForm();
-          loadNews();
-        }
-      } catch (err) {
-        toast(err.message, 'error');
-        btn.disabled = false;
-        btn.textContent = label;
-      }
-    });
-  });
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 //  UTILS
 // ════════════════════════════════════════════════════════════════════════════
-function toDateKey(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+function toJsDate(value) {
+  if (!value) return null;
+  const date = value.toDate ? value.toDate() : new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+function isHttpUrl(value) {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// isHttpUrl accepts `HTTPS://x`; store the scheme lower-cased so the
+// `notifications` rule and the app's scheme check agree.
+function normaliseLink(value) {
+  return value.trim().replace(/^[a-z][a-z0-9+.-]*:/i, (scheme) => scheme.toLowerCase());
 }
 
 // ── Europe/London wall clock ────────────────────────────────────────────
-// Announcements are authored in UK time whatever zone the browser is in, and
+// Notifications are scheduled in UK time whatever zone the browser is in, and
 // must land on the right instant on both sides of a BST/GMT change.
 const LONDON_TZ = 'Europe/London';
 const londonPartsFormat = new Intl.DateTimeFormat('en-GB', {
@@ -3451,16 +1606,6 @@ function londonWallTimeToDate(dateKey, hh, mm, ss = 0, ms = 0) {
   return new Date(wallAsUtc - londonOffsetMs(new Date(firstGuess)));
 }
 
-function londonDateKey(date) {
-  const p = londonParts(date);
-  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
-}
-
-function londonTimeValue(date) {
-  const p = londonParts(date);
-  return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
-}
-
 function formatLondonDateTime(date) {
   return date.toLocaleString('en-GB', {
     timeZone: LONDON_TZ, weekday: 'short', day: 'numeric', month: 'short',
@@ -3474,34 +1619,6 @@ function formatLondonDate(date) {
   });
 }
 
-// Calendar arithmetic on YYYY-MM-DD keys. Runs in UTC so no clock change or
-// browser zone can shift the day.
-function addDaysToKey(dateKey, days) {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d + days));
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `${date.getUTCFullYear()}-${mm}-${dd}`;
-}
-
-function formatDateKey(dateKey, opts = {}) {
-  const [y, m, d] = dateKey.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
-    weekday: 'short', day: 'numeric', month: 'short', ...opts, timeZone: 'UTC',
-  });
-}
-
-function formatDateTime(date) {
-  return date.toLocaleString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
-
-function formatDate(date) {
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -3510,29 +1627,9 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Set default news publish date on load
-document.addEventListener('DOMContentLoaded', () => {
-  setDefaultNewsDate();
-});
-// Also set it immediately in case DOMContentLoaded already fired
-setDefaultNewsDate();
-
-// ── Sermons Tab ─────────────────────────────────────────────────────────
-async function loadSermons() {
-  const list = document.getElementById('sermons-list');
-  list.innerHTML = '<p style="color:var(--muted);">Loading sermons…</p>';
-  loadFeaturedMode();
-  try {
-    const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
-    document.getElementById('sermons-count').textContent = snap.size;
-    if (snap.empty) {
-      list.innerHTML = '<p style="color:var(--muted);">No sermons yet. They will appear here automatically once the YouTube/SoundCloud sync runs.</p>';
-      return;
-    }
-    renderSermonList(snap.docs);
-  } catch (err) {
-    list.innerHTML = `<p style="color:var(--danger);">Error: ${escHtml(err.message)}</p>`;
-  }
+/** Attribute-safe escape for values echoed back into inputs. */
+function escAttr(v) {
+  return String(v ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 // YouTube/SoundCloud titles arrive HTML-entity-encoded (&#39; &amp; …).
@@ -3540,1180 +1637,12 @@ async function loadSermons() {
 const _entityScratch = document.createElement('textarea');
 function decodeEntities(s) { _entityScratch.innerHTML = s || ''; return _entityScratch.value; }
 
-// ── Featured sermons mode ───────────────────────────────────────────────
-// config/featured { mode, setAt }. 'auto' (also a missing doc) makes the app
-// show the newest YouTube uploads; 'pinned' shows sermons starred below;
-// 'off' hides the featured carousel so Messages leads with the latest.
-let featuredMode = null; // 'auto' | 'pinned' | 'off' once loaded
-
-const FEATURED_HINTS = {
-  auto: 'Stars only take effect in Pinned mode. Auto shows the newest YouTube uploads.',
-  off: 'No featured carousel: Messages leads with the latest messages. Stars are kept for when you switch back.',
-};
-const FEATURED_TOASTS = {
-  auto: 'Featured: showing the latest uploads',
-  pinned: 'Featured: showing pinned sermons',
-  off: 'Featured off: Messages leads with the latest messages',
-};
-
-function renderFeaturedMode() {
-  document.querySelectorAll('[data-featured-mode]').forEach(btn => {
-    const on = btn.dataset.featuredMode === featuredMode;
-    btn.classList.toggle('active', on);
-    btn.setAttribute('aria-checked', String(on));
-    btn.disabled = featuredMode === null;
-  });
-  const hint = document.getElementById('featured-hint');
-  hint.textContent = FEATURED_HINTS[featuredMode] || '';
-  hint.style.display = hint.textContent ? '' : 'none';
-}
-
-async function loadFeaturedMode() {
-  try {
-    const snap = await getDoc(doc(db, 'config', 'featured'));
-    const mode = snap.exists() ? snap.data().mode : 'auto';
-    featuredMode = mode === 'pinned' || mode === 'off' ? mode : 'auto';
-  } catch (err) {
-    featuredMode = null;
-    toast('Could not load the featured mode: ' + err.message, 'error');
-  }
-  renderFeaturedMode();
-}
-
-document.querySelectorAll('[data-featured-mode]').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const mode = btn.dataset.featuredMode;
-    if (featuredMode === null || mode === featuredMode) return;
-    const previous = featuredMode;
-    featuredMode = mode;
-    renderFeaturedMode();
-    try {
-      await setDoc(doc(db, 'config', 'featured'), { mode, setAt: serverTimestamp() });
-      toast(FEATURED_TOASTS[mode]);
-    } catch (err) {
-      featuredMode = previous;
-      renderFeaturedMode();
-      toast('Could not change the featured mode: ' + err.message, 'error');
-    }
-  });
-});
-
-function renderSermonList(docs) {
-  const list = document.getElementById('sermons-list');
-  list.innerHTML = docs.map(d => {
-    const s = d.data();
-    const date = s.publishedAt?.toDate ? s.publishedAt.toDate() : new Date();
-    const featured = s.isFeatured === true;
-    const sourceIcon = s.source === 'youtube'
-      ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'
-      : '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3z"/></svg>';
-    const sourceLabel = s.source === 'youtube' ? 'YouTube' : 'SoundCloud';
-    const dur = s.duration ? formatDuration(s.duration) : '';
-    return `<div class="item-card" data-id="${d.id}">
-      <div style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;">
-        ${s.thumbnailUrl ? `<img src="${escHtml(s.thumbnailUrl)}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : `<div style="width:64px;height:64px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0;">${sourceIcon}</div>`}
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <strong style="font-size:14px;min-width:0;">${escHtml(decodeEntities(s.title || 'Untitled'))}</strong>
-            <button class="feature-btn" data-id="${d.id}" data-featured="${featured}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${featured ? 'var(--orange)' : 'var(--muted)'};" title="${featured ? 'Unfeature' : 'Feature'}" aria-label="${featured ? 'Unfeature sermon' : 'Feature sermon'}">${featured ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>'}</button>
-          </div>
-          <div class="item-card-meta">${escHtml(s.speaker || 'Unknown')} · ${sourceLabel} · ${formatDate(date)} ${dur ? '· ' + dur : ''}</div>
-          ${s.description ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(decodeEntities(s.description).substring(0, 100))}</div>` : ''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Attach feature toggle listeners
-  list.querySelectorAll('.feature-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const isFeatured = btn.dataset.featured === 'true';
-      try {
-        await updateDoc(doc(db, 'sermons', id), { isFeatured: !isFeatured, updatedAt: serverTimestamp() });
-        toast(`${!isFeatured ? 'Featured' : 'Unfeatured'} sermon`);
-        loadSermons();
-      } catch (err) {
-        toast('Error: ' + err.message, 'error');
-      }
-    });
-  });
-}
-
-function formatDuration(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m >= 60) {
-    const h = Math.floor(m / 60);
-    return `${h}h ${m % 60}m`;
-  }
-  return `${m}m ${s}s`;
-}
-
-// ── YouTube channel browser (Content Studio ↔ YouTube binding) ─────────────
-const YT_SEARCH_URL = 'https://us-central1-kharis-app-47c49.cloudfunctions.net/searchYouTube';
-const STAR_FILLED = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
-const STAR_OUTLINE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
-
-let sermonSource = 'library'; // 'library' | 'youtube'
-let ytVideos = [];
-let ytNextPageToken = null;
-let ytLastQuery = '';
-let ytSearchTimer = null;
-
-async function searchYouTubeChannel({ append = false } = {}) {
-  const list = document.getElementById('sermons-list');
-  const moreBtn = document.getElementById('yt-load-more');
-  if (!append) {
-    list.innerHTML = '<div class="loading-row"><span class="spinner"></span> Searching the YouTube channel…</div>';
-    ytNextPageToken = null;
-    ytVideos = [];
-  }
-  moreBtn.disabled = true;
-  try {
-    const token = await auth.currentUser.getIdToken();
-    const params = new URLSearchParams({ limit: '25' });
-    if (ytLastQuery) params.set('q', ytLastQuery);
-    if (append && ytNextPageToken) params.set('pageToken', ytNextPageToken);
-    const res = await fetch(`${YT_SEARCH_URL}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    ytNextPageToken = data.nextPageToken;
-    ytVideos = append ? ytVideos.concat(data.videos) : data.videos;
-    if (sermonSource === 'youtube') renderYouTubeList();
-  } catch (err) {
-    list.innerHTML = `<p style="color:var(--danger);font-size:13px;">YouTube search failed: ${escHtml(err.message)}</p>`;
-  }
-  moreBtn.disabled = false;
-}
-
-function renderYouTubeList() {
-  const list = document.getElementById('sermons-list');
-  const moreBtn = document.getElementById('yt-load-more');
-  if (!ytVideos.length) {
-    list.innerHTML = '<div class="empty-state">No videos found on the channel for that search.</div>';
-    moreBtn.style.display = 'none';
-    return;
-  }
-  list.innerHTML = ytVideos.map((v, i) => {
-    const date = v.publishedAt ? formatDate(new Date(v.publishedAt)) : '';
-    const dur = v.duration ? formatDuration(v.duration) : '';
-    return `<div class="item-card">
-      <div style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;">
-        ${v.thumbnailUrl ? `<img src="${escHtml(v.thumbnailUrl)}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0;" />` : ''}
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <strong style="font-size:14px;min-width:0;">${escHtml(v.title)}</strong>
-            <button class="yt-feature-btn" data-i="${i}" style="background:none;border:none;cursor:pointer;flex-shrink:0;padding:0;line-height:1;color:${v.isFeatured ? 'var(--orange)' : 'var(--muted)'};" title="${v.isFeatured ? 'Unfeature' : 'Feature on the app'}" aria-label="${v.isFeatured ? 'Unfeature video' : 'Feature video'}">${v.isFeatured ? STAR_FILLED : STAR_OUTLINE}</button>
-          </div>
-          <div class="item-card-meta">
-            David Antwi · YouTube · ${date} ${dur ? '· ' + dur : ''}
-            ${v.inLibrary ? '<span class="meta-chip featured">In library</span>' : '<span class="meta-chip">Not synced yet</span>'}
-          </div>
-          ${v.description ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(v.description.substring(0, 100))}</div>` : ''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-  moreBtn.style.display = ytNextPageToken ? '' : 'none';
-  list.querySelectorAll('.yt-feature-btn').forEach(btn => {
-    btn.addEventListener('click', () => featureYouTubeVideo(Number(btn.dataset.i)));
-  });
-}
-
-/** Upserts the video into `sermons` (same doc scheme as the hourly sync) and
- *  toggles isFeatured, so the app's Messages page picks it up instantly. */
-async function featureYouTubeVideo(i) {
-  const v = ytVideos[i];
-  if (!v) return;
-  const makeFeatured = !v.isFeatured;
-  try {
-    const payload = {
-      title: v.title,
-      speaker: 'David Antwi',
-      description: v.description || '',
-      videoId: v.videoId,
-      thumbnailUrl: v.thumbnailUrl || null,
-      duration: v.duration || 0,
-      publishedAt: Timestamp.fromDate(new Date(v.publishedAt)),
-      source: 'youtube',
-      type: 'video',
-      isFeatured: makeFeatured,
-      updatedAt: serverTimestamp(),
-    };
-    if (!v.inLibrary) {
-      payload.playCount = 0;
-      payload.createdAt = serverTimestamp();
-    }
-    await setDoc(doc(db, 'sermons', `yt_${v.videoId}`), payload, { merge: true });
-    v.inLibrary = true;
-    v.isFeatured = makeFeatured;
-    toast(makeFeatured ? 'Featured on the app' : 'Unfeatured');
-    renderYouTubeList();
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
-  }
-}
-
-function setSermonSource(src) {
-  sermonSource = src;
-  document.getElementById('src-library').classList.toggle('active', src === 'library');
-  document.getElementById('src-youtube').classList.toggle('active', src === 'youtube');
-  const searchEl = document.getElementById('sermon-search');
-  searchEl.placeholder = src === 'youtube'
-    ? 'Search the whole YouTube channel…'
-    : 'Search by title, speaker…';
-  document.getElementById('yt-load-more').style.display = 'none';
-  if (src === 'youtube') {
-    ytLastQuery = searchEl.value.trim();
-    searchYouTubeChannel();
-  } else {
-    loadSermons();
-  }
-}
-
-document.getElementById('src-library').addEventListener('click', () => setSermonSource('library'));
-document.getElementById('src-youtube').addEventListener('click', () => setSermonSource('youtube'));
-document.getElementById('yt-load-more').addEventListener('click', () => searchYouTubeChannel({ append: true }));
-
-// Sermon search — filters the library, or (debounced) searches the channel.
-document.getElementById('sermon-search').addEventListener('input', async (e) => {
-  if (sermonSource === 'youtube') {
-    clearTimeout(ytSearchTimer);
-    ytSearchTimer = setTimeout(() => {
-      ytLastQuery = e.target.value.trim();
-      searchYouTubeChannel();
-    }, 550);
-    return;
-  }
-  const term = e.target.value.toLowerCase().trim();
-  const snap = await getDocs(query(collection(db, 'sermons'), orderBy('publishedAt', 'desc'), limit(50)));
-  const filtered = snap.docs.filter(d => {
-    const s = d.data();
-    return (s.title || '').toLowerCase().includes(term) || (s.speaker || '').toLowerCase().includes(term);
-  });
-  renderSermonList(filtered);
-});
-
-document.getElementById('refresh-sermons').addEventListener('click', () => {
-  if (sermonSource === 'youtube') searchYouTubeChannel();
-  else loadSermons();
-});
-
-// ── Branch pickers (events + announcements) ─────────────────────────────
-// Options come only from Firestore `branches`; the empty value is All
-// campuses and is always saved as null. Create/Save stay disabled until the
-// list has loaded once, so nothing is saved against a guessed branch.
-// Campus admins get only their own campus names and no All campuses option,
-// because the rules reject all-campus writes from them.
-const BRANCH_PICKERS = [
-  { select: 'ev-branch', error: 'ev-branch-error', submit: 'event-submit-btn' },
-  { select: 'nw-branch', error: 'nw-branch-error', submit: 'news-submit-btn' },
-];
-let branchesLoaded = false;
-let branchDirectory = []; // [{ id, name }] for every branch, in display order
-
-function ensureSelectOption(sel, value, label) {
-  if (value && ![...sel.options].some(o => o.value === value)) {
-    sel.add(new Option(label, value));
-  }
-}
-
-// Selects a stored branch, keeping one that is no longer in the list so an
-// edit never silently moves the item to All campuses.
-function setBranchValue(sel, branch) {
-  const value = (branch || '').trim();
-  ensureSelectOption(sel, value, `${value} (not a current branch)`);
-  sel.value = value;
-}
-
-function populateBranchPickers(names) {
-  const campus = isCampusScope();
-  const choices = campus
-    ? [...new Set([...names.filter(n => adminScope.branchNames.has(n)), ...adminScope.branchNames])]
-    : names;
-  const options = (campus ? '' : '<option value="">All branches</option>') +
-    choices.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
-  BRANCH_PICKERS.forEach(({ select, error, submit }) => {
-    const sel = document.getElementById(select);
-    const cur = sel.value;
-    sel.innerHTML = options;
-    if (campus && !canManageCampusNamed(cur)) sel.selectedIndex = 0;
-    else setBranchValue(sel, cur);
-    sel.disabled = false;
-    document.getElementById(error).style.display = 'none';
-    if (!branchesLoaded) document.getElementById(submit).disabled = false;
-  });
-  branchesLoaded = true;
-  populateNotifyBranches(choices);
-}
-
-function showBranchPickerError(message) {
-  BRANCH_PICKERS.forEach(({ error }) => {
-    const el = document.getElementById(error);
-    el.innerHTML = `<span>Could not load branches: ${escHtml(message)}</span>
-      <button type="button" class="btn btn-secondary branch-retry-btn" style="font-size:12px;padding:4px 10px;">Retry</button>`;
-    el.style.display = '';
-  });
-  nf('branch').innerHTML = '<option value="">Branches did not load. Open Branches to retry.</option>';
-}
-
-BRANCH_PICKERS.forEach(({ error }) => {
-  document.getElementById(error).addEventListener('click', (e) => {
-    if (!e.target.closest('.branch-retry-btn')) return;
-    BRANCH_PICKERS.forEach(p => { document.getElementById(p.error).style.display = 'none'; });
-    loadBranches();
-  });
-});
-
-// ── Branches Tab ────────────────────────────────────────────────────────
-async function loadBranches() {
-  const list = document.getElementById('branches-list');
-  list.innerHTML = '<p style="color:var(--muted);">Loading branches…</p>';
-  try {
-    const snap = await getDocs(query(collection(db, 'branches'), orderBy('order', 'asc')));
-    branchDirectory = snap.docs
-      .map(d => ({ id: d.id, name: (d.data().name || '').trim() }))
-      .filter(b => b.name);
-    populateBranchPickers(branchDirectory.map(b => b.name));
-    // Campus admins only ever see (and may only edit) their own branches.
-    const docs = snap.docs.filter(d => canManageBranchId(d.id));
-    document.getElementById('branches-count').textContent = docs.length;
-    // The announcement picker may have just changed.
-    updateNewsWherePreview();
-    if (!docs.length) {
-      list.innerHTML = isCampusScope()
-        ? '<p style="color:var(--muted);">None of your branches were found. Ask the church office to check your access.</p>'
-        : '<p style="color:var(--muted);">No branches yet. Add one using the form.</p>';
-      return;
-    }
-    const campus = isCampusScope();
-    list.innerHTML = docs.map(d => {
-      const b = d.data();
-      const meeting = [b.meetingDays || b.meetingDay, b.meetingTime].filter(Boolean).join(' at ') || 'Not set';
-      const subtitle = b.subtitle || b.location || '';
-      return `<div class="item-card" data-id="${d.id}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-          <div>
-            <strong>${escHtml(b.name || 'Unnamed')}</strong>
-            <div class="item-card-meta">${escHtml(subtitle)} ${subtitle ? '·' : ''} ${escHtml(meeting)}</div>
-            ${b.address ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;">📍 ${escHtml(b.address)}</div>` : ''}
-            ${b.description ? `<div style="color:var(--muted);font-size:12px;">${escHtml(b.description)}</div>` : ''}
-          </div>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-secondary branch-edit-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;">Edit</button>
-            ${campus ? '' : `<button class="btn btn-secondary branch-delete-btn" data-id="${d.id}" style="font-size:11px;padding:4px 10px;color:var(--danger);">Delete</button>`}
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-
-    // Attach listeners
-    list.querySelectorAll('.branch-edit-btn').forEach(btn => {
-      btn.addEventListener('click', () => editBranch(btn.dataset.id));
-    });
-    list.querySelectorAll('.branch-delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Delete this branch?')) return;
-        await deleteDoc(doc(db, 'branches', btn.dataset.id));
-        toast('Branch deleted');
-        loadBranches();
-      });
-    });
-    // A campus admin with a single campus goes straight to its editor.
-    const form = document.getElementById('branch-form');
-    if (campus && docs.length === 1 && !form.dataset.editId) editBranch(docs[0].id);
-  } catch (err) {
-    list.innerHTML = `<p style="color:var(--danger);">Error: ${escHtml(err.message)}</p>`;
-    if (!branchesLoaded) showBranchPickerError(err.message);
-  }
-}
-
-// ── Branch sub-forms: venues, services, gallery ─────────────────────────
-//
-// The branch document carries repeating structures (a branch can meet at
-// several venues and run any number of services). Rows are plain DOM built
-// from a template so the whole editor stays dependency-free, matching the rest
-// of this page. Row indices are only for input ids; order comes from position.
-
-/** Slug used when an admin leaves a venue/service id blank. */
-function slugify(v) {
-  return (v || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function venueRowHtml(i, v) {
-  v = v || {};
-  return `<div class="repeat-row" data-venue-row>
-    <div class="repeat-row-head">
-      <span>Venue ${i + 1}</span>
-      <button type="button" class="repeat-remove" data-remove-venue>Remove</button>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Venue Name</label>
-        <input type="text" data-v="name" value="${escAttr(v.name)}" placeholder="Brighton Sunday Venue" />
-      </div>
-      <div class="field">
-        <label>Venue ID</label>
-        <input type="text" data-v="id" value="${escAttr(v.id)}" placeholder="sunday" />
-      </div>
-    </div>
-    <div class="field">
-      <label>Address Line 1</label>
-      <input type="text" data-v="addressLine1" value="${escAttr(v.addressLine1)}" placeholder="123 Example Road" />
-    </div>
-    <div class="field">
-      <label>Address Line 2</label>
-      <input type="text" data-v="addressLine2" value="${escAttr(v.addressLine2)}" />
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>City</label>
-        <input type="text" data-v="city" value="${escAttr(v.city)}" placeholder="Brighton" />
-      </div>
-      <div class="field">
-        <label>Postcode</label>
-        <input type="text" data-v="postcode" value="${escAttr(v.postcode)}" placeholder="BN1 1AA" />
-      </div>
-    </div>
-    <div class="field">
-      <label>Country</label>
-      <input type="text" data-v="country" value="${escAttr(v.country)}" placeholder="United Kingdom" />
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Latitude</label>
-        <input type="number" step="any" data-v="latitude" value="${v.latitude ?? ''}" placeholder="50.8225" />
-      </div>
-      <div class="field">
-        <label>Longitude</label>
-        <input type="number" step="any" data-v="longitude" value="${v.longitude ?? ''}" placeholder="-0.1372" />
-      </div>
-    </div>
-    <div class="field">
-      <label>Parking Info</label>
-      <input type="text" data-v="parkingInfo" value="${escAttr(v.parkingInfo)}" placeholder="Free parking is available at the venue." />
-    </div>
-    <div class="field">
-      <label>Public Transport Info</label>
-      <input type="text" data-v="publicTransportInfo" value="${escAttr(v.publicTransportInfo)}" placeholder="Five minutes from Brighton Station." />
-    </div>
-    <div class="field">
-      <label>Directions</label>
-      <input type="text" data-v="directionsText" value="${escAttr(v.directionsText)}" placeholder="Enter through the main entrance…" />
-    </div>
-  </div>`;
-}
-
-function serviceRowHtml(i, sv) {
-  sv = sv || {};
-  const active = sv.isActive === false ? '' : 'checked';
-  return `<div class="repeat-row" data-service-row>
-    <div class="repeat-row-head">
-      <span>Service ${i + 1}</span>
-      <button type="button" class="repeat-remove" data-remove-service>Remove</button>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Service Name</label>
-        <input type="text" data-s="name" value="${escAttr(sv.name)}" placeholder="Morning Celebration" />
-      </div>
-      <div class="field">
-        <label>Service ID</label>
-        <input type="text" data-s="id" value="${escAttr(sv.id)}" placeholder="sunday-morning" />
-      </div>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Type</label>
-        <input type="text" data-s="type" value="${escAttr(sv.type)}" placeholder="sunday / midweek" />
-      </div>
-      <div class="field">
-        <label>Day</label>
-        <select data-s="day">
-          ${['','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-            .map(d => `<option value="${d}" ${sv.day === d ? 'selected' : ''}>${d || 'None'}</option>`)
-            .join('')}
-        </select>
-      </div>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Start Time</label>
-        <input type="time" data-s="startTime" value="${escAttr(sv.startTime)}" />
-      </div>
-      <div class="field">
-        <label>End Time</label>
-        <input type="time" data-s="endTime" value="${escAttr(sv.endTime)}" />
-      </div>
-    </div>
-    <div class="field">
-      <label>Venue</label>
-      <select data-s="venueId" data-selected="${escAttr(sv.venueId)}"></select>
-    </div>
-    <div class="field">
-      <label>Description</label>
-      <input type="text" data-s="description" value="${escAttr(sv.description)}" placeholder="Our main Sunday celebration service." />
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Order</label>
-        <input type="number" data-s="order" min="0" value="${sv.order ?? i + 1}" />
-      </div>
-      <div class="field field-inline" style="margin-top:26px;">
-        <input type="checkbox" data-s="isActive" ${active} />
-        <label>Active</label>
-      </div>
-    </div>
-  </div>`;
-}
-
-function galleryRowHtml(i, g) {
-  g = g || {};
-  return `<div class="repeat-row" data-gallery-row>
-    <div class="repeat-row-head">
-      <span>Image ${i + 1}</span>
-      <button type="button" class="repeat-remove" data-remove-gallery>Remove</button>
-    </div>
-    <div class="field">
-      <label>Image URL</label>
-      <input type="text" data-g="imageUrl" value="${escAttr(g.imageUrl)}" placeholder="assets/branches/brighton/gallery-1.jpg" />
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label>Alt Text</label>
-        <input type="text" data-g="alt" value="${escAttr(g.alt)}" placeholder="Kharis Brighton Sunday service" />
-      </div>
-      <div class="field">
-        <label>Order</label>
-        <input type="number" data-g="order" min="0" value="${g.order ?? i + 1}" />
-      </div>
-    </div>
-  </div>`;
-}
-
-/** Attribute-safe escape for values echoed back into inputs. */
-function escAttr(v) {
-  return String(v ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
-
-function renderVenues(list) {
-  const host = document.getElementById('br-venues');
-  host.innerHTML = (list && list.length)
-    ? list.map((v, i) => venueRowHtml(i, v)).join('')
-    : '<p class="repeat-empty">No venues yet.</p>';
-  syncServiceVenueOptions();
-}
-
-function renderServices(list) {
-  const host = document.getElementById('br-services');
-  host.innerHTML = (list && list.length)
-    ? list.map((sv, i) => serviceRowHtml(i, sv)).join('')
-    : '<p class="repeat-empty">No services yet.</p>';
-  syncServiceVenueOptions();
-}
-
-function renderGallery(list) {
-  const host = document.getElementById('br-gallery');
-  host.innerHTML = (list && list.length)
-    ? list.map((g, i) => galleryRowHtml(i, g)).join('')
-    : '<p class="repeat-empty">No gallery images yet.</p>';
-}
-
-/**
- * Keeps every service's venue dropdown in step with the venues currently in
- * the form, so `service.venueId` can only ever point at a venue that exists.
- * Preserves an already-saved selection even before its venue row is typed.
- */
-function syncServiceVenueOptions() {
-  const venues = collectVenues({ silent: true });
-  document.querySelectorAll('[data-service-row] select[data-s="venueId"]').forEach(sel => {
-    const chosen = sel.value || sel.dataset.selected || '';
-    sel.innerHTML = '<option value="">No venue</option>' +
-      venues.map(v => `<option value="${escAttr(v.id)}" ${v.id === chosen ? 'selected' : ''}>${escHtml(v.name || v.id)}</option>`).join('') +
-      // A saved venueId whose row was removed stays visible rather than
-      // silently resetting to "no venue".
-      (chosen && !venues.some(v => v.id === chosen)
-        ? `<option value="${escAttr(chosen)}" selected>${escHtml(chosen)} (missing)</option>`
-        : '');
-  });
-}
-
-function collectVenues(opts) {
-  const out = [];
-  document.querySelectorAll('[data-venue-row]').forEach(row => {
-    const get = (k) => (row.querySelector(`[data-v="${k}"]`)?.value ?? '').trim();
-    const name = get('name');
-    const id = slugify(get('id')) || slugify(name);
-    // Blank rows are dropped on save but MUST survive an add/remove re-render,
-    // otherwise pressing "+ Add venue" twice collapses back to one row.
-    if (!name && !id && !(opts && opts.keepBlank)) return;
-    const lat = parseFloat(get('latitude'));
-    const lng = parseFloat(get('longitude'));
-    out.push({
-      id,
-      name,
-      addressLine1: get('addressLine1'),
-      addressLine2: get('addressLine2'),
-      city: get('city'),
-      postcode: get('postcode'),
-      country: get('country'),
-      latitude: Number.isFinite(lat) ? lat : null,
-      longitude: Number.isFinite(lng) ? lng : null,
-      parkingInfo: get('parkingInfo'),
-      publicTransportInfo: get('publicTransportInfo'),
-      directionsText: get('directionsText'),
-    });
-  });
-  if (!opts || !opts.silent) {
-    const ids = out.map(v => v.id);
-    if (new Set(ids).size !== ids.length) return { error: 'Venue IDs must be unique.' };
-  }
-  return out;
-}
-
-function collectServices(opts) {
-  const out = [];
-  document.querySelectorAll('[data-service-row]').forEach((row, i) => {
-    const get = (k) => (row.querySelector(`[data-s="${k}"]`)?.value ?? '').trim();
-    const name = get('name');
-    const id = slugify(get('id')) || slugify(name);
-    if (!name && !id && !(opts && opts.keepBlank)) return;
-    out.push({
-      id,
-      name,
-      type: get('type'),
-      day: get('day'),
-      startTime: get('startTime'),
-      endTime: get('endTime'),
-      venueId: get('venueId') || null,
-      description: get('description'),
-      order: parseInt(get('order') || String(i + 1), 10),
-      isActive: row.querySelector('[data-s="isActive"]')?.checked ?? true,
-    });
-  });
-  if (opts && opts.silent) return out;
-  const ids = out.map(sv => sv.id);
-  if (new Set(ids).size !== ids.length) return { error: 'Service IDs must be unique.' };
-  return out;
-}
-
-function collectGallery(opts) {
-  const out = [];
-  document.querySelectorAll('[data-gallery-row]').forEach((row, i) => {
-    const get = (k) => (row.querySelector(`[data-g="${k}"]`)?.value ?? '').trim();
-    const imageUrl = get('imageUrl');
-    if (!imageUrl && !(opts && opts.keepBlank)) return;
-    out.push({ imageUrl, alt: get('alt'), order: parseInt(get('order') || String(i + 1), 10) });
-  });
-  return out;
-}
-
-// Add / remove wiring. Rows are re-rendered so the "Venue 2" style headings and
-// the service venue dropdowns stay correct after any removal.
-const KEEP = { silent: true, keepBlank: true };
-document.getElementById('br-add-venue').addEventListener('click', () => {
-  renderVenues([...collectVenues(KEEP), {}]);
-});
-document.getElementById('br-add-service').addEventListener('click', () => {
-  renderServices([...collectServices(KEEP), {}]);
-});
-document.getElementById('br-add-gallery').addEventListener('click', () => {
-  renderGallery([...collectGallery(KEEP), {}]);
-});
-document.getElementById('br-venues').addEventListener('click', (e) => {
-  if (!e.target.matches('[data-remove-venue]')) return;
-  const rows = [...document.querySelectorAll('[data-venue-row]')];
-  const idx = rows.indexOf(e.target.closest('[data-venue-row]'));
-  renderVenues(collectVenues(KEEP).filter((_, i) => i !== idx));
-});
-document.getElementById('br-services').addEventListener('click', (e) => {
-  if (!e.target.matches('[data-remove-service]')) return;
-  const rows = [...document.querySelectorAll('[data-service-row]')];
-  const idx = rows.indexOf(e.target.closest('[data-service-row]'));
-  renderServices(collectServices(KEEP).filter((_, i) => i !== idx));
-});
-document.getElementById('br-gallery').addEventListener('click', (e) => {
-  if (!e.target.matches('[data-remove-gallery]')) return;
-  const rows = [...document.querySelectorAll('[data-gallery-row]')];
-  const idx = rows.indexOf(e.target.closest('[data-gallery-row]'));
-  renderGallery(collectGallery(KEEP).filter((_, i) => i !== idx));
-});
-// Venue name/id edits must reach the service dropdowns as they are typed.
-document.getElementById('br-venues').addEventListener('input', (e) => {
-  if (e.target.matches('[data-v="name"], [data-v="id"]')) syncServiceVenueOptions();
-});
-
-/** Clears the whole branch editor, including every repeatable row. */
-function resetBranchForm() {
-  const form = document.getElementById('branch-form');
-  form.reset();
-  delete form.dataset.editId;
-  document.getElementById('br-active').checked = true;
-  renderVenues([]);
-  renderServices([]);
-  renderGallery([]);
-  setGivingForm('br', null);
-  setHomeEditor('br', null);
-  document.getElementById('branch-submit-btn').textContent = 'Save Branch';
-  syncBranchFormScope();
-}
-
-async function editBranch(id) {
-  if (!canManageBranchId(id)) return;
-  const d = await getDoc(doc(db, 'branches', id));
-  if (!d.exists()) return;
-  const b = d.data();
-  const set = (elId, val) => { document.getElementById(elId).value = val ?? ''; };
-
-  set('br-name', b.name);
-  set('br-subtitle', b.subtitle || b.location);
-  set('br-group', b.group || 'Kharis');
-  set('br-order', b.order ?? '');
-  document.getElementById('br-active').checked = b.isActive !== false;
-
-  // Nested `branding`/`hero` are the documented shape; the flat fields are the
-  // legacy mirror that shipped app versions still read.
-  set('br-gradient-start', b.branding?.gradientStart || b.gradientStart);
-  set('br-gradient-end', b.branding?.gradientEnd || b.gradientEnd);
-  set('br-hero-subtitle', b.hero?.subtitle);
-  set('br-hero-image', b.hero?.imageUrl || b.imageUrl);
-
-  set('br-short-desc', b.shortDescription);
-  set('br-description', b.description);
-
-  set('br-pastor-name', b.pastor?.name);
-  set('br-pastor-image', b.pastor?.imageUrl);
-  set('br-pastor-bio', b.pastor?.bio);
-
-  set('br-contact-email', b.contact?.email);
-  set('br-contact-phone', b.contact?.phone);
-
-  set('br-address', b.address);
-  set('br-meeting-days', b.meetingDays || b.meetingDay);
-  set('br-meeting-time', b.meetingTime);
-
-  set('br-instagram', b.instagram);
-  set('br-fv-title', b.featuredVideo?.title);
-  set('br-fv-url', b.featuredVideo?.youtubeUrl);
-  set('br-fv-thumb', b.featuredVideo?.thumbnailUrl);
-
-  setGivingForm('br', b.giving);
-  setHomeEditor('br', b.home);
-
-  const byOrder = (a, c) => (a.order ?? 0) - (c.order ?? 0);
-  renderVenues(Array.isArray(b.venues) ? b.venues : []);
-  renderServices(Array.isArray(b.services) ? [...b.services].sort(byOrder) : []);
-  renderGallery(Array.isArray(b.galleryImages) ? [...b.galleryImages].sort(byOrder) : []);
-
-  document.getElementById('branch-form').dataset.editId = id;
-  syncBranchFormScope();
-  document.getElementById('branch-submit-btn').textContent = 'Update Branch';
-  document.getElementById('br-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-document.getElementById('branch-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const editId = e.target.dataset.editId;
-  // Campus admins only ever update one of their own branches.
-  if (isCampusScope() && !(editId && canManageBranchId(editId))) {
-    toast('You can only update your own branch', 'error');
-    return;
-  }
-  const val = (id) => document.getElementById(id).value.trim();
-  const orNull = (id) => val(id) || null;
-  const normHex = (v) => {
-    v = v.trim();
-    if (!v) return null;
-    if (!v.startsWith('#')) v = '#' + v;
-    return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : undefined;
-  };
-  const gradientStart = normHex(val('br-gradient-start'));
-  const gradientEnd = normHex(val('br-gradient-end'));
-  if (gradientStart === undefined || gradientEnd === undefined) {
-    toast('Gradient colours must be 6-digit hex, e.g. #3B2A6B', 'error');
-    return;
-  }
-
-  const venues = collectVenues();
-  if (venues.error) { toast(venues.error, 'error'); return; }
-  const services = collectServices();
-  if (services.error) { toast(services.error, 'error'); return; }
-  // A service pointing at a venue that no longer exists would break directions
-  // in the app, so it is rejected here rather than written.
-  const venueIds = new Set(venues.map(v => v.id));
-  const orphan = services.find(sv => sv.venueId && !venueIds.has(sv.venueId));
-  if (orphan) {
-    toast(`Service "${orphan.name || orphan.id}" points at a venue that no longer exists.`, 'error');
-    return;
-  }
-
-  const giving = collectGiving('br');
-  if (giving.error) { toast(giving.error, 'error'); return; }
-
-  const heroImage = orNull('br-hero-image');
-  const data = {
-    name: val('br-name'),
-    subtitle: val('br-subtitle'),
-    group: val('br-group') || 'Kharis',
-    order: parseInt(val('br-order') || '0', 10),
-    isActive: document.getElementById('br-active').checked,
-
-    branding: { gradientStart, gradientEnd },
-    hero: { subtitle: orNull('br-hero-subtitle'), imageUrl: heroImage },
-
-    shortDescription: orNull('br-short-desc'),
-    description: orNull('br-description'),
-
-    pastor: {
-      name: orNull('br-pastor-name'),
-      imageUrl: orNull('br-pastor-image'),
-      bio: orNull('br-pastor-bio'),
-    },
-    contact: { email: orNull('br-contact-email'), phone: orNull('br-contact-phone') },
-
-    venues,
-    services,
-    instagram: orNull('br-instagram'),
-    featuredVideo: {
-      title: orNull('br-fv-title'),
-      youtubeUrl: orNull('br-fv-url'),
-      thumbnailUrl: orNull('br-fv-thumb'),
-    },
-    galleryImages: collectGallery(),
-
-    // ── Legacy mirrors ────────────────────────────────────────────────────
-    // Shipped app builds read these flat keys; keep writing them until the
-    // app reads `branding`/`hero` so an edit here never blanks a live card.
-    gradientStart,
-    gradientEnd,
-    imageUrl: heroImage,
-    address: orNull('br-address'),
-    meetingDays: orNull('br-meeting-days'),
-    meetingTime: orNull('br-meeting-time'),
-
-    // Blank giving / default layout are stored as null: the app then uses
-    // config/giving / config/home, then its built-in fallback.
-    giving: giving.value,
-    home: collectHome('br'),
-
-    updatedAt: serverTimestamp(),
-  };
-  // Identity and visibility stay super-admin only, and the rules reject a
-  // campus admin's write that touches them, so those keys are never sent.
-  if (isCampusScope()) BRANCH_IDENTITY_FIELDS.forEach(k => { delete data[k]; });
-
-  const btn = document.getElementById('branch-submit-btn');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  try {
-    if (editId) {
-      await updateDoc(doc(db, 'branches', editId), data);
-    } else {
-      data.createdAt = serverTimestamp();
-      await addDoc(collection(db, 'branches'), data);
-    }
-    toast(editId ? 'Branch updated' : 'Branch created');
-    resetBranchForm();
-    loadBranches();
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
-    btn.textContent = editId ? 'Update Branch' : 'Save Branch';
-  }
-  btn.disabled = false;
-});
-
-// Start with empty-state text rather than a bare form.
-renderVenues([]);
-renderServices([]);
-renderGallery([]);
-
-document.getElementById('refresh-branches').addEventListener('click', loadBranches);
-
-// ── Giving + Home layout sub-forms ──────────────────────────────────────
-// Shared by the branch editor (prefix 'br' → branches/{id}.giving / .home)
-// and App settings (prefix 'st' → config/giving / config/home). Shapes match
-// GivingDetails and HomeLayout in app/lib/shared/models/campus_config.dart.
-const BRANCH_IDENTITY_FIELDS = ['name', 'order', 'group', 'isActive'];
-
-const GIVING_FIELDS = new Map([
-  ['url',           { label: 'Online giving URL', type: 'url', placeholder: 'https://…' }],
-  ['bankName',      { label: 'Bank name', placeholder: 'e.g. Barclays' }],
-  ['accountName',   { label: 'Account name', placeholder: 'e.g. Kharis Church Brighton' }],
-  ['sortCode',      { label: 'Sort code', placeholder: '00-00-00' }],
-  ['accountNumber', { label: 'Account number', placeholder: '8 digits' }],
-  ['swiftBic',      { label: 'SWIFT / BIC', placeholder: 'For international transfers' }],
-  ['iban',          { label: 'IBAN', placeholder: 'For international transfers' }],
-  ['reference',     { label: 'Reference', placeholder: 'e.g. Tithe + your name' }],
-  ['note',          { label: 'Note', textarea: true, placeholder: 'Anything givers should know' }],
-]);
-// Rows of the giving form; pairs share a line.
-const GIVING_LAYOUT = [
-  ['url'], ['bankName', 'accountName'], ['sortCode', 'accountNumber'],
-  ['swiftBic', 'iban'], ['reference'], ['note'],
-];
-
-function givingFieldHtml(prefix, key) {
-  const f = GIVING_FIELDS.get(key);
-  const id = `${prefix}-gv-${key}`;
-  const input = f.textarea
-    ? `<textarea id="${id}" style="min-height:70px;" placeholder="${escAttr(f.placeholder)}"></textarea>`
-    : `<input type="${f.type || 'text'}" id="${id}" placeholder="${escAttr(f.placeholder)}" />`;
-  return `<div class="field"><label for="${id}">${escHtml(f.label)}</label>${input}</div>`;
-}
-
-function mountGivingForm(prefix) {
-  document.getElementById(`${prefix}-giving`).innerHTML = GIVING_LAYOUT.map(keys => keys.length > 1
-    ? `<div class="field-row">${keys.map(k => givingFieldHtml(prefix, k)).join('')}</div>`
-    : givingFieldHtml(prefix, keys[0])).join('');
-}
-
-function setGivingForm(prefix, giving) {
-  GIVING_FIELDS.forEach((_, key) => {
-    const v = giving?.[key];
-    document.getElementById(`${prefix}-gv-${key}`).value = typeof v === 'string' ? v : '';
-  });
-}
-
-function hasGiving(giving) {
-  return [...GIVING_FIELDS.keys()].some(k => typeof giving?.[k] === 'string' && giving[k].trim());
-}
-
-// { value } with only the filled-in keys, or value null when every field is
-// blank (follow the church-wide / built-in details); { error } on a bad URL.
-function collectGiving(prefix) {
-  const out = {};
-  GIVING_FIELDS.forEach((_, key) => {
-    const v = document.getElementById(`${prefix}-gv-${key}`).value.trim();
-    if (v) out[key] = v;
-  });
-  if (out.url) {
-    out.url = normaliseLink(out.url);
-    if (!isHttpUrl(out.url)) return { error: 'Online giving URL must be an http:// or https:// address' };
-  }
-  return { value: Object.keys(out).length ? out : null };
-}
-
-const HOME_SECTIONS = [
-  { id: 'profileCompletion', label: 'Complete your profile' },
-  { id: 'live',              label: 'Live now' },
-  { id: 'reading',           label: 'Bible reading of the day' },
-  { id: 'announcements',     label: 'Announcements' },
-  { id: 'events',            label: 'Upcoming events' },
-  { id: 'campus',            label: 'Your branch' },
-  { id: 'continueListening', label: 'Continue listening' },
-  { id: 'giving',            label: 'Giving' },
-];
-const HOME_LABELS = new Map(HOME_SECTIONS.map(s => [s.id, s.label]));
-// HomeLayout.fallback: every block on except the Giving shortcut.
-const HOME_FALLBACK = HOME_SECTIONS.map(s => ({ id: s.id, enabled: s.id !== 'giving' }));
-let churchHomeSections = null; // parsed config/home, or null when unset
-
-const HOME_EDITORS = {
-  br: { defaultLabel: 'Use church-wide default', fallback: () => churchHomeSections || HOME_FALLBACK },
-  st: { defaultLabel: "Use the app's built-in default", fallback: () => HOME_FALLBACK },
-};
-
-// Mirrors HomeLayout.fromJson: unknown ids are dropped, duplicates keep their
-// first position, omitted blocks are appended disabled; null when unusable.
-function parseHomeSections(raw) {
-  if (!raw || !Array.isArray(raw.sections)) return null;
-  const seen = new Set();
-  const out = [];
-  for (const e of raw.sections) {
-    if (!e || typeof e !== 'object' || !HOME_LABELS.has(e.id) || seen.has(e.id)) continue;
-    seen.add(e.id);
-    out.push({ id: e.id, enabled: e.enabled !== false });
-  }
-  if (!out.length) return null;
-  HOME_SECTIONS.forEach(s => { if (!seen.has(s.id)) out.push({ id: s.id, enabled: false }); });
-  return out;
-}
-
-// `focus` = { id, dir } keeps keyboard focus on the moved row's arrow.
-function renderHomeRows(prefix, sections, focus) {
-  const host = document.getElementById(`${prefix}-home-list`);
-  const locked = document.getElementById(`${prefix}-home-default`).checked;
-  host.classList.toggle('locked', locked);
-  const last = sections.length - 1;
-  host.innerHTML = sections.map((s, i) => {
-    const label = escHtml(HOME_LABELS.get(s.id));
-    return `<li class="home-row" data-home-id="${s.id}">
-      <label><input type="checkbox" data-home-enabled ${s.enabled ? 'checked' : ''} ${locked ? 'disabled' : ''} /> ${label}</label>
-      <span class="home-row-actions">
-        <button type="button" class="btn btn-secondary home-move" data-home-move="-1" aria-label="Move ${label} up" ${locked || i === 0 ? 'disabled' : ''}>↑</button>
-        <button type="button" class="btn btn-secondary home-move" data-home-move="1" aria-label="Move ${label} down" ${locked || i === last ? 'disabled' : ''}>↓</button>
-      </span>
-    </li>`;
-  }).join('');
-  if (focus) {
-    const row = host.querySelector(`[data-home-id="${focus.id}"]`);
-    (row?.querySelector(`[data-home-move="${focus.dir}"]:not(:disabled)`)
-      || row?.querySelector('.home-move:not(:disabled)'))?.focus();
-  }
-}
-
-function readHomeRows(prefix) {
-  return [...document.querySelectorAll(`#${prefix}-home-list [data-home-id]`)].map(li => ({
-    id: li.dataset.homeId,
-    enabled: li.querySelector('[data-home-enabled]').checked,
-  }));
-}
-
-// A stored layout fills the editor; null ticks the default toggle and shows
-// the layout that will apply instead.
-function setHomeEditor(prefix, raw) {
-  const sections = parseHomeSections(raw);
-  document.getElementById(`${prefix}-home-default`).checked = !sections;
-  renderHomeRows(prefix, sections || HOME_EDITORS[prefix].fallback());
-}
-
-// { sections } to store, or null to follow the default.
-function collectHome(prefix) {
-  if (document.getElementById(`${prefix}-home-default`).checked) return null;
-  return { sections: readHomeRows(prefix) };
-}
-
-function mountHomeEditor(prefix) {
-  const host = document.getElementById(`${prefix}-home`);
-  host.innerHTML = `<div class="field-inline">
-      <input type="checkbox" id="${prefix}-home-default" />
-      <label for="${prefix}-home-default">${escHtml(HOME_EDITORS[prefix].defaultLabel)}</label>
-    </div>
-    <ol class="home-list" id="${prefix}-home-list" aria-label="Home sections, top to bottom"></ol>`;
-  document.getElementById(`${prefix}-home-default`).addEventListener('change', (e) => {
-    renderHomeRows(prefix, e.target.checked ? HOME_EDITORS[prefix].fallback() : readHomeRows(prefix));
-  });
-  host.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-home-move]');
-    if (!btn) return;
-    const rows = readHomeRows(prefix);
-    const id = btn.closest('[data-home-id]').dataset.homeId;
-    const from = rows.findIndex(r => r.id === id);
-    const to = from + Number(btn.dataset.homeMove);
-    if (from < 0 || to < 0 || to >= rows.length) return;
-    [rows[from], rows[to]] = [rows[to], rows[from]];
-    renderHomeRows(prefix, rows, { id, dir: btn.dataset.homeMove });
-  });
-  setHomeEditor(prefix, null);
-}
-
-// A branch editor following the default shows the church-wide layout.
-function refreshBranchHomeDefault() {
-  if (document.getElementById('br-home-default').checked) renderHomeRows('br', HOME_EDITORS.br.fallback());
-}
-
-async function loadChurchHome() {
-  try {
-    const snap = await getDoc(doc(db, 'config', 'home'));
-    churchHomeSections = snap.exists() ? parseHomeSections(snap.data()) : null;
-  } catch {
-    // Display only: the branch editor then previews the built-in order.
-    churchHomeSections = null;
-  }
-  refreshBranchHomeDefault();
-}
-
-// Campus admins edit an existing campus only: no create, and the identity
-// fields are hidden (group/order/active) or locked (name).
-function syncBranchFormScope() {
-  const campus = isCampusScope();
-  const form = document.getElementById('branch-form');
-  const editing = !!form.dataset.editId;
-  document.getElementById('br-name').disabled = campus;
-  form.hidden = campus && !editing;
-  document.getElementById('br-scope-note').hidden = !(campus && !editing);
-  document.getElementById('branch-form-title').textContent = campus ? 'Edit Branch Details' : 'Add / Edit Branch';
-}
-
-mountGivingForm('br');
-mountHomeEditor('br');
-mountGivingForm('st');
-mountHomeEditor('st');
-
-// ── App settings (super admin) ──────────────────────────────────────────
-// config/giving and config/home hold exactly the giving / home shapes; an
-// absent doc means the app's built-in fallback, so clearing deletes the doc.
-function renderGivingStatus(isSet) {
-  document.getElementById('st-giving-status').innerHTML = isSet
-    ? '<span class="where-title">Church-wide details set</span>Branches without their own giving details show these.'
-    : '<span class="where-title">Not set</span>The app falls back to its built-in church details until you save some here.';
-}
-
-async function loadAppSettings() {
-  const status = document.getElementById('st-giving-status');
-  status.innerHTML = '<span class="spinner"></span> Loading…';
-  try {
-    const [givingSnap, homeSnap] = await Promise.all([
-      getDoc(doc(db, 'config', 'giving')),
-      getDoc(doc(db, 'config', 'home')),
-    ]);
-    const giving = givingSnap.exists() ? givingSnap.data() : null;
-    setGivingForm('st', giving);
-    renderGivingStatus(hasGiving(giving));
-    const home = homeSnap.exists() ? homeSnap.data() : null;
-    churchHomeSections = parseHomeSections(home);
-    setHomeEditor('st', home);
-    refreshBranchHomeDefault();
-  } catch (err) {
-    status.innerHTML = `<span class="warn">Could not load app settings: ${escHtml(err.message)}</span>`;
-  }
-}
-
-document.getElementById('settings-giving-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const giving = collectGiving('st');
-  if (giving.error) { toast(giving.error, 'error'); return; }
-  const btn = document.getElementById('st-giving-submit');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  try {
-    const ref = doc(db, 'config', 'giving');
-    if (giving.value) await setDoc(ref, giving.value);
-    else await deleteDoc(ref);
-    renderGivingStatus(!!giving.value);
-    toast(giving.value ? 'Church-wide giving saved' : 'Church-wide giving cleared: the app uses its built-in details');
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
-  }
-  btn.disabled = false;
-  btn.textContent = 'Save giving';
-});
-
-document.getElementById('settings-home-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const home = collectHome('st');
-  const btn = document.getElementById('st-home-submit');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  try {
-    const ref = doc(db, 'config', 'home');
-    if (home) await setDoc(ref, home);
-    else await deleteDoc(ref);
-    churchHomeSections = home ? home.sections : null;
-    refreshBranchHomeDefault();
-    toast(home ? 'Church-wide Home layout saved' : "Home layout reset to the app's built-in default");
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
-  }
-  btn.disabled = false;
-  btn.textContent = 'Save Home layout';
-});
-
 // ── Team access (super admin) ───────────────────────────────────────────
-// users/{uid}.role, plus adminBranchIds/adminBranchNames for a campus admin.
-// news/events store the branch NAME and branches are keyed by id, so both
-// lists are always written together, and both are removed when the role
-// changes away from campus_admin. Nobody may change their own access.
+// users/{uid}.role, plus adminBranchIds (Content Studio branch slugs) and
+// adminBranchNames for a branch admin. Notification audiences hold the branch
+// NAME and the app keys branches by slug, so both lists are always written
+// together, and both are removed when the role changes away from
+// campus_admin. Nobody may change their own access.
 const TEAM_ROLES = [
   { value: 'member', label: 'Member (no Studio access)' },
   { value: 'campus_admin', label: 'Branch admin' },
@@ -4750,7 +1679,7 @@ function teamRowHtml(uid, u) {
       </div>
       <div data-team-campuses ${role === 'campus_admin' ? '' : 'hidden'}>
         <div class="team-campuses" role="group" aria-label="Branches ${escAttr(name)} manages">
-          ${choices.length ? choices.map(b => `<label><input type="checkbox" data-team-branch value="${escAttr(b.id)}" data-name="${escAttr(b.name)}" ${chosen.has(b.id) ? 'checked' : ''} /> ${escHtml(b.name)}${b.missing ? ' (deleted branch)' : ''}</label>`).join('')
+          ${choices.length ? choices.map(b => `<label><input type="checkbox" data-team-branch value="${escAttr(b.id)}" data-name="${escAttr(b.name)}" ${chosen.has(b.id) ? 'checked' : ''} /> ${escHtml(b.name)}${b.missing ? ' (not in Content Studio)' : ''}</label>`).join('')
             : '<span class="repeat-empty">No branches loaded.</span>'}
         </div>
       </div>
@@ -4799,7 +1728,11 @@ async function searchTeam(email) {
 }
 
 async function loadTeam() {
-  if (!branchDirectory.length) await loadBranches();
+  try {
+    await loadBranchDirectory();
+  } catch (err) {
+    toast(`Could not load branches: ${err.message}`, 'error');
+  }
   await loadTeamAdmins();
 }
 

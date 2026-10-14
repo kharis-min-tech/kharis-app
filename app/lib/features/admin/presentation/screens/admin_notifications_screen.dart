@@ -289,7 +289,7 @@ class _NotificationComposerState extends ConsumerState<NotificationComposer> {
 
     final Widget? detail = switch (_linkKind) {
       NotificationLinkKind.sermon => picker(
-        source: ref.watch(adminSermonsProvider),
+        source: ref.watch(sermonsProvider),
         value: _sermonId,
         id: (s) => s.id,
         label: (s) => s.title,
@@ -307,7 +307,7 @@ class _NotificationComposerState extends ConsumerState<NotificationComposer> {
         onChanged: (v) => setState(() => _eventId = v),
       ),
       NotificationLinkKind.announcement => picker(
-        source: ref.watch(adminNewsProvider),
+        source: ref.watch(newsProvider(null)),
         value: _newsId,
         id: (n) => n.id,
         label: (n) => n.title,

@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
 
-/// Building blocks shared by the Content Studio bottom-sheet forms, so the
-/// event and announcement sheets look and behave the same everywhere they
-/// open (Studio lists and branch pages).
+/// Building blocks for the Studio forms (the notification composer), so
+/// fields, pickers and buttons look the same everywhere.
 
 /// `Sat 4 Oct`.
 String studioDayLabel(DateTime date) => DateFormat('EEE d MMM').format(date);
@@ -103,52 +99,6 @@ class StudioFieldLabel extends StatelessWidget {
       style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant),
     ),
   );
-}
-
-/// Rounded sheet with a drag handle and a scrolling [Form] (no [Form] when
-/// [formKey] is null, for sheets whose editor owns its own form).
-class StudioSheet extends StatelessWidget {
-  const StudioSheet({super.key, this.formKey, required this.children});
-
-  final GlobalKey<FormState>? formKey;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.outlineVariant,
-              borderRadius: AppRadius.pillBorder,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        ...children,
-      ],
-    );
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.md,
-        bottom: AppSpacing.md + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: formKey == null ? content : Form(key: formKey, child: content),
-      ),
-    );
-  }
 }
 
 /// Tappable field that opens a picker; [onClear] adds a clear (X) button.
@@ -262,135 +212,6 @@ class StudioSaveButton extends StatelessWidget {
     );
   }
 }
-
-/// Campus scope dropdown backed by the Firestore branch list and the
-/// signed-in admin's [AdminScope].
-///
-/// No hard-coded fallback: while the list (or the admin's scope) loads it
-/// says so (and the form keeps Save disabled, see [studioCampusesReady]); on
-/// error it offers a retry. A stored campus missing from the list is kept as
-/// an option so editing never silently re-scopes an item. `null` is
-/// all-campus, offered to super admins only: a campus admin picks one of
-/// their own campuses and the field requires a choice.
-class StudioCampusField extends ConsumerWidget {
-  const StudioCampusField({
-    super.key,
-    required this.value,
-    required this.onChanged,
-    required this.allLabel,
-  });
-
-  final String? value;
-  final ValueChanged<String?> onChanged;
-  final String allLabel;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final branches = ref.watch(branchesProvider);
-    final scopeAsync = ref.watch(adminScopeProvider);
-    final loading = _status(
-      const SizedBox.square(
-        dimension: 14,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: AppColors.secondary,
-        ),
-      ),
-      'Loading branches',
-    );
-    if (branches.hasError || scopeAsync.hasError) {
-      return _status(
-        const Icon(Icons.cloud_off_rounded, size: 16, color: AppColors.error),
-        'Could not load branches.',
-        action: TextButton(
-          onPressed: () => ref
-            ..invalidate(branchesProvider)
-            ..invalidate(adminScopeProvider),
-          child: Text(
-            'Retry',
-            style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-          ),
-        ),
-      );
-    }
-    final list = branches.valueOrNull;
-    final scope = scopeAsync.valueOrNull;
-    if (list == null || scope == null) return loading;
-
-    final campusOnly = !scope.isSuperAdmin;
-    final names = [
-      for (final b in list)
-        if (scope.canManageCampusNamed(b.name)) b.name,
-    ];
-    if (campusOnly) {
-      for (final n in scope.branchNames) {
-        if (!names.contains(n)) names.add(n);
-      }
-    }
-    final current = value;
-    if (current != null && !names.contains(current)) names.add(current);
-    return DropdownButtonFormField<String?>(
-      initialValue: current,
-      dropdownColor: AppColors.surfaceContainer,
-      style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
-      decoration: studioInputDecoration(hint: 'Choose a branch'),
-      items: [
-        if (!campusOnly)
-          DropdownMenuItem<String?>(value: null, child: Text(allLabel)),
-        for (final name in names)
-          DropdownMenuItem<String?>(value: name, child: Text(name)),
-      ],
-      validator: campusOnly
-          ? (v) => v == null ? 'Choose one of your branches' : null
-          : null,
-      onChanged: onChanged,
-    );
-  }
-
-  Widget _status(Widget leading, String text, {Widget? action}) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: action == null ? AppSpacing.sm : 2,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceSubtle,
-        borderRadius: AppRadius.inputBorder,
-      ),
-      child: Row(
-        children: [
-          leading,
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              text,
-              style: AppTypography.bodyLg.copyWith(color: AppColors.textMuted),
-            ),
-          ),
-          ?action,
-        ],
-      ),
-    );
-  }
-}
-
-/// True once the campus list and the admin's scope have loaded, so a form
-/// with a campus control may save. Forms show [kLoadingCampusesHint] next to
-/// a disabled Save until then.
-bool studioCampusesReady(WidgetRef ref) =>
-    ref.watch(branchesProvider).hasValue &&
-    ref.watch(adminScopeProvider).hasValue;
-
-/// The campus a new item starts on: a campus admin's first campus (they may
-/// not post church-wide content); `null` (all-campus) for a super admin.
-String? studioDefaultCampus(WidgetRef ref) {
-  final scope = ref.read(adminScopeProvider).valueOrNull;
-  if (scope == null || scope.isSuperAdmin) return null;
-  return (scope.branchNames.toList()..sort()).firstOrNull;
-}
-
-const String kLoadingCampusesHint = 'Loading branches';
 
 /// Muted helper line under a field or button.
 class StudioHint extends StatelessWidget {

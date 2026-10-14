@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
+import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 
@@ -15,32 +17,109 @@ int playlistGradientIndex(String playlistId) {
   return sum % 10;
 }
 
-/// Square gradient artwork for a playlist with a queue glyph, reused by the
-/// library card and the detail header.
-class PlaylistArt extends StatelessWidget {
-  const PlaylistArt({super.key, required this.playlist, this.radius = 0});
+/// Square playlist cover, reused by the library card, the Add to playlist
+/// sheet and the detail header: a mosaic of the playlist's message artwork,
+/// or a flat tile with a queue glyph when none of its messages has artwork.
+class PlaylistArt extends ConsumerWidget {
+  const PlaylistArt({
+    super.key,
+    required this.playlist,
+    this.radius = 0,
+    this.glyphSize = 44,
+  });
 
   final Playlist playlist;
   final double radius;
+  final double glyphSize;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PlaylistMosaic(
+      urls: ref.watch(playlistArtworkProvider(playlist.id)),
+      fallbackIndex: playlistGradientIndex(playlist.id),
+      radius: radius,
+      glyphSize: glyphSize,
+    );
+  }
+}
+
+/// Lays out up to four artwork [urls]: one fills the square, two split it
+/// side by side, three put one tall tile beside two stacked, four make a
+/// 2x2 grid. No URLs falls back to the flat [fallbackIndex] tile.
+class PlaylistMosaic extends StatelessWidget {
+  const PlaylistMosaic({
+    super.key,
+    required this.urls,
+    required this.fallbackIndex,
+    this.radius = 0,
+    this.glyphSize = 44,
+  });
+
+  final List<String> urls;
+  final int fallbackIndex;
+  final double radius;
+  final double glyphSize;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ArtworkImage(
-          url: null,
-          gradientIndex: playlistGradientIndex(playlist.id),
-          radius: radius,
+    if (urls.isEmpty) {
+      return ArtworkImage(
+        url: null,
+        gradientIndex: fallbackIndex,
+        radius: radius,
+        overlay: Icon(
+          Icons.queue_music_rounded,
+          color: Colors.white70,
+          size: glyphSize,
         ),
-        const Center(
-          child: Icon(
-            Icons.queue_music_rounded,
-            color: Colors.white70,
-            size: 44,
+      );
+    }
+    Widget tile(int i) => Expanded(
+      child: ArtworkImage(
+        url: urls[i],
+        gradientIndex: fallbackIndex,
+        radius: 0,
+      ),
+    );
+    final Widget grid = switch (urls.length) {
+      1 => ArtworkImage(url: urls[0], gradientIndex: fallbackIndex, radius: 0),
+      2 => Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [tile(0), tile(1)],
+      ),
+      3 => Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          tile(0),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [tile(1), tile(2)],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+      _ => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [tile(0), tile(1)],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [tile(2), tile(3)],
+            ),
+          ),
+        ],
+      ),
+    };
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: grid,
     );
   }
 }

@@ -7,9 +7,9 @@ import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Home's "Live now" block: shown only while `config/live` says a service is
-/// streaming and names the stream, so a tap always opens it. Opens the
-/// unified player in video mode on the live stream.
+/// Home's "Live now" block: shown only while the Content Studio says a
+/// service is streaming and names the stream, so a tap always opens it.
+/// Opens the unified player in video mode on the live stream.
 ///
 /// Renders nothing (not even [padding]) otherwise, so Home can place it
 /// unconditionally.

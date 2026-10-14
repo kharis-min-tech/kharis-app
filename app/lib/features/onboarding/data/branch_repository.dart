@@ -1,17 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:kharis_app/core/constants/api_config.dart';
-import 'package:kharis_app/core/constants/app_assets.dart';
+import 'package:kharis_app/core/services/content_api.dart';
+import 'package:kharis_app/core/utils/media_url.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 
-/// A church branch / campus. Gradient colours and a landmark image are stored
-/// as plain strings in Firestore so admins can edit them, and parsed here.
+/// A church branch, as published in the Kharis Content Studio.
 ///
-/// [contact], [venues], [services], [giving] and [home] are the per-campus
-/// settings Content Studio writes (shapes in `campus_config.dart`). The flat
-/// [address] / [meetingDays] / [meetingTime] are the legacy mirrors, read as
-/// a fallback when a campus has no structured services yet.
+/// [contact], [venues], [services] and [giving] come from the Studio's
+/// `branches`, `services` and `venues` tables. The flat [address] /
+/// [meetingDays] / [meetingTime] are kept for widgets that show a one-line
+/// summary; [address] is the first service venue's address.
 @immutable
 class Branch {
   const Branch({
@@ -25,7 +22,7 @@ class Branch {
     this.address,
     this.meetingDays,
     this.meetingTime,
-    this.group = 'Kharis',
+    this.group = mainGroup,
     this.contact = const CampusContact(),
     this.venues = const [],
     this.services = const [],
@@ -33,16 +30,31 @@ class Branch {
     this.home,
   });
 
+  /// [group] of the main Kharis branches.
+  static const String mainGroup = 'Kharis';
+
+  /// [group] of the Kharis Phase Two (KP2) branches; the Studio calls the
+  /// group "Kharis Phase 2".
+  static const String phaseTwoGroup = 'KP2';
+
+  /// Studio slug, e.g. `london` or `kp2-barking`.
   final String id;
+
+  /// Display name. Also the member's stored branch choice and the source of
+  /// the FCM branch topic, so it is the key screens match branches by.
   final String name;
   final String subtitle;
   final Color gradientStart;
   final Color gradientEnd;
+
+  /// Hero image; null when the Studio has no usable URL for it.
   final String? imageUrl;
   final int order;
   final String? address;
   final String? meetingDays;
   final String? meetingTime;
+
+  /// [mainGroup] or [phaseTwoGroup].
   final String group;
   final CampusContact contact;
   final List<CampusVenue> venues;
@@ -50,10 +62,11 @@ class Branch {
   /// Active services in Studio order.
   final List<CampusService> services;
 
-  /// Campus giving details; null gives to the church-wide account.
+  /// Branch giving page; null gives to the church-wide account.
   final GivingDetails? giving;
 
-  /// Campus Home layout; null falls back to `config/home`.
+  /// Branch Home layout. The Content Studio has none, so this is null and
+  /// Home shows [HomeLayout.fallback].
   final HomeLayout? home;
 
   /// The venue a service meets at, if [venueId] names one.
@@ -74,316 +87,222 @@ class Branch {
     final v = int.tryParse(h, radix: 16);
     return v == null ? fallback : Color(v);
   }
-
-  static String toHex(Color c) =>
-      '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 }
 
-/// Reads and writes the Firestore `branches` collection. Falls back to the
-/// built-in [seedBranches] when the collection is empty or unreachable so the
-/// onboarding branch picker always has content.
+const _weekdays = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
+/// 0 = Sunday ... 6 = Saturday for a day name ("Sunday", "Sundays", "sun").
+int? weekdayIndex(String? day) {
+  final d = day?.trim().toLowerCase();
+  if (d == null || d.length < 3) return null;
+  for (var i = 0; i < _weekdays.length; i++) {
+    if (_weekdays[i].startsWith(d.substring(0, 3))) return i;
+  }
+  return null;
+}
+
+/// Main branches before KP2, then Studio order, then name.
+int compareBranches(Branch a, Branch b) {
+  int rank(Branch x) => x.group == Branch.phaseTwoGroup ? 1 : 0;
+  final byGroup = rank(a).compareTo(rank(b));
+  if (byGroup != 0) return byGroup;
+  final byOrder = a.order.compareTo(b.order);
+  return byOrder != 0 ? byOrder : a.name.compareTo(b.name);
+}
+
+/// Reads branches, with their services and venues, from the Content Studio.
 class BranchRepository {
-  BranchRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  BranchRepository({required this._api});
 
-  final FirebaseFirestore _firestore;
+  final ContentApi _api;
 
-  static const String _apiUrl = ApiConfig.getBranches;
+  static const _branchQuery = {'is_active': 'eq.true'};
+  static const _serviceQuery = {'is_active': 'eq.true'};
 
-  static final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 12),
-      receiveTimeout: const Duration(seconds: 15),
-    ),
-  );
-
+  /// The last known branches first (when saved on this device), then the
+  /// Studio's current ones. Errors only when neither is available.
   Stream<List<Branch>> watchBranches() async* {
-    // API-first: one-shot fetch from the Cloud Functions endpoint so content
-    // appears even when Firestore is cold/unreachable, then hand over to the
-    // realtime Firestore stream below.
-    final apiBranches = await _fetchFromApi();
-    if (apiBranches != null && apiBranches.isNotEmpty) yield apiBranches;
+    final branches = _api.cached('branches');
+    final saved = branches == null
+        ? null
+        : joinBranches(
+            branches,
+            services: _api.cached('services') ?? const [],
+            venues: _api.cached('venues') ?? const [],
+          );
+    if (saved != null) yield saved;
     try {
-      yield* _firestore
-          .collection('branches')
-          .orderBy('order')
-          .snapshots()
-          .map((snap) {
-        final live = snap.docs.map((d) => _map(d.id, d.data())).toList();
-        return _mergeWithSeed(live);
-      });
+      final rows = await Future.wait([
+        _api.fetch('branches', query: _branchQuery),
+        _api.fetch('services', query: _serviceQuery),
+        _api.fetch('venues'),
+      ]);
+      yield joinBranches(rows[0], services: rows[1], venues: rows[2]);
     } catch (_) {
-      yield seedBranches;
+      if (saved == null) rethrow;
     }
   }
 
-  /// Overlays live Firestore branches onto the bundled network by id.
-  ///
-  /// The bundled [seedBranches] guarantee the full Kharis + KP2 network stays
-  /// visible even when the live collection holds only a partial migration,
-  /// while any branch the admin has edited or added wins over its seed twin.
-  /// This replaces an earlier all-or-nothing swap that discarded every live
-  /// document unless a KP2 branch existed, which silently reverted admin edits.
-  static List<Branch> _mergeWithSeed(List<Branch> live) {
-    if (live.isEmpty) return seedBranches;
-    final byId = <String, Branch>{
-      for (final b in seedBranches) b.id: b,
-      for (final b in live) b.id: b,
-    };
-    return byId.values.toList()
-      ..sort((a, b) {
-        final byOrder = a.order.compareTo(b.order);
-        return byOrder != 0 ? byOrder : a.name.compareTo(b.name);
-      });
-  }
-
-  /// One-shot fetch from the `getBranches` API. Returns `null` on any
-  /// failure so callers fall straight through to Firestore.
-  Future<List<Branch>?> _fetchFromApi() async {
-    try {
-      final res = await _dio.get<Map<String, dynamic>>(_apiUrl);
-      final raw = (res.data?['branches'] as List?) ?? const [];
-      return raw
-          .whereType<Map<String, dynamic>>()
-          .map((j) => _map((j['id'] as String?) ?? '', j))
-          .where((b) => b.id.isNotEmpty)
-          .toList()
-        ..sort((a, b) => a.order.compareTo(b.order));
-    } catch (_) {
-      return null;
+  /// Joins Studio rows into [Branch]es: active branches only, main branches
+  /// before KP2, each group in Studio order.
+  static List<Branch> joinBranches(
+    List<Map<String, dynamic>> branches, {
+    required List<Map<String, dynamic>> services,
+    required List<Map<String, dynamic>> venues,
+  }) {
+    final venuesByBranch = <String, List<CampusVenue>>{};
+    for (final v in venues) {
+      final branchId = _text(v['branch_id']);
+      final venue = _venue(v);
+      if (branchId == null || venue == null) continue;
+      (venuesByBranch[branchId] ??= []).add(venue);
     }
-  }
-
-  Future<void> addBranch({
-    required String name,
-    required String subtitle,
-    required Color gradientStart,
-    required Color gradientEnd,
-    String? imageUrl,
-    int order = 99,
-    String? address,
-    String? meetingDays,
-    String? meetingTime,
-    String group = 'Kharis',
-  }) {
-    return _firestore.collection('branches').add(_data(
-          name: name,
-          subtitle: subtitle,
-          gradientStart: gradientStart,
-          gradientEnd: gradientEnd,
-          imageUrl: imageUrl,
-          order: order,
-          address: address,
-          meetingDays: meetingDays,
-          meetingTime: meetingTime,
-          group: group,
-        ));
-  }
-
-  Future<void> updateBranch(
-    String id, {
-    required String name,
-    required String subtitle,
-    required Color gradientStart,
-    required Color gradientEnd,
-    String? imageUrl,
-    int order = 99,
-    String? address,
-    String? meetingDays,
-    String? meetingTime,
-    String group = 'Kharis',
-  }) {
-    return _firestore.collection('branches').doc(id).update(_data(
-          name: name,
-          subtitle: subtitle,
-          gradientStart: gradientStart,
-          gradientEnd: gradientEnd,
-          imageUrl: imageUrl,
-          order: order,
-          address: address,
-          meetingDays: meetingDays,
-          meetingTime: meetingTime,
-          group: group,
-        ));
-  }
-
-  Future<void> deleteBranch(String id) =>
-      _firestore.collection('branches').doc(id).delete();
-
-  Map<String, Object?> _data({
-    required String name,
-    required String subtitle,
-    required Color gradientStart,
-    required Color gradientEnd,
-    String? imageUrl,
-    required int order,
-    String? address,
-    String? meetingDays,
-    String? meetingTime,
-    String group = 'Kharis',
-  }) =>
-      {
-        'name': name,
-        'subtitle': subtitle,
-        'gradientStart': Branch.toHex(gradientStart),
-        'gradientEnd': Branch.toHex(gradientEnd),
-        'imageUrl': imageUrl,
-        'order': order,
-        'address': address,
-        'meetingDays': meetingDays,
-        'meetingTime': meetingTime,
-        'group': group,
-      };
-
-  Branch _map(String id, Map<String, dynamic> data) => Branch(
-        id: id,
-        name: data['name'] as String? ?? '',
-        // The web portal offers `subtitle`, `shortDescription` and a full
-        // `description`; legacy docs used `location`. `description` is now a
-        // paragraph in the Studio's branch schema, so it sinks to last resort:
-        // promoting it would put a whole paragraph on the branch card whenever
-        // an admin left the subtitle blank.
-        subtitle: data['subtitle'] as String? ??
-            data['shortDescription'] as String? ??
-            data['location'] as String? ??
-            data['description'] as String? ??
-            '',
-        gradientStart:
-            Branch.parseHex(data['gradientStart'] as String?, const Color(0xFF3B2A6B)),
-        gradientEnd:
-            Branch.parseHex(data['gradientEnd'] as String?, const Color(0xFF7C3AED)),
-        imageUrl: data['imageUrl'] as String?,
-        order: (data['order'] as num?)?.toInt() ?? 0,
-        address: data['address'] as String?,
-        meetingDays: data['meetingDays'] as String?,
-        meetingTime: data['meetingTime'] as String?,
-        group: data['group'] as String? ?? 'Kharis',
-        contact: CampusContact.fromBranchJson(data),
-        venues: data['venues'] is List
-            ? (data['venues'] as List)
-                .map(CampusVenue.fromJson)
-                .whereType<CampusVenue>()
-                .toList()
-            : const [],
-        services: CampusService.listFromJson(data['services']),
-        giving: GivingDetails.fromJson(data['giving']),
-        home: HomeLayout.fromJson(data['home']),
+    final servicesByBranch = <String, List<CampusService>>{};
+    for (final s in services) {
+      final branchId = _text(s['branch_id']);
+      final service = _service(s);
+      if (branchId == null || service == null || !service.isActive) continue;
+      (servicesByBranch[branchId] ??= []).add(service);
+    }
+    final result = <Branch>[];
+    for (final b in branches) {
+      if (b['is_active'] != true) continue;
+      final uuid = _text(b['id']);
+      final slug = _text(b['slug']) ?? uuid;
+      final name = _text(b['name']);
+      if (uuid == null || slug == null || name == null) continue;
+      final branchServices = [...?servicesByBranch[uuid]]
+        ..sort((x, y) {
+          final byOrder = x.order.compareTo(y.order);
+          if (byOrder != 0) return byOrder;
+          final byDay = (weekdayIndex(x.day) ?? 7).compareTo(
+            weekdayIndex(y.day) ?? 7,
+          );
+          if (byDay != 0) return byDay;
+          return (x.startTime ?? '').compareTo(y.startTime ?? '');
+        });
+      final branchVenues = venuesByBranch[uuid] ?? const <CampusVenue>[];
+      result.add(
+        _branch(b, slug, name, branchServices, branchVenues),
       );
+    }
+    return result..sort(compareBranches);
+  }
 
-  /// Built-in branches — the real Kharis network (kharis.org), used to seed
-  /// Firestore and as an offline fallback. Landmark photos are bundled under
-  /// `assets/design` and resolved via [AppAssets.city]; admins may override
-  /// with a hosted URL from the CMS.
-  static const _gA = Color(0xFF3B2A6B);
-  static const _gB = Color(0xFF7C3AED);
+  static Branch _branch(
+    Map<String, dynamic> b,
+    String slug,
+    String name,
+    List<CampusService> services,
+    List<CampusVenue> venues,
+  ) {
+    CampusVenue? firstVenue;
+    for (final s in services) {
+      for (final v in venues) {
+        if (v.id == s.venueId) {
+          firstVenue = v;
+          break;
+        }
+      }
+      if (firstVenue != null) break;
+    }
+    firstVenue ??= venues.isEmpty ? null : venues.first;
+    final address = firstVenue?.address;
+    final givingUrl = usableMediaUrl(_text(b['giving_link']));
+    return Branch(
+      id: slug,
+      name: name,
+      subtitle: _text(b['subtitle']) ?? _text(b['short_description']) ?? '',
+      gradientStart: Branch.parseHex(
+        _text(b['gradient_start']),
+        const Color(0xFF3B2A6B),
+      ),
+      gradientEnd: Branch.parseHex(
+        _text(b['gradient_end']),
+        const Color(0xFF7C3AED),
+      ),
+      imageUrl: usableMediaUrl(_text(b['hero_image_url'])),
+      order: (b['sort_order'] as num?)?.toInt() ?? 0,
+      address: address == null || address.isEmpty ? null : address,
+      group: _group(_text(b['group'])),
+      contact: CampusContact(
+        email: _text(b['contact_email']),
+        phone: _text(b['contact_phone']),
+        instagram: _text(b['instagram']),
+      ),
+      venues: venues,
+      services: services,
+      giving: givingUrl == null ? null : GivingDetails(url: givingUrl),
+    );
+  }
 
-  static final List<Branch> seedBranches = [
-    // ── Kharis main branches ────────────────────────────────────────────────
-    Branch(
-      id: 'london-hq',
-      name: 'London',
-      subtitle: 'United Kingdom · Main Branch',
-      gradientStart: _gA,
-      gradientEnd: _gB,
-      imageUrl: AppAssets.city('london-hq'),
-      order: 0,
-      address: 'Kensington Town Hall, Hornton St, London W8 7NX',
-      meetingDays: 'Sundays',
-      meetingTime: '10:00 AM',
-    ),
-    Branch(id: 'birmingham', name: 'Birmingham', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('birmingham'), order: 1),
-    Branch(id: 'brighton', name: 'Brighton', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('brighton'), order: 2),
-    Branch(id: 'bristol', name: 'Bristol', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('bristol'), order: 3),
-    Branch(id: 'chatham', name: 'Chatham', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('chatham'), order: 4),
-    Branch(id: 'chelmsford', name: 'Chelmsford', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('chelmsford'), order: 5),
-    Branch(id: 'coventry', name: 'Coventry', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('coventry'), order: 6),
-    Branch(id: 'croydon', name: 'Croydon', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('croydon'), order: 7),
-    Branch(id: 'luton', name: 'Luton', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('luton'), order: 8),
-    Branch(id: 'manchester', name: 'Manchester', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('manchester'), order: 9),
-    Branch(id: 'northampton', name: 'Northampton', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('northampton'), order: 10),
-    Branch(id: 'nottingham', name: 'Nottingham', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('nottingham'), order: 11),
-    Branch(id: 'orpington', name: 'Orpington', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('orpington'), order: 12),
-    Branch(id: 'reading', name: 'Reading', subtitle: 'United Kingdom', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('reading'), order: 13),
-    Branch(id: 'accra', name: 'Accra', subtitle: 'Ghana', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('accra'), order: 14),
-    Branch(id: 'freetown', name: 'Freetown', subtitle: 'Sierra Leone', gradientStart: _gA, gradientEnd: _gB, imageUrl: AppAssets.city('freetown'), order: 15),
-    // ── Kharis Phase Two (KP2) — young-adults revival ────────────────────────
-    Branch(
-      id: 'kp2-london',
-      name: 'KP2 London',
-      subtitle: 'United Kingdom',
-      group: 'KP2',
-      gradientStart: _gA,
-      gradientEnd: _gB,
-      imageUrl: AppAssets.city('kp2-london'),
-      order: 20,
-      address: 'Kensington Town Hall, Hornton St, London W8 7NX',
-      meetingDays: 'Sundays',
-      meetingTime: '2:00 PM',
-    ),
-    Branch(
-      id: 'kp2-romford',
-      name: 'KP2 Romford',
-      subtitle: 'United Kingdom',
-      group: 'KP2',
-      gradientStart: _gA,
-      gradientEnd: _gB,
-      imageUrl: AppAssets.city('kp2-romford'),
-      order: 21,
-      address: 'Marshalls Park Academy, Pettits Ln, Romford RM1 4EH',
-      meetingDays: 'Sundays',
-      meetingTime: '1:00 PM',
-    ),
-    Branch(
-      id: 'kp2-peterborough',
-      name: 'KP2 Peterborough',
-      subtitle: 'United Kingdom',
-      group: 'KP2',
-      gradientStart: _gA,
-      gradientEnd: _gB,
-      imageUrl: AppAssets.city('kp2-peterborough'),
-      order: 22,
-      address: 'Thomas Deacon Academy, Queens Gardens, Peterborough PE1 2UW',
-      meetingDays: 'Sundays',
-      meetingTime: '2:00 PM',
-    ),
-    Branch(
-      id: 'kp2-birmingham',
-      name: 'KP2 Birmingham',
-      subtitle: 'United Kingdom',
-      group: 'KP2',
-      gradientStart: _gA,
-      gradientEnd: _gB,
-      imageUrl: AppAssets.city('birmingham'),
-      order: 23,
-      address: 'Erdington Methodist Church, Erdington, Birmingham B23 6TX',
-      meetingDays: 'Sundays',
-      meetingTime: '1:00 PM',
-    ),
-    Branch(
-      id: 'kp2-southampton',
-      name: 'KP2 Southampton',
-      subtitle: 'United Kingdom',
-      group: 'KP2',
-      gradientStart: _gA,
-      gradientEnd: _gB,
-      imageUrl: AppAssets.city('kp2-southampton'),
-      order: 24,
-      address: 'River Church, 131A Northam Road, Southampton SO14 0HQ',
-      meetingDays: 'Sundays',
-      meetingTime: '2:00 PM',
-    ),
-    Branch(
-      id: 'kp2-barking',
-      name: 'KP2 Barking',
-      subtitle: 'United Kingdom',
-      group: 'KP2',
-      gradientStart: _gA,
-      gradientEnd: _gB,
-      imageUrl: AppAssets.city('kp2-barking'),
-      order: 25,
-      address: 'Greatfields School, Net St, Barking IG11 7QG',
-      meetingDays: 'Sundays',
-      meetingTime: '12:00 PM',
-    ),
-  ];
+  /// "Kharis Phase 2" (or anything naming KP2) is [Branch.phaseTwoGroup];
+  /// everything else is a main branch.
+  static String _group(String? raw) {
+    final g = raw?.toLowerCase() ?? '';
+    return g.contains('phase 2') || g.contains('phase two') || g.contains('kp2')
+        ? Branch.phaseTwoGroup
+        : Branch.mainGroup;
+  }
+
+  static CampusVenue? _venue(Map<String, dynamic> v) {
+    final id = _text(v['id']);
+    if (id == null) return null;
+    double? number(Object? x) => x is num ? x.toDouble() : null;
+    return CampusVenue(
+      id: id,
+      name: _text(v['name']),
+      addressLine1: _text(v['address_line1']),
+      addressLine2: _text(v['address_line2']),
+      city: _text(v['city']),
+      postcode: _text(v['postcode']),
+      country: _text(v['country']),
+      latitude: number(v['latitude']),
+      longitude: number(v['longitude']),
+      parkingInfo: _text(v['parking_info']),
+      publicTransportInfo: _text(v['public_transport_info']),
+      directionsText: _text(v['directions_text']),
+    );
+  }
+
+  static CampusService? _service(Map<String, dynamic> s) {
+    final id = _text(s['id']);
+    final name = _text(s['name']);
+    if (id == null || name == null) return null;
+    return CampusService(
+      id: id,
+      name: name,
+      type: _text(s['type']),
+      day: _text(s['day']),
+      startTime: _clock(s['start_time']),
+      endTime: _clock(s['end_time']),
+      venueId: _text(s['venue_id']),
+      description: _text(s['description']),
+      order: (s['sort_order'] as num?)?.toInt() ?? 0,
+      isActive: s['is_active'] != false,
+    );
+  }
+
+  /// Postgres `time` ("14:00:00") as "14:00", which the service-time
+  /// formatter shows as "2:00 PM". Anything else passes through.
+  static String? _clock(Object? raw) {
+    final t = _text(raw);
+    if (t == null) return null;
+    final m = RegExp(r'^(\d{2}:\d{2}):\d{2}(\.\d+)?$').firstMatch(t);
+    return m == null ? t : m.group(1);
+  }
+
+  static String? _text(Object? v) {
+    if (v is! String) return null;
+    final t = v.trim();
+    return t.isEmpty ? null : t;
+  }
 }

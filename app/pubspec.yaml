@@ -47,7 +47,6 @@ dependencies:
   audio_service: ^0.18.17
   cached_network_image: ^3.4.1
   hive_flutter: ^1.1.0
-  webview_flutter: ^4.10.0
   shared_preferences: ^2.3.4
   url_launcher: ^6.3.1
   add_2_calendar_new: ^1.0.4
@@ -100,7 +99,6 @@ flutter:
   assets:
     - assets/figma/
     - assets/icon/
-    - assets/data/
     - assets/design/
     - assets/google_fonts/
 

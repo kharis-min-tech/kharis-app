@@ -24,6 +24,7 @@ import 'package:kharis_app/features/home/presentation/widgets/news_section.dart'
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/features/shared_links/presentation/shared_link_screens.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
@@ -50,6 +51,16 @@ final _prayerNight = Event(
   branch: 'London',
   startTime: _now.add(const Duration(days: 3)),
   endTime: _now.add(const Duration(days: 3, hours: 2)),
+);
+
+/// A weekly Studio event: one event, dated at its next occurrence, under its
+/// plain Studio uuid.
+final _sundayService = Event(
+  id: '3f6c2a9e-1b7d-4c55-9a0e-6d2f8b1c4e77',
+  title: 'Sunday Service',
+  branch: 'London',
+  startTime: DateTime(_now.year, _now.month, _now.day + 4, 9),
+  recurrenceDays: const [0],
 );
 
 final _allCampusConference = Event(
@@ -120,6 +131,7 @@ GoRouter _router(String initial, Widget Function() start) => GoRouter(
         initial: state.extra is Event ? state.extra as Event : null,
       ),
     ),
+    ...sharedLinkRoutes,
     GoRoute(
       path: '/reading',
       builder: (_, _) => const Scaffold(body: Text('reader')),
@@ -154,7 +166,15 @@ Future<void> _pump(
         currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
         currentUserProvider.overrideWith((ref) => Stream.value(null)),
         branchesProvider.overrideWith(
-          (ref) => Stream.value(BranchRepository.seedBranches),
+          (ref) => Stream.value(const [
+            Branch(
+              id: 'london',
+              name: 'London',
+              subtitle: 'United Kingdom',
+              gradientStart: Color(0xFF3B2A6B),
+              gradientEnd: Color(0xFF7C3AED),
+            ),
+          ]),
         ),
         newsProvider.overrideWith(
           (ref, b) async => loadNews == null ? news : await loadNews(),
@@ -313,6 +333,21 @@ void main() {
       // Pushed above Home: Back has somewhere to go.
       expect(router.canPop(), isTrue);
     });
+
+    for (final path in ['/events', '/e']) {
+      testWidgets('$path/<uuid> opens a weekly event with its label', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          start: () => const HomeScreen(),
+          initial: '$path/${_sundayService.id}',
+          events: [_sundayService],
+        );
+        expect(find.text('Sunday Service'), findsWidgets);
+        expect(find.text('Every Sunday \u00b7 9:00 AM'), findsOneWidget);
+      });
+    }
 
     testWidgets('a push opened from another tab is stacked over Home', (
       tester,

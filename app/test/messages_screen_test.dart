@@ -1,5 +1,6 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -51,27 +52,25 @@ void main() {
     child: const MaterialApp(home: MessagesScreen()),
   );
 
-  testWidgets('offline fallback shows a banner whose Retry goes live', (
+  testWidgets('offline with nothing saved shows a banner whose Retry goes live', (
     tester,
   ) async {
-    final repo = FakePagedSermonRepository(
-      [live],
-      failFirstLoad: true,
-      catalogue: [testSermon('archive_1', title: 'Bundled message')],
-    );
+    final repo = FakePagedSermonRepository([live], failFirstLoad: true);
     await tester.pumpWidget(app(repo));
     await tester.pumpAndSettle();
 
-    expect(find.text('Offline archive'), findsOneWidget);
-    expect(find.text('Bundled message'), findsOneWidget);
+    expect(find.text('You are offline'), findsOneWidget);
+    expect(
+      find.text('Messages will appear here once you are back online.'),
+      findsOneWidget,
+    );
 
     repo.failFirstLoad = false;
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Offline archive'), findsNothing);
+    expect(find.text('You are offline'), findsNothing);
     expect(find.text('Live message 3'), findsWidgets);
-    expect(find.text('Bundled message'), findsNothing);
   });
 
   testWidgets('pull to refresh refetches page 1', (tester) async {
@@ -298,6 +297,147 @@ void main() {
         tester.getTopLeft(newest).dy,
         lessThan(tester.getTopLeft(find.text('Browse by topic')).dy),
       );
+    });
+  });
+
+  group('chip rows are never clipped', () {
+    final archive = [
+      testSermon(
+        'a',
+        title: 'Older message',
+        series: 'Faith Walk',
+        publishedAt: DateTime(2025, 3, 2),
+      ),
+      testSermon(
+        'b',
+        title: 'Newer message',
+        series: 'Faith Walk',
+        publishedAt: DateTime(2026, 9, 6),
+      ),
+    ];
+
+    /// The label is laid out at its full height and sits wholly inside its
+    /// pill and its row: nothing cuts the text.
+    void expectUnclipped(WidgetTester tester, String label) {
+      final text = find.text(label);
+      final paragraph = tester.renderObject<RenderParagraph>(text);
+      final full = paragraph.getMaxIntrinsicHeight(paragraph.size.width);
+      expect(
+        paragraph.size.height,
+        greaterThanOrEqualTo(full - 0.5),
+        reason: '"$label" squeezed to ${paragraph.size.height} of $full',
+      );
+      final rect = tester.getRect(text);
+      for (final outer in [
+        find.ancestor(of: text, matching: find.byType(AnimatedContainer)).first,
+        find
+            .ancestor(of: text, matching: find.byType(SingleChildScrollView))
+            .first,
+      ]) {
+        final box = tester.getRect(outer);
+        expect(rect.top, greaterThanOrEqualTo(box.top - 0.5), reason: label);
+        expect(rect.bottom, lessThanOrEqualTo(box.bottom + 0.5), reason: label);
+      }
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('series, year and topic rows at ${scale}x text', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(1170, 2532);
+        tester.view.devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              sermonRepositoryProvider.overrideWithValue(
+                FakePagedSermonRepository([archive]),
+              ),
+              sermonArchiveAutoHydrateProvider.overrideWithValue(false),
+              cmsSermonsProvider.overrideWith(
+                (ref) => Stream.value(const <Sermon>[]),
+              ),
+              videosProvider.overrideWith((ref) async => const <Sermon>[]),
+              firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
+              cacheServiceProvider.overrideWithValue(FakeCacheService()),
+              audioPlayerServiceProvider.overrideWithValue(
+                FakeAudioPlayerService(),
+              ),
+            ],
+            child: MaterialApp(
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: const MessagesScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final scroll = find.byType(Scrollable).first;
+        for (final label in ['Faith Walk (2)', 'All years', '2025 (1)']) {
+          await tester.scrollUntilVisible(
+            find.text(label),
+            200,
+            scrollable: scroll,
+          );
+          await tester.pumpAndSettle();
+          expectUnclipped(tester, label);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('the topic cards take their full height at 2x text', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sermonRepositoryProvider.overrideWithValue(
+              FakePagedSermonRepository([archive]),
+            ),
+            sermonArchiveAutoHydrateProvider.overrideWithValue(false),
+            cmsSermonsProvider.overrideWith(
+              (ref) => Stream.value(const <Sermon>[]),
+            ),
+            videosProvider.overrideWith((ref) async => const <Sermon>[]),
+            firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
+            cacheServiceProvider.overrideWithValue(FakeCacheService()),
+            audioPlayerServiceProvider.overrideWithValue(
+              FakeAudioPlayerService(),
+            ),
+          ],
+          child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: const MessagesScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('2 messages').first,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      final count = find.text('2 messages').first;
+      final row = find
+          .ancestor(of: count, matching: find.byType(SingleChildScrollView))
+          .first;
+      expect(
+        tester.getRect(count).bottom,
+        lessThanOrEqualTo(tester.getRect(row).bottom + 0.5),
+      );
+      expect(tester.takeException(), isNull);
     });
   });
 }

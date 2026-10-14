@@ -62,7 +62,7 @@ class AdminUsersScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Users',
+          'Team access',
           style: AppTypography.titleMd.copyWith(color: AppColors.heading),
         ),
         iconTheme: const IconThemeData(color: AppColors.heading),

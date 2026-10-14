@@ -5,19 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:kharis_app/features/admin/presentation/screens/admin_announcements_screen.dart';
-import 'package:kharis_app/features/admin/presentation/screens/admin_branch_detail_screen.dart';
 import 'package:kharis_app/features/admin/presentation/screens/admin_hub_screen.dart';
 import 'package:kharis_app/features/admin/presentation/screens/admin_users_screen.dart';
-import 'package:kharis_app/features/admin/presentation/widgets/event_form_sheet.dart';
-import 'package:kharis_app/features/calendar/data/event_repository.dart';
-import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 const _london = Branch(
   id: 'london',
@@ -91,8 +85,7 @@ void main() {
       });
       expect(campus.isCampusAdmin, isTrue);
       expect(campus.canUseStudio, isTrue);
-      expect(campus.canManageCampusNamed('London'), isTrue);
-      expect(campus.canManageCampusNamed(null), isFalse);
+      expect(campus.branchNames, {'London'});
       expect(
         AdminScope.fromProfile({'role': 'campus_admin'}).canUseStudio,
         isFalse,
@@ -102,191 +95,42 @@ void main() {
   });
 
   group('hub', () {
-    testWidgets('a campus admin sees only their campus sections', (
+    testWidgets('a branch admin sees Notifications and their branches', (
       tester,
     ) async {
       await _pump(tester, const AdminHubScreen(), _overrides(_campusAdmin));
 
       expect(find.text('Leeds · London'), findsOneWidget);
-      expect(find.text('Announcements'), findsOneWidget);
-      expect(find.text('Events'), findsOneWidget);
-      expect(find.text('Your branch'), findsOneWidget);
-      for (final hidden in [
-        'Users',
-        'Sermons',
-        'App settings',
-        'Bible Reading',
-        'Reading Plans',
-        'Branches',
-      ]) {
-        expect(find.text(hidden), findsNothing, reason: hidden);
-      }
+      expect(find.text('Notifications'), findsOneWidget);
+      expect(find.text('Team access'), findsNothing);
+      expect(
+        find.textContaining('managed in the Kharis Content Studio'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('a super admin sees every section', (tester) async {
+    testWidgets('a super admin sees Notifications and Team access', (
+      tester,
+    ) async {
       await _pump(
         tester,
         const AdminHubScreen(),
         _overrides(const AdminScope.superAdmin()),
       );
-      for (final shown in [
+      expect(find.text('Notifications'), findsOneWidget);
+      expect(find.text('Team access'), findsOneWidget);
+      for (final removed in [
         'Announcements',
         'Events',
         'Branches',
         'App settings',
-        'Users',
         'Bible Reading',
         'Reading Plans',
         'Sermons',
       ]) {
-        await tester.scrollUntilVisible(find.text(shown), 100);
-        expect(find.text(shown), findsOneWidget, reason: shown);
+        expect(find.text(removed), findsNothing, reason: removed);
       }
       expect(find.text('BRANCH ADMIN'), findsNothing);
-    });
-  });
-
-  group('campus pickers', () {
-    Future<void> openEventForm(WidgetTester tester, AdminScope scope) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: _overrides(scope),
-          child: MaterialApp(
-            home: Scaffold(
-              // The Studio screens that open this form already watch the
-              // scope, so it has resolved by the time the form opens.
-              body: Consumer(
-                builder: (context, ref, _) {
-                  ref.watch(adminScopeProvider);
-                  return TextButton(
-                    onPressed: () => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) => EventFormSheet(
-                        eventRepo: EventRepository(
-                          firestore: FakeFirebaseFirestore(),
-                        ),
-                        onSuccess: (_) {},
-                        onError: (_) {},
-                      ),
-                    ),
-                    child: const Text('open'),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-    }
-
-    testWidgets(
-      'a campus admin can only pick their campuses, with no all-campus option',
-      (tester) async {
-        await openEventForm(tester, _campusAdmin);
-
-        // A new event starts on one of their campuses.
-        final field = find.byType(DropdownButtonFormField<String?>);
-        expect(
-          find.descendant(of: field, matching: find.text('Leeds')),
-          findsOneWidget,
-        );
-
-        await tester.tap(field);
-        await tester.pumpAndSettle();
-        expect(find.text('London'), findsWidgets);
-        expect(find.text('Leeds'), findsWidgets);
-        expect(find.text('Accra'), findsNothing);
-        expect(find.text('All branches'), findsNothing);
-      },
-    );
-
-    testWidgets('a super admin keeps every campus and all-campus', (
-      tester,
-    ) async {
-      await openEventForm(tester, const AdminScope.superAdmin());
-
-      await tester.tap(find.byType(DropdownButtonFormField<String?>));
-      await tester.pumpAndSettle();
-      expect(find.text('Accra'), findsWidgets);
-      expect(find.text('All branches'), findsWidgets);
-    });
-
-    testWidgets('the announcements list shows only their campuses', (
-      tester,
-    ) async {
-      NewsItem item(String id, String? branch) => NewsItem(
-        id: id,
-        title: 'News $id',
-        type: NewsItem.types.first,
-        publishedAt: DateTime(2026, 10, 1),
-        branch: branch,
-      );
-      await _pump(tester, const AdminAnnouncementsScreen(), [
-        ..._overrides(_campusAdmin),
-        adminNewsProvider.overrideWith(
-          (ref) => Stream.value([
-            item('1', 'London'),
-            item('2', 'Accra'),
-            item('3', null),
-          ]),
-        ),
-      ]);
-
-      expect(find.text('News 1'), findsOneWidget);
-      expect(find.text('News 2'), findsNothing);
-      expect(find.text('News 3'), findsNothing);
-    });
-  });
-
-  group('branch page', () {
-    testWidgets('a campus admin sees campus settings but not identity', (
-      tester,
-    ) async {
-      final db = FakeFirebaseFirestore();
-      await db.collection('branches').doc('london').set({
-        'name': 'London',
-        'contact': {'email': 'london@kharis.org'},
-        'services': [
-          {'id': 'sunday', 'name': 'Sunday Service', 'day': 'Sundays'},
-        ],
-      });
-      await _pump(
-        tester,
-        const AdminBranchDetailScreen(branchId: 'london', branchName: 'London'),
-        [
-          ..._overrides(_campusAdmin, db: db),
-          upcomingEventsProvider.overrideWith((ref, _) => Stream.value([])),
-          adminNewsProvider.overrideWith((ref) => Stream.value([])),
-        ],
-      );
-
-      expect(find.text('Group'), findsNothing);
-      expect(find.text('london@kharis.org'), findsOneWidget);
-      expect(find.text('Sunday Service'), findsOneWidget);
-      await tester.scrollUntilVisible(find.text('GIVING'), 100);
-      expect(find.text('Uses the church-wide giving details.'), findsOneWidget);
-      await tester.scrollUntilVisible(find.text('HOME LAYOUT'), 100);
-      expect(find.text('Uses the church-wide default.'), findsOneWidget);
-    });
-
-    testWidgets('another campus is refused', (tester) async {
-      await _pump(
-        tester,
-        const AdminBranchDetailScreen(branchId: 'accra', branchName: 'Accra'),
-        [
-          ..._overrides(_campusAdmin, db: FakeFirebaseFirestore()),
-          upcomingEventsProvider.overrideWith((ref, _) => Stream.value([])),
-          adminNewsProvider.overrideWith((ref) => Stream.value([])),
-        ],
-      );
-      expect(
-        find.text('You can only manage your own branches.'),
-        findsOneWidget,
-      );
     });
   });
 

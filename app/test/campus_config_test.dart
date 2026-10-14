@@ -50,47 +50,22 @@ const _campusLayout = HomeLayout([
   HomeSection(HomeSectionId.announcements, enabled: false),
 ]);
 
-const _churchLayout = HomeLayout([
-  HomeSection(HomeSectionId.giving),
-  HomeSection(HomeSectionId.reading),
-]);
-
-const _campusGiving = GivingDetails(
-  accountName: 'Kharis London',
-  accountNumber: '12345678',
-);
-
-const _churchGiving = GivingDetails(
-  url: 'https://give.example.org',
-  accountName: 'Kharis Church UK',
-  accountNumber: '87654321',
-);
-
-/// Resolves the campus settings for a member at [campus] (null = All
-/// campuses) against [branches] and the church-wide `config/*` docs.
+/// Resolves the branch settings for a member at [campus] (null = All
+/// branches) against [branches].
 Future<ProviderContainer> _resolve({
   required String? campus,
   List<Branch> branches = const [],
-  HomeLayout? churchHome,
-  GivingDetails? churchGiving,
 }) async {
   final container = ProviderContainer(
     overrides: [
       currentBranchProvider.overrideWith((ref) => Stream.value(campus)),
       branchesProvider.overrideWith((ref) => Stream.value(branches)),
-      churchHomeLayoutProvider.overrideWith((ref) => Stream.value(churchHome)),
-      churchGivingProvider.overrideWith((ref) => Stream.value(churchGiving)),
     ],
   );
   addTearDown(container.dispose);
-  container
-    ..listen(effectiveHomeLayoutProvider, (_, _) {})
-    ..listen(effectiveGivingProvider, (_, _) {})
-    ..listen(givingRecipientProvider, (_, _) {});
+  container.listen(effectiveHomeLayoutProvider, (_, _) {});
   await container.read(currentBranchProvider.future);
   await container.read(branchesProvider.future);
-  await container.read(churchHomeLayoutProvider.future);
-  await container.read(churchGivingProvider.future);
   return container;
 }
 
@@ -98,11 +73,10 @@ void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('Home layout resolution', () {
-    test('the campus layout wins over config/home', () async {
+    test('the campus layout wins over the built-in one', () async {
       final c = await _resolve(
         campus: 'London',
         branches: [_branch('London', home: _campusLayout)],
-        churchHome: _churchLayout,
       );
       expect(c.read(effectiveHomeLayoutProvider), _campusLayout);
       // Order kept; the disabled block is hidden.
@@ -112,28 +86,26 @@ void main() {
       ]);
     });
 
-    test('a campus without a layout falls back to config/home', () async {
+    test('a campus without a layout uses the built-in one', () async {
       final c = await _resolve(
         campus: 'London',
         branches: [
           _branch('London'),
           _branch('Leeds', home: _campusLayout),
         ],
-        churchHome: _churchLayout,
       );
-      expect(c.read(effectiveHomeLayoutProvider), _churchLayout);
+      expect(c.read(effectiveHomeLayoutProvider), HomeLayout.fallback);
     });
 
-    test('All campuses reads config/home', () async {
+    test('All branches uses the built-in layout', () async {
       final c = await _resolve(
         campus: null,
         branches: [_branch('London', home: _campusLayout)],
-        churchHome: _churchLayout,
       );
-      expect(c.read(effectiveHomeLayoutProvider), _churchLayout);
+      expect(c.read(effectiveHomeLayoutProvider), HomeLayout.fallback);
     });
 
-    test('nothing set anywhere: the built-in fallback', () async {
+    test('the built-in layout ships giving disabled', () async {
       final c = await _resolve(campus: 'London', branches: [_branch('London')]);
       expect(c.read(effectiveHomeLayoutProvider), HomeLayout.fallback);
       expect(
@@ -141,34 +113,6 @@ void main() {
         isNot(contains(HomeSectionId.giving)),
         reason: 'giving ships disabled',
       );
-    });
-  });
-
-  group('Giving resolution', () {
-    test('the campus account wins and names the campus', () async {
-      final c = await _resolve(
-        campus: 'London',
-        branches: [_branch('London', giving: _campusGiving)],
-        churchGiving: _churchGiving,
-      );
-      expect(c.read(effectiveGivingProvider), _campusGiving);
-      expect(c.read(givingRecipientProvider), 'London');
-    });
-
-    test('a campus without an account gives through config/giving', () async {
-      final c = await _resolve(
-        campus: 'London',
-        branches: [_branch('London')],
-        churchGiving: _churchGiving,
-      );
-      expect(c.read(effectiveGivingProvider), _churchGiving);
-      expect(c.read(givingRecipientProvider), kChurchWideRecipient);
-    });
-
-    test('nothing set anywhere: the built-in church details', () async {
-      final c = await _resolve(campus: null);
-      expect(c.read(effectiveGivingProvider), kBuiltInGiving);
-      expect(c.read(givingRecipientProvider), 'Kharis Church');
     });
   });
 
@@ -212,26 +156,25 @@ void main() {
               postcode: 'W8 7NX',
             ),
           ],
-          services: CampusService.listFromJson([
-            {
-              'id': 'pm',
-              'name': 'Evening Prayer',
-              'day': 'Wednesdays',
-              'startTime': '19:00',
-              'venueId': 'hall',
-              'order': 2,
-            },
-            {
-              'id': 'am',
-              'name': 'Sunday Service',
-              'day': 'Sundays',
-              'startTime': '10:00',
-              'endTime': '12:00',
-              'venueId': 'hall',
-              'order': 1,
-            },
-            {'id': 'old', 'name': 'Retired Service', 'isActive': false},
-          ]),
+          services: const [
+            CampusService(
+              id: 'am',
+              name: 'Sunday Service',
+              day: 'Sundays',
+              startTime: '10:00',
+              endTime: '12:00',
+              venueId: 'hall',
+              order: 1,
+            ),
+            CampusService(
+              id: 'pm',
+              name: 'Evening Prayer',
+              day: 'Wednesdays',
+              startTime: '19:00',
+              venueId: 'hall',
+              order: 2,
+            ),
+          ],
           // Legacy mirrors are ignored once services exist.
           meetingDays: 'Saturdays',
           meetingTime: '9:00 AM',
@@ -245,9 +188,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Wednesdays \u00b7 7:00 PM'), findsOneWidget);
-      expect(find.text('Retired Service'), findsNothing);
       expect(find.textContaining('Saturdays'), findsNothing);
-      // Studio order, not list order.
       expect(
         tester.getTopLeft(find.text('Sunday Service')).dy,
         lessThan(tester.getTopLeft(find.text('Evening Prayer')).dy),
@@ -298,7 +239,7 @@ void main() {
   });
 
   group('Home', () {
-    Future<void> pumpHome(WidgetTester tester, HomeLayout? churchHome) async {
+    Future<void> pumpHome(WidgetTester tester, HomeLayout? campusHome) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       tester.view.physicalSize = const Size(1200, 4000);
@@ -311,10 +252,7 @@ void main() {
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
             currentUserProvider.overrideWith((ref) => Stream.value(null)),
             branchesProvider.overrideWith(
-              (ref) => Stream.value([_branch('London')]),
-            ),
-            churchHomeLayoutProvider.overrideWith(
-              (ref) => Stream.value(churchHome),
+              (ref) => Stream.value([_branch('London', home: campusHome)]),
             ),
             newsProvider.overrideWith((ref, b) async => const []),
             upcomingEventsProvider.overrideWith(
@@ -345,12 +283,12 @@ void main() {
     /// The block inside a Home section's sliver (a box, so it has a position).
     Finder section(HomeSectionId id) => find
         .descendant(
-          of: find.byKey(ValueKey('home-section-${id.id}')),
+          of: find.byKey(ValueKey('home-section-${id.name}')),
           matching: find.byWidgetPredicate((_) => true),
         )
         .first;
 
-    testWidgets('renders the Studio layout in order, hiding disabled blocks', (
+    testWidgets('renders a branch layout in order, hiding disabled blocks', (
       tester,
     ) async {
       await pumpHome(

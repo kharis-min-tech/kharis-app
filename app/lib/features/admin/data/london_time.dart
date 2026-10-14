@@ -1,10 +1,9 @@
-/// Europe/London wall-clock arithmetic for Content Studio dates.
+/// Europe/London wall-clock arithmetic for Studio dates.
 ///
 /// The church schedules in UK time whatever timezone the admin's device is in,
-/// so "expires on 12 Oct" means the end of 12 Oct in London and "publish at
-/// 09:00" means 09:00 London. The app has no tz database, and the UK rule is
-/// fixed: BST (UTC+1) runs from 01:00 UTC on the last Sunday of March to
-/// 01:00 UTC on the last Sunday of October; GMT (UTC+0) otherwise.
+/// so "send at 09:00" means 09:00 London. The app has no tz database, and the
+/// UK rule is fixed: BST (UTC+1) runs from 01:00 UTC on the last Sunday of
+/// March to 01:00 UTC on the last Sunday of October; GMT (UTC+0) otherwise.
 library;
 
 /// Day of the month of the last Sunday of [month] in [year].
@@ -46,10 +45,6 @@ DateTime londonWallTime(
   final summer = asUtc.subtract(const Duration(hours: 1));
   return isBritishSummerTime(summer) ? summer : asUtc;
 }
-
-/// The last millisecond of [date]'s calendar day in London: what an
-/// announcement "expires on [date]" means.
-DateTime londonEndOfDay(DateTime date) => londonWallTime(date, 23, 59, 59, 999);
 
 /// [utc] as London wall-clock time, returned as a UTC-flagged [DateTime]
 /// whose fields read as London's clock (for prefilling pickers).

@@ -1,15 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Hub screen for the in-app admin console.
+/// Where branches, events, announcements and live are managed now.
+const String kContentStudioUrl =
+    'https://kharis-content.itadmin-a94.workers.dev';
+
+/// Hub screen for the in-app Studio.
 /// Driven by [adminScopeProvider]: a spinner while checking, a denial message
-/// for non-admins, every section for a super admin, and only their campuses'
-/// announcements, events and branch pages for a campus admin (whose
-/// campuses are named in the header).
+/// for non-admins, Notifications for every Studio user and Team access for a
+/// super admin. A branch admin's branches are named in the header. App
+/// content lives in the Kharis Content Studio, which the note links to.
 class AdminHubScreen extends ConsumerWidget {
   const AdminHubScreen({super.key});
 
@@ -64,6 +71,8 @@ class AdminHubScreen extends ConsumerWidget {
               vertical: AppSpacing.md,
             ),
             children: [
+              const _ContentStudioNote(),
+              const SizedBox(height: AppSpacing.md),
               if (scope.isCampusAdmin) ...[
                 _CampusHeader(scope: scope),
                 const SizedBox(height: AppSpacing.md),
@@ -83,26 +92,6 @@ class AdminHubScreen extends ConsumerWidget {
   static List<_HubCard> _cardsFor(AdminScope scope) {
     final superAdmin = scope.isSuperAdmin;
     return [
-      const _HubCard(
-        icon: Icons.campaign_rounded,
-        title: 'Announcements',
-        subtitle: 'Manage news, notices, and ministry updates',
-        route: '/admin/announcements',
-      ),
-      const _HubCard(
-        icon: Icons.event_rounded,
-        title: 'Events',
-        subtitle: 'Schedule and edit upcoming church events',
-        route: '/admin/events',
-      ),
-      _HubCard(
-        icon: Icons.location_city_rounded,
-        title: superAdmin ? 'Branches' : 'Your branch',
-        subtitle: superAdmin
-            ? 'Add, edit, and reorder branches'
-            : 'Giving, contact, service times and Home layout',
-        route: '/admin/branches',
-      ),
       _HubCard(
         icon: Icons.notifications_rounded,
         title: 'Notifications',
@@ -111,44 +100,69 @@ class AdminHubScreen extends ConsumerWidget {
             : 'Send a push to your branch or staff phones',
         route: '/admin/notifications',
       ),
-      if (superAdmin) ...const [
-        _HubCard(
-          icon: Icons.tune_rounded,
-          title: 'App settings',
-          subtitle: 'Church-wide giving details and Home layout',
-          route: '/admin/settings',
-        ),
-        _HubCard(
+      if (superAdmin)
+        const _HubCard(
           icon: Icons.group_rounded,
-          title: 'Users',
-          subtitle: 'View members, manage roles and branch admins',
+          title: 'Team access',
+          subtitle: 'Manage roles and branch admins',
           route: '/admin/users',
         ),
-        _HubCard(
-          icon: Icons.menu_book_rounded,
-          title: 'Bible Reading',
-          subtitle: 'Set daily scripture readings and prayers',
-          route: '/admin/bible-reading',
-        ),
-        _HubCard(
-          icon: Icons.auto_stories_rounded,
-          title: 'Reading Plans',
-          subtitle: 'Schedule a month of readings that advance on their own',
-          route: '/admin/reading-plans',
-        ),
-        _HubCard(
-          icon: Icons.mic_rounded,
-          title: 'Sermons',
-          subtitle: 'Add, edit, feature, and manage preached messages',
-          route: '/admin/sermons',
-        ),
-      ],
     ];
   }
 }
 
-/// Names the campuses a campus admin manages, so it is clear whose content
-/// the hub's sections cover.
+/// Points admins at the Kharis Content Studio for app content.
+class _ContentStudioNote extends StatelessWidget {
+  const _ContentStudioNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceDark,
+      borderRadius: AppRadius.cardBorder,
+      child: InkWell(
+        borderRadius: AppRadius.cardBorder,
+        onTap: () => unawaited(
+          launchUrl(
+            Uri.parse(kContentStudioUrl),
+            mode: LaunchMode.externalApplication,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                color: AppColors.secondary,
+                size: 20,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Content (branches, events, announcements, live) is managed '
+                  'in the Kharis Content Studio.',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              const Icon(
+                Icons.open_in_new_rounded,
+                color: AppColors.textFaint,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Names the branches a branch admin manages, so it is clear whose
+/// notifications they send.
 class _CampusHeader extends StatelessWidget {
   const _CampusHeader({required this.scope});
 
@@ -171,8 +185,7 @@ class _CampusHeader extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'You manage announcements, events, notifications and branch '
-          'details for '
+          'You send notifications for '
           '${names.length == 1 ? 'this branch' : 'these branches'}.',
           style: AppTypography.bodySm.copyWith(color: AppColors.textMuted),
         ),
