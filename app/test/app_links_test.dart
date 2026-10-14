@@ -314,6 +314,7 @@ void main() {
           ),
           GoRoute(
             path: kSharedMessageHome,
+            routes: [sharedMessageRoute],
             builder: (_, _) => const Scaffold(body: Text('messages tab')),
           ),
         ],
@@ -370,6 +371,65 @@ void main() {
       expect(find.text('messages tab'), findsOneWidget);
     });
 
+    testWidgets('a message link opened from inside the tab shell lands in '
+        'the shell once, with no duplicate shell', (tester) async {
+      final router = GoRouter(
+        initialLocation: '/home',
+        routes: [
+          ...sharedLinkRoutes,
+          StatefulShellRoute.indexedStack(
+            builder: (_, _, shell) => Scaffold(body: shell),
+            branches: [
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: '/home',
+                    builder: (_, _) => const Text('home tab'),
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: kSharedMessageHome,
+                    routes: [sharedMessageRoute],
+                    builder: (_, _) => const Text('messages tab'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ..._playerOverrides(audio, cache, library: const [_audioOnly]),
+            sermonByIdProvider.overrideWith(
+              (ref, id) => AsyncData<Sermon?>(id == '2700' ? _audioOnly : null),
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('home tab'), findsOneWidget);
+
+      // A link tapped while the member is on a tab (e.g. from a push).
+      router.go('/m/2700');
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(tester.takeException(), isNull, reason: 'frame $i');
+      }
+
+      expect(find.byType(MediaPlayerScreen), findsOneWidget);
+      expect(path(router), kSharedMessageHome);
+      router.routerDelegate.navigatorKey.currentState!.pop();
+      await settle(tester);
+      expect(find.text('messages tab'), findsOneWidget);
+    });
+
     testWidgets('/m/:id?t= plays the audio from t', (tester) async {
       await pump(tester, '/m/2700?t=95', sermons: const [_audioOnly]);
 
@@ -408,6 +468,7 @@ void main() {
           ...sharedLinkRoutes,
           GoRoute(
             path: kSharedMessageHome,
+            routes: [sharedMessageRoute],
             builder: (_, _) => const Text('messages tab'),
           ),
         ],
@@ -464,6 +525,7 @@ void main() {
           ...sharedLinkRoutes,
           GoRoute(
             path: kSharedMessageHome,
+            routes: [sharedMessageRoute],
             builder: (_, _) => const Text('messages tab'),
           ),
         ],
@@ -512,6 +574,11 @@ void main() {
         routes: [
           ...sharedLinkRoutes,
           GoRoute(path: '/home', builder: (_, _) => const Text('home tab')),
+          GoRoute(
+            path: kSharedMessageHome,
+            routes: [sharedMessageRoute],
+            builder: (_, _) => const Text('messages tab'),
+          ),
         ],
       );
       addTearDown(router.dispose);

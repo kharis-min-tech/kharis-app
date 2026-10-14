@@ -25,15 +25,7 @@ import '../../features/notes/presentation/screens/notes_screen.dart';
 import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/admin/presentation/screens/admin_hub_screen.dart';
-import '../../features/admin/presentation/screens/admin_announcements_screen.dart';
-import '../../features/admin/presentation/screens/admin_events_screen.dart';
-import '../../features/admin/presentation/screens/admin_branches_screen.dart';
 import '../../features/admin/presentation/screens/admin_users_screen.dart';
-import '../../features/admin/presentation/screens/admin_bible_reading_screen.dart';
-import '../../features/admin/presentation/screens/admin_reading_plans_screen.dart';
-import '../../features/admin/presentation/screens/admin_sermons_screen.dart';
-import '../../features/admin/presentation/screens/admin_branch_detail_screen.dart';
-import '../../features/admin/presentation/screens/admin_app_settings_screen.dart';
 import '../../features/admin/presentation/screens/admin_notifications_screen.dart';
 import '../../features/shared_links/presentation/shared_link_screens.dart';
 import '../../shared/providers/auth_provider.dart';
@@ -100,6 +92,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/messages',
                 builder: (context, state) => const MessagesScreen(),
+                // Shared message links (/m/:id redirects here) open inside
+                // the Messages tab so the shell is never torn down.
+                routes: [sharedMessageRoute],
               ),
             ],
           ),
@@ -136,9 +131,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const FullPlayerScreen(),
       ),
 
-      // ── Today's reading (overlays shell) ──────────────────────────────────
+      // ── Today's reading / Bible (overlays shell) ──────────────────────────
+      // Both open the Bible reader on today's reading; /bible is More's
+      // "Bible" row, /reading the Home card and reading pushes.
       GoRoute(
         path: '/reading',
+        builder: (context, state) => const ReadingScreen(),
+      ),
+      GoRoute(
+        path: '/bible',
         builder: (context, state) => const ReadingScreen(),
       ),
 
@@ -210,47 +211,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AdminHubScreen(),
       ),
       GoRoute(
-        path: '/admin/announcements',
-        builder: (context, state) => const AdminAnnouncementsScreen(),
-      ),
-      GoRoute(
-        path: '/admin/events',
-        builder: (context, state) => const AdminEventsScreen(),
-      ),
-      GoRoute(
         path: '/admin/notifications',
         builder: (context, state) => const AdminNotificationsScreen(),
       ),
       GoRoute(
-        path: '/admin/branches',
-        builder: (context, state) => const AdminBranchesScreen(),
-      ),
-      GoRoute(
         path: '/admin/users',
         builder: (context, state) => const AdminUsersScreen(),
-      ),
-      GoRoute(
-        path: '/admin/bible-reading',
-        builder: (context, state) => const AdminBibleReadingScreen(),
-      ),
-      GoRoute(
-        path: '/admin/reading-plans',
-        builder: (context, state) => const AdminReadingPlansScreen(),
-      ),
-      GoRoute(
-        path: '/admin/sermons',
-        builder: (context, state) => const AdminSermonsScreen(),
-      ),
-      GoRoute(
-        path: '/admin/settings',
-        builder: (context, state) => const AdminAppSettingsScreen(),
-      ),
-      GoRoute(
-        path: '/admin/branches/:id',
-        builder: (context, state) => AdminBranchDetailScreen(
-          branchId: state.pathParameters['id']!,
-          branchName: state.extra as String? ?? '',
-        ),
       ),
     ],
   );
