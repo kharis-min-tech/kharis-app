@@ -7,43 +7,17 @@ import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/constants/bible_books.dart';
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/core/utils/usfm_books.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
+import 'package:kharis_app/features/home/data/daily_content_repository.dart';
+import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
 import 'package:kharis_app/features/home/data/reading_plan.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
+import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-
-final bibleRepositoryProvider = Provider<BibleRepository>(
-  (ref) => BibleRepository(),
-);
-
-/// Selected reading translation. Session-scoped; defaults to NIV.
-final selectedBibleProvider = StateProvider<BibleVersion>(
-  (ref) => const BibleVersion(
-    id: BibleRepository.defaultBibleId,
-    abbreviation: BibleRepository.defaultBibleAbbreviation,
-    title: 'New International Version 2011',
-  ),
-);
-
-/// Versions licensed for the app key.
-final biblesProvider = FutureProvider<List<BibleVersion>>(
-  (ref) => ref.watch(bibleRepositoryProvider).getBibles(),
-);
-
-/// Passage for (usfm, version), cached per pair by the repository.
-final passageProvider =
-    FutureProvider.family<
-      BiblePassage,
-      ({String usfm, int bibleId, String abbrev})
-    >(
-      (ref, key) => ref
-          .watch(bibleRepositoryProvider)
-          .getPassage(key.usfm, bibleId: key.bibleId, abbreviation: key.abbrev),
-    );
 
 // ── Read marks ────────────────────────────────────────────────────────────────
 
@@ -97,16 +71,105 @@ Color _scriptureInk(BuildContext context) =>
     ? const Color(0xFFE8E2D8)
     : const Color(0xFF2A2723);
 
-/// Full-screen reader for today's Bible reading with version switching.
-/// Design-handoff v3 — calm, scripture-forward, Newsreader serif on light warm.
-class ReadingScreen extends ConsumerWidget {
+/// The Bible reader. Opens on today's reading (the same one as Home's card),
+/// and from there browses the whole Bible: book list, chapter grid,
+/// previous/next chapter, reference search and translation choice.
+/// Design-handoff v3: calm, scripture-forward, Newsreader serif on light warm.
+class ReadingScreen extends ConsumerStatefulWidget {
   const ReadingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReadingScreen> createState() => _ReadingScreenState();
+}
+
+/// Today's reading as a place in the Bible, or why it cannot be shown.
+({BibleLocation? location, String? problem}) _todayLocation(
+  BibleReading reading,
+) {
+  final usfm = resolveBookUsfm(reading.book);
+  if (usfm == null) {
+    return (
+      location: null,
+      problem:
+          '\u201c${reading.book}\u201d isn\u2019t a book we recognise. '
+          'Please check back tomorrow.',
+    );
+  }
+  final chapters = kCanonBooks.firstWhere((b) => b.usfm == usfm).chapters;
+  // A plan that runs past the end of its book would ask YouVersion for a
+  // chapter that does not exist ("2 Corinthians 17") and get a 404. Say what
+  // is wrong instead of offering a Retry that cannot succeed.
+  if (reading.chapter < 1 || reading.chapter > chapters) {
+    return (
+      location: null,
+      problem:
+          '${reading.book} has $chapters chapters, so '
+          '${reading.book} ${reading.chapter} can\u2019t be shown. '
+          'Please check back tomorrow.',
+    );
+  }
+  return (location: BibleLocation(usfm, reading.chapter), problem: null);
+}
+
+class _ReadingScreenState extends ConsumerState<ReadingScreen> {
+  /// The chapter being browsed; null while on today's reading.
+  BibleLocation? _browsing;
+
+  BibleLocation? get _today {
+    final content = ref.read(dailyContentProvider).valueOrNull;
+    return content == null ? null : _todayLocation(content.reading).location;
+  }
+
+  void _go(BibleLocation to) {
+    final today = _today;
+    setState(() {
+      // Landing on today's chapter (without a verse) is today's reading.
+      _browsing = today != null && to == today ? null : to;
+    });
+  }
+
+  void _backToToday() => setState(() => _browsing = null);
+
+  Future<void> _pickChapter(BibleLocation? current) async {
+    final picked = await pickBibleChapter(context, current: current);
+    if (picked != null && mounted) _go(picked);
+  }
+
+  Future<void> _search() async {
+    final picked = await showModalBottomSheet<BibleLocation>(
+      context: context,
+      backgroundColor: context.kc.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.card),
+        ),
+      ),
+      builder: (_) => const _ReferenceSearchSheet(),
+    );
+    if (picked != null && mounted) _go(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final contentAsync = ref.watch(dailyContentProvider);
     final content = contentAsync.valueOrNull;
     final dayLabel = content == null ? null : readingPlanDayLabel(content);
+    final today = content == null
+        ? null
+        : _todayLocation(content.reading).location;
+    final browsing = _browsing;
+    final current = browsing ?? today;
+    final version = ref.watch(selectedBibleProvider);
+
+    final String title;
+    if (browsing != null) {
+      title = 'Bible';
+    } else if (dayLabel != null) {
+      title = 'Reading plan \u00B7 $dayLabel';
+    } else {
+      title = 'Today\u2019s reading';
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -123,29 +186,32 @@ class ReadingScreen extends ConsumerWidget {
           },
         ),
         actions: [
+          IconButton(
+            key: const Key('bible-search'),
+            tooltip: 'Go to a passage',
+            icon: Icon(Icons.search_rounded, color: context.kc.onBg),
+            onPressed: _search,
+          ),
           // Hands the passage to YouVersion / bible.com for people who want
           // their own Bible app (tester feedback).
           IconButton(
             tooltip: 'Open in Bible app',
-            icon: Icon(Icons.menu_book_rounded, color: context.kc.onBg),
-            onPressed: () {
-              final reading = content?.reading;
-              if (reading == null) return;
-              final usfm = usfmPassageId(reading.book, '${reading.chapter}');
-              if (usfm == null) return;
-              unawaited(
-                launchUrl(
-                  Uri.parse('https://www.bible.com/bible/111/$usfm'),
-                  mode: LaunchMode.externalApplication,
-                ),
-              );
-            },
+            icon: Icon(Icons.open_in_new_rounded, color: context.kc.onBg),
+            onPressed: current == null
+                ? null
+                : () => unawaited(
+                    launchUrl(
+                      Uri.parse(
+                        'https://www.bible.com/bible/${version.id}/'
+                        '${current.passageId}',
+                      ),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
           ),
         ],
         title: Text(
-          dayLabel == null
-              ? 'Today\u2019s reading'
-              : 'Reading plan \u00B7 $dayLabel',
+          title,
           style: AppTypography.ui(
             size: 13,
             weight: FontWeight.w700,
@@ -154,261 +220,667 @@ class ReadingScreen extends ConsumerWidget {
         ),
         centerTitle: true,
       ),
-      body: contentAsync.when(
-        loading: () =>
-            Center(child: CircularProgressIndicator(color: context.kc.onChip)),
-        error: (_, _) => _ErrorView(
-          title: 'Couldn\u2019t load today\u2019s reading',
-          message: 'Check your connection and try again.',
-          onRetry: () => ref.invalidate(dailyContentProvider),
+      body: browsing != null
+          ? _PassageView(
+              key: const ValueKey('browse'),
+              location: browsing,
+              isToday: false,
+              onNavigate: _go,
+              onPickChapter: () => _pickChapter(browsing),
+              onToday: _backToToday,
+            )
+          : contentAsync.when(
+              loading: () => Center(
+                child: CircularProgressIndicator(color: context.kc.onChip),
+              ),
+              error: (_, _) => _ErrorView(
+                title: 'Couldn\u2019t load today\u2019s reading',
+                message: 'Check your connection and try again.',
+                onRetry: () => ref.invalidate(dailyContentProvider),
+                actionLabel: 'Browse the Bible',
+                onAction: () => _pickChapter(null),
+              ),
+              data: (content) {
+                final today = _todayLocation(content.reading);
+                final location = today.location;
+                if (location == null) {
+                  return _ErrorView(
+                    title: 'Today\u2019s reading isn\u2019t available',
+                    message: today.problem!,
+                    actionLabel: 'Browse the Bible',
+                    onAction: () => _pickChapter(null),
+                  );
+                }
+                return _PassageView(
+                  key: const ValueKey('today'),
+                  location: location,
+                  isToday: true,
+                  onNavigate: _go,
+                  onPickChapter: () => _pickChapter(location),
+                  prayer: content.prayer,
+                  prayerReference: content.prayerReference,
+                );
+              },
+            ),
+    );
+  }
+}
+
+void _showVersionSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: context.kc.surface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
         ),
-        data: (content) {
-          final reading = content.reading;
-          final chapters = kBibleBooks[reading.book];
-          // A plan that runs past the end of its book would ask YouVersion
-          // for a chapter that does not exist ("2 Corinthians 17") and get a
-          // 404. Say what is wrong instead of offering a Retry that cannot
-          // succeed.
-          if (chapters != null && reading.chapter > chapters) {
-            return _ErrorView(
-              title: 'Today\u2019s reading isn\u2019t available',
-              message:
-                  '${reading.book} has $chapters chapters, so '
-                  '${reading.book} ${reading.chapter} can\u2019t be shown. '
-                  'Please check back tomorrow.',
+        child: Consumer(
+          builder: (context, sheetRef, _) {
+            final biblesAsync = sheetRef.watch(biblesProvider);
+            final selected = sheetRef.watch(selectedBibleProvider);
+
+            return biblesAsync.when(
+              loading: () => Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: CircularProgressIndicator(color: context.kc.onChip),
+                ),
+              ),
+              error: (_, _) => Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Could not load versions',
+                      style: AppTypography.bodySm.copyWith(
+                        color: context.kc.muted,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => sheetRef.invalidate(biblesProvider),
+                      child: Text(
+                        'Retry',
+                        style: AppTypography.ui(
+                          weight: FontWeight.w600,
+                          color: context.kc.onChip,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              data: (bibles) => ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Text(
+                      'BIBLE VERSION',
+                      style: AppTypography.labelMd.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                        color: context.kc.onChip,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final b in bibles)
+                    ListTile(
+                      key: Key('bible-version-${b.id}'),
+                      dense: true,
+                      title: Text(
+                        b.abbreviation,
+                        style: AppTypography.ui(
+                          size: 14,
+                          weight: b.id == selected.id
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: b.id == selected.id
+                              ? context.kc.onChip
+                              : context.kc.onBg,
+                        ),
+                      ),
+                      subtitle: Text(
+                        b.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.ui(
+                          size: 12,
+                          color: context.kc.muted,
+                        ),
+                      ),
+                      trailing: b.id == selected.id
+                          ? Icon(
+                              Icons.check_rounded,
+                              color: context.kc.onChip,
+                              size: 20,
+                            )
+                          : null,
+                      onTap: () {
+                        unawaited(
+                          sheetRef
+                              .read(selectedBibleProvider.notifier)
+                              .select(b),
+                        );
+                        Navigator.of(sheetContext).pop();
+                      },
+                    ),
+                ],
+              ),
             );
-          }
-          final usfm = usfmPassageId(reading.book, '${reading.chapter}');
-          if (usfm == null) {
-            return _ErrorView(
-              title: 'Today\u2019s reading isn\u2019t available',
+          },
+        ),
+      ),
+    ),
+  );
+}
+
+/// One chapter: header (today label or way back to it, reference, version),
+/// the text with any searched verses highlighted, then previous/next.
+class _PassageView extends ConsumerStatefulWidget {
+  const _PassageView({
+    super.key,
+    required this.location,
+    required this.isToday,
+    required this.onNavigate,
+    required this.onPickChapter,
+    this.onToday,
+    this.prayer = '',
+    this.prayerReference = '',
+  });
+
+  final BibleLocation location;
+  final bool isToday;
+  final ValueChanged<BibleLocation> onNavigate;
+  final VoidCallback onPickChapter;
+
+  /// Returns to today's reading; shown while browsing.
+  final VoidCallback? onToday;
+  final String prayer;
+  final String prayerReference;
+
+  @override
+  ConsumerState<_PassageView> createState() => _PassageViewState();
+}
+
+class _PassageViewState extends ConsumerState<_PassageView> {
+  final _verseKey = GlobalKey();
+
+  /// The verse selection already scrolled to, so rebuilds do not jump again.
+  BibleLocation? _revealed;
+
+  void _revealVerse(BibleLocation location) {
+    if (location.verseStart == null || _revealed == location) return;
+    _revealed = location;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _verseKey.currentContext;
+      if (target == null || !target.mounted) return;
+      Scrollable.ensureVisible(
+        target,
+        alignment: 0.2,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final location = widget.location;
+    final version = ref.watch(selectedBibleProvider);
+    final index =
+        ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
+        BibleIndex.bundled();
+    final passageKey = (
+      usfm: location.passageId,
+      bibleId: version.id,
+      abbrev: version.abbreviation,
+    );
+    final passageAsync = ref.watch(passageProvider(passageKey));
+
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(30, 8, 30, 0),
+      child: _PassageHeader(
+        label: index.label(location),
+        versionLabel: version.abbreviation,
+        isToday: widget.isToday,
+        onToday: widget.onToday,
+        onPickChapter: widget.onPickChapter,
+        onPickVersion: () => _showVersionSheet(context),
+      ),
+    );
+
+    Widget withHeader(Widget body) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        header,
+        Expanded(child: body),
+      ],
+    );
+
+    return passageAsync.when(
+      loading: () => withHeader(
+        Center(child: CircularProgressIndicator(color: context.kc.onChip)),
+      ),
+      error: (error, _) {
+        debugPrint('ReadingScreen: passage $location failed: $error');
+        final notFound =
+            error is DioException && error.response?.statusCode == 404;
+        if (notFound) {
+          return withHeader(
+            _ErrorView(
+              title: 'This passage isn\u2019t available',
               message:
-                  '\u201c${reading.book}\u201d isn\u2019t a book we '
-                  'recognise. Please check back tomorrow.',
-            );
-          }
-          return _PassageView(
-            usfmId: usfm,
-            fallbackReference: '${reading.book} ${reading.chapter}',
-            prayer: content.prayer,
-            prayerReference: content.prayerReference,
+                  '${index.label(location.wholeChapter)} couldn\u2019t be '
+                  'found in ${version.abbreviation}. Try another version, '
+                  'or open it in your Bible app.',
+              actionLabel: 'Change version',
+              onAction: () => _showVersionSheet(context),
+            ),
           );
-        },
+        }
+        return withHeader(
+          _ErrorView(
+            title: 'Couldn\u2019t load the passage',
+            message: 'Check your connection and try again.',
+            onRetry: () {
+              ref.invalidate(passageProvider(passageKey));
+              if (index.isFallback) {
+                ref.invalidate(bibleIndexProvider(version.id));
+              }
+            },
+          ),
+        );
+      },
+      data: (passage) {
+        _revealVerse(location);
+        final previous = index.previous(location);
+        final next = index.next(location);
+        return SingleChildScrollView(
+          key: PageStorageKey('bible-${location.passageId}'),
+          padding: const EdgeInsets.only(bottom: 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              header,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 20, 30, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _PassageBody(
+                      blocks: passage.blocks,
+                      highlight: location.verseStart == null
+                          ? null
+                          : (
+                              location.verseStart!,
+                              location.verseEnd ?? location.verseStart!,
+                            ),
+                      verseKey: _verseKey,
+                    ),
+                    if (passage.copyright != null &&
+                        passage.copyright!.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        passage.copyright!,
+                        style: AppTypography.ui(
+                          size: 11,
+                          height: 1.5,
+                          color: context.kc.muted,
+                        ),
+                      ),
+                    ],
+                    if (widget.isToday) ...[
+                      const SizedBox(height: 26),
+                      _DailyPrayer(
+                        prayer: widget.prayer,
+                        reference: widget.prayerReference,
+                      ),
+                      const SizedBox(height: 22),
+                      const _ReadingActions(),
+                    ],
+                    if (previous != null || next != null) ...[
+                      const SizedBox(height: 26),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: previous == null
+                                ? const SizedBox.shrink()
+                                : _ChapterStep(
+                                    key: const Key('bible-prev'),
+                                    caption: 'Previous',
+                                    label: index.label(previous),
+                                    forward: false,
+                                    onTap: () => widget.onNavigate(previous),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: next == null
+                                ? const SizedBox.shrink()
+                                : _ChapterStep(
+                                    key: const Key('bible-next'),
+                                    caption: 'Next',
+                                    label: index.label(next),
+                                    forward: true,
+                                    onTap: () => widget.onNavigate(next),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// "Today's reading" eyebrow (or a way back to it while browsing), the
+/// reference that opens the book list, and the version switcher.
+class _PassageHeader extends StatelessWidget {
+  const _PassageHeader({
+    required this.label,
+    required this.versionLabel,
+    required this.isToday,
+    required this.onToday,
+    required this.onPickChapter,
+    required this.onPickVersion,
+  });
+
+  final String label;
+  final String versionLabel;
+  final bool isToday;
+  final VoidCallback? onToday;
+  final VoidCallback onPickChapter;
+  final VoidCallback onPickVersion;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    final onToday = this.onToday;
+    final Widget eyebrow;
+    if (isToday) {
+      eyebrow = Text(
+        'TODAY\u2019S READING',
+        style: AppTypography.ui(
+          size: 11,
+          weight: FontWeight.w600,
+          letterSpacing: 11 * 0.09,
+          color: kc.onChip,
+        ),
+      );
+    } else if (onToday != null) {
+      eyebrow = Semantics(
+        button: true,
+        label: 'Back to today\u2019s reading',
+        excludeSemantics: true,
+        child: GestureDetector(
+          key: const Key('bible-today'),
+          behavior: HitTestBehavior.opaque,
+          onTap: onToday,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: kc.chipBg,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.today_rounded, size: 14, color: kc.onChip),
+                const SizedBox(width: 5),
+                Text(
+                  'Today\u2019s reading',
+                  style: AppTypography.ui(
+                    size: 12,
+                    weight: FontWeight.w700,
+                    color: kc.onChip,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      eyebrow = const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // The version sits up here so the reference gets the full width.
+        Row(
+          children: [
+            Expanded(
+              child: Align(alignment: Alignment.centerLeft, child: eyebrow),
+            ),
+            const SizedBox(width: 12),
+            _VersionPill(label: versionLabel, onTap: onPickVersion),
+          ],
+        ),
+        Semantics(
+          button: true,
+          label: '$label. Choose a book and chapter',
+          excludeSemantics: true,
+          child: GestureDetector(
+            key: const Key('bible-reference'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onPickChapter,
+            child: Text.rich(
+              TextSpan(
+                // The no-break space keeps the chevron with the last word.
+                text: '$label\u00A0',
+                children: [
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: kc.muted,
+                      size: 26,
+                    ),
+                  ),
+                ],
+              ),
+              style: AppTypography.display(
+                size: 32,
+                weight: FontWeight.w700,
+              ).copyWith(color: kc.onBg, height: 1.15),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Previous / next chapter card at the end of a chapter.
+class _ChapterStep extends StatelessWidget {
+  const _ChapterStep({
+    super.key,
+    required this.caption,
+    required this.label,
+    required this.forward,
+    required this.onTap,
+  });
+
+  final String caption;
+  final String label;
+  final bool forward;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    final arrow = Icon(
+      forward ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
+      color: kc.onChip,
+      size: 22,
+    );
+    final text = Expanded(
+      child: Column(
+        crossAxisAlignment: forward
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          Text(caption, style: AppTypography.ui(size: 11.5, color: kc.muted)),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.ui(
+              size: 14,
+              weight: FontWeight.w700,
+              color: kc.onBg,
+            ),
+          ),
+        ],
+      ),
+    );
+    return Semantics(
+      button: true,
+      label: '$caption chapter, $label',
+      excludeSemantics: true,
+      child: Material(
+        color: kc.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          side: BorderSide(color: kc.divider),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            child: Row(children: forward ? [text, arrow] : [arrow, text]),
+          ),
+        ),
       ),
     );
   }
 }
 
-class _PassageView extends ConsumerWidget {
-  const _PassageView({
-    required this.usfmId,
-    required this.fallbackReference,
-    required this.prayer,
-    required this.prayerReference,
-  });
+/// "Go to" sheet: a reference field that resolves against the selected
+/// version and explains anything it cannot find.
+class _ReferenceSearchSheet extends ConsumerStatefulWidget {
+  const _ReferenceSearchSheet();
 
-  final String usfmId;
-  final String fallbackReference;
-  final String prayer;
-  final String prayerReference;
+  @override
+  ConsumerState<_ReferenceSearchSheet> createState() =>
+      _ReferenceSearchSheetState();
+}
 
-  void _showVersionSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: context.kc.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppRadius.card),
-        ),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
-          ),
-          child: Consumer(
-            builder: (context, sheetRef, _) {
-              final biblesAsync = sheetRef.watch(biblesProvider);
-              final selected = sheetRef.watch(selectedBibleProvider);
+class _ReferenceSearchSheetState extends ConsumerState<_ReferenceSearchSheet> {
+  final _controller = TextEditingController();
+  String? _error;
 
-              return biblesAsync.when(
-                loading: () => Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(
-                    child: CircularProgressIndicator(color: context.kc.onChip),
-                  ),
-                ),
-                error: (_, _) => Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Could not load versions',
-                    style: AppTypography.bodySm.copyWith(
-                      color: context.kc.muted,
-                    ),
-                  ),
-                ),
-                data: (bibles) => ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 22),
-                      child: Text(
-                        'BIBLE VERSION',
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.1,
-                          color: context.kc.onChip,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    for (final b in bibles)
-                      ListTile(
-                        dense: true,
-                        title: Text(
-                          b.abbreviation,
-                          style: AppTypography.ui(
-                            size: 14,
-                            weight: b.id == selected.id
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: b.id == selected.id
-                                ? context.kc.onChip
-                                : context.kc.onBg,
-                          ),
-                        ),
-                        subtitle: Text(
-                          b.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.ui(
-                            size: 12,
-                            color: context.kc.muted,
-                          ),
-                        ),
-                        trailing: b.id == selected.id
-                            ? Icon(
-                                Icons.check_rounded,
-                                color: context.kc.onChip,
-                                size: 20,
-                              )
-                            : null,
-                        onTap: () {
-                          sheetRef.read(selectedBibleProvider.notifier).state =
-                              b;
-                          Navigator.of(sheetContext).pop();
-                        },
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final navigator = Navigator.of(context);
+    final version = ref.read(selectedBibleProvider);
+    final index = await ref.read(bibleIndexProvider(version.id).future);
+    if (!mounted) return;
+    switch (parseBibleReference(_controller.text, index)) {
+      case ReferenceFound(:final location):
+        navigator.pop(location);
+      case ReferenceError(:final message):
+        setState(() => _error = message);
+    }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final version = ref.watch(selectedBibleProvider);
-    final passageAsync = ref.watch(
-      passageProvider((
-        usfm: usfmId,
-        bibleId: version.id,
-        abbrev: version.abbreviation,
-      )),
-    );
-
-    return passageAsync.when(
-      loading: () =>
-          Center(child: CircularProgressIndicator(color: context.kc.onChip)),
-      error: (error, _) {
-        debugPrint('ReadingScreen: passage $usfmId failed: $error');
-        final notFound =
-            error is DioException && error.response?.statusCode == 404;
-        if (notFound) {
-          return _ErrorView(
-            title: 'This passage isn\u2019t available',
-            message:
-                '$fallbackReference couldn\u2019t be found in '
-                '${version.abbreviation}. Try another version, or open it '
-                'in your Bible app.',
-            actionLabel: 'Change version',
-            onAction: () => _showVersionSheet(context, ref),
-          );
-        }
-        return _ErrorView(
-          title: 'Couldn\u2019t load the passage',
-          message: 'Check your connection and try again.',
-          onRetry: () => ref.invalidate(
-            passageProvider((
-              usfm: usfmId,
-              bibleId: version.id,
-              abbrev: version.abbreviation,
-            )),
-          ),
-        );
-      },
-      data: (passage) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(30, 8, 30, 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Eyebrow.
-            Text(
-              'TODAY\u2019S READING',
-              style: AppTypography.ui(
-                size: 11,
-                weight: FontWeight.w600,
-                letterSpacing: 11 * 0.09,
-                color: context.kc.onChip,
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Go to a passage',
+                style: AppTypography.display(
+                  size: 20,
+                  weight: FontWeight.w700,
+                ).copyWith(color: kc.onBg),
               ),
-            ),
-            const SizedBox(height: 8),
-            // Reference (display) + version switcher.
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Text(
-                    passage.reference.isNotEmpty
-                        ? passage.reference
-                        : fallbackReference,
-                    style: AppTypography.display(
-                      size: 32,
-                      weight: FontWeight.w700,
-                    ).copyWith(color: context.kc.onBg, height: 1.15),
+              const SizedBox(height: 14),
+              TextField(
+                key: const Key('bible-search-field'),
+                controller: _controller,
+                autofocus: true,
+                autocorrect: false,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.go,
+                onSubmitted: (_) => _submit(),
+                onChanged: (_) {
+                  if (_error != null) setState(() => _error = null);
+                },
+                style: AppTypography.ui(size: 16, color: kc.onBg),
+                decoration: InputDecoration(
+                  hintText: 'John 3:16, Psalm 23, 1 Cor 13:4-7',
+                  hintStyle: AppTypography.ui(size: 15, color: kc.muted),
+                  errorText: _error,
+                  errorMaxLines: 3,
+                  prefixIcon: Icon(Icons.search_rounded, color: kc.muted),
+                  filled: true,
+                  fillColor: kc.surfaceAlt,
+                  border: OutlineInputBorder(
+                    borderRadius: AppRadius.inputBorder,
+                    borderSide: BorderSide.none,
                   ),
                 ),
-                const SizedBox(width: 12),
-                _VersionPill(
-                  label: passage.bibleAbbreviation,
-                  onTap: () => _showVersionSheet(context, ref),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _PassageBody(blocks: passage.blocks),
-            if (passage.copyright != null && passage.copyright!.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                passage.copyright!,
-                style: AppTypography.ui(
-                  size: 11,
-                  height: 1.5,
-                  color: context.kc.muted,
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const Key('bible-search-go'),
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.buttonBorder,
+                    ),
+                  ),
+                  child: Text(
+                    'Go',
+                    style: AppTypography.ui(
+                      size: 15,
+                      weight: FontWeight.w700,
+                      color: AppColors.onPrimary,
+                    ),
+                  ),
                 ),
               ),
             ],
-            const SizedBox(height: 26),
-            _DailyPrayer(prayer: prayer, reference: prayerReference),
-            const SizedBox(height: 22),
-            const _ReadingActions(),
-          ],
+          ),
         ),
       ),
     );
@@ -468,11 +940,21 @@ class _VersionPill extends StatelessWidget {
 
 /// Renders passage blocks with superscript verse numbers, poetry indents,
 /// headings, and superscriptions — all in Newsreader serif for a calm,
-/// scripture-forward reading tone.
+/// scripture-forward reading tone. Verses in [highlight] get a soft tint and
+/// the block where the first of them starts carries [verseKey] so the reader
+/// can scroll to it.
 class _PassageBody extends StatelessWidget {
-  const _PassageBody({required this.blocks});
+  const _PassageBody({
+    required this.blocks,
+    required this.verseKey,
+    this.highlight,
+  });
 
   final List<PassageBlock> blocks;
+  final GlobalKey verseKey;
+
+  /// First and last verse to highlight, inclusive.
+  final (int, int)? highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -488,6 +970,24 @@ class _PassageBody extends StatelessWidget {
       color: _verseAccent(context),
     );
 
+    final highlight = this.highlight;
+    bool lit(int? verse) =>
+        highlight != null &&
+        verse != null &&
+        verse >= highlight.$1 &&
+        verse <= highlight.$2;
+    final litStyle = TextStyle(backgroundColor: context.kc.chipBg);
+    // Highlighted verse numbers sit in the text run (not a superscript
+    // widget) so the tint runs through them; the height multiplier gives the
+    // smaller number the same line box as the body, so the tint is full-line.
+    final litVerseStyle = verseStyle.copyWith(
+      color: context.kc.onChip,
+      backgroundColor: context.kc.chipBg,
+      height: bodyStyle.fontSize! * bodyStyle.height! / verseStyle.fontSize!,
+    );
+
+    // Text before a block's first verse label continues the previous verse.
+    int? verse;
     final children = <Widget>[];
     for (final block in blocks) {
       if (block.isHeading) {
@@ -522,30 +1022,42 @@ class _PassageBody extends StatelessWidget {
       }
 
       final spans = <InlineSpan>[];
+      var startsHighlight = false;
       for (final seg in block.segments) {
         if (seg.verse != null) {
+          verse = seg.verse;
+          if (highlight != null && verse == highlight.$1) {
+            startsHighlight = true;
+          }
           spans.add(
-            WidgetSpan(
-              alignment: PlaceholderAlignment.top,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Text('${seg.verse}', style: verseStyle),
-              ),
-            ),
+            lit(verse)
+                ? TextSpan(text: '${seg.verse}\u00A0', style: litVerseStyle)
+                : WidgetSpan(
+                    alignment: PlaceholderAlignment.top,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Text('${seg.verse}', style: verseStyle),
+                    ),
+                  ),
           );
         }
         if (seg.text.isNotEmpty) {
-          spans.add(TextSpan(text: '${seg.text} '));
+          spans.add(
+            TextSpan(text: '${seg.text} ', style: lit(verse) ? litStyle : null),
+          );
         }
       }
-      children.add(
-        Padding(
-          padding: EdgeInsets.only(
-            left: block.poetryIndent * 18.0,
-            bottom: block.styleClass.startsWith('q') ? 0 : 14,
-          ),
-          child: Text.rich(TextSpan(style: bodyStyle, children: spans)),
+      final paragraph = Padding(
+        padding: EdgeInsets.only(
+          left: block.poetryIndent * 18.0,
+          bottom: block.styleClass.startsWith('q') ? 0 : 14,
         ),
+        child: Text.rich(TextSpan(style: bodyStyle, children: spans)),
+      );
+      children.add(
+        startsHighlight
+            ? KeyedSubtree(key: verseKey, child: paragraph)
+            : paragraph,
       );
     }
 

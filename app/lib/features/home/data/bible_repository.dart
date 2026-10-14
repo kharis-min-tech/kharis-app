@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:kharis_app/core/constants/bible_books.dart';
 
 /// Fetches Bible passage text and version metadata from the YouVersion
 /// Platform API.
@@ -26,6 +27,7 @@ class BibleRepository {
   final Dio _dio;
 
   final _passageCache = <String, BiblePassage>{};
+  final _booksCache = <int, List<BibleBook>>{};
   List<BibleVersion>? _biblesCache;
 
   Options get _options {
@@ -61,6 +63,60 @@ class BibleRepository {
         ),
     ];
     return _biblesCache!;
+  }
+
+  /// Books of [bibleId] in canonical order, with each book's chapters and
+  /// verse counts. Versions differ (NT-only, partial OT, deuterocanon), so
+  /// navigation and reference search use this rather than a fixed table.
+  Future<List<BibleBook>> getBooks(int bibleId) async {
+    final cached = _booksCache[bibleId];
+    if (cached != null) return cached;
+
+    final response = await _withRetry(
+      () => _dio.get<Map<String, dynamic>>(
+        '$_base/bibles/$bibleId/books',
+        options: _options,
+      ),
+    );
+    final data = (response.data?['data'] as List? ?? const [])
+        .cast<Map<String, dynamic>>();
+    final books = <BibleBook>[];
+    for (final b in data) {
+      final chapters = <int>[];
+      final verseCounts = <int, int>{};
+      for (final c
+          in (b['chapters'] as List? ?? const [])
+              .cast<Map<String, dynamic>>()) {
+        // Skips non-numeric ids such as Psalm 151's "1_1".
+        final number = int.tryParse('${c['id']}');
+        if (number == null) continue;
+        chapters.add(number);
+        var lastVerse = 0;
+        for (final v
+            in (c['verses'] as List? ?? const [])
+                .cast<Map<String, dynamic>>()) {
+          final n = int.tryParse('${v['id']}');
+          if (n != null && n > lastVerse) lastVerse = n;
+        }
+        if (lastVerse > 0) verseCounts[number] = lastVerse;
+      }
+      if (chapters.isEmpty) continue;
+      books.add(
+        BibleBook(
+          usfm: b['id'] as String,
+          title: (b['title'] ?? b['id']) as String,
+          testament: switch (b['canon']) {
+            'old_testament' => Testament.old,
+            'new_testament' => Testament.newTestament,
+            _ => Testament.other,
+          },
+          chapters: chapters,
+          verseCounts: verseCounts,
+        ),
+      );
+    }
+    if (books.isEmpty) throw StateError('No books for Bible $bibleId');
+    return _booksCache[bibleId] = books;
   }
 
   /// Fetches a passage (chapter or verse) by USFM id, e.g. 'PSA.23',
@@ -217,4 +273,145 @@ class PassageSegment {
 
   final int? verse;
   final String text;
+}
+
+/// A book as one Bible version has it.
+class BibleBook {
+  const BibleBook({
+    required this.usfm,
+    required this.title,
+    required this.testament,
+    required this.chapters,
+    this.verseCounts = const {},
+  });
+
+  /// The bundled canon entry, used when the version's own list is unreachable.
+  BibleBook.canon(CanonBook book)
+    : usfm = book.usfm,
+      title = book.name,
+      testament = book.testament,
+      chapters = [for (var c = 1; c <= book.chapters; c++) c],
+      verseCounts = const {};
+
+  final String usfm;
+  final String title;
+  final Testament testament;
+
+  /// Chapter numbers in order (1..n for every known version).
+  final List<int> chapters;
+
+  /// Last verse per chapter; empty when unknown (bundled fallback).
+  final Map<int, int> verseCounts;
+
+  bool hasChapter(int chapter) => chapters.contains(chapter);
+}
+
+/// A place in the Bible: a chapter, optionally a verse or verse range to
+/// scroll to and highlight.
+@immutable
+class BibleLocation {
+  const BibleLocation(
+    this.usfm,
+    this.chapter, {
+    this.verseStart,
+    this.verseEnd,
+  });
+
+  final String usfm;
+  final int chapter;
+  final int? verseStart;
+
+  /// Last highlighted verse; equals [verseStart] for a single verse.
+  final int? verseEnd;
+
+  /// Chapter passage id for the passages endpoint, e.g. `JHN.3`.
+  String get passageId => '$usfm.$chapter';
+
+  bool sameChapter(BibleLocation other) =>
+      usfm == other.usfm && chapter == other.chapter;
+
+  /// The chapter itself, without a verse selection.
+  BibleLocation get wholeChapter => BibleLocation(usfm, chapter);
+
+  @override
+  bool operator ==(Object other) =>
+      other is BibleLocation &&
+      other.usfm == usfm &&
+      other.chapter == chapter &&
+      other.verseStart == verseStart &&
+      other.verseEnd == verseEnd;
+
+  @override
+  int get hashCode => Object.hash(usfm, chapter, verseStart, verseEnd);
+
+  @override
+  String toString() => verseStart == null
+      ? passageId
+      : '$passageId.$verseStart${verseEnd != verseStart ? '-$verseEnd' : ''}';
+}
+
+/// The books of one version, plus chapter-to-chapter navigation.
+class BibleIndex {
+  const BibleIndex(this.books, {this.isFallback = false});
+
+  /// The bundled 66-book canon, for when the version's list cannot load.
+  factory BibleIndex.bundled() => BibleIndex([
+    for (final b in kCanonBooks) BibleBook.canon(b),
+  ], isFallback: true);
+
+  final List<BibleBook> books;
+
+  /// True when built from the bundled table rather than the API.
+  final bool isFallback;
+
+  BibleBook? book(String usfm) {
+    for (final b in books) {
+      if (b.usfm == usfm) return b;
+    }
+    return null;
+  }
+
+  /// Human label, e.g. "John 3", "John 3:16" or "1 Corinthians 13:4-7".
+  String label(BibleLocation at) {
+    final name =
+        book(at.usfm)?.title ??
+        kCanonBooks
+            .where((b) => b.usfm == at.usfm)
+            .map((b) => b.name)
+            .firstOrNull ??
+        at.usfm;
+    final start = at.verseStart;
+    if (start == null) return '$name ${at.chapter}';
+    final end = at.verseEnd;
+    return end == null || end == start
+        ? '$name ${at.chapter}:$start'
+        : '$name ${at.chapter}:$start-$end';
+  }
+
+  /// The chapter after [at], continuing into the next book; null at the end
+  /// of the Bible or when [at] is not in this version.
+  BibleLocation? next(BibleLocation at) => _step(at, 1);
+
+  /// The chapter before [at], continuing into the previous book; null at the
+  /// start of the Bible or when [at] is not in this version.
+  BibleLocation? previous(BibleLocation at) => _step(at, -1);
+
+  BibleLocation? _step(BibleLocation at, int delta) {
+    final bookIndex = books.indexWhere((b) => b.usfm == at.usfm);
+    if (bookIndex < 0) return null;
+    final chapters = books[bookIndex].chapters;
+    final chapterIndex = chapters.indexOf(at.chapter);
+    if (chapterIndex < 0) return null;
+    final target = chapterIndex + delta;
+    if (target >= 0 && target < chapters.length) {
+      return BibleLocation(at.usfm, chapters[target]);
+    }
+    final otherIndex = bookIndex + delta;
+    if (otherIndex < 0 || otherIndex >= books.length) return null;
+    final other = books[otherIndex];
+    return BibleLocation(
+      other.usfm,
+      delta > 0 ? other.chapters.first : other.chapters.last,
+    );
+  }
 }
