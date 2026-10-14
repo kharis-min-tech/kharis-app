@@ -73,17 +73,18 @@ class _BibleBooksScreenState extends ConsumerState<BibleBooksScreen> {
   @override
   Widget build(BuildContext context) {
     final version = ref.watch(selectedBibleProvider);
-    final indexAsync = ref.watch(bibleIndexProvider(version.id));
+    // Like the reader: the version's own list once it has loaded, the
+    // bundled 66-book table until then, so a slow connection never leaves
+    // the member looking at a spinner.
+    final index =
+        ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
+        BibleIndex.bundled();
 
     return Scaffold(
       backgroundColor: context.kc.bg,
       appBar: _pickerAppBar(context, 'Books'),
-      body: indexAsync.when(
-        loading: () =>
-            Center(child: CircularProgressIndicator(color: context.kc.onChip)),
-        // The provider falls back to the bundled table, so this is rare.
-        error: (_, _) => const SizedBox.shrink(),
-        data: (index) {
+      body: Builder(
+        builder: (context) {
           _revealCurrent();
           final groups = [
             ('Old Testament', Testament.old),

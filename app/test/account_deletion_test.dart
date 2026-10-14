@@ -151,7 +151,6 @@ Future<void> _pumpMore(
         sharedPreferencesProvider.overrideWithValue(prefs),
         firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
         currentUserProvider.overrideWith((ref) => Stream.value(user)),
-        isAdminProvider.overrideWith((ref) => false),
         branchesProvider.overrideWith((ref) => Stream.value(const [])),
         notificationServiceProvider.overrideWithValue(_QuietNotifications()),
         authRepositoryProvider.overrideWithValue(auth ?? _FakeAuth()),

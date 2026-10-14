@@ -49,7 +49,9 @@ class StudioBranch {
   /// Same rule as the Studio's "Kharis" / "Kharis Phase 2" groups.
   bool get isPhaseTwo {
     final g = groupRaw.toLowerCase();
-    return g.contains('phase 2') || g.contains('phase two') || g.contains('kp2');
+    return g.contains('phase 2') ||
+        g.contains('phase two') ||
+        g.contains('kp2');
   }
 
   /// Name as the branch picker tile shows it.
@@ -79,7 +81,13 @@ String? formatClock(Object? raw) {
   final s = '${raw ?? ''}'.trim();
   final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
   if (m == null) return null;
-  final t = DateTime(2000, 1, 1, int.parse(m.group(1)!), int.parse(m.group(2)!));
+  final t = DateTime(
+    2000,
+    1,
+    1,
+    int.parse(m.group(1)!),
+    int.parse(m.group(2)!),
+  );
   return DateFormat('h:mm a').format(t);
 }
 
@@ -111,9 +119,9 @@ class StudioEvent {
   }
 
   bool get weekly => '${row['recurrence'] ?? ''}'.toLowerCase() == 'weekly';
-  List<int> get days => [
-    for (final d in (row['recurrence_days'] as List? ?? const [])) d as int,
-  ]..sort();
+  List<int> get days =>
+      [for (final d in (row['recurrence_days'] as List? ?? const [])) d as int]
+        ..sort();
 
   DateTime get start => DateTime.parse('${row['start_time']}').toLocal();
   DateTime? get end {
@@ -162,15 +170,18 @@ class StudioEvent {
   String toString() => '$title${weekly ? ' (weekly)' : ''}';
 }
 
-Future<List<StudioEvent>> studioEvents() async =>
-    [for (final r in await studioRows('events')) StudioEvent(r)];
+Future<List<StudioEvent>> studioEvents() async => [
+  for (final r in await studioRows('events')) StudioEvent(r),
+];
 
 /// Studio announcements the app treats as published.
 Future<List<Map<String, dynamic>>> studioNews() async {
   final rows = await studioRows('news');
   return [
     for (final r in rows)
-      if (r['status'] == null || r['status'] == 'published' || r['status'] == 'live')
+      if (r['status'] == null ||
+          r['status'] == 'published' ||
+          r['status'] == 'live')
         if (r['is_published'] != false && r['published'] != false) r,
   ];
 }
@@ -200,6 +211,16 @@ Future<String> fetchText(String url) async {
     options: Options(responseType: ResponseType.plain),
   );
   return res.data ?? '';
+}
+
+/// The text at [url], or null when the server says it doesn't exist (404).
+Future<String?> fetchTextOrNull(String url) async {
+  try {
+    return (await fetchText(url)).trim();
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) return null;
+    rethrow;
+  }
 }
 
 /// English Bible versions YouVersion offers this app key.

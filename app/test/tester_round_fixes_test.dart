@@ -282,7 +282,6 @@ void main() {
             firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
             currentUserProvider.overrideWith((ref) => Stream.value(_member)),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
-            isAdminProvider.overrideWith((ref) => false),
           ],
           child: const MaterialApp(home: SettingsScreen()),
         ),

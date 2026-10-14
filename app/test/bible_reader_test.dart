@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,6 +64,9 @@ class _FakeBibleRepository extends BibleRepository {
   final passageRequests = <String>[];
   bool offline = false;
 
+  /// When set, the version's book list never arrives (a stalled request).
+  bool booksHang = false;
+
   @override
   Future<List<BibleVersion>> getBibles() async => const [
     BibleVersion(id: 111, abbreviation: 'NIV', title: 'New International'),
@@ -69,8 +74,9 @@ class _FakeBibleRepository extends BibleRepository {
   ];
 
   @override
-  Future<List<BibleBook>> getBooks(int bibleId) async =>
-      _indexWithVerses().books;
+  Future<List<BibleBook>> getBooks(int bibleId) => booksHang
+      ? Completer<List<BibleBook>>().future
+      : Future.value(_indexWithVerses().books);
 
   @override
   Future<BiblePassage> getPassage(
@@ -114,10 +120,11 @@ Future<(_FakeBibleRepository, SharedPreferences)> _pumpReader(
   WidgetTester tester, {
   DailyContent? today,
   Map<String, Object> prefs = const {},
+  bool booksHang = false,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sharedPrefs = await SharedPreferences.getInstance();
-  final repo = _FakeBibleRepository();
+  final repo = _FakeBibleRepository()..booksHang = booksHang;
   tester.view.physicalSize = const Size(800, 1600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -507,6 +514,20 @@ void main() {
       expect(repo.passageRequests.last, '111/JHN.3');
       expect(_hasHighlight(tester), isTrue);
       expect(find.byKey(const Key('bible-today')), findsOneWidget);
+    });
+
+    testWidgets('search and the book list work while the version\'s book '
+        'list is still loading', (tester) async {
+      await _pumpReader(tester, today: _today('Psalms', 23), booksHang: true);
+
+      await _search(tester, 'John 3:16');
+      expect(_header('John 3:16'), findsOneWidget);
+
+      await tester.tap(_header('John 3:16'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BibleBooksScreen), findsOneWidget);
+      expect(find.text('Genesis'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('search explains an unknown book or chapter', (tester) async {

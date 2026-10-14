@@ -130,8 +130,10 @@ Future<void> onboardingJourney(Journey j) async {
     'guest branch is "${guestChoice.name}" '
     '(got ${j.c.read(currentBranchProvider).valueOrNull})',
   );
-  j.note('role stored for a guest who skipped the role step: '
-      '${guestRepo.selectedRole}');
+  j.note(
+    'role stored for a guest who skipped the role step: '
+    '${guestRepo.selectedRole}',
+  );
   await j.shot('home-after-guest-path');
 }
 
@@ -158,8 +160,12 @@ Future<void> _checkBranchGroups(Journey j, List<StudioBranch> branches) async {
     if (inner is BranchTile) (groups[header ?? '?'] ??= []).add(inner.name);
   }
   List<String> sorted(Iterable<String> names) => names.toList()..sort();
-  final wantMain = sorted(branches.where((b) => !b.isPhaseTwo).map((b) => b.tileName));
-  final wantKp2 = sorted(branches.where((b) => b.isPhaseTwo).map((b) => b.tileName));
+  final wantMain = sorted(
+    branches.where((b) => !b.isPhaseTwo).map((b) => b.tileName),
+  );
+  final wantKp2 = sorted(
+    branches.where((b) => b.isPhaseTwo).map((b) => b.tileName),
+  );
   j.check(
     listEquals(sorted(groups['BRANCHES'] ?? const []), wantMain),
     'BRANCHES group = Studio "Kharis" branches '
@@ -187,7 +193,9 @@ Future<void> _checkBranchGroups(Journey j, List<StudioBranch> branches) async {
     await scrollUntilFound(
       t,
       find.text('KHARIS PHASE TWO'),
-      scrollable: verticalScrollableIn(find.descendant(of: screen, matching: find.byType(ListView))),
+      scrollable: verticalScrollableIn(
+        find.descendant(of: screen, matching: find.byType(ListView)),
+      ),
     );
     await j.shot('branch-picker-kp2');
   }

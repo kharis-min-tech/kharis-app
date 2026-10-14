@@ -26,11 +26,15 @@ Future<Finder> _findRow(Journey j, Sermon s) async {
   await t.tap(field, warnIfMissed: false);
   await t.enterText(field, s.title);
   final row = find.byKey(ValueKey(s.id));
-  await pumpUntilFound(t, row, timeout: const Duration(seconds: 30), reason: 'row for "${s.title}"');
+  await pumpUntilFound(
+    t,
+    row,
+    timeout: const Duration(seconds: 30),
+    reason: 'row for "${s.title}"',
+  );
   FocusManager.instance.primaryFocus?.unfocus();
   await pumpFor(t, const Duration(milliseconds: 600));
-  await t.ensureVisible(row);
-  await pumpFor(t, const Duration(milliseconds: 300));
+  await ensureCentred(t, row);
   return row;
 }
 
@@ -52,7 +56,8 @@ Future<void> playlistsJourney(Journey j) async {
   j.check(await waitArchiveHydrated(j), 'archive loaded');
 
   // Three messages, distinct artwork where the library has it.
-  final pool = j.c.read(sermonLibraryProvider).sermons.take(300).toList()..shuffle(r);
+  final pool = j.c.read(sermonLibraryProvider).sermons.take(300).toList()
+    ..shuffle(r);
   final chosen = <Sermon>[];
   final arts = <String>{};
   for (final s in pool) {
@@ -64,17 +69,26 @@ Future<void> playlistsJourney(Journey j) async {
     if (chosen.length == 3) break;
     if (!chosen.contains(s)) chosen.add(s);
   }
-  j.note('messages for the playlist: ${chosen.map((s) => s.title).toList()} '
-      '(${arts.length} with distinct artwork)');
+  j.note(
+    'messages for the playlist: ${chosen.map((s) => s.title).toList()} '
+    '(${arts.length} with distinct artwork)',
+  );
 
   // ── Create ───────────────────────────────────────────────────────────────
   final name = 'E2E ${DateTime.now().millisecondsSinceEpoch % 1000000}';
   await _openPlaylists(j);
-  await pumpUntil(t, () => j.c.read(playlistsProvider).hasValue, timeout: const Duration(seconds: 30));
+  await pumpUntil(
+    t,
+    () => j.c.read(playlistsProvider).hasValue,
+    timeout: const Duration(seconds: 30),
+  );
   await t.tap(find.byKey(const ValueKey('playlists-new')), warnIfMissed: false);
   await pumpUntilFound(t, find.byType(AlertDialog));
   await t.tap(
-    find.descendant(of: find.byType(AlertDialog), matching: find.text('Create')),
+    find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text('Create'),
+    ),
     warnIfMissed: false,
   );
   await pumpFor(t, const Duration(milliseconds: 500));
@@ -83,22 +97,38 @@ Future<void> playlistsJourney(Journey j) async {
     'empty playlist name is refused',
   );
   await t.enterText(
-    find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
+    find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextField),
+    ),
     name,
   );
   await t.tap(
-    find.descendant(of: find.byType(AlertDialog), matching: find.text('Create')),
+    find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text('Create'),
+    ),
     warnIfMissed: false,
   );
-  await pumpUntilFound(t, find.byType(PlaylistDetailScreen), reason: 'new playlist opens');
+  await pumpUntilFound(
+    t,
+    find.byType(PlaylistDetailScreen),
+    reason: 'new playlist opens',
+  );
   final created = await pumpUntil(
     t,
-    () => (j.c.read(playlistsProvider).valueOrNull ?? const []).any((p) => p.name == name),
+    () => (j.c.read(playlistsProvider).valueOrNull ?? const []).any(
+      (p) => p.name == name,
+    ),
     timeout: const Duration(seconds: 20),
   );
   j.check(created, 'playlist "$name" created');
   if (!created) return;
-  final id = j.c.read(playlistsProvider).valueOrNull!.firstWhere((p) => p.name == name).id;
+  final id = j.c
+      .read(playlistsProvider)
+      .valueOrNull!
+      .firstWhere((p) => p.name == name)
+      .id;
   await j.shot('playlist-created');
 
   try {
@@ -106,7 +136,10 @@ Future<void> playlistsJourney(Journey j) async {
     for (final s in chosen) {
       final row = await _findRow(j, s);
       await t.tap(
-        find.descendant(of: row, matching: find.byIcon(Icons.more_vert_rounded)),
+        find.descendant(
+          of: row,
+          matching: find.byIcon(Icons.more_vert_rounded),
+        ),
         warnIfMissed: false,
       );
       final sheet = find.byType(AddToPlaylistSheet);
@@ -129,20 +162,28 @@ Future<void> playlistsJourney(Journey j) async {
 
     // ── Mosaic ─────────────────────────────────────────────────────────────
     await _openPlaylists(j);
-    final card = find.ancestor(of: find.text(name), matching: find.byType(PlaylistCard));
+    final card = find.ancestor(
+      of: find.text(name),
+      matching: find.byType(PlaylistCard),
+    );
     await pumpUntilFound(t, card, reason: 'playlist card');
-    final mosaic = find.descendant(of: card.first, matching: find.byType(PlaylistMosaic));
-    final wantArt = {
-      for (final s in chosen)
-        ?usableMediaUrl(s.artworkUrl),
-    };
+    final mosaic = find.descendant(
+      of: card.first,
+      matching: find.byType(PlaylistMosaic),
+    );
+    final wantArt = {for (final s in chosen) ?usableMediaUrl(s.artworkUrl)};
     j.check(
       await pumpUntil(
         t,
         () =>
             mosaic.evaluate().isNotEmpty &&
-            t.widget<PlaylistMosaic>(mosaic.first).urls.toSet().containsAll(wantArt) &&
-            t.widget<PlaylistMosaic>(mosaic.first).urls.length == wantArt.length,
+            t
+                .widget<PlaylistMosaic>(mosaic.first)
+                .urls
+                .toSet()
+                .containsAll(wantArt) &&
+            t.widget<PlaylistMosaic>(mosaic.first).urls.length ==
+                wantArt.length,
         timeout: const Duration(seconds: 30),
       ),
       'mosaic shows the ${wantArt.length} message artworks '
@@ -150,7 +191,10 @@ Future<void> playlistsJourney(Journey j) async {
     );
     if (wantArt.isNotEmpty) {
       j.check(
-        find.descendant(of: mosaic.first, matching: find.byType(Image)).evaluate().length >=
+        find
+                .descendant(of: mosaic.first, matching: find.byType(Image))
+                .evaluate()
+                .length >=
             wantArt.length,
         'mosaic paints one image per artwork',
       );
@@ -165,29 +209,48 @@ Future<void> playlistsJourney(Journey j) async {
       matching: find.byType(SermonListItem),
     );
     j.check(
-      await pumpUntil(t, () => rows.evaluate().length == 3, timeout: const Duration(seconds: 20)),
+      await pumpUntil(
+        t,
+        () => rows.evaluate().length == 3,
+        timeout: const Duration(seconds: 20),
+      ),
       'playlist lists 3 messages (got ${rows.evaluate().length})',
     );
     final renamed = '$name renamed';
     await t.tap(
-      find.descendant(of: find.byType(AppBar), matching: find.byIcon(Icons.more_vert_rounded)),
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byIcon(Icons.more_vert_rounded),
+      ),
       warnIfMissed: false,
     );
     await pumpUntilFound(t, find.text('Rename'));
     await t.tap(find.text('Rename'), warnIfMissed: false);
     await pumpUntilFound(t, find.text('Rename playlist'));
     await t.enterText(
-      find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
       renamed,
     );
     await t.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('Save')),
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Save'),
+      ),
       warnIfMissed: false,
     );
     j.check(
       await pumpUntil(
         t,
-        () => find.descendant(of: find.byType(PlaylistDetailScreen), matching: find.text(renamed)).evaluate().isNotEmpty,
+        () => find
+            .descendant(
+              of: find.byType(PlaylistDetailScreen),
+              matching: find.text(renamed),
+            )
+            .evaluate()
+            .isNotEmpty,
         timeout: const Duration(seconds: 15),
       ),
       'rename shows "$renamed"',
@@ -196,7 +259,10 @@ Future<void> playlistsJourney(Journey j) async {
     // ── Remove one ─────────────────────────────────────────────────────────
     final removed = t.widget<SermonListItem>(rows.first).title;
     await t.tap(
-      find.descendant(of: rows.first, matching: find.byIcon(Icons.more_vert_rounded)),
+      find.descendant(
+        of: rows.first,
+        matching: find.byIcon(Icons.more_vert_rounded),
+      ),
       warnIfMissed: false,
     );
     await pumpUntilFound(t, find.text('Remove from this playlist'));
@@ -204,7 +270,9 @@ Future<void> playlistsJourney(Journey j) async {
     j.check(
       await pumpUntil(
         t,
-        () => rows.evaluate().length == 2 && find.text('2 messages').evaluate().isNotEmpty,
+        () =>
+            rows.evaluate().length == 2 &&
+            find.text('2 messages').evaluate().isNotEmpty,
         timeout: const Duration(seconds: 15),
       ),
       'removing "$removed" leaves 2 messages',
@@ -225,20 +293,28 @@ Future<void> playlistsJourney(Journey j) async {
       await pumpUntilFound(t, find.byType(PlaylistDetailScreen));
     }
     await t.tap(
-      find.descendant(of: find.byType(AppBar), matching: find.byIcon(Icons.more_vert_rounded)),
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byIcon(Icons.more_vert_rounded),
+      ),
       warnIfMissed: false,
     );
     await pumpUntilFound(t, find.text('Delete playlist'));
     await t.tap(find.text('Delete playlist'), warnIfMissed: false);
     await pumpUntilFound(t, find.text('Delete playlist?'));
     await t.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('Delete')),
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Delete'),
+      ),
       warnIfMissed: false,
     );
     j.check(
       await pumpUntil(
         t,
-        () => !(j.c.read(playlistsProvider).valueOrNull ?? const []).any((p) => p.id == id),
+        () => !(j.c.read(playlistsProvider).valueOrNull ?? const []).any(
+          (p) => p.id == id,
+        ),
         timeout: const Duration(seconds: 20),
       ),
       'playlist deleted',
@@ -249,7 +325,10 @@ Future<void> playlistsJourney(Journey j) async {
       'deleted playlist gone from My playlists',
     );
   } catch (e) {
-    j.check(false, 'deleting the playlist from its menu failed: ${'$e'.split('\n').first}');
+    j.check(
+      false,
+      'deleting the playlist from its menu failed: ${'$e'.split('\n').first}',
+    );
     j.c.read(playlistRepositoryProvider).deletePlaylist(id);
     j.note('test playlist $id removed through the repository instead');
   }
@@ -261,15 +340,26 @@ Future<void> playlistsJourney(Journey j) async {
   await pumpUntilFound(t, player);
   final like = inPlayer(find.byTooltip('Add to Favourites'));
   final unlike = inPlayer(find.byTooltip('Remove from Favourites'));
-  await pumpUntil(t, () => like.evaluate().isNotEmpty || unlike.evaluate().isNotEmpty);
+  await pumpUntil(
+    t,
+    () => like.evaluate().isNotEmpty || unlike.evaluate().isNotEmpty,
+  );
   if (unlike.evaluate().isNotEmpty) {
     j.note('"${fav.title}" was already a favourite; unliking first');
     await t.tap(unlike.first, warnIfMissed: false);
-    await pumpUntil(t, () => like.evaluate().isNotEmpty, timeout: const Duration(seconds: 15));
+    await pumpUntil(
+      t,
+      () => like.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 15),
+    );
   }
   await t.tap(like.first, warnIfMissed: false);
   j.check(
-    await pumpUntil(t, () => unlike.evaluate().isNotEmpty, timeout: const Duration(seconds: 15)),
+    await pumpUntil(
+      t,
+      () => unlike.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 15),
+    ),
     'heart fills after liking "${fav.title}"',
   );
   await j.shot('liked');
@@ -277,9 +367,16 @@ Future<void> playlistsJourney(Journey j) async {
   await clearMessagesSearch(t);
   await openMoreRow(t, 'Favourites');
   await pumpUntilFound(t, find.byType(FavoritesScreen));
-  final listed = find.descendant(of: find.byType(FavoritesScreen), matching: find.text(fav.title));
+  final listed = find.descendant(
+    of: find.byType(FavoritesScreen),
+    matching: find.text(fav.title),
+  );
   j.check(
-    await pumpUntil(t, () => listed.evaluate().isNotEmpty, timeout: const Duration(seconds: 20)),
+    await pumpUntil(
+      t,
+      () => listed.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 20),
+    ),
     'Favourites lists "${fav.title}"',
   );
   await j.shot('favourites');
@@ -291,19 +388,28 @@ Future<void> playlistsJourney(Journey j) async {
   await pumpUntilFound(t, unlike);
   await t.tap(unlike.first, warnIfMissed: false);
   j.check(
-    await pumpUntil(t, () => like.evaluate().isNotEmpty, timeout: const Duration(seconds: 15)),
+    await pumpUntil(
+      t,
+      () => like.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 15),
+    ),
     'heart empties after unliking',
   );
   await closePlayer(t);
   await openMoreRow(t, 'Favourites');
   await pumpUntilFound(t, find.byType(FavoritesScreen));
   j.check(
-    await pumpUntil(t, () => listed.evaluate().isEmpty, timeout: const Duration(seconds: 20)),
+    await pumpUntil(
+      t,
+      () => listed.evaluate().isEmpty,
+      timeout: const Duration(seconds: 20),
+    ),
     'Favourites no longer lists "${fav.title}"',
   );
   final favs = j.c.read(favoritesProvider).valueOrNull;
   j.check(
-    favs == null || !favs.sermonIds.any((id) => id == fav.id || id.endsWith(fav.id)),
+    favs == null ||
+        !favs.sermonIds.any((id) => id == fav.id || id.endsWith(fav.id)),
     'favourite removed from the account',
   );
 }

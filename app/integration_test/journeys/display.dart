@@ -22,7 +22,9 @@ Future<void> _sweep(Journey j, Type screen, String name) async {
   final scrollables = find.descendant(
     of: find.byType(screen),
     matching: find.byWidgetPredicate(
-      (w) => w is Scrollable && axisDirectionToAxis(w.axisDirection) == Axis.vertical,
+      (w) =>
+          w is Scrollable &&
+          axisDirectionToAxis(w.axisDirection) == Axis.vertical,
     ),
   );
   if (scrollables.evaluate().isEmpty) return;
@@ -79,9 +81,13 @@ Future<void> displayJourney(Journey j) async {
   try {
     await pumpFor(t, const Duration(seconds: 1));
     await tapNav(t, 'Home');
-    final applied = MediaQuery.textScalerOf(t.element(find.byType(HomeScreen))).scale(10) / 10;
-    j.note('system text scale 1.6 -> app applies ${applied.toStringAsFixed(2)} '
-        '(clamped to kMaxTextScale $kMaxTextScale)');
+    final applied =
+        MediaQuery.textScalerOf(t.element(find.byType(HomeScreen))).scale(10) /
+        10;
+    j.note(
+      'system text scale 1.6 -> app applies ${applied.toStringAsFixed(2)} '
+      '(clamped to kMaxTextScale $kMaxTextScale)',
+    );
     j.check(
       (applied - kMaxTextScale).abs() < 0.01,
       'large system text reaches the app, clamped to $kMaxTextScale (got $applied)',

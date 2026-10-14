@@ -68,7 +68,8 @@ Future<void> eventsJourney(Journey j) async {
   await pumpUntilFound(t, find.byType(CalendarScreen));
   await pumpUntil(
     t,
-    () => _inCalendar(find.byType(CircularProgressIndicator)).evaluate().isEmpty,
+    () =>
+        _inCalendar(find.byType(CircularProgressIndicator)).evaluate().isEmpty,
     timeout: const Duration(seconds: 30),
   );
   await pumpFor(t, const Duration(seconds: 1));
@@ -97,7 +98,9 @@ Future<void> eventsJourney(Journey j) async {
     }
   }
   final appUpcoming = t
-      .widgetList<EventCard>(_inCalendar(find.byType(EventCard, skipOffstage: false)))
+      .widgetList<EventCard>(
+        _inCalendar(find.byType(EventCard, skipOffstage: false)),
+      )
       .map((c) => c.event.id)
       .toSet();
   j.check(
@@ -106,8 +109,10 @@ Future<void> eventsJourney(Journey j) async {
     '(app $appUpcoming)',
   );
   if (!upcoming.any((e) => e.weekly)) {
-    j.note('DATA: no weekly event in the Studio; the "Every <day>" card '
-        'is not exercised this run');
+    j.note(
+      'DATA: no weekly event in the Studio; the "Every <day>" card '
+      'is not exercised this run',
+    );
   }
   await j.shot('upcoming');
 
@@ -142,10 +147,15 @@ Future<void> eventsJourney(Journey j) async {
   await j.shot('my-rsvps-before');
 
   if (upcoming.isEmpty) {
-    j.skip('no upcoming Studio event to open, RSVP to or add to a calendar '
-        '(empty states checked)');
+    j.skip(
+      'no upcoming Studio event to open, RSVP to or add to a calendar '
+      '(empty states checked)',
+    );
   }
-  final target = upcoming.firstWhere((e) => e.weekly, orElse: () => upcoming.first);
+  final target = upcoming.firstWhere(
+    (e) => e.weekly,
+    orElse: () => upcoming.first,
+  );
   j.note('detail / RSVP target: $target');
   final rsvpedBefore = j.c.read(isEventRsvpedProvider(target.id));
   j.check(!rsvpedBefore, 'not RSVPed to "${target.title}" before the journey');
@@ -156,8 +166,9 @@ Future<void> eventsJourney(Journey j) async {
   final detail = find.byType(EventDetailScreen);
   if (target.weekly) {
     j.check(
-      paintedTexts(within: find.byKey(const Key('event-detail-recurrence')))
-          .any((s) => s.contains(target.everyLabel)),
+      paintedTexts(
+        within: find.byKey(const Key('event-detail-recurrence')),
+      ).any((s) => s.contains(target.everyLabel)),
       'detail repeats "${target.everyLabel}"',
     );
   }
@@ -165,9 +176,16 @@ Future<void> eventsJourney(Journey j) async {
 
   final location = '${target.row['location'] ?? ''}'.trim();
   if (location.isNotEmpty) {
-    final directions = find.descendant(of: detail, matching: find.text('Get directions'));
+    final directions = find.descendant(
+      of: detail,
+      matching: find.text('Get directions'),
+    );
     await tapVisible(t, directions);
-    await pumpUntil(t, () => launches.isNotEmpty, timeout: const Duration(seconds: 5));
+    await pumpUntil(
+      t,
+      () => launches.isNotEmpty,
+      timeout: const Duration(seconds: 5),
+    );
     final mapsHost = defaultTargetPlatform == TargetPlatform.iOS
         ? 'maps.apple.com'
         : 'www.google.com/maps';
@@ -183,9 +201,16 @@ Future<void> eventsJourney(Journey j) async {
     j.note('DATA: "${target.title}" has no location; no Get directions');
   }
 
-  final addCal = find.descendant(of: detail, matching: find.text('Add to calendar'));
+  final addCal = find.descendant(
+    of: detail,
+    matching: find.text('Add to calendar'),
+  );
   await tapVisible(t, addCal);
-  await pumpUntil(t, () => calendarAdds.isNotEmpty, timeout: const Duration(seconds: 5));
+  await pumpUntil(
+    t,
+    () => calendarAdds.isNotEmpty,
+    timeout: const Duration(seconds: 5),
+  );
   final add = calendarAdds.isEmpty ? null : calendarAdds.last;
   final wantStart = target.weekly ? _nextOccurrence(target, now) : target.start;
   final gotStart = add == null
@@ -196,7 +221,8 @@ Future<void> eventsJourney(Journey j) async {
     'Add to calendar sends "${target.title}" (got ${add?['title']})',
   );
   j.check(
-    gotStart != null && gotStart.difference(wantStart).abs() < const Duration(minutes: 1),
+    gotStart != null &&
+        gotStart.difference(wantStart).abs() < const Duration(minutes: 1),
     'calendar start is $wantStart (got $gotStart)',
   );
   if (target.weekly) {
@@ -208,10 +234,17 @@ Future<void> eventsJourney(Journey j) async {
 
   // ── RSVP round trip ──────────────────────────────────────────────────────
   final rsvp = find.descendant(of: detail, matching: find.text('RSVP'));
-  final going = find.descendant(of: detail, matching: find.text('Going \u2713'));
+  final going = find.descendant(
+    of: detail,
+    matching: find.text('Going \u2713'),
+  );
   await tapVisible(t, rsvp);
   j.check(
-    await pumpUntil(t, () => going.evaluate().isNotEmpty, timeout: const Duration(seconds: 20)),
+    await pumpUntil(
+      t,
+      () => going.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 20),
+    ),
     'RSVP turns into "Going ✓"',
   );
   j.check(
@@ -241,7 +274,11 @@ Future<void> eventsJourney(Journey j) async {
   await _openDetail(j, target);
   await tapVisible(t, going);
   j.check(
-    await pumpUntil(t, () => rsvp.evaluate().isNotEmpty, timeout: const Duration(seconds: 20)),
+    await pumpUntil(
+      t,
+      () => rsvp.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 20),
+    ),
     'tapping "Going ✓" cancels the RSVP',
   );
   j.check(
@@ -277,7 +314,10 @@ Future<void> _openDetail(Journey j, StudioEvent e) async {
   await pumpUntilFound(t, find.byType(EventDetailScreen));
   await pumpUntilFound(
     t,
-    find.descendant(of: find.byType(EventDetailScreen), matching: find.text('Add to calendar')),
+    find.descendant(
+      of: find.byType(EventDetailScreen),
+      matching: find.text('Add to calendar'),
+    ),
     reason: 'detail loaded',
   );
   await pumpFor(t, const Duration(seconds: 1));

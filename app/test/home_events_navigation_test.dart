@@ -987,66 +987,6 @@ void main() {
     });
   });
 
-  group('admin guard (U12)', () {
-    Future<GoRouter> guarded(WidgetTester tester, {required bool admin}) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final prefs = await SharedPreferences.getInstance();
-      late GoRouter router;
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            sharedPreferencesProvider.overrideWithValue(prefs),
-            currentUserProvider.overrideWith(
-              (ref) => Stream.value(
-                User(
-                  id: 'u1',
-                  email: 'a@kharis.org',
-                  displayName: 'A',
-                  role: admin ? 'admin' : 'member',
-                  createdAt: DateTime(2024),
-                ),
-              ),
-            ),
-            isAdminProvider.overrideWith((ref) async => admin),
-          ],
-          child: Consumer(
-            builder: (context, ref, _) {
-              router = GoRouter(
-                initialLocation: '/home',
-                redirect: ref.read(routerNotifierProvider).redirect,
-                routes: [
-                  GoRoute(path: '/home', builder: (_, _) => const Text('home')),
-                  GoRoute(
-                    path: '/admin',
-                    builder: (_, _) => const Text('admin'),
-                  ),
-                ],
-              );
-              return MaterialApp.router(routerConfig: router);
-            },
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      return router;
-    }
-
-    testWidgets('a member is bounced off /admin', (tester) async {
-      final router = await guarded(tester, admin: false);
-      router.go('/admin');
-      await tester.pumpAndSettle();
-      expect(find.text('admin'), findsNothing);
-      expect(find.text('home'), findsOneWidget);
-    });
-
-    testWidgets('an admin gets in', (tester) async {
-      final router = await guarded(tester, admin: true);
-      router.go('/admin');
-      await tester.pumpAndSettle();
-      expect(find.text('admin'), findsOneWidget);
-    });
-  });
-
   group('welcome redirect on a fresh install', () {
     Future<void> launchAt(
       WidgetTester tester, {
@@ -1063,7 +1003,6 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             cacheServiceProvider.overrideWithValue(FakeCacheService()),
             currentUserProvider.overrideWith((ref) => Stream.value(user)),
-            isAdminProvider.overrideWith((ref) async => false),
           ],
           child: Consumer(
             builder: (context, ref, _) {

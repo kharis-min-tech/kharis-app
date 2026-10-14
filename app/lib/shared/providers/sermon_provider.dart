@@ -827,31 +827,21 @@ Sermon withAudioTwin(Sermon sermon, Map<String, Sermon> twins) {
 
 // ── CMS (Firestore realtime) ──────────────────────────────────────────────────
 
-/// The Firestore-backed sermon repository used by the CMS.
+/// The Firestore `sermons` collection (hand-added sermons, YouTube mirrors
+/// and starred features).
 ///
 /// Deliberately separate from [sermonRepositoryProvider]: the public library
-/// reads the external Kharis sermon API, while every admin write/delete must
-/// land in the Firestore `sermons` collection.
-final adminSermonRepositoryProvider = Provider<FirestoreSermonRepository>(
+/// reads the external Kharis sermon API.
+final firestoreSermonRepositoryProvider = Provider<FirestoreSermonRepository>(
   (ref) => FirestoreSermonRepository(firestore: ref.watch(firestoreProvider)),
 );
-
-/// Admin-only realtime stream of every `sermons` doc for the Studio.
-final adminSermonsProvider = StreamProvider<List<Sermon>>((ref) {
-  if (!kUseFirebase) return Stream.value(const []);
-  try {
-    return ref.watch(adminSermonRepositoryProvider).watchSermons();
-  } catch (_) {
-    return Stream.value(const []);
-  }
-});
 
 /// Hand-added CMS sermons for the member library. Filtered by source, so the
 /// YouTube mirrors in the same collection cannot fill the window.
 final cmsSermonsProvider = StreamProvider<List<Sermon>>((ref) {
   if (!kUseFirebase) return Stream.value(const []);
   try {
-    return ref.watch(adminSermonRepositoryProvider).watchCmsSermons();
+    return ref.watch(firestoreSermonRepositoryProvider).watchCmsSermons();
   } catch (_) {
     return Stream.value(const []);
   }
@@ -877,7 +867,7 @@ final featuredModeProvider = StreamProvider<FeaturedMode>((ref) {
 final pinnedFeaturedProvider = StreamProvider<List<Sermon>>((ref) {
   if (!kUseFirebase) return Stream.value(const []);
   try {
-    return ref.watch(adminSermonRepositoryProvider).watchPinnedFeatured();
+    return ref.watch(firestoreSermonRepositoryProvider).watchPinnedFeatured();
   } catch (_) {
     return Stream.value(const []);
   }
@@ -967,7 +957,7 @@ final _cmsSermonDocProvider = FutureProvider.autoDispose
     .family<Sermon?, String>((ref, id) async {
       if (!kUseFirebase) return null;
       try {
-        return await ref.watch(adminSermonRepositoryProvider).getSermonById(id);
+        return await ref.watch(firestoreSermonRepositoryProvider).getSermonById(id);
       } catch (_) {
         return null;
       }

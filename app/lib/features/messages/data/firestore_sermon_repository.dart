@@ -4,13 +4,14 @@ import 'package:kharis_app/core/utils/html_entities.dart';
 import 'package:kharis_app/core/utils/sermon_categorizer.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 
-/// Sources the Studio writes for hand-added audio sermons. The `sermons`
+/// Sources of hand-added audio sermons. The `sermons`
 /// collection also holds YouTube mirrors (`yt_<videoId>`, source 'youtube');
 /// those carry no audio and must not crowd hand-added sermons out of the
 /// member library's window.
 const List<String> kCmsAudioSources = ['audio', 'admin'];
 
-/// Reads and writes the Firestore `sermons` collection (the CMS).
+/// Reads the Firestore `sermons` collection (YouTube mirrors written by
+/// `syncYouTube` and earlier hand-added sermons).
 class FirestoreSermonRepository {
   FirestoreSermonRepository({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -26,104 +27,6 @@ class FirestoreSermonRepository {
     } catch (_) {
       return null;
     }
-  }
-
-  // ── Admin writes ────────────────────────────────────────────────────────────
-
-  /// Adds a new sermon to the Firestore `sermons` collection.
-  Future<String> addSermon({
-    required String title,
-    required String speaker,
-    required String audioUrl,
-    String? artworkUrl,
-    int? durationSeconds,
-    DateTime? publishedAt,
-    String? series,
-    String? description,
-    String? category,
-    String? videoId,
-    String? source,
-    bool isFeatured = false,
-  }) async {
-    final ref = await _firestore.collection('sermons').add({
-      'title': title,
-      'speaker': speaker,
-      'audioUrl': audioUrl,
-      'thumbnailUrl': artworkUrl,
-      'artworkUrl': artworkUrl,
-      'duration': durationSeconds,
-      'publishedAt': publishedAt != null
-          ? Timestamp.fromDate(publishedAt)
-          : FieldValue.serverTimestamp(),
-      'series': series,
-      'description': description,
-      'category': category ?? sermonCategory(title, description: description),
-      'videoId': videoId,
-      'source': source ?? 'audio',
-      'isFeatured': isFeatured,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    return ref.id;
-  }
-
-  /// Overwrites the editable field surface of an existing sermon document.
-  ///
-  /// Every optional field is written even when `null`, so clearing a field in
-  /// the admin form actually clears it in Firestore. A patch-style version
-  /// that skipped nulls made "delete the series" a silent no-op.
-  Future<void> updateSermon(
-    String id, {
-    required String title,
-    required String speaker,
-    required String audioUrl,
-    String? artworkUrl,
-    int? durationSeconds,
-    DateTime? publishedAt,
-    String? series,
-    String? description,
-    String? category,
-    String? videoId,
-    String? source,
-    required bool isFeatured,
-  }) {
-    final data = <String, dynamic>{
-      'title': title,
-      'speaker': speaker,
-      'audioUrl': audioUrl,
-      'thumbnailUrl': artworkUrl,
-      'artworkUrl': artworkUrl,
-      'duration': durationSeconds,
-      'series': series,
-      'description': description,
-      'category': category ?? sermonCategory(title, description: description),
-      'videoId': videoId,
-      'source': source ?? 'audio',
-      'isFeatured': isFeatured,
-    };
-    // Leave the existing publish date alone when the form has none, rather
-    // than blanking the field the library sorts on.
-    if (publishedAt != null) {
-      data['publishedAt'] = Timestamp.fromDate(publishedAt);
-    }
-    return _firestore.collection('sermons').doc(id).update(data);
-  }
-
-  /// Deletes a sermon document.
-  Future<void> deleteSermon(String id) =>
-      _firestore.collection('sermons').doc(id).delete();
-
-  /// Toggles the featured flag on a sermon.
-  Future<void> setFeatured(String id, bool featured) =>
-      _firestore.collection('sermons').doc(id).update({'isFeatured': featured});
-
-  /// Streams sermons for the admin panel, newest first.
-  Stream<List<Sermon>> watchSermons({int limit = 100}) {
-    return _firestore
-        .collection('sermons')
-        .orderBy('publishedAt', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((snap) => snap.docs.map(_docToSermon).toList());
   }
 
   /// Streams hand-added CMS sermons (see [kCmsAudioSources]) for the member

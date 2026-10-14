@@ -79,7 +79,10 @@ Future<void> playerJourney(Journey j) async {
   j.check(queue != null && queue.hasNext, 'queue built from the list');
   final next = queue?.next;
   if (next != null) {
-    await t.tap(inPlayer(find.byIcon(Icons.skip_next_rounded)), warnIfMissed: false);
+    await t.tap(
+      inPlayer(find.byIcon(Icons.skip_next_rounded)),
+      warnIfMissed: false,
+    );
     j.check(
       await pumpUntil(
         t,
@@ -89,27 +92,46 @@ Future<void> playerJourney(Journey j) async {
       'Next moves to "${next.title}"',
     );
     await pumpFor(t, const Duration(seconds: 1));
-    // Previous restarts a message past 3 s first, then steps back.
+    // Previous restarts a message past 3 s first, then steps back. After a
+    // restart the second tap must come at once: waiting lets playback pass
+    // 3 s again, and the tap would only restart it a second time.
     for (var i = 0; i < 2 && audio.currentSermon?.id != first.id; i++) {
-      await t.tap(inPlayer(find.byIcon(Icons.skip_previous_rounded)), warnIfMissed: false);
+      await t.tap(
+        inPlayer(find.byIcon(Icons.skip_previous_rounded)),
+        warnIfMissed: false,
+      );
       await pumpUntil(
         t,
-        () => audio.currentSermon?.id == first.id,
+        () =>
+            audio.currentSermon?.id == first.id ||
+            audio.position < const Duration(seconds: 2),
         timeout: const Duration(seconds: 6),
       );
     }
-    j.check(audio.currentSermon?.id == first.id, 'Previous returns to "${first.title}"');
+    j.check(
+      audio.currentSermon?.id == first.id,
+      'Previous returns to "${first.title}"',
+    );
   }
 
   // ── Audio <-> video keeps the position ───────────────────────────────────
   var current = audio.currentSermon!;
   for (var i = 0; i < 8 && !current.hasVideo; i++) {
-    await t.tap(inPlayer(find.byIcon(Icons.skip_next_rounded)), warnIfMissed: false);
-    await pumpUntil(t, () => audio.currentSermon?.id != current.id, timeout: const Duration(seconds: 20));
+    await t.tap(
+      inPlayer(find.byIcon(Icons.skip_next_rounded)),
+      warnIfMissed: false,
+    );
+    await pumpUntil(
+      t,
+      () => audio.currentSermon?.id != current.id,
+      timeout: const Duration(seconds: 20),
+    );
     current = audio.currentSermon!;
   }
   if (!current.hasVideo) {
-    j.note('DATA: none of the next 8 messages has a video; switch not exercised');
+    j.note(
+      'DATA: none of the next 8 messages has a video; switch not exercised',
+    );
   } else {
     await _checkModeSwitch(j, current);
   }
@@ -120,7 +142,11 @@ Future<void> playerJourney(Journey j) async {
   // ── Share (OS sheet answered by the harness) ─────────────────────────────
   final sharing = audio.currentSermon!;
   await tapPlayerAction(t, 'Share');
-  await pumpUntil(t, () => shares.isNotEmpty, timeout: const Duration(seconds: 5));
+  await pumpUntil(
+    t,
+    () => shares.isNotEmpty,
+    timeout: const Duration(seconds: 5),
+  );
   final payload = shares.isEmpty ? '' : shares.last;
   j.check(
     payload.contains('https://kharis-app-47c49.web.app/m/'),
@@ -130,8 +156,10 @@ Future<void> playerJourney(Journey j) async {
     !RegExp(r'youtube\.com|youtu\.be|yetanothersermon\.host').hasMatch(payload),
     'share text carries no third-party links',
   );
-  j.note('OS share sheet stubbed by the harness: a headless iOS simulator '
-      'cannot dismiss it');
+  j.note(
+    'OS share sheet stubbed by the harness: a headless iOS simulator '
+    'cannot dismiss it',
+  );
   await pumpFor(t, const Duration(seconds: 1));
 
   // ── Minimise, mini player, dismiss ───────────────────────────────────────
@@ -142,20 +170,29 @@ Future<void> playerJourney(Journey j) async {
     'closing the player leaves the mini player',
   );
   j.check(
-    find.descendant(of: mini, matching: find.text(sharing.title)).evaluate().isNotEmpty,
+    find
+        .descendant(of: mini, matching: find.text(sharing.title))
+        .evaluate()
+        .isNotEmpty,
     'mini player shows "${sharing.title}"',
   );
   await j.shot('mini-player');
   await tapNav(t, 'Giving');
   await pumpUntilFound(t, find.byType(GivingScreen));
   j.check(mini.evaluate().isEmpty, 'mini player hidden on Giving');
-  j.check(audio.currentSermon?.id == sharing.id, 'audio stays loaded on Giving');
+  j.check(
+    audio.currentSermon?.id == sharing.id,
+    'audio stays loaded on Giving',
+  );
   await tapNav(t, 'Home');
   j.check(
     await pumpUntil(t, () => mini.evaluate().isNotEmpty),
     'mini player back on Home',
   );
-  await t.tap(find.descendant(of: mini, matching: find.text(sharing.title)), warnIfMissed: false);
+  await t.tap(
+    find.descendant(of: mini, matching: find.text(sharing.title)),
+    warnIfMissed: false,
+  );
   j.check(
     await pumpUntil(t, () => player.evaluate().isNotEmpty),
     'tapping the mini player reopens the player',
@@ -167,7 +204,11 @@ Future<void> playerJourney(Journey j) async {
   await closePlayer(t);
   await t.drag(mini, const Offset(0, 200), warnIfMissed: false);
   j.check(
-    await pumpUntil(t, () => mini.evaluate().isEmpty, timeout: const Duration(seconds: 10)),
+    await pumpUntil(
+      t,
+      () => mini.evaluate().isEmpty,
+      timeout: const Duration(seconds: 10),
+    ),
     'swiping the mini player down dismisses it',
   );
   j.check(audio.currentSermon == null, 'dismissing stops playback');
@@ -181,7 +222,9 @@ Future<void> _checkModeSwitch(Journey j, Sermon s) async {
   final audio = j.c.read(audioPlayerServiceProvider);
   await pumpUntil(
     t,
-    () => seekBarOf(t).duration > Duration.zero && audio.position > const Duration(seconds: 1),
+    () =>
+        seekBarOf(t).duration > Duration.zero &&
+        audio.position > const Duration(seconds: 1),
     timeout: const Duration(seconds: 45),
   );
   final rect = t.getRect(inPlayer(find.byType(SeekBar)).first);
@@ -229,7 +272,9 @@ Future<void> _checkModeSwitch(Journey j, Sermon s) async {
     () {
       if (modeToggleOf(t).activeMode != MediaMode.audio) return false;
       final st = j.c.read(playerStateProvider).valueOrNull;
-      if (st != null && st.playing && st.processingState == ProcessingState.ready) {
+      if (st != null &&
+          st.playing &&
+          st.processingState == ProcessingState.ready) {
         audioPos ??= audio.position;
         return true;
       }
@@ -256,7 +301,11 @@ Future<void> _checkNotes(Journey j) async {
   await pumpUntilFound(t, find.byType(SermonNotesSheet));
   final add = find.textContaining('Add a note at ');
   j.check(
-    await pumpUntil(t, () => add.evaluate().isNotEmpty, timeout: const Duration(seconds: 5)),
+    await pumpUntil(
+      t,
+      () => add.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 5),
+    ),
     'notes sheet offers "Add a note at mm:ss"',
   );
   if (add.evaluate().isEmpty) return;
@@ -266,7 +315,10 @@ Future<void> _checkNotes(Journey j) async {
   await pumpUntilFound(t, find.byType(NoteEditorScreen));
   final body = 'E2E note ${DateTime.now().millisecondsSinceEpoch}';
   await t.enterText(
-    find.descendant(of: find.byType(NoteEditorScreen), matching: find.byType(TextField)),
+    find.descendant(
+      of: find.byType(NoteEditorScreen),
+      matching: find.byType(TextField),
+    ),
     body,
   );
   await pumpFor(t, const Duration(milliseconds: 400));
@@ -274,16 +326,25 @@ Future<void> _checkNotes(Journey j) async {
   await pumpUntil(t, () => find.byType(NoteEditorScreen).evaluate().isEmpty);
   await tapPlayerAction(t, 'Notes');
   await pumpUntilFound(t, find.byType(SermonNotesSheet));
-  final noteText = find.descendant(of: find.byType(SermonNotesSheet), matching: find.text(body));
+  final noteText = find.descendant(
+    of: find.byType(SermonNotesSheet),
+    matching: find.text(body),
+  );
   j.check(
-    await pumpUntil(t, () => noteText.evaluate().isNotEmpty, timeout: const Duration(seconds: 15)),
+    await pumpUntil(
+      t,
+      () => noteText.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 15),
+    ),
     'saved note listed on the message',
   );
   final stamp = label.replaceFirst('Add a note at ', '');
   final m = RegExp(r'^(?:(\d+):)?(\d+):(\d\d)$').firstMatch(stamp);
   final secs = m == null
       ? null
-      : int.parse(m.group(1) ?? '0') * 3600 + int.parse(m.group(2)!) * 60 + int.parse(m.group(3)!);
+      : int.parse(m.group(1) ?? '0') * 3600 +
+            int.parse(m.group(2)!) * 60 +
+            int.parse(m.group(3)!);
   j.check(
     secs != null && (secs - atTap.inSeconds).abs() <= 2,
     'note stamped at the playback time ($stamp vs ${fmt(atTap)})',
@@ -296,15 +357,20 @@ Future<void> _checkNotes(Journey j) async {
   j.check(
     await pumpUntil(
       t,
-      () => !(j.c.read(notesProvider).valueOrNull ?? const []).any((n) => n.body == body),
+      () => !(j.c.read(notesProvider).valueOrNull ?? const []).any(
+        (n) => n.body == body,
+      ),
       timeout: const Duration(seconds: 15),
     ),
     'swiping the note away deletes it',
   );
   // Leave nothing behind from earlier aborted runs either.
   final repo = j.c.read(notesRepositoryProvider);
-  for (final n in (j.c.read(notesProvider).valueOrNull ?? const [])
-      .where((n) => n.body.startsWith('E2E note ') || n.body.startsWith('Walkthrough note '))) {
+  for (final n in (j.c.read(notesProvider).valueOrNull ?? const []).where(
+    (n) =>
+        n.body.startsWith('E2E note ') ||
+        n.body.startsWith('Walkthrough note '),
+  )) {
     await repo.delete(n.id);
   }
   if (find.byType(SermonNotesSheet).evaluate().isNotEmpty) {
@@ -317,52 +383,119 @@ Future<void> _checkTranscript(Journey j, Random r) async {
   final t = j.tester;
   final r2 = await r2Messages();
   final candidates = r2
-      .where((m) =>
-          '${m['transcript_url'] ?? ''}'.trim().isNotEmpty &&
-          '${m['audio_url'] ?? ''}'.trim().isNotEmpty)
+      .where(
+        (m) =>
+            '${m['transcript_url'] ?? ''}'.trim().isNotEmpty &&
+            '${m['audio_url'] ?? ''}'.trim().isNotEmpty,
+      )
       .toList();
   if (candidates.isEmpty) {
     j.note('DATA: no R2 message has a transcript; transcript not exercised');
     return;
   }
-  final library = {for (final s in j.c.read(sermonLibraryProvider).sermons) s.id: s};
-  final inApp = candidates.where((m) => library.containsKey('${m['id']}')).toList();
+  final library = {
+    for (final s in j.c.read(sermonLibraryProvider).sermons) s.id: s,
+  };
+  final inApp =
+      candidates.where((m) => library.containsKey('${m['id']}')).toList()
+        ..shuffle(r);
   j.check(inApp.isNotEmpty, 'R2 transcript messages are in the app library');
   if (inApp.isEmpty) return;
-  final m = pick(r, inApp);
-  final sermon = library['${m['id']}']!;
-  j.note('transcript message: "${sermon.title}" (${sermon.id})');
-  j.check(sermon.hasTranscript, 'app knows "${sermon.title}" has a transcript');
-  final path = '${m['transcript_url']}'.trim();
-  final url = path.startsWith('http') ? path : '$kR2BucketBaseUrl/$path';
-  final text = (await fetchText(url)).trim();
-  final opening = text.split(RegExp(r'\s+')).take(6).join(' ');
 
+  // The R2 catalogue lists transcript links whose files are missing (404),
+  // so find one message of each kind and check the app handles both.
+  ({Sermon sermon, String text})? present;
+  Sermon? missing;
+  for (final m in inApp.take(40)) {
+    if (present != null && missing != null) break;
+    final path = '${m['transcript_url']}'.trim();
+    final url = path.startsWith('http') ? path : '$kR2BucketBaseUrl/$path';
+    final text = await fetchTextOrNull(url);
+    final sermon = library['${m['id']}']!;
+    if (text == null || text.isEmpty) {
+      missing ??= sermon;
+    } else {
+      present ??= (sermon: sermon, text: text);
+    }
+  }
+
+  if (present == null) {
+    j.note('DATA: none of 40 sampled R2 transcript links resolved');
+  } else {
+    final sermon = present.sermon;
+    j.note('transcript message: "${sermon.title}" (${sermon.id})');
+    j.check(
+      sermon.hasTranscript,
+      'app knows "${sermon.title}" has a transcript',
+    );
+    final opening = present.text.split(RegExp(r'\s+')).take(6).join(' ');
+    await _openTranscript(j, sermon);
+    final body = find.descendant(
+      of: find.byType(TranscriptSheet),
+      matching: find.byType(SelectableText),
+    );
+    final loaded = await pumpUntil(
+      t,
+      () => body.evaluate().isNotEmpty,
+      timeout: const Duration(seconds: 30),
+    );
+    final shown = loaded
+        ? (t.widget<SelectableText>(body.first).data ?? '')
+        : '';
+    String norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    j.check(
+      loaded && norm(shown).contains(norm(opening)),
+      'transcript sheet shows the R2 transcript (starts "$opening")',
+    );
+    await j.shot('transcript');
+    await _closeTranscript(j);
+  }
+
+  if (missing == null) {
+    j.note('DATA: every sampled R2 transcript link resolved');
+  } else {
+    j.note('missing transcript file: "${missing.title}" (${missing.id})');
+    await _openTranscript(j, missing);
+    final none = find.descendant(
+      of: find.byType(TranscriptSheet),
+      matching: find.text('No transcript is available for this message.'),
+    );
+    j.check(
+      await pumpUntil(
+        t,
+        () => none.evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 30),
+      ),
+      'a missing transcript file says "No transcript", not a connection error',
+    );
+    await j.shot('transcript-missing');
+    await _closeTranscript(j);
+  }
+}
+
+Future<void> _openTranscript(Journey j, Sermon sermon) async {
+  final t = j.tester;
   await openMessagesReset(j);
   final field = find.byType(TextField).first;
   await t.tap(field, warnIfMissed: false);
   await t.enterText(field, sermon.title);
   final row = find.byKey(ValueKey(sermon.id));
-  await pumpUntilFound(t, row, timeout: const Duration(seconds: 30), reason: 'search row');
+  await pumpUntilFound(
+    t,
+    row,
+    timeout: const Duration(seconds: 30),
+    reason: 'search row',
+  );
   FocusManager.instance.primaryFocus?.unfocus();
   await pumpFor(t, const Duration(milliseconds: 500));
   await tapVisible(t, row);
   await pumpUntilFound(t, player);
   await tapPlayerAction(t, 'Transcript');
   await pumpUntilFound(t, find.byType(TranscriptSheet));
-  final body = find.descendant(of: find.byType(TranscriptSheet), matching: find.byType(SelectableText));
-  final loaded = await pumpUntil(
-    t,
-    () => body.evaluate().isNotEmpty,
-    timeout: const Duration(seconds: 30),
-  );
-  final shown = loaded ? (t.widget<SelectableText>(body.first).data ?? '') : '';
-  String norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
-  j.check(
-    loaded && norm(shown).contains(norm(opening)),
-    'transcript sheet shows the R2 transcript (starts "$opening")',
-  );
-  await j.shot('transcript');
+}
+
+Future<void> _closeTranscript(Journey j) async {
+  final t = j.tester;
   Navigator.of(t.element(find.byType(TranscriptSheet))).pop();
   await pumpFor(t, const Duration(milliseconds: 600));
   await closePlayer(t);

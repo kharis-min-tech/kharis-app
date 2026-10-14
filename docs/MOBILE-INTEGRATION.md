@@ -15,7 +15,7 @@ Related documents:
 - [`API.md`](API.md): request and response shapes, Firestore rules and push notifications.
 - [`openapi.yaml`](openapi.yaml): machine-readable description of the HTTP endpoints.
 
-In prose a church location is called a **Branch**. Code and data keep their historical names: the `branch` field, `campus_admin`, `CampusVenue`, `AdminScope.campus`, and so on.
+In prose a church location is called a **Branch**. Code and data keep their historical names: the `branch` field, `CampusVenue`, `campus_config.dart`, and so on.
 
 Most providers live in `app/lib/shared/providers/sermon_provider.dart`. Other provider files are named in the table.
 
@@ -25,7 +25,7 @@ Most providers live in `app/lib/shared/providers/sermon_provider.dart`. Other pr
 |---|---|---|---|---|
 | Sermon library | `R2MessagesRepository` (`features/messages/data/r2_messages_repository.dart`) | `sermonRepositoryProvider` | R2 `messages.json` plus page 1 of the sermon API, merged ([API.md 3.4](API.md#34-how-the-app-merges-r2-with-the-api)) | 1. paged sermon API<br>2. Hive archive<br>3. empty library marked offline, with Retry |
 | Sermon API paging and search | `KharisApiSermonRepository` (`kharis_api_sermon_repository.dart`) | used by the R2 repository | `ApiConfig.sermonApiBase` + `sermons/` ([API.md 2](API.md#2-public-sermon-api-yetanothersermonhost)) | none (the library notifier retries) |
-| Studio sermons, pinned featured | `FirestoreSermonRepository` (`firestore_sermon_repository.dart`) | `adminSermonRepositoryProvider`, `adminSermonsProvider`, `cmsSermonsProvider`, `pinnedFeaturedProvider` | Firestore `sermons` | none |
+| Hand-added sermons, pinned featured | `FirestoreSermonRepository` (`firestore_sermon_repository.dart`, read-only) | `firestoreSermonRepositoryProvider`, `cmsSermonsProvider`, `pinnedFeaturedProvider` | Firestore `sermons` | none |
 | Featured mode | `CurationRepository` (`curation_repository.dart`) | `curationRepositoryProvider`, `featuredModeProvider` | `config/featured.mode` | `auto` when the doc is missing or on error |
 | Videos | `VideoRepository` (`video_repository.dart`) | `videoRepositoryProvider`, `videosProvider` | YouTube Data API `playlistItems` + `videos` ([API.md 4](API.md#4-youtube-data-api)) | 1. channel Atom feed<br>2. embedded `kharisVideos` (`kharis_content.dart`) |
 | Live banner | `LiveRepository` (`features/home/data/live_repository.dart`) | `liveRepositoryProvider`, `liveStatusProvider` | Content Studio `app_config` row `key = liveStream`: `{url, title, enabled \| is_live}` (network only, never cached) | not live |
@@ -35,13 +35,11 @@ Most providers live in `app/lib/shared/providers/sermon_provider.dart`. Other pr
 | Events | `EventRepository` (`features/calendar/data/event_repository.dart`) | `eventRepositoryProvider`, `upcomingEventsProvider`, `pastEventsProvider` | Content Studio `events`. `branch_name` null means every Branch. `recurrence = weekly` expands into one event per `recurrence_days` date (0 = Sunday) until `recurrence_until`, at most 8 weeks ahead; occurrence ids are `<id>~<yyyymmdd>` | last good response saved in Hive |
 | RSVPs | `RsvpRepository` (`rsvp_repository.dart`) | `rsvpRepositoryProvider` | Firestore `rsvps/{uid}_{eventId}` | none |
 | Daily reading | `DailyContentRepository` (`features/home/data/daily_content_repository.dart`) | `dailyContentRepositoryProvider` | `GET getDailyReading` | 1. `dailyContent/{date}`<br>2. `readingPlans` resolved on the device (same rules as the server)<br>3. built-in Psalm 23 |
-| Reading plans (Studio) | `ReadingPlanRepository` (`reading_plan_repository.dart`) | `readingPlanRepositoryProvider` (`reading_plan_provider.dart`) | Firestore `readingPlans` | none |
+| Reading plans | `ReadingPlanRepository` (`reading_plan_repository.dart`) | `readingPlanRepositoryProvider` (`reading_plan_provider.dart`) | Firestore `readingPlans` | none |
 | Bible text | `BibleRepository` (`features/home/data/bible_repository.dart`) | `bibleRepositoryProvider` | YouVersion `https://api.youversion.com/v1` (`/bibles`, `/bibles/{id}/passages/{usfm}`), header `x-yvp-app-key` | in-memory cache only |
-| Notifications (push) | `NotificationService` (`core/services/notification_service.dart`) | `notificationServiceProvider`, `notificationInitProvider`, `notificationTopicSyncProvider` (`shared/providers/notification_provider.dart`) | FCM topics ([API.md 7.1](API.md#71-fcm-topics)). Writes `users/{uid}.fcmToken`. Follows `studio_test` through `syncStudioTestTopic` while `adminScopeProvider` reports `canUseStudio`, and leaves it when that turns false. A `type: 'studio'` tap opens the payload `link` (in-app or external), or `/notifications` when there is no link. | none |
-| Studio notifications (this release) | `StudioNotificationRepository` (`features/home/data/studio_notification_repository.dart`) | `studioNotificationRepositoryProvider`, `sentNotificationsProvider` (family by audience), `inboxNotificationsProvider` (`shared/providers/notification_feed_provider.dart`) | Firestore `notifications`. Inbox: `watchSent` (`status == 'sent'` and `audience.type`, plus `audience.branch` for a Branch; ordered by `sentAt` desc, limit 50) for Everyone plus the member's Branch, merged and de-duplicated by `mergeSentNotifications`. Studio: `watchHistory` (`createdAt` desc, limit 50), `schedule()`, `cancel()`. See [API.md 7.3](API.md#73-studio-notification-service-new-in-this-release). | Firestore SDK cache. If one stream fails, the inbox still shows the other; it shows an error only when both fail. |
+| Notifications (push) | `NotificationService` (`core/services/notification_service.dart`) | `notificationServiceProvider`, `notificationInitProvider`, `notificationTopicSyncProvider` (`shared/providers/notification_provider.dart`) | FCM topics ([API.md 7.1](API.md#71-fcm-topics)). Writes `users/{uid}.fcmToken`. A tap routes by `data.type` (`notificationTargetFor`). | none |
 | Auth and profile | `FirebaseAuthRepository` (`features/onboarding/data/firebase_auth_repository.dart`) | `firebaseAuthRepositoryProvider`, `authRepositoryProvider` (`auth_provider.dart`) | Firebase Auth (email or anonymous) and `users/{uid}` | none |
 | Account deletion | `AccountDeletionService`, `AccountDataRepository`, `LocalAccountData` (`features/settings/data/account_deletion.dart`); UI in `features/settings/presentation/widgets/delete_account_flow.dart` | `accountDeletionServiceProvider`, `accountDataRepositoryProvider`, `localAccountDataProvider` | Password re-auth, then batched deletes of `users/{uid}/notes`, `users/{uid}/playlists`, `rsvps` (`userId == uid`) and `users/{uid}`, then `currentUser.delete()`. `requires-recent-login` prompts for the password and retries. See [API.md 6.8](API.md#68-users). | none; errors are shown and nothing local is cleared until the account is gone |
-| Roles (Studio) | `UserAdminRepository` (`user_admin_repository.dart`) | `userAdminRepositoryProvider` | `users`: `role`, `adminBranchIds`, `adminBranchNames`; `campus_admin` is shown as "Branch admin" | none |
 | Onboarding state | `OnboardingRepository` | `onboardingRepositoryProvider` | SharedPreferences only | none |
 | Notes | `NoteRepository` + `LocalNoteStore` (`features/notes/data/note_repository.dart`) | `notesRepositoryProvider`, `localNoteStoreProvider` (`notes_provider.dart`) | `users/{uid}/notes` | Hive `notes` box; local notes are uploaded on sign-in |
 | Playlists and Favorites | `PlaylistRepository` (`features/playlists/data/playlist_repository.dart`) | `playlistRepositoryProvider` | `users/{uid}/playlists`; Favorites is the doc `liked` | Firestore offline write queue |
@@ -49,10 +47,7 @@ Most providers live in `app/lib/shared/providers/sermon_provider.dart`. Other pr
 | Connect forms | `ConnectRepository` (`features/connect/data/connect_repository.dart`) | `connectRepositoryProvider` | `visitors`, `testimonies` | none; errors are thrown |
 | Audio | `AudioPlayerService` (`features/player/data/audio_player_service.dart`) | `audioPlayerServiceProvider` | sermon `audioUrl`, which 302-redirects to signed R2 | manual retry only |
 
-The in-app Studio (`features/admin`) has two sections: Notifications (composer and history) and Team access (roles and Branch admins). Branches, events, announcements and live are managed in the Kharis Content Studio (https://kharis-content.itadmin-a94.workers.dev). The Studio role gate (`AdminScope`, `shared/models/campus_config.dart`) works like this:
-
-- `role == 'admin'` or the `admin` claim makes the user a super admin: every notification audience and Team access.
-- `role == 'campus_admin'` with a non-empty `adminBranchIds` (Branch slugs) makes the user a Branch admin, who sends notifications to `adminBranchNames` or staff test devices.
+Content (branches, services, venues, events, announcements, featured videos, live) is managed in the Kharis Content Studio (https://kharis-content.itadmin-a94.workers.dev, Supabase). The app has no Studio of its own and no admin roles. The Notifications screen lists upcoming events and live announcements (`campusUpcomingEventsProvider`, `campusNewsProvider`); pushes composed in a Studio are not available until the Content Studio supports them, so only the automatic pushes ([API.md 7](API.md#7-push-notifications)) arrive.
 
 ## 2. Timeouts, retries and offline behaviour
 
@@ -114,8 +109,6 @@ Firestore streams use the SDK's default persistence. The app sets no custom `Set
 The web builds are hosted at:
 
 - `https://kharis-app-47c49.web.app` (`app/firebase.json`)
-- Studio: `https://kharis-app-admin.web.app` (`admin/firebase.json`)
-- Studio: `https://kharis-church-admin.web.app` (`admin/firebase.kharis-church.json`)
 
 ## 5. Environment configuration
 

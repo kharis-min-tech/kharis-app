@@ -50,7 +50,8 @@ void resetChannelRecords() {
   messagingCalls.clear();
 }
 
-const _iosLaunch = 'dev.flutter.pigeon.url_launcher_ios.UrlLauncherApi.launchUrl';
+const _iosLaunch =
+    'dev.flutter.pigeon.url_launcher_ios.UrlLauncherApi.launchUrl';
 const _iosInApp =
     'dev.flutter.pigeon.url_launcher_ios.UrlLauncherApi.openUrlInSafariViewController';
 const _androidLaunch =
@@ -118,7 +119,9 @@ void installChannelFakes() {
     final nonBrowserOnly = decoded is List && decoded.length > 1
         ? decoded[1] == true
         : false;
-    launches.add(Launch(_firstString(decoded) ?? '?', external: !nonBrowserOnly));
+    launches.add(
+      Launch(_firstString(decoded) ?? '?', external: !nonBrowserOnly),
+    );
     return const _PigeonReplyCodec().encodeMessage([const _PigeonEnum(129, 0)]);
   });
   // InAppLoadResult.success = custom type 130, index 0.
@@ -131,7 +134,9 @@ void installChannelFakes() {
     final nonBrowserOnly = decoded is List && decoded.length > 2
         ? decoded[2] == true
         : false;
-    launches.add(Launch(_firstString(decoded) ?? '?', external: !nonBrowserOnly));
+    launches.add(
+      Launch(_firstString(decoded) ?? '?', external: !nonBrowserOnly),
+    );
     return const StandardMessageCodec().encodeMessage([true]);
   });
   messenger.setMockMessageHandler(_androidInApp, (message) async {

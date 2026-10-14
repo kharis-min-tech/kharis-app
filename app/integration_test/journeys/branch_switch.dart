@@ -31,7 +31,9 @@ Future<void> branchSwitchJourney(Journey j) async {
   final r = seeded(effectiveSeed, 'branch-switch');
   final from = pick(r, branches);
   final to = pick(r, branches.where((b) => b.uuid != from.uuid).toList());
-  j.note('seed $effectiveSeed: start at "${from.name}", switch to "${to.name}"');
+  j.note(
+    'seed $effectiveSeed: start at "${from.name}", switch to "${to.name}"',
+  );
   final events = await studioEvents();
   final news = await studioNews();
   final now = DateTime.now();
@@ -58,7 +60,10 @@ Future<void> branchSwitchJourney(Journey j) async {
   );
   j.check(
     find
-        .descendant(of: find.byType(SettingsScreen), matching: find.text(to.name))
+        .descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.text(to.name),
+        )
         .evaluate()
         .isNotEmpty,
     'More shows "${to.name}" on the Switch branch row',
@@ -70,7 +75,10 @@ Future<void> branchSwitchJourney(Journey j) async {
   final card = find.byKey(const Key('campus-card'));
   await scrollUntilFound(t, card, scrollable: _homeScroll);
   j.check(
-    find.descendant(of: card, matching: find.text(to.name)).evaluate().isNotEmpty,
+    find
+        .descendant(of: card, matching: find.text(to.name))
+        .evaluate()
+        .isNotEmpty,
     'Your branch card names "${to.name}"',
   );
   if (to.services.isEmpty) {
@@ -82,7 +90,9 @@ Future<void> branchSwitchJourney(Journey j) async {
             matching: find.byWidgetPredicate(
               (w) =>
                   w.key is ValueKey<String> &&
-                  (w.key! as ValueKey<String>).value.startsWith('campus-service-'),
+                  (w.key! as ValueKey<String>).value.startsWith(
+                    'campus-service-',
+                  ),
             ),
           )
           .evaluate()
@@ -96,7 +106,8 @@ Future<void> branchSwitchJourney(Journey j) async {
     final texts = paintedTexts(within: row);
     final when = serviceWhen(s);
     j.check(
-      texts.contains('${s['name']}'.trim()) && (when == null || texts.contains(when)),
+      texts.contains('${s['name']}'.trim()) &&
+          (when == null || texts.contains(when)),
       'service "${s['name']}" shows "$when" (painted $texts)',
     );
   }
@@ -123,7 +134,10 @@ Future<void> branchSwitchJourney(Journey j) async {
   await pumpUntilFound(t, chip);
   j.check(
     find
-        .descendant(of: find.byType(CalendarScreen), matching: find.text(to.name))
+        .descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.text(to.name),
+        )
         .evaluate()
         .isNotEmpty,
     'Events chip shows "${to.name}"',
@@ -161,7 +175,8 @@ Future<void> branchSwitchJourney(Journey j) async {
     timeout: const Duration(seconds: 30),
   );
   final shownIds = {
-    for (final e in j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
+    for (final e
+        in j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
       e.id,
   };
   j.check(
@@ -214,7 +229,9 @@ Future<void> _checkAnnouncements(
   final now = DateTime.now();
   final visible = news.where((n) {
     final b = '${n['branch_name'] ?? n['branch'] ?? ''}'.trim();
-    final exp = DateTime.tryParse('${n['expires_at'] ?? n['expiry_date'] ?? ''}');
+    final exp = DateTime.tryParse(
+      '${n['expires_at'] ?? n['expiry_date'] ?? ''}',
+    );
     return (branch == null || b.isEmpty || b == branch) &&
         (exp == null || exp.isAfter(now));
   }).toList();
@@ -224,14 +241,20 @@ Future<void> _checkAnnouncements(
         : 'No announcements for $branch yet.';
     j.note('DATA: no live announcements for ${branch ?? 'All branches'}');
     j.check(
-      find.descendant(of: carousel, matching: find.text(empty)).evaluate().isNotEmpty,
+      find
+          .descendant(of: carousel, matching: find.text(empty))
+          .evaluate()
+          .isNotEmpty,
       'announcements empty state "$empty" '
       '(painted ${paintedTexts(within: carousel)})',
     );
   } else {
     final title = '${visible.first['title']}'.trim();
     j.check(
-      find.descendant(of: carousel, matching: find.text(title)).evaluate().isNotEmpty,
+      find
+          .descendant(of: carousel, matching: find.text(title))
+          .evaluate()
+          .isNotEmpty,
       'announcement "$title" shown for ${branch ?? 'All branches'}',
     );
   }
@@ -264,7 +287,8 @@ Future<void> _checkHomeEvents(
     );
   } else {
     final shown = {
-      for (final e in j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
+      for (final e
+          in j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
         e.id,
     };
     for (final e in expected) {
@@ -273,14 +297,21 @@ Future<void> _checkHomeEvents(
     j.check(
       texts.any((s) => s.contains(expected.first.title)) ||
           // The strip is horizontal; later cards may be off screen.
-          find.descendant(of: strip, matching: find.text(expected.first.title, skipOffstage: false)).evaluate().isNotEmpty,
+          find
+              .descendant(
+                of: strip,
+                matching: find.text(expected.first.title, skipOffstage: false),
+              )
+              .evaluate()
+              .isNotEmpty,
       'strip shows "${expected.first.title}"',
     );
   }
   for (final e in hidden) {
     j.check(
-      !(j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
-          .any((x) => x.id == e.id),
+      !(j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const []).any(
+        (x) => x.id == e.id,
+      ),
       'event "${e.title}" (branch ${e.branch}) is hidden from $branch',
     );
   }

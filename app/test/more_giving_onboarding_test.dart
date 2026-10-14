@@ -167,7 +167,6 @@ List<Override> _baseOverrides({
   sharedPreferencesProvider.overrideWithValue(prefs),
   firestoreProvider.overrideWithValue(db),
   currentUserProvider.overrideWith((ref) => Stream.value(user)),
-  isAdminProvider.overrideWith((ref) => false),
   branchesProvider.overrideWith((ref) => Stream.value(branches)),
   notificationServiceProvider.overrideWithValue(_QuietNotifications()),
   notificationPrefsProvider.overrideWith(

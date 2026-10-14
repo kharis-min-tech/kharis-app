@@ -119,46 +119,16 @@ firebase deploy --only firestore:indexes
 
 ---
 
-## 7. Admins
+## 7. Content and access
 
-### Super admins
-
-A super admin may write everything admins can write. Either set the `admin: true`
-custom claim from a trusted server environment via the Firebase Admin SDK:
-
-```typescript
-import { getAuth } from 'firebase-admin/auth';
-
-// Set admin claim for a user by UID
-await getAuth().setCustomUserClaims('USER_UID_HERE', { admin: true });
-```
-
-or set `role: 'admin'` on the user's `users/{uid}` profile (the Studio's Team
-access does this; only an existing super admin can change a role).
-
-### Branch admins
-
-The Studio (`admin/index.html` and the in-app Studio) only sends
-notifications and manages Team access. Branches, events, announcements and
-live are managed in the Kharis Content Studio
-(https://kharis-content.itadmin-a94.workers.dev).
-
-A branch admin may send notifications to their own branches or to staff test
-devices, and read the notification history. They cannot send to Everyone or
-change anyone's access.
-
-A super admin assigns one by setting all three fields together on
-`users/{uid}` (the Studio's Team access does this):
-
-| Field | Value |
-|---|---|
-| `role` | `'campus_admin'` |
-| `adminBranchIds` | Content Studio branch slugs, e.g. `['london']` |
-| `adminBranchNames` | the matching branch **names**, e.g. `['London']`; a notification's branch audience holds the name |
-
-Keep the two lists in step (and update `adminBranchNames` if a branch is
-renamed in the Content Studio). Users can never set their own `role` or
-branch lists.
+Branches, services, venues, events, announcements, featured videos and live
+are managed in the Kharis Content Studio
+(https://kharis-content.itadmin-a94.workers.dev, Supabase). This repo has no
+Studio of its own and no admin roles: the Firestore rules give no client write
+access to content, and no client can set or change a profile's `role`. Pushes
+composed in a Studio are not available until the Content Studio supports them;
+the automatic pushes (daily reading, birthdays, service reminders,
+announcements, events) still run.
 
 ### Testing the rules
 
@@ -199,30 +169,6 @@ firebase emulators:start
 ```
 
 The emulator UI is available at [http://localhost:4000](http://localhost:4000).
-
-### Studio against the emulators
-
-`admin/index.html` connects to the Auth emulator (`127.0.0.1:9099`) and the
-Firestore emulator (`127.0.0.1:8181`) under the offline project `demo-kharis`
-when it is opened on localhost with `?emulators=1`. The hosted Studio ignores
-the flag, so it can never be pointed away from production. Branch, event and
-announcement pickers always read the live Kharis Content Studio (Supabase,
-read-only).
-
-```bash
-# firebase.json for the emulators: {"firestore":{"rules":"<repo>/backend/firestore.rules"},
-#   "emulators":{"auth":{"port":9099},"firestore":{"port":8181},"singleProjectMode":true}}
-firebase emulators:start --only auth,firestore --project demo-kharis
-cd ~/Workspace/kharis-org/admin && python3 -m http.server 5055 --bind 127.0.0.1
-open 'http://localhost:5055/?emulators=1'
-```
-
-The emulators start empty: create test users through the Auth emulator REST API
-(`/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`) and write their
-`users/{uid}` docs (role `admin` or `campus_admin` with `adminBranchIds` and
-`adminBranchNames`) through the Firestore emulator REST API with
-`Authorization: Bearer owner`, which bypasses the rules. Notifications can be
-composed but are not delivered: the functions are not emulated.
 
 ---
 
@@ -304,7 +250,7 @@ Besides name, services, venues and contact details, each branch may carry:
 
 ### `config` collection
 
-Publicly readable; super-admin writable only.
+Publicly readable; no client writes it (Cloud Functions or the Firebase console only).
 
 | Doc | Shape | Notes |
 |---|---|---|

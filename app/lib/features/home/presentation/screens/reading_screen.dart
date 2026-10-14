@@ -794,11 +794,15 @@ class _ReferenceSearchSheetState extends ConsumerState<_ReferenceSearchSheet> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  void _submit() {
     final navigator = Navigator.of(context);
     final version = ref.read(selectedBibleProvider);
-    final index = await ref.read(bibleIndexProvider(version.id).future);
-    if (!mounted) return;
+    // Never wait on the version's book list here: on a slow connection Go
+    // would do nothing for up to a minute. The bundled table covers the
+    // standard canon; the reader re-checks the chapter once the list lands.
+    final index =
+        ref.read(bibleIndexProvider(version.id)).valueOrNull ??
+        BibleIndex.bundled();
     switch (parseBibleReference(_controller.text, index)) {
       case ReferenceFound(:final location):
         navigator.pop(location);

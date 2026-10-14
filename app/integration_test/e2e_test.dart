@@ -25,18 +25,66 @@ import 'support/harness.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  journey('onboarding', 'fresh install: role path, guest path, branch groups', onboardingJourney);
-  journey('branch_switch', 'switch branch from More; Home and events follow', branchSwitchJourney);
-  journey('events', 'upcoming / past / RSVPs, detail, directions, calendar, RSVP', eventsJourney);
-  journey('messages', 'archive, search, filters, sort, pull to refresh', messagesJourney);
-  journey('player', 'play, seek, skip, audio/video, notes, share, mini player, transcript', playerJourney);
+  journey(
+    'onboarding',
+    'fresh install: role path, guest path, branch groups',
+    onboardingJourney,
+  );
+  journey(
+    'branch_switch',
+    'switch branch from More; Home and events follow',
+    branchSwitchJourney,
+  );
+  journey(
+    'events',
+    'upcoming / past / RSVPs, detail, directions, calendar, RSVP',
+    eventsJourney,
+  );
+  journey(
+    'messages',
+    'archive, search, filters, sort, pull to refresh',
+    messagesJourney,
+  );
+  journey(
+    'player',
+    'play, seek, skip, audio/video, notes, share, mini player, transcript',
+    playerJourney,
+  );
   journey('playlists', 'playlist lifecycle and favourites', playlistsJourney);
-  journey('bible', 'today, search, browse, book boundary, translation', bibleJourney);
-  journey('giving', 'no branch picker, give securely, copy bank details', givingJourney);
-  journey('forms', 'new here and testimony validation and stubbed submission', formsJourney);
-  journey('deep_links', 'shared /m /e /a links and not-found', deepLinksJourney);
-  journey('display', 'light/dark and large text without layout errors', displayJourney);
-  journey('account', 'guest has no Delete account; member delete flow (faked)', accountJourney);
+  journey(
+    'bible',
+    'today, search, browse, book boundary, translation',
+    bibleJourney,
+  );
+  journey(
+    'giving',
+    'no branch picker, give securely, copy bank details',
+    givingJourney,
+  );
+  journey(
+    'forms',
+    'new here and testimony validation and stubbed submission',
+    formsJourney,
+  );
+  journey(
+    'deep_links',
+    'shared /m /e /a links and not-found',
+    deepLinksJourney,
+  );
+  journey(
+    'display',
+    'light/dark and large text without layout errors',
+    displayJourney,
+  );
+  journey(
+    'account',
+    'guest has no Delete account; member delete flow (faked)',
+    accountJourney,
+  );
   journey('more_menu', 'every More row opens and returns', moreMenuJourney);
-  journey('notifications', 'inbox and notification link routing', notificationsJourney);
+  journey(
+    'notifications',
+    'inbox and notification link routing',
+    notificationsJourney,
+  );
 }

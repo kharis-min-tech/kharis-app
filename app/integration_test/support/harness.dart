@@ -168,9 +168,21 @@ Future<void> tapNav(WidgetTester tester, String label) async {
 
 /// Taps the first match of [finder] after scrolling it into view.
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
-  await tester.ensureVisible(finder.first);
-  await pumpFor(tester, const Duration(milliseconds: 300));
+  await ensureCentred(tester, finder.first);
   await tester.tap(finder.first, warnIfMissed: false);
+}
+
+/// Scrolls [finder] to about a third of the way down its scrollable.
+/// `WidgetTester.ensureVisible` can leave it at the bottom edge, under the
+/// bottom bar or mini player that float over the list on smaller screens,
+/// and a tap there lands on the bar instead.
+Future<void> ensureCentred(WidgetTester tester, Finder finder) async {
+  await Scrollable.ensureVisible(
+    tester.element(finder),
+    alignment: 0.3,
+    duration: const Duration(milliseconds: 200),
+  );
+  await pumpFor(tester, const Duration(milliseconds: 400));
 }
 
 /// The first vertical [Scrollable] under [of] (text fields and horizontal
@@ -179,17 +191,20 @@ Finder verticalScrollableIn(Finder of) => find
     .descendant(
       of: of,
       matching: find.byWidgetPredicate(
-        (w) => w is Scrollable && axisDirectionToAxis(w.axisDirection) == Axis.vertical,
+        (w) =>
+            w is Scrollable &&
+            axisDirectionToAxis(w.axisDirection) == Axis.vertical,
       ),
     )
     .first;
 
 /// Every string currently painted.
 List<String> paintedTexts({Finder? within}) => [
-  for (final e in (within == null
-          ? find.byType(RichText)
-          : find.descendant(of: within, matching: find.byType(RichText)))
-      .evaluate())
+  for (final e
+      in (within == null
+              ? find.byType(RichText)
+              : find.descendant(of: within, matching: find.byType(RichText)))
+          .evaluate())
     (e.widget as RichText).text.toPlainText(),
 ];
 
@@ -489,9 +504,7 @@ void journey(
         status = 'PASS';
         detail = '';
       }
-      debugPrint(
-        'KJOURNEY:$id:$status:$ms:${detail.replaceAll('\n', ' ')}',
-      );
+      debugPrint('KJOURNEY:$id:$status:$ms:${detail.replaceAll('\n', ' ')}');
       if (j.failures.isNotEmpty) {
         fail('journey $id failed:\n  ${j.failures.join('\n  ')}');
       }

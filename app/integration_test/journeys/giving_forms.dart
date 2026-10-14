@@ -26,24 +26,44 @@ Future<void> givingJourney(Journey j) async {
   await pumpUntilFound(t, find.byType(GivingScreen));
   await pumpFor(t, const Duration(seconds: 1));
   final giving = find.byType(GivingScreen);
-  final scroll = find.descendant(of: giving, matching: find.byType(Scrollable)).first;
+  final scroll = find
+      .descendant(of: giving, matching: find.byType(Scrollable))
+      .first;
   j.check(
-    find.descendant(of: giving, matching: find.text('YOUR BRANCH')).evaluate().isEmpty &&
-        find.descendant(of: giving, matching: find.text('GIVING TO')).evaluate().isEmpty,
+    find
+            .descendant(of: giving, matching: find.text('YOUR BRANCH'))
+            .evaluate()
+            .isEmpty &&
+        find
+            .descendant(of: giving, matching: find.text('GIVING TO'))
+            .evaluate()
+            .isEmpty,
     'Giving has no branch picker',
   );
   await j.shot('giving');
 
-  final give = find.descendant(of: giving, matching: find.text('Give securely'));
+  final give = find.descendant(
+    of: giving,
+    matching: find.text('Give securely'),
+  );
   await scrollUntilFound(t, give, scrollable: scroll);
   await t.tap(give, warnIfMissed: false);
-  await pumpUntil(t, () => launches.isNotEmpty, timeout: const Duration(seconds: 5));
+  await pumpUntil(
+    t,
+    () => launches.isNotEmpty,
+    timeout: const Duration(seconds: 5),
+  );
   j.check(
-    launches.length == 1 && launches.single.url == kGivingUrl && launches.single.external,
+    launches.length == 1 &&
+        launches.single.url == kGivingUrl &&
+        launches.single.external,
     'Give securely opens $kGivingUrl in the external browser (got $launches)',
   );
 
-  final copy = find.descendant(of: giving, matching: find.text('Copy bank details'));
+  final copy = find.descendant(
+    of: giving,
+    matching: find.text('Copy bank details'),
+  );
   await scrollUntilFound(t, copy, scrollable: scroll);
   await Clipboard.setData(const ClipboardData(text: ''));
   await t.tap(copy, warnIfMissed: false);
@@ -65,7 +85,10 @@ Future<void> givingJourney(Journey j) async {
     ))
       w.data ?? '',
   };
-  final lines = (clip?.text ?? '').split('\n').where((l) => l.contains(': ')).toList();
+  final lines = (clip?.text ?? '')
+      .split('\n')
+      .where((l) => l.contains(': '))
+      .toList();
   final missing = [
     for (final l in lines)
       if (!shown.contains(l.substring(0, l.indexOf(': '))) ||
@@ -137,12 +160,20 @@ bool _shows(Finder screen, String text) => find
 /// "hint=text!error" for every text field, for failure messages.
 List<String> _fieldStates(WidgetTester t, Finder screen) => [
   for (final w in t.widgetList<TextField>(
-    find.descendant(of: screen, matching: find.byType(TextField, skipOffstage: false)),
+    find.descendant(
+      of: screen,
+      matching: find.byType(TextField, skipOffstage: false),
+    ),
   ))
     '${w.decoration?.hintText}="${w.controller?.text}"!${w.decoration?.errorText}',
 ];
 
-Future<void> _choose(WidgetTester t, Finder screen, String hint, String item) async {
+Future<void> _choose(
+  WidgetTester t,
+  Finder screen,
+  String hint,
+  String item,
+) async {
   await tapVisible(t, find.descendant(of: screen, matching: find.text(hint)));
   await pumpFor(t, const Duration(milliseconds: 800));
   final entry = find.text(item);
@@ -161,10 +192,14 @@ Future<void> formsJourney(Journey j) async {
   final branches = await studioBranches();
   final branch = pick(seeded(effectiveSeed, 'forms'), branches);
   await j.launch(
-    overrides: [connectRepositoryProvider.overrideWithValue(ConnectRepository(dio: dio))],
+    overrides: [
+      connectRepositoryProvider.overrideWithValue(ConnectRepository(dio: dio)),
+    ],
   );
-  j.note('submissions go to a stubbed Dio adapter; the live insert (and its '
-      'RLS policy) is not exercised here');
+  j.note(
+    'submissions go to a stubbed Dio adapter; the live insert (and its '
+    'RLS policy) is not exercised here',
+  );
 
   // ── New here ─────────────────────────────────────────────────────────────
   await openMoreRow(t, "I'm new here");
@@ -178,18 +213,26 @@ Future<void> formsJourney(Journey j) async {
   await _type(t, _field(newHere, 'Your name'), 'E2E Visitor');
   await _type(t, _field(newHere, 'you@example.com'), 'not-an-email');
   await _submit(t, newHere, 'Connect with us');
-  j.check(_shows(newHere, 'Enter a valid email'), 'new here: bad email rejected');
+  j.check(
+    _shows(newHere, 'Enter a valid email'),
+    'new here: bad email rejected',
+  );
   j.check(!_shows(newHere, 'Name is required'), 'new here: name error clears');
   j.check(stub.requests.isEmpty, 'new here: bad email sends nothing');
   await _type(t, _field(newHere, 'you@example.com'), 'e2e@example.invalid');
   await _choose(t, newHere, 'Choose your branch', branch.name);
   await _submit(t, newHere, 'Connect with us');
   j.check(
-    await pumpUntil(t, () => find.text('Welcome to Kharis').evaluate().isNotEmpty),
+    await pumpUntil(
+      t,
+      () => find.text('Welcome to Kharis').evaluate().isNotEmpty,
+    ),
     'new here: success screen',
   );
   final visitor = stub.requests.isEmpty ? null : stub.requests.last;
-  final visitorBody = visitor?.data is String ? jsonDecode(visitor!.data as String) : visitor?.data;
+  final visitorBody = visitor?.data is String
+      ? jsonDecode(visitor!.data as String)
+      : visitor?.data;
   j.check(
     visitor != null &&
         visitor.method == 'POST' &&
@@ -251,11 +294,16 @@ Future<void> formsJourney(Journey j) async {
   await _choose(t, testimony, 'Choose your branch', branch.name);
   await _submit(t, testimony, 'Share testimony');
   j.check(
-    await pumpUntil(t, () => find.text('Thank you for sharing').evaluate().isNotEmpty),
+    await pumpUntil(
+      t,
+      () => find.text('Thank you for sharing').evaluate().isNotEmpty,
+    ),
     'testimony: success screen',
   );
   final sent = stub.requests.isEmpty ? null : stub.requests.last;
-  final body = sent?.data is String ? jsonDecode(sent!.data as String) : sent?.data;
+  final body = sent?.data is String
+      ? jsonDecode(sent!.data as String)
+      : sent?.data;
   j.check(
     sent != null &&
         sent.uri.path.endsWith('/rest/v1/testimonies') &&

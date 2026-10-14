@@ -665,7 +665,6 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           currentUserProvider.overrideWith((ref) => Stream.value(null)),
-          isAdminProvider.overrideWith((ref) => false),
         ],
       );
       addTearDown(container.dispose);

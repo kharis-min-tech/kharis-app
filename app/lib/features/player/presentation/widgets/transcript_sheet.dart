@@ -57,51 +57,51 @@ class TranscriptSheet extends ConsumerWidget {
   }
 
   Widget _grabber(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: AppSpacing.sm),
-        height: 4,
-        width: 40,
-        decoration: BoxDecoration(
-          color: context.kc.divider,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
+    margin: const EdgeInsets.only(top: AppSpacing.sm),
+    height: 4,
+    width: 40,
+    decoration: BoxDecoration(
+      color: context.kc.divider,
+      borderRadius: BorderRadius.circular(2),
+    ),
+  );
 
   Widget _header(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.md,
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.lg,
+      AppSpacing.lg,
+      AppSpacing.lg,
+      AppSpacing.md,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Transcript',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: context.kc.onBg,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Transcript',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: context.kc.onBg,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              sermon.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                color: context.kc.muted,
-              ),
-            ),
-          ],
+        const SizedBox(height: 2),
+        Text(
+          sermon.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            color: context.kc.muted,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _body(
     BuildContext context,
     WidgetRef ref,
-    AsyncValue<String> transcript,
+    AsyncValue<String?> transcript,
   ) {
     final url = sermon.transcriptUrl;
     if (url == null) {
@@ -118,22 +118,24 @@ class TranscriptSheet extends ConsumerWidget {
         'Couldn’t load the transcript. Check your connection and try again.',
         onRetry: () => ref.invalidate(transcriptProvider(url)),
       ),
-      data: (text) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          0,
-          AppSpacing.lg,
-          AppSpacing.md,
-        ),
-        child: SelectableText(
-          text,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            height: 1.6,
-            color: context.kc.onBg,
-          ),
-        ),
-      ),
+      data: (text) => text == null
+          ? _message(context, 'No transcript is available for this message.')
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
+              child: SelectableText(
+                text,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: context.kc.onBg,
+                ),
+              ),
+            ),
     );
   }
 

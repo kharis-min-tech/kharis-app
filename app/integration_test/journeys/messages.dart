@@ -11,14 +11,15 @@ import '../support/live_data.dart';
 
 /// Scrolls the Messages page until a pill of [railPattern]'s rail is on
 /// screen, then drags that rail sideways until [label] is, and taps it.
-Future<void> _tapRailPill(
-  Journey j,
-  String label,
-  RegExp railPattern,
-) async {
+Future<void> _tapRailPill(Journey j, String label, RegExp railPattern) async {
   final t = j.tester;
   final anyPill = find.textContaining(railPattern);
-  await scrollUntilFound(t, anyPill, scrollable: messagesScroll, step: const Offset(0, -150));
+  await scrollUntilFound(
+    t,
+    anyPill,
+    scrollable: messagesScroll,
+    step: const Offset(0, -150),
+  );
   final rail = railOf(anyPill, 'rail $railPattern');
   final target = find.text(label);
   final end = DateTime.now().add(const Duration(seconds: 40));
@@ -26,7 +27,12 @@ Future<void> _tapRailPill(
     await t.drag(rail, const Offset(-250, 0), warnIfMissed: false);
     await pumpFor(t, const Duration(milliseconds: 300));
   }
-  await pumpUntilFound(t, target, timeout: const Duration(seconds: 2), reason: 'pill "$label"');
+  await pumpUntilFound(
+    t,
+    target,
+    timeout: const Duration(seconds: 2),
+    reason: 'pill "$label"',
+  );
   await t.ensureVisible(target.first);
   await pumpFor(t, const Duration(milliseconds: 300));
   await t.tap(target.first, warnIfMissed: false);
@@ -70,17 +76,19 @@ Future<void> messagesJourney(Journey j) async {
       .where((m) => RegExp(r'[A-Za-z]{6,}').hasMatch('${m['title']}'))
       .toList();
   final probe = pick(r, withTitles);
-  final words = RegExp(r'[A-Za-z]{6,}')
-      .allMatches('${probe['title']}')
-      .map((m) => m.group(0)!)
-      .toList()
-    ..sort((a, b) => b.length.compareTo(a.length));
+  final words =
+      RegExp(
+          r'[A-Za-z]{6,}',
+        ).allMatches('${probe['title']}').map((m) => m.group(0)!).toList()
+        ..sort((a, b) => b.length.compareTo(a.length));
   final query = words.first;
   j.note('search probe: "$query" from "${probe['title']}" (${probe['id']})');
   final field = find.byType(TextField).first;
   await t.tap(field, warnIfMissed: false);
   await t.enterText(field, query);
-  final resultsRe = RegExp('^([\\d,]+) results? for "${RegExp.escape(query)}"\$');
+  final resultsRe = RegExp(
+    '^([\\d,]+) results? for "${RegExp.escape(query)}"\$',
+  );
   int? hits;
   final found = await pumpUntil(t, () {
     for (final s in paintedTexts()) {
@@ -133,7 +141,11 @@ Future<void> messagesJourney(Journey j) async {
     j.check(false, 'the library has at least one topic with messages');
   } else {
     final topic = pick(r, topics);
-    await _tapRailPill(j, topic, RegExp('^(${topics.map(RegExp.escape).join('|')})\$'));
+    await _tapRailPill(
+      j,
+      topic,
+      RegExp('^(${topics.map(RegExp.escape).join('|')})\$'),
+    );
     final rows = _list(j);
     j.check(
       j.c.read(selectedCategoryProvider) == topic,
@@ -190,7 +202,9 @@ Future<void> messagesJourney(Journey j) async {
       RegExp(r'^(All years|\d{4} \(\d+\))$'),
     );
     final rows = _list(j);
-    final expected = lib.sermons.where((s) => s.publishedAt?.year == year).length;
+    final expected = lib.sermons
+        .where((s) => s.publishedAt?.year == year)
+        .length;
     j.check(
       rows.length == expected && rows.every((s) => s.publishedAt?.year == year),
       '$year filter lists the $expected messages dated $year (got ${rows.length})',
@@ -214,12 +228,23 @@ Future<void> messagesJourney(Journey j) async {
   }
 
   final oldest = find.text('Oldest');
-  await scrollUntilFound(t, oldest, scrollable: messagesScroll, step: const Offset(0, -150));
+  await scrollUntilFound(
+    t,
+    oldest,
+    scrollable: messagesScroll,
+    step: const Offset(0, -150),
+  );
   await t.tap(oldest.first, warnIfMissed: false);
   await pumpFor(t, const Duration(seconds: 2));
   j.check(ordered(_list(j), ascending: true), 'Oldest lists oldest first');
-  await scrollUntilFound(t, find.byType(SermonListItem), scrollable: messagesScroll);
-  final firstPainted = t.widget<SermonListItem>(find.byType(SermonListItem).first);
+  await scrollUntilFound(
+    t,
+    find.byType(SermonListItem),
+    scrollable: messagesScroll,
+  );
+  final firstPainted = t.widget<SermonListItem>(
+    find.byType(SermonListItem).first,
+  );
   j.check(
     firstPainted.title == _list(j).first.title,
     'first row is the oldest message "${_list(j).first.title}" '
@@ -227,7 +252,12 @@ Future<void> messagesJourney(Journey j) async {
   );
   await j.shot('sort-oldest');
   final newest = find.text('Newest');
-  await scrollUntilFound(t, newest, scrollable: messagesScroll, step: const Offset(0, 150));
+  await scrollUntilFound(
+    t,
+    newest,
+    scrollable: messagesScroll,
+    step: const Offset(0, 150),
+  );
   await t.tap(newest.first, warnIfMissed: false);
   await pumpFor(t, const Duration(seconds: 2));
   j.check(ordered(_list(j), ascending: false), 'Newest lists newest first');
@@ -235,7 +265,12 @@ Future<void> messagesJourney(Journey j) async {
   // ── Pull to refresh ──────────────────────────────────────────────────────
   await openMessagesReset(j);
   final before = j.c.read(sermonLibraryProvider).fetchedAt;
-  await t.fling(messagesScroll, const Offset(0, 500), 1200, warnIfMissed: false);
+  await t.fling(
+    messagesScroll,
+    const Offset(0, 500),
+    1200,
+    warnIfMissed: false,
+  );
   final spun = await pumpUntil(
     t,
     () => find.byType(RefreshProgressIndicator).evaluate().isNotEmpty,
@@ -244,14 +279,10 @@ Future<void> messagesJourney(Journey j) async {
   );
   j.check(spun, 'pull down shows the refresh indicator');
   j.check(
-    await pumpUntil(
-      t,
-      () {
-        final after = j.c.read(sermonLibraryProvider).fetchedAt;
-        return after != null && (before == null || after.isAfter(before));
-      },
-      timeout: const Duration(seconds: 45),
-    ),
+    await pumpUntil(t, () {
+      final after = j.c.read(sermonLibraryProvider).fetchedAt;
+      return after != null && (before == null || after.isAfter(before));
+    }, timeout: const Duration(seconds: 45)),
     'pull to refresh refetches the library '
     '($before -> ${j.c.read(sermonLibraryProvider).fetchedAt})',
   );

@@ -1,25 +1,11 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:kharis_app/features/admin/data/london_time.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 
 // Plain `test`s: Firestore snapshot streams do not deliver under flutter_test's
 // FakeAsync zone.
 void main() {
-  group('London time', () {
-    test('London wall time converts across BST and GMT', () {
-      expect(
-        londonWallTime(DateTime(2026, 3, 29), 9),
-        DateTime.utc(2026, 3, 29, 8),
-      );
-      expect(
-        toLondonWallClock(DateTime.utc(2026, 7, 4, 23, 30)),
-        DateTime.utc(2026, 7, 5, 0, 30),
-      );
-    });
-  });
-
   group('DailyContentRepository', () {
     test(
       'a plan day past the book is bounded and carries its plan day',

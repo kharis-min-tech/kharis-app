@@ -56,7 +56,6 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
-    final isAdmin = ref.watch(isAdminProvider).valueOrNull ?? false;
     final branch = ref.watch(currentBranchProvider).valueOrNull;
     final version = ref.watch(appVersionProvider).valueOrNull;
     final signedIn =
@@ -87,23 +86,6 @@ class SettingsScreen extends ConsumerWidget {
                 const _SignedOutCard(),
 
               const SizedBox(height: 22),
-
-              if (isAdmin) ...[
-                const _SectionLabel('Manage'),
-                const SizedBox(height: 8),
-                _MenuCard(
-                  children: [
-                    _MoreMenuItem(
-                      icon: Icons.shield_outlined,
-                      label: 'Admin console',
-                      accent: context.kc.accentInk,
-                      onTap: () => context.push('/admin'),
-                      isLast: true,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 22),
-              ],
 
               const _SectionLabel('Appearance'),
               const SizedBox(height: 8),

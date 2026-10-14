@@ -52,7 +52,9 @@ Future<void> deepLinksJourney(Journey j) async {
 
   // /m/<id>
   final r2 = await r2Messages();
-  final library = {for (final s in j.c.read(sermonLibraryProvider).sermons) s.id: s};
+  final library = {
+    for (final s in j.c.read(sermonLibraryProvider).sermons) s.id: s,
+  };
   final ids = r2.map((m) => '${m['id']}').where(library.containsKey).toList();
   j.check(ids.isNotEmpty, 'live message ids are in the library');
   if (ids.isNotEmpty) {
@@ -83,7 +85,10 @@ Future<void> deepLinksJourney(Journey j) async {
       await pumpUntil(
         t,
         () => find
-            .descendant(of: find.byType(EventDetailScreen), matching: find.text(e.title))
+            .descendant(
+              of: find.byType(EventDetailScreen),
+              matching: find.text(e.title),
+            )
             .evaluate()
             .isNotEmpty,
         timeout: const Duration(seconds: 40),
@@ -120,5 +125,9 @@ Future<void> deepLinksJourney(Journey j) async {
     '/e/00000000-0000-4000-8000-000000000000',
     'We couldn\u2019t find that event',
   );
-  await _expectNotFound(j, '/a/$bogus', 'We couldn\u2019t find that announcement');
+  await _expectNotFound(
+    j,
+    '/a/$bogus',
+    'We couldn\u2019t find that announcement',
+  );
 }
