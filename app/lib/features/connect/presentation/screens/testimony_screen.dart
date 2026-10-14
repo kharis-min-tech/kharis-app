@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/widgets/connect_form_widgets.dart';
+import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import 'package:kharis_app/shared/widgets/shake_effect.dart';
 
 enum _FormState { form, sending, success }
 
+/// "Share a testimony": the website's testimony form (the Studio
+/// `testimonies` schema). Submissions land unpublished for review.
 class TestimonyScreen extends ConsumerStatefulWidget {
   const TestimonyScreen({super.key});
 
@@ -19,16 +22,22 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _summaryController = TextEditingController();
   final _testimonyController = TextEditingController();
   final _shakeKey = GlobalKey<ShakeEffectState>();
 
   String? _selectedBranch;
+  String? _category;
+  bool _anonymous = false;
   _FormState _state = _FormState.form;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
+    _summaryController.dispose();
     _testimonyController.dispose();
     super.dispose();
   }
@@ -38,23 +47,37 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
       _shakeKey.currentState?.shake();
       return;
     }
+    final branches = ref.read(branchesProvider).valueOrNull ?? const [];
+    final branch = branches.where((b) => b.name == _selectedBranch).firstOrNull;
+    if (branch == null) {
+      _shakeKey.currentState?.shake();
+      return;
+    }
     setState(() => _state = _FormState.sending);
     try {
       await ref
           .read(connectRepositoryProvider)
           .submitTestimony(
-            name: _nameController.text.trim(),
-            email: _emailController.text.trim(),
-            branch: _selectedBranch ?? '',
-            text: _testimonyController.text.trim(),
+            TestimonySubmission(
+              name: _nameController.text.trim(),
+              email: _emailController.text.trim(),
+              phone: _phoneController.text.trim(),
+              branch: branch,
+              category: _category,
+              summary: _summaryController.text.trim(),
+              testimony: _testimonyController.text.trim(),
+              anonymous: _anonymous,
+            ),
           );
       if (mounted) setState(() => _state = _FormState.success);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() => _state = _FormState.form);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Something went wrong. Please try again.'),
+            content: Text(
+              'Your testimony was not sent. Please try again later.',
+            ),
             backgroundColor: AppColors.errorContainer,
           ),
         );
@@ -154,22 +177,21 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Name
               ConnectFormField(
                 controller: _nameController,
                 label: 'Full name *',
+                hint: 'Your name',
                 textInputAction: TextInputAction.next,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Name is required';
                   return null;
                 },
               ),
-              const SizedBox(height: 14),
-
-              // Email (optional, validated if non-empty)
+              const SizedBox(height: 16),
               ConnectFormField(
                 controller: _emailController,
                 label: 'Email address',
+                hint: 'Optional',
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 validator: (v) {
@@ -179,21 +201,50 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 14),
-
-              // Branch dropdown
+              const SizedBox(height: 16),
+              ConnectFormField(
+                controller: _phoneController,
+                label: 'Phone number',
+                hint: 'Optional',
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 16),
               ConnectBranchDropdown(
+                label: 'Branch *',
                 value: _selectedBranch,
                 onChanged: (v) => setState(() => _selectedBranch = v),
+                validator: (v) => v == null ? 'Branch is required' : null,
               ),
-              const SizedBox(height: 14),
-
-              // Testimony text
+              const SizedBox(height: 16),
+              ConnectDropdownField(
+                label: 'Category',
+                hint: 'Choose a category',
+                items: kTestimonyCategories,
+                value: _category,
+                onChanged: (v) => setState(() => _category = v),
+              ),
+              const SizedBox(height: 16),
+              ConnectFormField(
+                controller: _summaryController,
+                label: 'Short title / summary *',
+                hint: 'e.g. Healed after surgery',
+                maxLength: kTestimonySummaryMaxLength,
+                textInputAction: TextInputAction.next,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Add a short title';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
               ConnectFormField(
                 controller: _testimonyController,
                 label: 'Your testimony *',
+                hint: 'Tell us what God has done',
                 maxLines: 6,
-                maxLength: 2000,
+                maxLength: kTestimonyMaxLength,
                 textInputAction: TextInputAction.newline,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
@@ -202,7 +253,26 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                value: _anonymous,
+                onChanged: (v) => setState(() => _anonymous = v),
+                activeTrackColor: context.kc.accent,
+                title: Text(
+                  'Share anonymously',
+                  style: AppTypography.ui(
+                    size: 15,
+                    weight: FontWeight.w600,
+                    color: context.kc.onBg,
+                  ),
+                ),
+                subtitle: Text(
+                  'Your name is not shown if it is published',
+                  style: AppTypography.ui(size: 13, color: context.kc.muted),
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // Submit
               PressEffect(

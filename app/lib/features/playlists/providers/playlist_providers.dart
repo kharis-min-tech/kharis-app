@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:kharis_app/core/utils/media_url.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
@@ -102,6 +103,27 @@ final playlistResolutionProvider = Provider.autoDispose
       if (playlist == null) return const PlaylistResolution();
       return _resolve(ref, playlist.sermonIds);
     });
+
+/// Up to four distinct, usable artwork URLs from [sermons], in list order:
+/// the source of a playlist's mosaic cover. Empty when none has artwork.
+List<String> playlistArtworkUrls(Iterable<Sermon> sermons) {
+  final urls = <String>[];
+  for (final sermon in sermons) {
+    final url = usableMediaUrl(sermon.artworkUrl);
+    if (url == null || urls.contains(url)) continue;
+    urls.add(url);
+    if (urls.length == 4) break;
+  }
+  return urls;
+}
+
+/// The mosaic cover URLs for one playlist. See [playlistArtworkUrls].
+final playlistArtworkProvider = Provider.autoDispose
+    .family<List<String>, String>(
+      (ref, playlistId) => playlistArtworkUrls(
+        ref.watch(playlistResolutionProvider(playlistId)).sermons,
+      ),
+    );
 
 /// Favorites, newest favorited first. Favorites carry no per-message
 /// timestamp; the stored order is favoriting order (the heart appends, and

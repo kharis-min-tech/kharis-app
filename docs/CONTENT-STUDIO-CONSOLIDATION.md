@@ -1,5 +1,10 @@
 # Spec: Consolidate Content Studio into the main church website
 
+> **Superseded (Oct 2026).** Content is now managed in the Kharis Content
+> Studio (https://kharis-content.itadmin-a94.workers.dev, Supabase). The web
+> portal (`admin/`) and the in-app admin (`app/lib/features/admin/`) described
+> below have been removed from this repo. Kept for history only.
+
 **Status:** agreed direction (Aug 18 product call) · **Owner:** tech team · **Depends on:** none (can start any time)
 
 ## Why

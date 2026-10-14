@@ -11,8 +11,7 @@ import 'auth_repository.dart';
 /// profile document.
 ///
 /// The profile doc is the single source of truth for display name, branch,
-/// avatar and role. Admin status is the `admin` custom claim OR a profile
-/// `role == 'admin'`, evaluated by the Firestore rules and [authStateChanges].
+/// avatar and role.
 class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({fb.FirebaseAuth? auth, FirebaseFirestore? firestore})
     : _auth = auth ?? fb.FirebaseAuth.instance,
@@ -244,18 +243,6 @@ class FirebaseAuthRepository implements AuthRepository {
       'createdAt': FieldValue.serverTimestamp(),
       ...updates,
     }, SetOptions(merge: true));
-  }
-
-  /// True when the current user is an admin (custom claim or profile role).
-  Future<bool> isCurrentUserAdmin() async {
-    final fbUser = _auth.currentUser;
-    if (fbUser == null) return false;
-    if (_cached?.role == 'admin') return true;
-    try {
-      final token = await fbUser.getIdTokenResult(true);
-      if (token.claims?['admin'] == true) return true;
-    } catch (_) {}
-    return false;
   }
 
   /// Accepts the 'yyyy-MM-dd' strings we write plus any legacy Timestamp.

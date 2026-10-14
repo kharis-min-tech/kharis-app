@@ -38,18 +38,22 @@ final sharedLinkArchiveFillingProvider = Provider.autoDispose<bool>(
 /// through universal / App Links (cold start included), on the web app at
 /// the same URL. Each resolves its id and opens the item; an id that does
 /// not resolve gets [SharedLinkNotFoundScreen], with a way Home.
+///
+/// `/m/:id` only redirects to [sharedMessageRoute] under the Messages tab
+/// (attach it there): a top-level message page would replace the tab shell,
+/// and returning to Messages while the old shell was still being removed
+/// built a second shell with the same GlobalKey.
 final List<RouteBase> sharedLinkRoutes = [
   GoRoute(
     path: '/${AppLinks.messageSegment}/:id',
-    builder: (context, state) => SharedMessageScreen(
-      id: state.pathParameters['id']!,
-      startAt: AppLinks.parseTime(
-        state.uri.queryParameters[AppLinks.timeParam],
-      ),
-      video: AppLinks.parseVideo(
-        state.uri.queryParameters[AppLinks.videoParam],
-      ),
-    ),
+    redirect: (context, state) => Uri(
+      path:
+          '$kSharedMessageHome/${AppLinks.messageSegment}/'
+          '${Uri.encodeComponent(state.pathParameters['id']!)}',
+      queryParameters: state.uri.queryParameters.isEmpty
+          ? null
+          : state.uri.queryParameters,
+    ).toString(),
   ),
   GoRoute(
     path: '/${AppLinks.eventSegment}/:id',
@@ -62,6 +66,17 @@ final List<RouteBase> sharedLinkRoutes = [
         SharedAnnouncementScreen(id: state.pathParameters['id']!),
   ),
 ];
+
+/// A shared message, as a child of the Messages tab route
+/// ([kSharedMessageHome]); `/m/:id` redirects here.
+final GoRoute sharedMessageRoute = GoRoute(
+  path: '${AppLinks.messageSegment}/:id',
+  builder: (context, state) => SharedMessageScreen(
+    id: state.pathParameters['id']!,
+    startAt: AppLinks.parseTime(state.uri.queryParameters[AppLinks.timeParam]),
+    video: AppLinks.parseVideo(state.uri.queryParameters[AppLinks.videoParam]),
+  ),
+);
 
 /// The live announcement [id]: from the member's campus feed first, then the
 /// unscoped feed (a link shared by someone at another campus). Loading while

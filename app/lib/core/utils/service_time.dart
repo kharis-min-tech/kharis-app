@@ -1,12 +1,8 @@
-/// Normalises the `meetingTime` field on a branch for display.
+/// Normalises a service time for display.
 ///
-/// Two admin surfaces write the same Firestore field in different shapes and
-/// neither can be retired without breaking the other:
-///
-/// * `admin/index.html` uses `<input type="time">`, which yields 24-hour
-///   `'14:00'` (or `'14:00:00'` in some browsers).
-/// * The Flutter admin panel and the bundled seed data use human 12-hour
-///   `'2:00 PM'`.
+/// Times arrive in two shapes: 24-hour `'14:00'` / `'14:00:00'` (the Content
+/// Studio's `services.start_time`) and human 12-hour `'2:00 PM'` (older
+/// stored values).
 ///
 /// Reading either shape must produce the same member-facing string, so the
 /// read side normalises to 12-hour form. Anything that is not a recognised

@@ -18,9 +18,6 @@ class SermonPage {
 
 /// Contract for the member sermon library source.
 abstract class AbstractSermonRepository {
-  /// Loads the guaranteed offline catalogue (bundled asset; never empty).
-  Future<List<Sermon>> loadCatalogue();
-
   /// Fetches one page of the library.
   ///
   /// [url] is the absolute `next` link from a previous page; `null` means the

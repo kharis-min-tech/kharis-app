@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:kharis_app/features/admin/data/content_config_repository.dart';
 import 'package:kharis_app/features/messages/data/curation_repository.dart';
 
 /// Firestore whose document listens fail, as on permission-denied.
@@ -44,22 +43,4 @@ void main() {
     await db.collection('config').doc('featured').set({'mode': 'off'});
     expect(await member.watchFeaturedMode().first, FeaturedMode.off);
   });
-
-  test(
-    'the Studio writer and the member reader share one FeaturedMode',
-    () async {
-      final db = FakeFirebaseFirestore();
-      final studio = ContentConfigRepository(firestore: db);
-      final member = CurationRepository(firestore: db);
-
-      expect(await member.watchFeaturedMode().first, FeaturedMode.auto);
-      await studio.setFeaturedMode(FeaturedMode.pinned);
-      expect(await member.watchFeaturedMode().first, FeaturedMode.pinned);
-      expect(await studio.watchFeaturedMode().first, FeaturedMode.pinned);
-
-      await db.collection('config').doc('featured').set({'mode': 'bogus'});
-      expect(await member.watchFeaturedMode().first, FeaturedMode.auto);
-      expect(await studio.watchFeaturedMode().first, FeaturedMode.auto);
-    },
-  );
 }
