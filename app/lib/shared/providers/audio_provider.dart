@@ -12,11 +12,25 @@ final playbackHistoryProvider = Provider<PlaybackHistory>((ref) {
   return PlaybackHistory(ref.watch(cacheServiceProvider));
 });
 
+/// Where the member is with one message (not started, "28 min left", or
+/// finished), redrawn whenever the history records a new position.
+final listeningProgressProvider = Provider.autoDispose
+    .family<ListeningProgress, Sermon>((ref, sermon) {
+      final history = ref.watch(playbackHistoryProvider);
+      void changed() => ref.invalidateSelf();
+      history.changes.addListener(changed);
+      ref.onDispose(() => history.changes.removeListener(changed));
+      return history.progressOf(sermon);
+    });
+
 /// Singleton [AudioPlayerService] scoped to the widget tree root.
 /// Disposed automatically when the provider scope is destroyed.
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final cache = ref.read(cacheServiceProvider);
-  final service = AudioPlayerService(cache);
+  final service = AudioPlayerService(
+    cache,
+    history: ref.read(playbackHistoryProvider),
+  );
   ref.onDispose(() => service.dispose());
   return service;
 });

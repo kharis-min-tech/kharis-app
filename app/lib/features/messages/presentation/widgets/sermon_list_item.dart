@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
+
+/// "28 min left", "1 h 5 min left", "Under 1 min left".
+String timeLeftLabel(Duration remaining) {
+  final minutes = (remaining.inSeconds / 60).ceil();
+  if (remaining.inSeconds < 60) return 'Under 1 min left';
+  if (minutes < 60) return '$minutes min left';
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  return m == 0 ? '$h h left' : '$h h $m min left';
+}
 
 /// Spec-matching 56px sermon list row for the Messages tab.
 ///
 /// Shows gradient art (play icon when idle, animated equalizer when playing),
-/// title, speaker/category, date/duration meta, and a trailing 3-dot button.
+/// title, speaker/category, date/duration meta with the member's listening
+/// progress ("28 min left" and a bar, or "Finished"), and a 3-dot button.
 class SermonListItem extends StatefulWidget {
   const SermonListItem({
     super.key,
@@ -21,7 +33,7 @@ class SermonListItem extends StatefulWidget {
     this.isPlaying = false,
     this.onTap,
     this.onMoreTap,
-    this.progress = 0,
+    this.listening = const NotStarted(),
   });
 
   final String title;
@@ -36,8 +48,8 @@ class SermonListItem extends StatefulWidget {
   final VoidCallback? onTap;
   final VoidCallback? onMoreTap;
 
-  /// Playback progress 0–1; renders a gold progress bar when > 0.
-  final double progress;
+  /// Where the member is with this message; see [ListeningProgress].
+  final ListeningProgress listening;
 
   @override
   State<SermonListItem> createState() => _SermonListItemState();
@@ -98,10 +110,19 @@ class _SermonListItemState extends State<SermonListItem>
     final speakerLine = cat.isNotEmpty
         ? '${widget.speaker} · $cat'
         : widget.speaker;
+    final listening = widget.listening;
     final metaLine = [
       widget.dateLabel,
-      widget.durationLabel,
+      switch (listening) {
+        InProgress(:final remaining?) => timeLeftLabel(remaining),
+        _ => widget.durationLabel,
+      },
     ].where((s) => s.isNotEmpty).join(' · ');
+    final fraction = switch (listening) {
+      InProgress(:final fraction?) => fraction.clamp(0.0, 1.0),
+      _ => null,
+    };
+    final finished = listening is Finished;
 
     return InkWell(
       onTap: widget.onTap,
@@ -151,30 +172,56 @@ class _SermonListItemState extends State<SermonListItem>
                       color: context.kc.muted,
                     ),
                   ),
-                  if (metaLine.isNotEmpty) ...[
+                  if (metaLine.isNotEmpty || finished) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      metaLine,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.ui(
-                        size: 11,
-                        color: context.kc.muted,
-                      ),
-                    ),
-                  ],
-                  if (widget.progress > 0) ...[
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      child: LinearProgressIndicator(
-                        value: widget.progress.clamp(0.0, 1.0),
-                        minHeight: 3,
-                        backgroundColor: context.kc.surfaceAlt,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          context.kc.accent,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            finished
+                                ? [
+                                    metaLine,
+                                    'Finished',
+                                  ].where((s) => s.isNotEmpty).join(' · ')
+                                : metaLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.ui(
+                              size: 11,
+                              color: context.kc.muted,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (finished) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 13,
+                            color: context.kc.accent,
+                            semanticLabel: 'Finished',
+                          ),
+                        ],
+                        if (fraction != null) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 64,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                              child: LinearProgressIndicator(
+                                key: const Key('listening-progress'),
+                                value: fraction,
+                                minHeight: 3,
+                                backgroundColor: context.kc.surfaceAlt,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  context.kc.accent,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ],

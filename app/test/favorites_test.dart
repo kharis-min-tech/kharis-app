@@ -84,6 +84,8 @@ void main() {
   }
 
   List<Override> overridesFor(FakeFirebaseFirestore db) => [
+    // List rows show listening progress from the playback history.
+    cacheServiceProvider.overrideWithValue(FakeCacheService()),
     firestoreProvider.overrideWithValue(db),
     currentUserProvider.overrideWith((ref) => Stream.value(member)),
     sermonsProvider.overrideWith((ref) async => library),

@@ -28,7 +28,6 @@ Future<void> _pump(WidgetTester tester, Brightness brightness) {
         body: BranchTile(
           name: 'London',
           region: 'Headquarters',
-          gradientColors: const [Colors.purple, Colors.orange],
           onTap: () {},
           isHq: true,
         ),

@@ -190,9 +190,7 @@ class BranchRepository {
           return (x.startTime ?? '').compareTo(y.startTime ?? '');
         });
       final branchVenues = venuesByBranch[uuid] ?? const <CampusVenue>[];
-      result.add(
-        _branch(b, slug, name, branchServices, branchVenues),
-      );
+      result.add(_branch(b, slug, name, branchServices, branchVenues));
     }
     return result..sort(compareBranches);
   }

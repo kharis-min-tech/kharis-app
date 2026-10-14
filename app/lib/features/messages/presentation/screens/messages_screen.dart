@@ -90,6 +90,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       artworkUrl: sermon.artworkUrl,
       listIndex: index,
       isPlaying: isPlaying,
+      listening: ref.watch(listeningProgressProvider(sermon)),
       onTap: onTap,
       onMoreTap: () => showAddToPlaylistSheet(
         context,
