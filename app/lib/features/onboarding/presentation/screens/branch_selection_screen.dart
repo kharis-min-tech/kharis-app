@@ -180,8 +180,6 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
           child: BranchTile(
             name: b.name.startsWith('KP2 ') ? b.name.substring(4) : b.name,
             region: _region(b.subtitle),
-            gradientColors: b.gradient,
-            imageUrl: b.imageUrl,
             isHq: _isHq(b.subtitle),
             onTap: () => _confirm(context, ref, b),
           ),
