@@ -264,12 +264,18 @@ void main() {
             dailyContentProvider.overrideWith(
               (ref) => Stream.value(
                 const DailyContent(
-                  reading: BibleReading(book: 'John', chapter: 3, verse: '16'),
-                  prayer: 'Lord, teach us to pray.',
-                  prayerReference: 'Luke 11:1',
+                  reading: DailyEntry(
+                    title: 'John 3:16',
+                    reference: 'John 3:16',
+                  ),
+                  prayer: DailyEntry(
+                    title: 'Lord, teach us to pray.',
+                    reference: 'Luke 11:1',
+                  ),
                 ),
               ),
             ),
+            dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
             continueListeningProvider.overrideWith((ref) => null),
           ],
           child: const MaterialApp(home: HomeScreen()),

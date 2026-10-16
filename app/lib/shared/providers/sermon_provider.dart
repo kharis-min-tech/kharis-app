@@ -957,7 +957,9 @@ final _cmsSermonDocProvider = FutureProvider.autoDispose
     .family<Sermon?, String>((ref, id) async {
       if (!kUseFirebase) return null;
       try {
-        return await ref.watch(firestoreSermonRepositoryProvider).getSermonById(id);
+        return await ref
+            .watch(firestoreSermonRepositoryProvider)
+            .getSermonById(id);
       } catch (_) {
         return null;
       }
@@ -1307,13 +1309,18 @@ final myRsvpEventsProvider = FutureProvider<RsvpEvents>((ref) async {
 // ── Daily content ─────────────────────────────────────────────────────────────
 
 final dailyContentRepositoryProvider = Provider<DailyContentRepository>((ref) {
-  return DailyContentRepository();
+  return DailyContentRepository(api: ref.watch(contentApiProvider));
 });
 
-/// Today's reading + prayer. Realtime snapshot of dailyContent/{today}.
-final dailyContentProvider = StreamProvider<DailyContent>((ref) {
-  final repo = ref.watch(dailyContentRepositoryProvider);
-  return repo.watchTodaysContent();
+/// Today's Content Studio reading + prayer; `null` when the Studio has none
+/// (the reading card hides).
+final dailyContentProvider = StreamProvider<DailyContent?>((ref) {
+  return ref.watch(dailyContentRepositoryProvider).watchTodaysContent();
+});
+
+/// Today's Content Studio Daily Message; `null` when there is none.
+final dailyMessageProvider = StreamProvider<DailyMessage?>((ref) {
+  return ref.watch(dailyContentRepositoryProvider).watchTodaysMessage();
 });
 
 // ── News ──────────────────────────────────────────────────────────────────────
@@ -1338,7 +1345,7 @@ final liveRepositoryProvider = Provider<LiveRepository>((ref) {
   return LiveRepository(api: ref.watch(contentApiProvider));
 });
 
-/// Whether a service is live, from the Content Studio `liveStream` setting.
+/// Whether a service is live, from the Content Studio `live_stream` setting.
 final liveStatusProvider = StreamProvider<LiveStatus>((ref) {
   return ref.watch(liveRepositoryProvider).watchLiveStatus();
 });

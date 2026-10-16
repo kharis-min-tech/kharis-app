@@ -1,307 +1,166 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:kharis_app/core/constants/api_config.dart';
-import 'package:kharis_app/core/constants/bible_books.dart';
-import 'package:kharis_app/features/home/data/reading_plan_repository.dart';
+import 'package:kharis_app/core/services/content_api.dart';
 
+/// `YYYY-MM-DD` key for [date]'s calendar day, matching the Studio's `date`
+/// columns.
+String readingDateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+/// One Studio Daily Reading or Daily Prayer entry.
+@immutable
+class DailyEntry {
+  const DailyEntry({required this.title, this.body = '', this.reference = ''});
+
+  final String title;
+
+  /// Free text, or empty.
+  final String body;
+
+  /// Free-text scripture reference ("John 3:16-18"), or empty.
+  final String reference;
+}
+
+/// Today's reading and prayer; at least one is set.
 @immutable
 class DailyContent {
-  const DailyContent({
-    required this.reading,
-    required this.prayer,
-    required this.prayerReference,
-    this.planDay,
-    this.planDays,
-  });
+  const DailyContent({this.reading, this.prayer});
 
-  final BibleReading reading;
-  final String prayer;
+  final DailyEntry? reading;
 
-  /// Scripture reference for the prayer (e.g. "Philippians 4:6").
-  final String prayerReference;
-
-  /// 1-based day of the reading plan this came from ("Day 3 of 13"), never
-  /// above [planDays]; a finished plan pinned to its last day reports
-  /// [planDays]. `null` for a hand-written day or the built-in fallback.
-  final int? planDay;
-
-  /// Length of the reading plan in days; `null` when [planDay] is.
-  final int? planDays;
+  /// No prayer means no prayer section.
+  final DailyEntry? prayer;
 }
 
+/// Today's Studio Daily Message: a sermon, with the Studio's note.
 @immutable
-class BibleReading {
-  const BibleReading({
-    required this.book,
-    required this.chapter,
-    required this.verse,
-  });
+class DailyMessage {
+  const DailyMessage({required this.sermonId, this.note = ''});
 
-  final String book;
-  final int chapter;
-  final String verse;
+  final String sermonId;
 
-  /// Human-readable reference, e.g. "John 3:16-17". A `1-end` verse range means
-  /// the whole chapter, so it collapses to "Proverbs 2".
-  String get reference => formatReadingReference(book, chapter, verse);
+  /// Free text, or empty.
+  final String note;
 }
 
-/// Where a resolved reading came from.
-enum DailyContentSource {
-  /// A hand-written `dailyContent/{date}` document.
-  day,
+/// Studio workspaces whose daily entries the app shows, most specific first:
+/// the Mobile App workspace, then the shared one.
+const List<String> kAppWorkspaces = ['app', 'general'];
 
-  /// A reading plan that covers the date.
-  plan,
-
-  /// The last day of an expired plan, because nothing covers the date yet.
-  planLastDay,
-
-  /// Nothing is configured at all — the built-in fallback.
-  fallback,
-}
-
-/// A reading plus why it resolved that way — what the Content Studio previews.
-@immutable
-class ResolvedDailyContent {
-  const ResolvedDailyContent({
-    required this.content,
-    required this.source,
-    this.planTitle,
-  });
-
-  final DailyContent content;
-  final DailyContentSource source;
-
-  /// Title of the plan behind [content], when it came from one.
-  final String? planTitle;
-}
-
-/// Reads the devotional content for a date.
+/// Today's reading, prayer and message from the Content Studio (Supabase),
+/// through [ContentApi] and its offline copy. Nothing is bundled: when the
+/// Studio has nothing for today the streams emit `null` and the UI hides the
+/// card.
 ///
-/// Resolution order matches `getDailyReading` on the backend:
-///   1. a hand-written `dailyContent/{YYYY-MM-DD}` document;
-///   2. the reading plan covering that date (see [resolvePlanReading]);
-///   3. the last day of the most recently expired plan;
-///   4. [_hardcodedContent], so the UI is never empty.
+/// - Reading and prayer: today's `daily_entries` rows of kind `reading` and
+///   `prayer`, the `app` workspace's before the `general` one's.
+/// - Message: today's `daily_messages` row, which names a sermon.
+///
+/// A table or column the Studio database does not have (yet) answers with a
+/// 4xx; that reads as "nothing today", not as a failure.
 class DailyContentRepository {
-  DailyContentRepository({
-    FirebaseFirestore? firestore,
-    ReadingPlanRepository? plans,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _plans = plans ?? ReadingPlanRepository(firestore: firestore);
+  DailyContentRepository({required this._api, DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now;
 
-  final FirebaseFirestore _firestore;
-  final ReadingPlanRepository _plans;
+  final ContentApi _api;
+  final DateTime Function() _clock;
 
-  static const String _apiUrl = ApiConfig.getDailyReading;
+  static const _entryTable = 'daily_entries';
+  static const _messageTable = 'daily_messages';
 
-  static final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 12),
-      receiveTimeout: const Duration(seconds: 15),
-    ),
-  );
-
-  /// Returns today's content (or the fallback if unavailable).
-  Future<DailyContent> getTodaysContent() =>
-      getContentForDate(readingDateKey(DateTime.now()));
-
-  /// Realtime stream of today's content; emits the fallback first so the UI
-  /// is never empty, then live snapshots as the document changes.
-  Stream<DailyContent> watchTodaysContent() async* {
-    final today = dateOnly(DateTime.now());
-    // API-first: one-shot fetch from the Cloud Functions endpoint so content
-    // appears even when Firestore is cold/unreachable, then hand over to the
-    // realtime Firestore stream below.
-    final apiContent = await _fetchFromApi();
-    if (apiContent != null) yield apiContent;
-
-    // Plans change rarely, so one fetch is enough to keep this fallback in step
-    // with the plan resolution the API performs.
-    final plans = await _plansOrEmpty(today);
-    try {
-      yield* _firestore
-          .collection('dailyContent')
-          .doc(readingDateKey(today))
-          .snapshots()
-          .map((doc) {
-            final data = doc.data();
-            // A hand-written day always wins over the plan.
-            if (_hasReading(data)) return _mapData(data!);
-            final resolved = resolvePlanReading(plans, today);
-            return resolved == null ? _hardcodedContent : _fromPlan(resolved);
-          });
-    } catch (_) {
-      yield _hardcodedContent;
-    }
-  }
-
-  /// One-shot fetch of today's reading from the `getDailyReading` API.
-  /// Returns `null` on any failure so callers fall straight through to
-  /// Firestore.
-  Future<DailyContent?> _fetchFromApi() async {
-    try {
-      final res = await _dio.get<Map<String, dynamic>>(_apiUrl);
-      final readings = (res.data?['readings'] as List?) ?? const [];
-      final first = readings.isNotEmpty ? readings.first : null;
-      if (first is! Map<String, dynamic> || first.isEmpty) return null;
-      return _mapData(first);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Returns content for [dateKey] formatted as `"YYYY-MM-DD"`.
-  Future<DailyContent> getContentForDate(String dateKey) async =>
-      (await resolveForDate(dateKey)).content;
-
-  /// Resolves [dateKey] and reports which rule produced the reading.
-  Future<ResolvedDailyContent> resolveForDate(String dateKey) async {
-    final date = parseReadingDate(dateKey) ?? dateOnly(DateTime.now());
-    try {
-      final doc = await _firestore
-          .collection('dailyContent')
-          .doc(dateKey)
-          .get();
-      final data = doc.data();
-      // A hand-written day BEATS the plan for that date — that is what lets an
-      // admin special-case Christmas without disturbing the plan around it.
-      if (_hasReading(data)) {
-        return ResolvedDailyContent(
-          content: _mapData(data!),
-          source: DailyContentSource.day,
-        );
-      }
-    } catch (_) {
-      // Fall through to plan resolution.
-    }
-
-    final resolved = resolvePlanReading(await _plansOrEmpty(date), date);
-    if (resolved == null) {
-      return const ResolvedDailyContent(
-        content: _hardcodedContent,
-        source: DailyContentSource.fallback,
-      );
-    }
-    return ResolvedDailyContent(
-      content: _fromPlan(resolved),
-      source: resolved.pinnedToLastDay
-          ? DailyContentSource.planLastDay
-          : DailyContentSource.plan,
-      planTitle: resolved.plan.title,
-    );
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  Future<List<ReadingPlan>> _plansOrEmpty(DateTime date) async {
-    try {
-      return await _plans.plansThrough(date);
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  bool _hasReading(Map<String, dynamic>? data) {
-    final reading = data?['reading'];
-    return reading is Map && (reading['book'] as String?)?.isNotEmpty == true;
-  }
-
-  DailyContent _fromPlan(PlanResolution resolved) {
-    final reading = resolved.reading;
-    return DailyContent(
-      reading: BibleReading(
-        book: reading.book,
-        chapter: reading.chapter,
-        verse: reading.verse,
-      ),
-      prayer: reading.prayer,
-      prayerReference: reading.prayerReference,
-      planDay: resolved.day.clamp(1, resolved.plan.days),
-      planDays: resolved.plan.days,
-    );
-  }
-
-  /// Maps a `dailyContent` document or a `getDailyReading` API reading.
-  ///
-  /// A chapter past the end of a known book is clamped to its last chapter:
-  /// no such chapter exists, and an older backend could still emit one for an
-  /// over-long plan (the "2 Corinthians 17" bug), which the Bible API 404s.
-  DailyContent _mapData(Map<String, dynamic> data) {
-    final readingData = data['reading'] as Map<String, dynamic>?;
-    final planDays = (data['planDays'] as num?)?.toInt();
-    final planDay = (data['planDay'] as num?)?.toInt();
-    return DailyContent(
-      reading: readingData != null
-          ? _boundedReading(
-              readingData['book'] as String? ?? '',
-              (readingData['chapter'] as num?)?.toInt() ?? 1,
-              readingData['verse'] as String? ?? '1',
-            )
-          : _hardcodedContent.reading,
-      prayer: data['prayer'] as String? ?? _hardcodedContent.prayer,
-      prayerReference:
-          data['prayerReference'] as String? ??
-          _hardcodedContent.prayerReference,
-      planDays: planDays != null && planDays > 0 ? planDays : null,
-      planDay: planDay != null && planDays != null && planDays > 0
-          ? planDay.clamp(1, planDays)
-          : null,
-    );
-  }
-
-  static BibleReading _boundedReading(String book, int chapter, String verse) {
-    final total = kBibleBooks[book];
-    return BibleReading(
-      book: book,
-      chapter: total != null && chapter > total ? total : chapter,
-      verse: verse,
-    );
-  }
-
-  // ── Write methods (admin) ──────────────────────────────────────────────────
-
-  /// Creates or overwrites the dailyContent document for [dateKey] (YYYY-MM-DD).
-  Future<void> setContent(String dateKey, DailyContent content) {
-    return _firestore.collection('dailyContent').doc(dateKey).set({
-      'reading': {
-        'book': content.reading.book,
-        'chapter': content.reading.chapter,
-        'verse': content.reading.verse,
-      },
-      'prayer': content.prayer,
-      'prayerReference': content.prayerReference,
+  /// Today's reading and prayer, or `null` when there are neither. The saved
+  /// copy first, then the network's; a network failure ends the stream
+  /// quietly when the saved copy is on screen, and is an error otherwise.
+  Stream<DailyContent?> watchTodaysContent() {
+    final key = readingDateKey(_clock());
+    return _todayRows(_entryTable, {
+      'date': 'eq.$key',
+      'workspace': 'in.(${kAppWorkspaces.join(',')})',
+    }).map((rows) {
+      final reading = _entry(rows, key, 'reading');
+      final prayer = _entry(rows, key, 'prayer');
+      if (reading == null && prayer == null) return null;
+      return DailyContent(reading: reading, prayer: prayer);
     });
   }
 
-  /// Deletes the dailyContent document for [dateKey].
-  Future<void> deleteContent(String dateKey) =>
-      _firestore.collection('dailyContent').doc(dateKey).delete();
-
-  /// Streams the most recent dailyContent documents for the admin list view.
-  Stream<List<MapEntry<String, DailyContent>>> watchRecentContent({
-    int limit = 30,
-  }) {
-    return _firestore
-        .collection('dailyContent')
-        .orderBy(FieldPath.documentId, descending: true)
-        .limit(limit)
-        .snapshots()
-        .map(
-          (snap) =>
-              snap.docs.map((d) => MapEntry(d.id, _mapData(d.data()))).toList(),
-        );
+  /// Today's Daily Message, or `null`.
+  Stream<DailyMessage?> watchTodaysMessage() {
+    final key = readingDateKey(_clock());
+    return _todayRows(_messageTable, {'date': 'eq.$key'}).map((rows) {
+      for (final row in rows) {
+        final sermonId = _text(row['sermon_id']);
+        if (_isDay(row, key) && sermonId != null) {
+          return DailyMessage(
+            sermonId: sermonId,
+            note: _text(row['note']) ?? '',
+          );
+        }
+      }
+      return null;
+    });
   }
 
-  // ── Fallback ───────────────────────────────────────────────────────────────
+  Stream<List<Map<String, dynamic>>> _todayRows(
+    String table,
+    Map<String, String> query,
+  ) async* {
+    final saved = _api.cached(table);
+    if (saved != null) yield saved;
+    try {
+      yield await _api.fetch(table, query: query);
+    } catch (error) {
+      if (_isMissing(error)) {
+        yield const [];
+      } else if (saved == null) {
+        rethrow;
+      }
+    }
+  }
 
-  static const _hardcodedContent = DailyContent(
-    reading: BibleReading(book: 'Psalms', chapter: 23, verse: '1-6'),
-    prayer:
-        'Lord, thank You for being my Shepherd. Lead me today in paths of righteousness. '
-        'Still my heart in moments of uncertainty and let Your goodness and mercy follow me.',
-    prayerReference: 'Psalm 23:1',
-  );
+  /// The Studio answered, but rejected the query: the table or a column is
+  /// not there. Server errors and dropped connections are real failures.
+  static bool _isMissing(Object error) {
+    final status = error is DioException ? error.response?.statusCode : null;
+    return status != null && status >= 400 && status < 500;
+  }
+
+  /// Today's [kind] entry with a title, the app workspace's first.
+  static DailyEntry? _entry(
+    List<Map<String, dynamic>> rows,
+    String key,
+    String kind,
+  ) {
+    for (final workspace in kAppWorkspaces) {
+      for (final row in rows) {
+        final title = _text(row['title']);
+        if (title == null ||
+            row['kind'] != kind ||
+            row['workspace'] != workspace ||
+            !_isDay(row, key)) {
+          continue;
+        }
+        return DailyEntry(
+          title: title,
+          body: _text(row['body']) ?? '',
+          reference: _text(row['reference']) ?? '',
+        );
+      }
+    }
+    return null;
+  }
+
+  /// The saved copy of a date-filtered table may be from another day.
+  static bool _isDay(Map<String, dynamic> row, String key) {
+    final date = row['date'];
+    return date is String && date.startsWith(key);
+  }
+
+  static String? _text(Object? value) {
+    if (value is! String) return null;
+    final text = value.trim();
+    return text.isEmpty ? null : text;
+  }
 }

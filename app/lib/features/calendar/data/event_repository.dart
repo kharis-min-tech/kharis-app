@@ -138,9 +138,7 @@ class EventRepository {
     try {
       final rows = await _api.load(_table, query: _query);
       final now = _clock();
-      return [
-        for (final id in unique) ?resolve(rows, id, now: now),
-      ];
+      return [for (final id in unique) ?resolve(rows, id, now: now)];
     } catch (_) {
       return const [];
     }
@@ -194,9 +192,22 @@ class EventRepository {
     return null;
   }
 
+  /// Studio sites that the app shows: "Mobile app", and the shared General
+  /// workspace.
+  static const appSites = {'app', 'general'};
+
+  /// Whether the Studio's "Show on" list includes the app. Unpublishing in
+  /// the Studio empties the list, so an unpublished row is hidden too; a
+  /// website-only row (`kharis`, `kp2`) is not the app's.
+  static bool shownInApp(Map<String, dynamic> row) {
+    final sites = row['sites'];
+    return sites is List && sites.any(appSites.contains);
+  }
+
   /// A row as one event. A weekly event is dated at its next (or running)
   /// occurrence; once `recurrence_until` is behind it, it is null. A weekly
-  /// row without days reads as a one-off.
+  /// row without days reads as a one-off. Null when the Studio does not show
+  /// the row in the app (see [shownInApp]).
   static Event? fromRow(Map<String, dynamic> row, {required DateTime now}) {
     final base = _single(row);
     if (base == null) return null;
@@ -234,9 +245,10 @@ class EventRepository {
     return null;
   }
 
-  /// The row as one event; null without an id, a title or a start time, so
-  /// one malformed row never takes out the list.
+  /// A row as a one-off event; null when the Studio does not show it in the
+  /// app (see [shownInApp]) or it lacks an id, title or start.
   static Event? _single(Map<String, dynamic> row) {
+    if (!shownInApp(row)) return null;
     final id = _text(row['id']);
     final title = _text(row['title']);
     final start = _instant(row['start_time']);

@@ -5,12 +5,7 @@ import 'package:kharis_app/features/messages/data/kharis_api_sermon_repository.d
 
 @immutable
 class LiveStatus {
-  const LiveStatus({
-    required this.isLive,
-    this.videoId,
-    this.title,
-    this.url,
-  });
+  const LiveStatus({required this.isLive, this.videoId, this.title, this.url});
 
   final bool isLive;
 
@@ -23,7 +18,7 @@ class LiveStatus {
 
   static const notLive = LiveStatus(isLive: false);
 
-  /// The Content Studio `app_config` value under key `liveStream`:
+  /// The Content Studio `app_config` value under key `live_stream`:
   /// `{url, title, enabled | is_live}`. Off, missing or unreadable is
   /// [notLive].
   static LiveStatus fromConfig(Object? value) {
@@ -52,7 +47,7 @@ class LiveRepository {
 
   final ContentApi _api;
 
-  static const _query = {'key': 'eq.liveStream'};
+  static const _query = {'key': 'eq.live_stream'};
 
   /// The Studio's current state. Read from the network only: a saved "live"
   /// would announce a stream long after it ended. Any failure reads as
@@ -67,7 +62,9 @@ class LiveRepository {
 
   static LiveStatus fromRows(List<Map<String, dynamic>> rows) {
     for (final row in rows) {
-      if (row['key'] == 'liveStream') return LiveStatus.fromConfig(row['value']);
+      if (row['key'] == 'live_stream') {
+        return LiveStatus.fromConfig(row['value']);
+      }
     }
     return LiveStatus.notLive;
   }

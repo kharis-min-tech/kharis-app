@@ -170,8 +170,13 @@ class StudioEvent {
   String toString() => '$title${weekly ? ' (weekly)' : ''}';
 }
 
+/// Studio events ticked to show on the app ("Mobile app" or General).
 Future<List<StudioEvent>> studioEvents() async => [
-  for (final r in await studioRows('events')) StudioEvent(r),
+  for (final r in await studioRows('events'))
+    if ((r['sites'] as List? ?? const []).any(
+      (s) => s == 'app' || s == 'general',
+    ))
+      StudioEvent(r),
 ];
 
 /// Studio announcements the app treats as published.
@@ -179,10 +184,11 @@ Future<List<Map<String, dynamic>>> studioNews() async {
   final rows = await studioRows('news');
   return [
     for (final r in rows)
-      if (r['status'] == null ||
-          r['status'] == 'published' ||
-          r['status'] == 'live')
-        if (r['is_published'] != false && r['published'] != false) r,
+      if (r['workspace'] == 'app' || r['workspace'] == 'general')
+        if (r['status'] == null ||
+            r['status'] == 'published' ||
+            r['status'] == 'live')
+          if (r['is_published'] != false && r['published'] != false) r,
   ];
 }
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/features/home/data/bible_reference.dart';
+import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
@@ -134,29 +135,45 @@ Future<void> bibleJourney(Journey j) async {
         j.c.read(dailyContentProvider).hasValue ||
         j.c.read(dailyContentProvider).hasError,
   );
-  final content = j.c.read(dailyContentProvider).valueOrNull;
+  final daily = j.c.read(dailyContentProvider);
+  final content = daily.valueOrNull;
   if (content == null) {
+    final title = daily.hasError
+        ? 'Couldn\u2019t load today\u2019s reading'
+        : 'No reading today';
     j.check(
-      _inReader(
-        find.text('Couldn\u2019t load today\u2019s reading'),
-      ).evaluate().isNotEmpty,
+      _inReader(find.text(title)).evaluate().isNotEmpty,
       'no daily content: the reader says so and offers to browse',
     );
   } else {
-    j.check(await _passageLoaded(j), 'today\u2019s passage loads');
-    final label = _label(t);
-    final want = content.reading;
-    final m = RegExp(r'^(.*) (\d+)$').firstMatch(label);
-    j.check(
-      m != null &&
-          int.parse(m.group(2)!) == want.chapter &&
-          resolveBookUsfm(m.group(1)!) == resolveBookUsfm(want.book),
-      'opens on today\u2019s reading ${want.book} ${want.chapter} (shows "$label")',
-    );
-    j.check(
-      _inReader(find.text('TODAY\u2019S READING')).evaluate().isNotEmpty,
-      'marked as today\u2019s reading',
-    );
+    final index = BibleIndex.bundled();
+    final reference = content.reading?.reference ?? '';
+    final want = reference.isEmpty
+        ? null
+        : switch (parseBibleReference(reference, index)) {
+            ReferenceFound(:final location) => location,
+            ReferenceError() => null,
+          };
+    if (want == null) {
+      j.check(
+        _inReader(
+          find.byKey(const Key('reading-today-text')),
+        ).evaluate().isNotEmpty,
+        'a reading without a passage shows the Studio\u2019s text',
+      );
+    } else {
+      j.check(await _passageLoaded(j), 'today\u2019s passage loads');
+      final label = _label(t);
+      final shown = parseBibleReference(label, index);
+      j.check(
+        shown is ReferenceFound && shown.location == want,
+        'opens on today\u2019s reading $reference (shows "$label")',
+      );
+      j.check(
+        _inReader(find.text('TODAY\u2019S READING')).evaluate().isNotEmpty,
+        'marked as today\u2019s reading',
+      );
+    }
   }
   await j.shot('today');
 

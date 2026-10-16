@@ -22,7 +22,13 @@ Map<String, dynamic> _row({
   String id = 'welcome',
   String title = 'Welcome to the new Kharis app',
   Map<String, dynamic> extra = const {},
-}) => {'id': id, 'title': title, 'created_at': _past, ...extra};
+}) => {
+  'id': id,
+  'title': title,
+  'workspace': 'app',
+  'created_at': _past,
+  ...extra,
+};
 
 Widget _homeHarness(SupabaseStub stub, {String? branch}) {
   return ProviderScope(
@@ -44,6 +50,17 @@ void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('NewsRepository mapping', () {
+    test('only Mobile App and General announcements reach the app', () {
+      final live = NewsRepository.liveFor([
+        _row(id: 'app'),
+        _row(id: 'general', extra: {'workspace': 'general'}),
+        _row(id: 'kharis', extra: {'workspace': 'kharis'}),
+        _row(id: 'kp2', extra: {'workspace': 'kp2'}),
+        _row(id: 'none', extra: {'workspace': null}),
+      ], branch: null);
+      expect(live.map((n) => n.id), unorderedEquals(['app', 'general']));
+    });
+
     test('reads every known column name and filters bad image URLs', () {
       final item = NewsRepository.fromRow(
         _row(
@@ -85,18 +102,20 @@ void main() {
       );
     });
 
-    test('drafts, rows without a title, scheduled and expired are not live',
-        () {
-      final items = NewsRepository.liveFor([
-        _row(id: 'ok'),
-        _row(id: 'draft', extra: {'status': 'draft'}),
-        {'id': 'untitled', 'created_at': _past},
-        _row(id: 'scheduled', extra: {'published_at': _future}),
-        _row(id: 'expired', extra: {'expires_at': _past}),
-      ], branch: null);
+    test(
+      'drafts, rows without a title, scheduled and expired are not live',
+      () {
+        final items = NewsRepository.liveFor([
+          _row(id: 'ok'),
+          _row(id: 'draft', extra: {'status': 'draft'}),
+          {'id': 'untitled', 'created_at': _past},
+          _row(id: 'scheduled', extra: {'published_at': _future}),
+          _row(id: 'expired', extra: {'expires_at': _past}),
+        ], branch: null);
 
-      expect(items.map((n) => n.id), ['ok']);
-    });
+        expect(items.map((n) => n.id), ['ok']);
+      },
+    );
 
     test('branch scoping: own branch plus all branches', () {
       final rows = [
@@ -143,9 +162,11 @@ void main() {
       'news': [
         _row(),
         _row(id: 'go', title: 'Listen to messages on the go'),
-        _row(id: 'old', title: 'Old expired notice', extra: {
-          'expires_at': _past,
-        }),
+        _row(
+          id: 'old',
+          title: 'Old expired notice',
+          extra: {'expires_at': _past},
+        ),
       ],
     });
     await tester.pumpWidget(_homeHarness(stub));
@@ -166,12 +187,16 @@ void main() {
   ) async {
     final stub = SupabaseStub({
       'news': [
-        _row(id: 'mine', title: 'London notice', extra: {
-          'branch_name': 'London',
-        }),
-        _row(id: 'theirs', title: 'Leeds notice', extra: {
-          'branch_name': 'Leeds',
-        }),
+        _row(
+          id: 'mine',
+          title: 'London notice',
+          extra: {'branch_name': 'London'},
+        ),
+        _row(
+          id: 'theirs',
+          title: 'Leeds notice',
+          extra: {'branch_name': 'Leeds'},
+        ),
       ],
     });
     await tester.pumpWidget(_homeHarness(stub, branch: 'London'));

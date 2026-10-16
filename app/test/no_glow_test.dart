@@ -15,6 +15,7 @@ import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/daily_message_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/live_now_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
 import 'package:kharis_app/features/home/presentation/widgets/upcoming_events_strip.dart';
@@ -301,9 +302,14 @@ void main() {
             dailyContentProvider.overrideWith(
               (ref) => Stream.value(
                 const DailyContent(
-                  reading: BibleReading(book: 'John', chapter: 3, verse: '16'),
-                  prayer: 'Lord, teach us to pray.',
-                  prayerReference: 'Luke 11:1',
+                  reading: DailyEntry(
+                    title: 'John 3:16',
+                    reference: 'John 3:16',
+                  ),
+                  prayer: DailyEntry(
+                    title: 'Lord, teach us to pray.',
+                    reference: 'Luke 11:1',
+                  ),
                 ),
               ),
             ),
@@ -322,6 +328,36 @@ void main() {
           ],
         );
         expect(find.text('Read now'), findsNothing, reason: 'skeleton shown');
+        expect(_gloss(tester, flatFills: true), isEmpty);
+      });
+
+      testWidgets('Home: daily message card', (tester) async {
+        await pumpCard(
+          tester,
+          const DailyMessageCard(),
+          overrides: [
+            dailyMessageProvider.overrideWith(
+              (ref) => Stream.value(
+                const DailyMessage(
+                  sermonId: 's1',
+                  note: 'God is light, and in Him is no darkness at all.',
+                ),
+              ),
+            ),
+            sermonByIdProvider.overrideWith(
+              (ref, id) => const AsyncData<Sermon?>(
+                Sermon(
+                  id: 's1',
+                  title: 'Walk in the light',
+                  speaker: 'Pastor',
+                  audioUrl: 'https://example.org/a.mp3',
+                ),
+              ),
+            ),
+          ],
+        );
+        await tester.pump();
+        expect(find.text('Walk in the light'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 

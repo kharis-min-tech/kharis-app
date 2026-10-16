@@ -34,6 +34,8 @@ import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/bible_provider.dart';
+import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 
 import 'support/fake_cache_service.dart';
@@ -97,11 +99,15 @@ NewsItem _news(
 );
 
 const _reading = DailyContent(
-  reading: BibleReading(book: '2 Corinthians', chapter: 13, verse: '1-end'),
-  prayer: 'Lord, make us complete.',
-  prayerReference: '2 Corinthians 13:11',
-  planDay: 13,
-  planDays: 13,
+  reading: DailyEntry(
+    title: 'Be made complete',
+    reference: '2 Corinthians 13',
+    body: 'Paul closes his letter.',
+  ),
+  prayer: DailyEntry(
+    title: 'Lord, make us complete.',
+    reference: '2 Corinthians 13:11',
+  ),
 );
 
 // ── Harness ───────────────────────────────────────────────────────────────────
@@ -147,7 +153,7 @@ Future<void> _pump(
   List<NewsItem> news = const [],
   Future<List<NewsItem>> Function()? loadNews,
   List<Event> events = const [],
-  Stream<DailyContent>? reading,
+  Stream<DailyContent?>? reading,
   void Function(GoRouter router)? beforeMount,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -190,6 +196,7 @@ Future<void> _pump(
         dailyContentProvider.overrideWith(
           (ref) => reading ?? Stream.value(_reading),
         ),
+        dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
         // Nothing to resume: the card collapses (its engine is WP2's).
         continueListeningProvider.overrideWith((ref) => null),
       ],
@@ -549,19 +556,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 150));
     });
 
-    testWidgets('reading card: failure shows an error card with Retry, '
-        'never a made-up reading', (tester) async {
-      var subscriptions = 0;
+    testWidgets('reading card: a failed load hides the card, never a '
+        'made-up reading', (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
-            dailyContentProvider.overrideWith((ref) {
-              subscriptions++;
-              return Stream<DailyContent>.error(Exception('offline'));
-            }),
+            dailyContentProvider.overrideWith(
+              (ref) => Stream<DailyContent?>.error(Exception('offline')),
+            ),
           ],
           child: const MaterialApp(home: Scaffold(body: TodaysReadingCard())),
         ),
@@ -569,19 +574,12 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.byKey(const Key('reading-card-error')), findsOneWidget);
-      expect(
-        find.text('We couldn\u2019t load today\u2019s reading.'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Psalm'), findsNothing);
-
-      await tester.tap(find.text('Retry'));
-      await tester.pump();
-      expect(subscriptions, 2);
+      expect(find.byKey(const Key('reading-card-loading')), findsNothing);
+      expect(find.text('Read now'), findsNothing);
+      expect(find.text('Retry'), findsNothing);
     });
 
-    testWidgets('reading card: skeleton while loading, plan day once loaded', (
+    testWidgets('reading card: skeleton while loading, the entry once loaded', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -603,9 +601,10 @@ void main() {
       expect(find.text('Loading...'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 150));
-      // The real plan position, not the day of the year.
-      expect(find.text("TODAY'S READING \u00b7 DAY 13 OF 13"), findsOneWidget);
+      expect(find.text("TODAY'S READING"), findsOneWidget);
+      expect(find.text('Be made complete'), findsOneWidget);
       expect(find.text('2 Corinthians 13'), findsOneWidget);
+      expect(find.text('Lord, make us complete.'), findsOneWidget);
     });
   });
 
@@ -633,7 +632,7 @@ void main() {
       expect(container.read(readingMarksProvider), isEmpty);
     });
 
-    testWidgets('a reading past the end of its book explains itself', (
+    testWidgets('a reference that cannot be opened shows the Studio text', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -642,16 +641,17 @@ void main() {
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            bibleIndexProvider.overrideWith(
+              (ref, id) async => BibleIndex.bundled(),
+            ),
             dailyContentProvider.overrideWith(
               (ref) => Stream.value(
                 const DailyContent(
-                  reading: BibleReading(
-                    book: '2 Corinthians',
-                    chapter: 17,
-                    verse: '1-end',
+                  reading: DailyEntry(
+                    title: 'Finish well',
+                    reference: '2 Corinthians 17',
+                    body: 'The book has thirteen chapters.',
                   ),
-                  prayer: '',
-                  prayerReference: '',
                 ),
               ),
             ),
@@ -662,14 +662,10 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(
-        find.text('Today\u2019s reading isn\u2019t available'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('2 Corinthians has 13 chapters'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('reading-today-text')), findsOneWidget);
+      expect(find.text('Finish well'), findsOneWidget);
+      expect(find.text('The book has thirteen chapters.'), findsOneWidget);
+      expect(find.text('Browse the Bible'), findsOneWidget);
       expect(find.text('Retry'), findsNothing);
     });
   });
