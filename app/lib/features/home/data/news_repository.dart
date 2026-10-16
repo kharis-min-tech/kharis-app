@@ -119,9 +119,15 @@ class NewsRepository {
     return items..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
   }
 
-  /// One row as a [NewsItem]; null without an id or title, or when the row
-  /// is not published.
+  /// Studio workspaces whose announcements the app shows: "Mobile App" and
+  /// the shared General workspace. Website workspaces (`kharis`, `kp2`) are
+  /// for kharis.org.
+  static const appWorkspaces = {'app', 'general'};
+
+  /// One row as a [NewsItem]; null without an id or title, when the row is
+  /// not published, or when it belongs to a website workspace.
   static NewsItem? fromRow(Map<String, dynamic> row) {
+    if (!appWorkspaces.contains(row['workspace'])) return null;
     final id = _text(row['id']);
     final title = _text(row['title']);
     if (id == null || title == null) return null;

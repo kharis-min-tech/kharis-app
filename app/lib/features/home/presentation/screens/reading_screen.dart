@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/constants/bible_books.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,8 +12,6 @@ import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
-import 'package:kharis_app/features/home/data/reading_plan.dart';
-import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -82,49 +79,37 @@ class ReadingScreen extends ConsumerStatefulWidget {
   ConsumerState<ReadingScreen> createState() => _ReadingScreenState();
 }
 
-/// Today's reading as a place in the Bible, or why it cannot be shown.
-({BibleLocation? location, String? problem}) _todayLocation(
-  BibleReading reading,
-) {
-  final usfm = resolveBookUsfm(reading.book);
-  if (usfm == null) {
-    return (
-      location: null,
-      problem:
-          '\u201c${reading.book}\u201d isn\u2019t a book we recognise. '
-          'Please check back tomorrow.',
-    );
-  }
-  final chapters = kCanonBooks.firstWhere((b) => b.usfm == usfm).chapters;
-  // A plan that runs past the end of its book would ask YouVersion for a
-  // chapter that does not exist ("2 Corinthians 17") and get a 404. Say what
-  // is wrong instead of offering a Retry that cannot succeed.
-  if (reading.chapter < 1 || reading.chapter > chapters) {
-    return (
-      location: null,
-      problem:
-          '${reading.book} has $chapters chapters, so '
-          '${reading.book} ${reading.chapter} can\u2019t be shown. '
-          'Please check back tomorrow.',
-    );
-  }
-  return (location: BibleLocation(usfm, reading.chapter), problem: null);
+/// Where today's reading opens: its reference as a place in [index], or
+/// `null` when it has none or it does not parse.
+BibleLocation? _todayLocation(DailyEntry? reading, BibleIndex index) {
+  final reference = reading?.reference ?? '';
+  if (reference.isEmpty) return null;
+  return switch (parseBibleReference(reference, index)) {
+    ReferenceFound(:final location) => location,
+    ReferenceError() => null,
+  };
 }
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   /// The chapter being browsed; null while on today's reading.
   BibleLocation? _browsing;
 
-  BibleLocation? get _today {
-    final content = ref.read(dailyContentProvider).valueOrNull;
-    return content == null ? null : _todayLocation(content.reading).location;
-  }
+  BibleIndex _index(int bibleId) =>
+      ref.read(bibleIndexProvider(bibleId)).valueOrNull ?? BibleIndex.bundled();
+
+  BibleLocation? get _today => _todayLocation(
+    ref.read(dailyContentProvider).valueOrNull?.reading,
+    _index(ref.read(selectedBibleProvider).id),
+  );
 
   void _go(BibleLocation to) {
     final today = _today;
     setState(() {
       // Landing on today's chapter (without a verse) is today's reading.
-      _browsing = today != null && to == today ? null : to;
+      final isToday =
+          today != null &&
+          (to == today || (to.sameChapter(today) && to.verseStart == null));
+      _browsing = isToday ? null : to;
     });
   }
 
@@ -153,23 +138,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   @override
   Widget build(BuildContext context) {
     final contentAsync = ref.watch(dailyContentProvider);
-    final content = contentAsync.valueOrNull;
-    final dayLabel = content == null ? null : readingPlanDayLabel(content);
-    final today = content == null
-        ? null
-        : _todayLocation(content.reading).location;
+    final version = ref.watch(selectedBibleProvider);
+    final index =
+        ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
+        BibleIndex.bundled();
+    final today = _todayLocation(contentAsync.valueOrNull?.reading, index);
     final browsing = _browsing;
     final current = browsing ?? today;
-    final version = ref.watch(selectedBibleProvider);
-
-    final String title;
-    if (browsing != null) {
-      title = 'Bible';
-    } else if (dayLabel != null) {
-      title = 'Reading plan \u00B7 $dayLabel';
-    } else {
-      title = 'Today\u2019s reading';
-    }
+    final title = browsing != null ? 'Bible' : 'Today\u2019s reading';
 
     return Scaffold(
       appBar: AppBar(
@@ -241,14 +217,25 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 onAction: () => _pickChapter(null),
               ),
               data: (content) {
-                final today = _todayLocation(content.reading);
-                final location = today.location;
-                if (location == null) {
+                final reading = content?.reading;
+                if (content == null) {
                   return _ErrorView(
-                    title: 'Today\u2019s reading isn\u2019t available',
-                    message: today.problem!,
+                    title: 'No reading today',
+                    message:
+                        'Today\u2019s reading hasn\u2019t been '
+                        'published yet.',
                     actionLabel: 'Browse the Bible',
                     onAction: () => _pickChapter(null),
+                  );
+                }
+                final location = _todayLocation(reading, index);
+                if (location == null) {
+                  // No reference to open (or one that does not parse): the
+                  // Studio's own words, and the way into the Bible.
+                  return _TodayTextView(
+                    reading: reading,
+                    prayer: content.prayer,
+                    onBrowse: () => _pickChapter(null),
                   );
                 }
                 return _PassageView(
@@ -256,9 +243,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                   location: location,
                   isToday: true,
                   onNavigate: _go,
-                  onPickChapter: () => _pickChapter(location),
+                  onPickChapter: () => _pickChapter(location.wholeChapter),
+                  reading: reading,
                   prayer: content.prayer,
-                  prayerReference: content.prayerReference,
                 );
               },
             ),
@@ -393,8 +380,8 @@ class _PassageView extends ConsumerStatefulWidget {
     required this.onNavigate,
     required this.onPickChapter,
     this.onToday,
-    this.prayer = '',
-    this.prayerReference = '',
+    this.reading,
+    this.prayer,
   });
 
   final BibleLocation location;
@@ -404,8 +391,10 @@ class _PassageView extends ConsumerStatefulWidget {
 
   /// Returns to today's reading; shown while browsing.
   final VoidCallback? onToday;
-  final String prayer;
-  final String prayerReference;
+
+  /// Today's Studio entries, shown beneath today's passage.
+  final DailyEntry? reading;
+  final DailyEntry? prayer;
 
   @override
   ConsumerState<_PassageView> createState() => _PassageViewState();
@@ -539,11 +528,26 @@ class _PassageViewState extends ConsumerState<_PassageView> {
                       ),
                     ],
                     if (widget.isToday) ...[
-                      const SizedBox(height: 26),
-                      _DailyPrayer(
-                        prayer: widget.prayer,
-                        reference: widget.prayerReference,
-                      ),
+                      if (widget.reading case final reading?
+                          when reading.body.isNotEmpty) ...[
+                        const SizedBox(height: 26),
+                        _EntryCard(
+                          key: const Key('reading-note'),
+                          label: 'DAILY READING',
+                          icon: Icons.menu_book_rounded,
+                          entry: reading,
+                          showReference: false,
+                        ),
+                      ],
+                      if (widget.prayer case final prayer?) ...[
+                        const SizedBox(height: 26),
+                        _EntryCard(
+                          label: 'DAILY PRAYER',
+                          icon: Icons.self_improvement_rounded,
+                          entry: prayer,
+                          italic: true,
+                        ),
+                      ],
                       const SizedBox(height: 22),
                       const _ReadingActions(),
                     ],
@@ -1072,17 +1076,85 @@ class _PassageBody extends StatelessWidget {
   }
 }
 
-/// Calm serif daily-prayer card shown beneath the passage.
-class _DailyPrayer extends StatelessWidget {
-  const _DailyPrayer({required this.prayer, required this.reference});
+/// Today's reading that has no passage to open: the Studio's title,
+/// reference and text, the daily prayer, and the way into the Bible.
+class _TodayTextView extends StatelessWidget {
+  const _TodayTextView({
+    required this.reading,
+    required this.prayer,
+    required this.onBrowse,
+  });
 
-  final String prayer;
-  final String reference;
+  final DailyEntry? reading;
+  final DailyEntry? prayer;
+  final VoidCallback onBrowse;
 
   @override
   Widget build(BuildContext context) {
-    if (prayer.trim().isEmpty) return const SizedBox.shrink();
+    final reading = this.reading;
+    final prayer = this.prayer;
+    return SingleChildScrollView(
+      key: const Key('reading-today-text'),
+      padding: const EdgeInsets.fromLTRB(30, 8, 30, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (reading != null)
+            _EntryCard(
+              label: 'TODAY\u2019S READING',
+              icon: Icons.menu_book_rounded,
+              entry: reading,
+            ),
+          if (prayer != null) ...[
+            if (reading != null) const SizedBox(height: 20),
+            _EntryCard(
+              label: 'DAILY PRAYER',
+              icon: Icons.self_improvement_rounded,
+              entry: prayer,
+              italic: true,
+            ),
+          ],
+          const SizedBox(height: 16),
+          Center(
+            child: TextButton(
+              onPressed: onBrowse,
+              child: Text(
+                'Browse the Bible',
+                style: AppTypography.ui(
+                  weight: FontWeight.w600,
+                  color: context.kc.onChip,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
+/// Calm card for one Studio entry (today's reading text or the daily
+/// prayer): its label, the reference, the title and the text.
+class _EntryCard extends StatelessWidget {
+  const _EntryCard({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.entry,
+    this.showReference = true,
+    this.italic = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final DailyEntry entry;
+  final bool showReference;
+
+  /// Serif italic text, for prayers.
+  final bool italic;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
@@ -1096,14 +1168,10 @@ class _DailyPrayer extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.self_improvement_rounded,
-                color: context.kc.accentInk,
-                size: 16,
-              ),
+              Icon(icon, color: context.kc.accentInk, size: 16),
               const SizedBox(width: 7),
               Text(
-                'DAILY PRAYER',
+                label,
                 style: AppTypography.ui(
                   size: 11,
                   weight: FontWeight.w700,
@@ -1113,23 +1181,33 @@ class _DailyPrayer extends StatelessWidget {
               ),
             ],
           ),
-          if (reference.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
+          const SizedBox(height: 12),
+          Text(
+            entry.title,
+            style: AppTypography.display(
+              size: 19,
+              weight: FontWeight.w700,
+            ).copyWith(color: context.kc.onBg, height: 1.25),
+          ),
+          if (showReference && entry.reference.isNotEmpty) ...[
+            const SizedBox(height: 4),
             Text(
-              'Inspired by $reference',
+              entry.reference,
               style: AppTypography.ui(size: 12.5, color: context.kc.muted),
             ),
           ],
-          const SizedBox(height: 14),
-          Text(
-            prayer,
-            style: AppTypography.serif(
-              size: 17,
-              italic: true,
-              height: 1.6,
-              color: _scriptureInk(context),
+          if (entry.body.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              entry.body,
+              style: AppTypography.serif(
+                size: 17,
+                italic: italic,
+                height: 1.6,
+                color: _scriptureInk(context),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

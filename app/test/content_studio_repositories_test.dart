@@ -127,9 +127,11 @@ Map<String, dynamic> _event(
   List<int> days = const [],
   String? until,
   String? image,
+  List<String> sites = const ['app'],
 }) => {
   'id': id,
   'title': 'Event $id',
+  'sites': sites,
   'description': null,
   'location': 'Hall',
   'image_url': image,
@@ -211,7 +213,11 @@ void main() {
       ).watchBranches().toList();
 
       expect(offline, hasLength(1));
-      expect(offline.single.map((b) => b.name), ['Accra', 'London', 'KP2 Barking']);
+      expect(offline.single.map((b) => b.name), [
+        'Accra',
+        'London',
+        'KP2 Barking',
+      ]);
       expect(offline.single[1].services, hasLength(2));
     });
 
@@ -236,6 +242,28 @@ void main() {
   });
 
   group('EventRepository', () {
+    test('shows only rows the Studio shows on the app', () {
+      final now = DateTime.parse(_at(2026, 10, 15, 9));
+      final rows = [
+        _event('app', start: _at(2026, 10, 20, 19)),
+        _event('general', start: _at(2026, 10, 20, 19), sites: ['general']),
+        _event('web', start: _at(2026, 10, 20, 19), sites: ['kharis', 'kp2']),
+        _event('both', start: _at(2026, 10, 20, 19), sites: ['kp2', 'app']),
+        _event('unpublished', start: _at(2026, 10, 20, 19), sites: []),
+        {..._event('legacy', start: _at(2026, 10, 20, 19))}..remove('sites'),
+      ];
+      expect(
+        EventRepository.upcoming(rows, branch: null, now: now).map((e) => e.id),
+        unorderedEquals(['app', 'general', 'both']),
+      );
+      expect(EventRepository.resolve(rows, 'unpublished', now: now), isNull);
+      final later = DateTime.parse(_at(2026, 10, 25, 9));
+      expect(
+        EventRepository.past(rows, branch: null, now: later).map((e) => e.id),
+        unorderedEquals(['app', 'general', 'both']),
+      );
+    });
+
     final weekly = _event(
       'sun',
       start: _at(2026, 10, 4, 10),
@@ -279,10 +307,11 @@ void main() {
     });
 
     test('a series that starts later begins on its first date', () {
-      final later = EventRepository.fromRow(
-        {...weekly, 'start_time': _at(2026, 11, 29, 10), 'end_time': null},
-        now: _now,
-      );
+      final later = EventRepository.fromRow({
+        ...weekly,
+        'start_time': _at(2026, 11, 29, 10),
+        'end_time': null,
+      }, now: _now);
       expect(later?.startTime, DateTime(2026, 11, 29, 10));
     });
 
@@ -311,13 +340,20 @@ void main() {
         ),
       ];
 
-      final london = EventRepository.upcoming(rows, branch: 'London', now: _now);
+      final london = EventRepository.upcoming(
+        rows,
+        branch: 'London',
+        now: _now,
+      );
       expect(london.map((e) => e.id), ['sun', 'lon', 'img']);
       expect(london.any((e) => e.id == 'lee'), isFalse);
       expect(london.firstWhere((e) => e.id == 'img').imageUrl, isNull);
       expect(
-        EventRepository.upcoming(rows, branch: null, now: _now)
-            .any((e) => e.id == 'lee'),
+        EventRepository.upcoming(
+          rows,
+          branch: null,
+          now: _now,
+        ).any((e) => e.id == 'lee'),
         isTrue,
       );
     });
@@ -333,8 +369,11 @@ void main() {
         ['b', 'a'],
       );
       expect(
-        EventRepository.past(rows, branch: 'London', now: _now)
-            .map((e) => e.id),
+        EventRepository.past(
+          rows,
+          branch: 'London',
+          now: _now,
+        ).map((e) => e.id),
         ['a'],
       );
     });
@@ -367,10 +406,10 @@ void main() {
   });
 
   group('LiveRepository', () {
-    test('app_config liveStream maps enabled and is_live', () {
+    test('app_config live_stream maps enabled and is_live', () {
       final on = LiveRepository.fromRows([
         {
-          'key': 'liveStream',
+          'key': 'live_stream',
           'value': {
             'url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
             'title': 'Sunday',
@@ -395,9 +434,9 @@ void main() {
 
     test('offline is not live', () async {
       final stub = SupabaseStub({})..offline = true;
-      final status = await LiveRepository(api: stub.api())
-          .watchLiveStatus()
-          .first;
+      final status = await LiveRepository(
+        api: stub.api(),
+      ).watchLiveStatus().first;
       expect(status.isLive, isFalse);
     });
   });

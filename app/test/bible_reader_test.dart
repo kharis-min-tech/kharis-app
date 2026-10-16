@@ -111,9 +111,8 @@ class _FakeBibleRepository extends BibleRepository {
 }
 
 DailyContent _today(String book, int chapter) => DailyContent(
-  reading: BibleReading(book: book, chapter: chapter, verse: '1-end'),
-  prayer: 'Lord, teach me.',
-  prayerReference: '',
+  reading: DailyEntry(title: '$book $chapter', reference: '$book $chapter'),
+  prayer: const DailyEntry(title: 'Lord, teach me.'),
 );
 
 Future<(_FakeBibleRepository, SharedPreferences)> _pumpReader(

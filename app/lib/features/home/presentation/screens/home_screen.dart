@@ -12,6 +12,7 @@ import '../widgets/continue_listening_card.dart';
 import '../widgets/giving_shortcut_card.dart';
 import '../widgets/live_now_card.dart';
 import '../widgets/todays_reading_card.dart';
+import '../widgets/daily_message_card.dart';
 import '../widgets/campus_card.dart';
 import '../widgets/profile_completion_card.dart';
 import '../widgets/news_section.dart';
@@ -29,13 +30,17 @@ class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   /// Pull-to-refresh reloads everything Home shows and holds the spinner
-  /// until it has all answered: today's reading, the campus announcements and
-  /// events, and the branch settings (branches with services and giving, and
-  /// the live stream) behind the layout and the campus card.
+  /// until it has all answered: today's reading and message, the campus
+  /// announcements and events, and the branch settings (branches with
+  /// services and giving, and the live stream) behind the layout and the
+  /// campus card.
   Future<void> _refresh(WidgetRef ref) {
-    ref.invalidate(dailyContentProvider);
+    ref
+      ..invalidate(dailyContentProvider)
+      ..invalidate(dailyMessageProvider);
     return Future.wait<void>([
       settleRefresh(ref.refresh(dailyContentProvider.future)),
+      settleRefresh(ref.refresh(dailyMessageProvider.future)),
       refreshCampusContent(ref),
       refreshCampusConfig(ref),
     ]);
@@ -93,9 +98,14 @@ class _HomeSection extends StatelessWidget {
       // phone are set.
       HomeSectionId.profileCompletion => const ProfileCompletionCard(),
       HomeSectionId.live => const LiveNowCard(padding: _blockPadding),
-      HomeSectionId.reading => const Padding(
-        padding: _blockPadding,
-        child: TodaysReadingCard(),
+      // Today's reading, then the Daily Message; each collapses when the
+      // Studio has nothing for today.
+      HomeSectionId.reading => const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TodaysReadingCard(padding: _blockPadding),
+          DailyMessageCard(padding: _blockPadding),
+        ],
       ),
       HomeSectionId.announcements => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
