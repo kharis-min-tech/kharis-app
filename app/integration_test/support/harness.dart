@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // Shared harness for the on-device journeys in integration_test/e2e_test.dart.
 //
 // Every journey is its own `testWidgets`, so one failing journey never stops
@@ -176,11 +178,17 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 /// `WidgetTester.ensureVisible` can leave it at the bottom edge, under the
 /// bottom bar or mini player that float over the list on smaller screens,
 /// and a tap there lands on the bar instead.
+///
+/// The scroll is animated and frames only advance when the test pumps, so
+/// the animation is started, not awaited: awaiting it before pumping left
+/// the journey waiting forever whenever [finder] actually had to move.
 Future<void> ensureCentred(WidgetTester tester, Finder finder) async {
-  await Scrollable.ensureVisible(
-    tester.element(finder),
-    alignment: 0.3,
-    duration: const Duration(milliseconds: 200),
+  unawaited(
+    Scrollable.ensureVisible(
+      tester.element(finder),
+      alignment: 0.3,
+      duration: const Duration(milliseconds: 200),
+    ),
   );
   await pumpFor(tester, const Duration(milliseconds: 400));
 }

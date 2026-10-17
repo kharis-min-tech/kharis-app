@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -64,6 +66,9 @@ class _FakeBibleRepository extends BibleRepository {
   final passageRequests = <String>[];
   bool offline = false;
 
+  /// `bibleId/usfm` passages the version does not have (a 404).
+  final missing = <String>{};
+
   /// When set, the version's book list never arrives (a stalled request).
   bool booksHang = false;
 
@@ -89,6 +94,14 @@ class _FakeBibleRepository extends BibleRepository {
       throw DioException.connectionError(
         requestOptions: RequestOptions(path: usfmId),
         reason: 'offline',
+      );
+    }
+    if (missing.contains('$bibleId/$usfmId')) {
+      final request = RequestOptions(path: usfmId);
+      throw DioException.badResponse(
+        statusCode: 404,
+        requestOptions: request,
+        response: Response(requestOptions: request, statusCode: 404),
       );
     }
     return BiblePassage(
@@ -118,12 +131,16 @@ DailyContent _today(String book, int chapter) => DailyContent(
 Future<(_FakeBibleRepository, SharedPreferences)> _pumpReader(
   WidgetTester tester, {
   DailyContent? today,
+  bool nothingToday = false,
   Map<String, Object> prefs = const {},
   bool booksHang = false,
+  Set<String> missing = const {},
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sharedPrefs = await SharedPreferences.getInstance();
-  final repo = _FakeBibleRepository()..booksHang = booksHang;
+  final repo = _FakeBibleRepository()
+    ..booksHang = booksHang
+    ..missing.addAll(missing);
   tester.view.physicalSize = const Size(800, 1600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -133,7 +150,8 @@ Future<(_FakeBibleRepository, SharedPreferences)> _pumpReader(
         sharedPreferencesProvider.overrideWithValue(sharedPrefs),
         bibleRepositoryProvider.overrideWithValue(repo),
         dailyContentProvider.overrideWith(
-          (ref) => Stream.value(today ?? _today('John', 3)),
+          (ref) =>
+              Stream.value(nothingToday ? null : today ?? _today('John', 3)),
         ),
       ],
       child: const MaterialApp(home: ReadingScreen()),
@@ -141,6 +159,69 @@ Future<(_FakeBibleRepository, SharedPreferences)> _pumpReader(
   );
   await tester.pumpAndSettle();
   return (repo, sharedPrefs);
+}
+
+/// The reader's `/reading` and `/bible` routes, pushed over a More stub (or
+/// opened alone, as a cold-start push tap does), so Close and back can be
+/// checked against what lies underneath.
+Future<(GoRouter, _FakeBibleRepository)> _pumpRoutes(
+  WidgetTester tester, {
+  required String open,
+  bool overMore = true,
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+  final repo = _FakeBibleRepository();
+  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  Widget stub(String path) => Scaffold(body: Text('route:$path'));
+  final router = GoRouter(
+    initialLocation: overMore ? '/more' : open,
+    routes: [
+      GoRoute(path: '/more', builder: (_, _) => stub('/more')),
+      GoRoute(path: '/home', builder: (_, _) => stub('/home')),
+      GoRoute(path: '/reading', builder: (_, _) => const ReadingScreen()),
+      GoRoute(
+        path: '/bible',
+        builder: (_, _) => const ReadingScreen(browse: true),
+      ),
+    ],
+  );
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        bibleRepositoryProvider.overrideWithValue(repo),
+        dailyContentProvider.overrideWith(
+          (ref) => Stream.value(_today('John', 3)),
+        ),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
+  );
+  await tester.pumpAndSettle();
+  if (overMore) {
+    unawaited(router.push(open));
+    await tester.pumpAndSettle();
+  }
+  return (router, repo);
+}
+
+/// Book list -> [book] -> chapter grid cell [chapter] (when it has one).
+Future<void> _chooseBook(
+  WidgetTester tester,
+  String book, [
+  int? chapter,
+]) async {
+  await tester.ensureVisible(find.text(book));
+  await tester.tap(find.text(book));
+  await tester.pumpAndSettle();
+  if (chapter != null) {
+    await tester.tap(find.byKey(Key('bible-chapter-$chapter')));
+    await tester.pumpAndSettle();
+  }
 }
 
 Finder _header(String label) => find.byWidgetPredicate(
@@ -273,6 +354,19 @@ void main() {
       expect(_error('3:16'), contains('couldn\u2019t read'));
       expect(_error('John 3:16-4:2'), contains('couldn\u2019t read'));
       expect(_error('John three'), contains('couldn\u2019t'));
+    });
+
+    test('numbers too long for an int are explained, not thrown', () {
+      const huge = '99999999999999999999';
+      expect(_error('John $huge'), 'John has 21 chapters.');
+      expect(
+        _error('John 3:$huge', _indexWithVerses()),
+        'John 3 has 36 verses.',
+      );
+      expect(
+        _found('John 3:16-$huge', _indexWithVerses()),
+        const BibleLocation('JHN', 3, verseStart: 16, verseEnd: 36),
+      );
     });
 
     test('a book missing from the version says so', () {
@@ -602,6 +696,182 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Couldn\u2019t load the passage'), findsNothing);
       expect(find.textContaining('Verse 1 of JHN.3'), findsOneWidget);
+    });
+
+    testWidgets('searching an overlong chapter explains it and stays put', (
+      tester,
+    ) async {
+      await _pumpReader(tester);
+      await _search(tester, 'John 99999999999999999999');
+      expect(tester.takeException(), isNull);
+      expect(find.text('John has 21 chapters.'), findsOneWidget);
+      expect(_header('John 3'), findsOneWidget);
+    });
+
+    for (final (book, chapter, missingStep, presentStep) in const [
+      ('Genesis', 1, 'bible-prev', 'bible-next'),
+      ('Revelation', 22, 'bible-next', 'bible-prev'),
+    ]) {
+      testWidgets('$book $chapter is an end of the Bible: only one step', (
+        tester,
+      ) async {
+        await _pumpReader(tester, today: _today(book, chapter));
+        expect(_header('$book $chapter'), findsOneWidget);
+        expect(find.byKey(Key(missingStep)), findsNothing);
+        expect(find.byKey(Key(presentStep)), findsOneWidget);
+      });
+    }
+
+    testWidgets('no reading today offers Browse the Bible, and it works', (
+      tester,
+    ) async {
+      final (repo, _) = await _pumpReader(tester, nothingToday: true);
+      expect(find.text('No reading today'), findsOneWidget);
+      expect(repo.passageRequests, isEmpty);
+
+      await tester.tap(find.text('Browse the Bible'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BibleBooksScreen), findsOneWidget);
+      await _chooseBook(tester, 'Romans', 8);
+      expect(_header('Romans 8'), findsOneWidget);
+      expect(repo.passageRequests, ['111/ROM.8']);
+    });
+
+    testWidgets('a reading reference that does not parse shows the Studio '
+        'text and the way into the Bible', (tester) async {
+      await _pumpReader(
+        tester,
+        today: const DailyContent(
+          reading: DailyEntry(
+            title: 'Faith at work',
+            reference: 'Hebrews 11 and James 2',
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('reading-today-text')), findsOneWidget);
+      expect(find.text('Faith at work'), findsOneWidget);
+
+      await tester.tap(find.text('Browse the Bible'));
+      await tester.pumpAndSettle();
+      await _chooseBook(tester, 'Jude');
+      expect(find.byType(BibleChaptersScreen), findsNothing);
+      expect(_header('Jude 1'), findsOneWidget, reason: 'one chapter: no grid');
+    });
+
+    testWidgets('a passage missing from the version offers another version', (
+      tester,
+    ) async {
+      final (repo, _) = await _pumpReader(
+        tester,
+        today: _today('Psalms', 23),
+        missing: {'111/PSA.23'},
+      );
+      expect(find.text('This passage isn\u2019t available'), findsOneWidget);
+
+      await tester.tap(find.text('Change version'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bible-version-3034')));
+      await tester.pumpAndSettle();
+      expect(repo.passageRequests.last, '3034/PSA.23');
+      expect(find.textContaining('Verse 1 of PSA.23 in BSB'), findsOneWidget);
+    });
+
+    testWidgets('switching version while browsing stays on that chapter', (
+      tester,
+    ) async {
+      final (repo, _) = await _pumpReader(tester);
+      await tester.ensureVisible(find.byKey(const Key('bible-next')));
+      await tester.tap(find.byKey(const Key('bible-next')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('NIV'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bible-version-3034')));
+      await tester.pumpAndSettle();
+      expect(repo.passageRequests.last, '3034/JHN.4');
+      expect(_header('John 4'), findsOneWidget);
+      expect(find.byKey(const Key('bible-today')), findsOneWidget);
+    });
+
+    testWidgets('Open in Bible app says so when it cannot open', (
+      tester,
+    ) async {
+      final launched = <String>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'launch') {
+          launched.add((call.arguments as Map)['url'] as String);
+        }
+        return false;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      await _pumpReader(tester);
+      await tester.tap(find.byTooltip('Open in Bible app'));
+      await tester.pumpAndSettle();
+      expect(launched, ['https://www.bible.com/bible/111/JHN.3']);
+      expect(
+        find.text('Could not open the Bible app. Please try again.'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('routes', () {
+    testWidgets('More > Bible opens on the book list; Close and system back '
+        'return straight to More', (tester) async {
+      final (router, repo) = await _pumpRoutes(tester, open: '/bible');
+      expect(find.byType(BibleBooksScreen), findsOneWidget);
+      expect(find.text('TODAY\u2019S READING'), findsNothing);
+      expect(repo.passageRequests, isEmpty);
+
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('route:/more'), findsOneWidget);
+      expect(find.byType(ReadingScreen), findsNothing);
+
+      unawaited(router.push('/bible'));
+      await tester.pumpAndSettle();
+      // Into a book's chapters and back out keeps the list.
+      await _chooseBook(tester, 'Romans');
+      expect(find.byType(BibleChaptersScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(BibleBooksScreen), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('route:/more'), findsOneWidget);
+      expect(find.byType(ReadingScreen), findsNothing);
+    });
+
+    testWidgets('a chapter chosen from More > Bible offers today\u2019s '
+        'reading, and Close returns to More', (tester) async {
+      final (_, repo) = await _pumpRoutes(tester, open: '/bible');
+      await _chooseBook(tester, 'Romans', 8);
+      expect(find.byType(BibleBooksScreen), findsNothing);
+      expect(_header('Romans 8'), findsOneWidget);
+      expect(repo.passageRequests, ['111/ROM.8']);
+
+      await tester.tap(find.byKey(const Key('bible-today')));
+      await tester.pumpAndSettle();
+      expect(_header('John 3'), findsOneWidget);
+      expect(find.text('TODAY\u2019S READING'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('route:/more'), findsOneWidget);
+    });
+
+    testWidgets('Close with nothing underneath (a cold-start push tap) goes '
+        'Home', (tester) async {
+      await _pumpRoutes(tester, open: '/reading', overMore: false);
+      expect(_header('John 3'), findsOneWidget);
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('route:/home'), findsOneWidget);
     });
   });
 }
