@@ -1,4 +1,4 @@
-name: Build iOS IPA
+name: Build and Upload iOS to TestFlight
 
 on:
   workflow_dispatch:
@@ -15,25 +15,6 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Check required secrets are present
-        env:
-          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
-          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
-          ENV_JSON: ${{ secrets.ENV_JSON }}
-        run: |
-          missing=""
-
-          [ -n "$IOS_CERTIFICATE_BASE64" ] || missing="$missing IOS_CERTIFICATE_BASE64"
-          [ -n "$IOS_CERTIFICATE_PASSWORD" ] || missing="$missing IOS_CERTIFICATE_PASSWORD"
-          [ -n "$IOS_PROVISIONING_PROFILE_BASE64" ] || missing="$missing IOS_PROVISIONING_PROFILE_BASE64"
-          [ -n "$ENV_JSON" ] || missing="$missing ENV_JSON"
-
-          if [ -n "$missing" ]; then
-            echo "::error::Missing repository secret(s):$missing"
-            exit 1
-          fi
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -41,7 +22,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Install Flutter dependencies
+      - name: Install dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile
 
@@ -80,8 +61,6 @@ jobs:
             -k build \
             build.keychain
 
-      - name: Verify Signing Identity
-        run: |
           echo "===== SIGNING IDENTITIES ====="
           security find-identity -v -p codesigning
 
@@ -96,24 +75,11 @@ jobs:
           cp profile.mobileprovision \
             ~/Library/MobileDevice/Provisioning\ Profiles/
 
-      - name: Verify Provisioning Profile
-        run: |
-          security cms -D -i profile.mobileprovision > profile.plist
-
-          echo "===== TEAM ID ====="
-          /usr/libexec/PlistBuddy \
-            -c "Print :TeamIdentifier:0" \
-            profile.plist
-
-          echo "===== PROFILES ====="
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles
-
       - name: Calculate build number
         id: build
         run: |
           BUILD_NUMBER=$(( ${{ github.run_number }} + 4 ))
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-          echo "Using build number: $BUILD_NUMBER"
 
       - name: Install CocoaPods
         working-directory: app/ios
@@ -128,16 +94,26 @@ jobs:
             --build-number=${{ steps.build.outputs.build_number }} \
             --dart-define-from-file=env.json
 
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-release-ipa-${{ steps.build.outputs.build_number }}
-          path: app/build/ios/ipa/*.ipa
-          retention-days: 30
-
-      - name: Scrub credentials
-        if: always()
+      - name: Configure App Store Connect API Key
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
         run: |
-          rm -f app/env.json
-          rm -f certificate.p12
-          rm -f profile.mobileprovision
+          mkdir -p ~/.appstoreconnect/private_keys
+
+          cat > ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8 <<EOF
+          $APPSTORE_PRIVATE_KEY
+          EOF
+
+      - name: Upload to TestFlight
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        run: |
+          IPA_PATH=$(find app/build/ios/ipa -name "*.ipa" | head -n 1)
+
+          echo "Uploading: $IPA_PATH"
+
+          xcrun altool \
+            --upload-app \
+     
