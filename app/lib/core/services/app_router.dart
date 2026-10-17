@@ -127,15 +127,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Today's reading / Bible (overlays shell) ──────────────────────────
-      // Both open the Bible reader on today's reading; /bible is More's
-      // "Bible" row, /reading the Home card and reading pushes.
+      // /reading (Home card, More's "Daily reading", reading pushes) opens the
+      // reader on today's reading; /bible (More's "Bible") on the book list.
       GoRoute(
         path: '/reading',
         builder: (context, state) => const ReadingScreen(),
       ),
       GoRoute(
         path: '/bible',
-        builder: (context, state) => const ReadingScreen(),
+        builder: (context, state) => const ReadingScreen(browse: true),
       ),
 
       // ── Playlists (overlays shell) ────────────────────────────────────────

@@ -243,11 +243,12 @@ ReferenceLookup _resolve(
   String? verseText,
   String? verseEndText,
 ) {
-  var chapter = chapterText == null
-      ? book.chapters.first
-      : int.parse(chapterText);
-  int? verseStart = verseText == null ? null : int.parse(verseText);
-  int? verseEnd = verseEndText == null ? null : int.parse(verseEndText);
+  // Digits too long for an int name no chapter or verse in any book; the
+  // checks below then explain the reference instead of the parse throwing.
+  int number(String text) => int.tryParse(text) ?? 1 << 30;
+  var chapter = chapterText == null ? book.chapters.first : number(chapterText);
+  int? verseStart = verseText == null ? null : number(verseText);
+  int? verseEnd = verseEndText == null ? null : number(verseEndText);
 
   // "Jude 3" means verse 3 of the only chapter.
   if (book.chapters.length == 1 &&

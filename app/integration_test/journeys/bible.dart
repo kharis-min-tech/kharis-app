@@ -8,6 +8,7 @@ import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
+import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
@@ -53,9 +54,23 @@ Future<void> _pickChapter(
   int chapters,
   int chapter,
 ) async {
-  final t = j.tester;
   // A verse search scrolls the passage: bring the heading back first.
-  await tapVisible(t, _inReader(find.byKey(const Key('bible-reference'))));
+  await tapVisible(
+    j.tester,
+    _inReader(find.byKey(const Key('bible-reference'))),
+  );
+  await _chooseFromBooks(j, title, chapters, chapter);
+}
+
+/// On the book list (pushed, or More's Bible row), picks [title] chapter
+/// [chapter] and waits for its passage.
+Future<void> _chooseFromBooks(
+  Journey j,
+  String title,
+  int chapters,
+  int chapter,
+) async {
+  final t = j.tester;
   await pumpUntilFound(t, find.byType(BibleBooksScreen));
   final books = verticalScrollableIn(find.byType(BibleBooksScreen));
   final row = find.descendant(
@@ -110,9 +125,11 @@ Future<void> _tapStep(Journey j, String key) async {
   await _passageLoaded(j);
 }
 
-/// (g) Bible: opens on today's reading; "John 3:16" search highlights the
-/// verse; a random book + chapter from the picker; previous / next across a
-/// book boundary; another translation, then NIV again.
+/// (g) Bible: Daily reading opens on today's reading; "John 3:16" search
+/// highlights the verse; a random book + chapter from the picker; previous /
+/// next across a book boundary; another translation, then NIV again. More's
+/// Bible row opens on the book list, Close from it returns to More, and a
+/// chapter chosen there offers the way back to today's reading.
 Future<void> bibleJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'bible');
@@ -125,7 +142,7 @@ Future<void> bibleJourney(Journey j) async {
   );
 
   await j.launch();
-  await openMoreRow(t, 'Bible');
+  await openMoreRow(t, 'Daily reading');
   await pumpUntilFound(t, find.byType(ReadingScreen));
 
   // ── Today's reading ──────────────────────────────────────────────────────
@@ -271,12 +288,10 @@ Future<void> bibleJourney(Journey j) async {
     await scrollUntilFound(
       t,
       tile,
-      scrollable: find
-          .ancestor(
-            of: find.text('BIBLE VERSION'),
-            matching: find.byType(Scrollable),
-          )
-          .first,
+      // The sheet's list is the topmost Scrollable. Finding it through the
+      // "BIBLE VERSION" heading broke once scrolling took the heading off
+      // screen (the list builds lazily), aborting on versions far down.
+      scrollable: find.byType(Scrollable).last,
     );
     await t.tap(tile, warnIfMissed: false);
     await pumpUntil(t, () => find.text('BIBLE VERSION').evaluate().isEmpty);
@@ -320,4 +335,50 @@ Future<void> bibleJourney(Journey j) async {
     'NIV saved on the device',
   );
   await j.shot('niv-restored');
+
+  // ── More > Bible: the book list first ────────────────────────────────────
+  await tapBack(t);
+  await pumpUntilFound(t, find.byType(SettingsScreen));
+  await openMoreRow(t, 'Bible');
+  j.check(
+    await pumpUntil(
+      t,
+      () => _inReader(find.byType(BibleBooksScreen)).evaluate().isNotEmpty,
+    ),
+    'More > Bible opens on the book list',
+  );
+  await j.shot('bible-books');
+  await tapBack(t);
+  j.check(
+    await pumpUntil(
+      t,
+      () =>
+          find.byType(ReadingScreen).evaluate().isEmpty &&
+          find.byType(SettingsScreen).evaluate().isNotEmpty,
+    ),
+    'Close on the book list returns straight to More',
+  );
+
+  await openMoreRow(t, 'Bible');
+  await _chooseFromBooks(j, book.title, book.chapters, chapter);
+  j.check(
+    _label(t) == '${book.title} $chapter',
+    'More > Bible opens ${book.title} $chapter (shows "${_label(t)}")',
+  );
+  j.check(
+    _inReader(find.byKey(const Key('bible-today'))).evaluate().isNotEmpty ||
+        _inReader(find.text('TODAY\u2019S READING')).evaluate().isNotEmpty,
+    'a chapter chosen from More > Bible offers Today\u2019s reading',
+  );
+  await j.shot('bible-chosen');
+  await tapBack(t);
+  j.check(
+    await pumpUntil(
+      t,
+      () =>
+          find.byType(ReadingScreen).evaluate().isEmpty &&
+          find.byType(SettingsScreen).evaluate().isNotEmpty,
+    ),
+    'Close from that chapter returns to More',
+  );
 }

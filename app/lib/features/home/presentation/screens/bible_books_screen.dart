@@ -15,11 +15,22 @@ Future<BibleLocation?> pickBibleChapter(
   MaterialPageRoute(builder: (_) => BibleBooksScreen(current: current)),
 );
 
-AppBar _pickerAppBar(BuildContext context, String title) => AppBar(
+AppBar _pickerAppBar(
+  BuildContext context,
+  String title, {
+  VoidCallback? onClose,
+}) => AppBar(
   backgroundColor: context.kc.bg,
   elevation: 0,
   scrolledUnderElevation: 0,
   iconTheme: IconThemeData(color: context.kc.onBg),
+  leading: onClose == null
+      ? null
+      : IconButton(
+          tooltip: 'Close',
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.kc.onBg),
+          onPressed: onClose,
+        ),
   title: Text(
     title,
     style: AppTypography.display(
@@ -33,10 +44,22 @@ AppBar _pickerAppBar(BuildContext context, String title) => AppBar(
 /// Books grouped Old Testament / New Testament (and other books for versions
 /// that carry them).
 class BibleBooksScreen extends ConsumerStatefulWidget {
-  const BibleBooksScreen({super.key, this.current});
+  const BibleBooksScreen({
+    super.key,
+    this.current,
+    this.onPicked,
+    this.onClose,
+  });
 
   /// Where the reader is; its book is marked and scrolled into view.
   final BibleLocation? current;
+
+  /// Receives the chosen chapter when the list is the reader's own first
+  /// screen (More's Bible row) rather than a pushed picker that pops with it.
+  final ValueChanged<BibleLocation>? onPicked;
+
+  /// Leaves the Bible altogether; shown as the app bar's Close.
+  final VoidCallback? onClose;
 
   @override
   ConsumerState<BibleBooksScreen> createState() => _BibleBooksScreenState();
@@ -46,19 +69,23 @@ class _BibleBooksScreenState extends ConsumerState<BibleBooksScreen> {
   final _currentKey = GlobalKey();
   bool _revealed = false;
 
+  void _done(BibleLocation picked) {
+    final onPicked = widget.onPicked;
+    onPicked != null ? onPicked(picked) : Navigator.of(context).pop(picked);
+  }
+
   Future<void> _open(BibleBook book) async {
-    final navigator = Navigator.of(context);
     if (book.chapters.length == 1) {
-      navigator.pop(BibleLocation(book.usfm, book.chapters.single));
+      _done(BibleLocation(book.usfm, book.chapters.single));
       return;
     }
-    final picked = await navigator.push<BibleLocation>(
+    final picked = await Navigator.of(context).push<BibleLocation>(
       MaterialPageRoute(
         builder: (_) =>
             BibleChaptersScreen(book: book, current: widget.current),
       ),
     );
-    if (picked != null && mounted) navigator.pop(picked);
+    if (picked != null && mounted) _done(picked);
   }
 
   void _revealCurrent() {
@@ -82,7 +109,7 @@ class _BibleBooksScreenState extends ConsumerState<BibleBooksScreen> {
 
     return Scaffold(
       backgroundColor: context.kc.bg,
-      appBar: _pickerAppBar(context, 'Books'),
+      appBar: _pickerAppBar(context, 'Books', onClose: widget.onClose),
       body: Builder(
         builder: (context) {
           _revealCurrent();
