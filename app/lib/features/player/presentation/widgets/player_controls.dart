@@ -27,6 +27,7 @@ class TransportBinding {
     required this.onToggleRepeat,
     this.onPrevious,
     this.onNext,
+    this.onSeekBy,
   });
 
   final bool isPlaying;
@@ -45,11 +46,17 @@ class TransportBinding {
 
   /// Null disables the control (last message in the queue).
   final VoidCallback? onNext;
+
+  /// Moves playback by a signed offset (back 15 s / forward 30 s), clamped
+  /// to the message. Null disables both skip buttons.
+  final ValueChanged<Duration>? onSeekBy;
 }
 
 /// Transport controls.
 ///
-/// Row layout: speed pill | previous | play/pause | next | repeat.
+/// Main row: previous | back 15 s | play/pause | forward 30 s | next, the
+/// podcast-app arrangement with the time skips next to Play. Below it: the
+/// speed pill on the left and repeat on the right.
 /// Previous and Next walk the queue the member launched from, Spotify-style:
 /// Previous restarts the message once it is past three seconds, otherwise
 /// steps back; both disable at the ends of the queue. The play/pause button
@@ -65,6 +72,25 @@ class PlayerControls extends ConsumerWidget {
 
   static const List<double> speeds = [1, 1.25, 1.5, 2, 0.75];
 
+  /// Podcast-app skips: back a little to re-hear, forward further to skip.
+  static const Duration backSkip = Duration(seconds: 15);
+  static const Duration forwardSkip = Duration(seconds: 30);
+
+  /// [position] moved by [offset], kept within the message ([duration] may
+  /// be unknown, in which case only the start bounds it).
+  static Duration skipTarget(
+    Duration position,
+    Duration offset,
+    Duration? duration,
+  ) {
+    var target = position + offset;
+    if (target < Duration.zero) target = Duration.zero;
+    if (duration != null && duration > Duration.zero && target > duration) {
+      target = duration;
+    }
+    return target;
+  }
+
   /// The speed after [current] in [speeds]; unknown rates restart the cycle.
   static double nextSpeed(double current) {
     final index = speeds.indexWhere((s) => (s - current).abs() < 0.01);
@@ -75,34 +101,58 @@ class PlayerControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final binding = transport ?? _audioBinding(ref);
 
+    final seekBy = binding.onSeekBy;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _SpeedPill(
-            speed: binding.speed,
-            onTap: () => binding.onSetSpeed(nextSpeed(binding.speed)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _SkipButton(
+                icon: Icons.skip_previous_rounded,
+                label: 'Previous message',
+                size: 44,
+                onPressed: binding.onPrevious,
+              ),
+              _TimeSkipButton(
+                seconds: 15,
+                forward: false,
+                onPressed: seekBy == null ? null : () => seekBy(-backSkip),
+              ),
+              _PlayPauseButton(
+                isPlaying: binding.isPlaying,
+                isBuffering: binding.isBuffering,
+                onTap: binding.isPlaying ? binding.onPause : binding.onPlay,
+              ),
+              _TimeSkipButton(
+                seconds: 30,
+                forward: true,
+                onPressed: seekBy == null ? null : () => seekBy(forwardSkip),
+              ),
+              _SkipButton(
+                icon: Icons.skip_next_rounded,
+                label: 'Next message',
+                size: 44,
+                onPressed: binding.onNext,
+              ),
+            ],
           ),
-          _SkipButton(
-            icon: Icons.skip_previous_rounded,
-            label: 'Previous message',
-            onPressed: binding.onPrevious,
-          ),
-          _PlayPauseButton(
-            isPlaying: binding.isPlaying,
-            isBuffering: binding.isBuffering,
-            onTap: binding.isPlaying ? binding.onPause : binding.onPlay,
-          ),
-          _SkipButton(
-            icon: Icons.skip_next_rounded,
-            label: 'Next message',
-            onPressed: binding.onNext,
-          ),
-          _RepeatButton(
-            active: binding.repeatOn,
-            onTap: binding.onToggleRepeat,
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _SpeedPill(
+                speed: binding.speed,
+                onTap: () => binding.onSetSpeed(nextSpeed(binding.speed)),
+              ),
+              _RepeatButton(
+                active: binding.repeatOn,
+                onTap: binding.onToggleRepeat,
+              ),
+            ],
           ),
         ],
       ),
@@ -142,6 +192,15 @@ class PlayerControls extends ConsumerWidget {
       onToggleRepeat: () => unawaited(service.setRepeatOne(!repeatOn)),
       onPrevious: skips.previous,
       onNext: skips.next,
+      onSeekBy: (offset) => unawaited(
+        service.seek(
+          skipTarget(
+            ref.read(positionProvider).valueOrNull ?? Duration.zero,
+            offset,
+            ref.read(durationProvider).valueOrNull,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -295,8 +354,10 @@ class _SkipButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.size = 54,
   });
 
+  final double size;
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
@@ -319,14 +380,14 @@ class _SkipButton extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onPressed,
           child: SizedBox(
-            width: 54,
-            height: 54,
+            width: size,
+            height: size,
             child: Icon(
               icon,
               color: enabled
                   ? context.kc.onBg
                   : context.kc.onBg.withValues(alpha: 0.3),
-              size: 30,
+              size: size * 0.55,
             ),
           ),
         ),
@@ -376,6 +437,64 @@ class _RepeatButton extends StatelessWidget {
                     ),
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Back / forward by a fixed number of seconds: a circular arrow with the
+/// seconds in its centre, as podcast apps draw it. Material has no 15 s
+/// glyph, so the number is set as text over the plain arrow.
+class _TimeSkipButton extends StatelessWidget {
+  const _TimeSkipButton({
+    required this.seconds,
+    required this.forward,
+    required this.onPressed,
+  });
+
+  final int seconds;
+  final bool forward;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    final color = enabled
+        ? context.kc.onBg
+        : context.kc.onBg.withValues(alpha: 0.3);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: forward ? 'Forward $seconds seconds' : 'Back $seconds seconds',
+      excludeSemantics: true,
+      child: InkResponse(
+        key: Key(forward ? 'skip-forward' : 'skip-back'),
+        onTap: onPressed,
+        radius: 30,
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Transform.flip(
+                flipX: forward,
+                child: Icon(Icons.replay_rounded, size: 40, color: color),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  '$seconds',
+                  style: AppTypography.ui(
+                    size: 11,
+                    weight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

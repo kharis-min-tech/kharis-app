@@ -7,8 +7,8 @@ import 'package:just_audio/just_audio.dart' show ProcessingState;
 
 import 'package:kharis_app/core/constants/http_constants.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
-import 'package:kharis_app/features/notes/presentation/screens/note_editor_screen.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
+import 'package:kharis_app/features/player/domain/transcript.dart';
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
@@ -24,9 +24,9 @@ import '../support/harness.dart';
 import '../support/live_data.dart';
 
 /// (e) Player: play, seek, next / previous, audio <-> video keeps the
-/// position, a note added then deleted, share text, minimise to the mini
-/// player (hidden on Giving), dismiss; the transcript sheet for a message
-/// the R2 catalogue says has one.
+/// position, the notepad (stamp the time, save, reopen, seek back, restore),
+/// share text, minimise to the mini player (hidden on Giving), dismiss; the
+/// transcript sheet for a message the R2 catalogue says has one.
 Future<void> playerJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'player');
@@ -136,7 +136,7 @@ Future<void> playerJourney(Journey j) async {
     await _checkModeSwitch(j, current);
   }
 
-  // ── Notes: add at the current time, then delete ──────────────────────────
+  // ── Notes: stamp the time in the notepad, seek back to it, restore ───────
   await _checkNotes(j);
 
   // ── Share (OS sheet answered by the harness) ─────────────────────────────
@@ -297,48 +297,43 @@ Future<void> _checkModeSwitch(Journey j, Sermon s) async {
 Future<void> _checkNotes(Journey j) async {
   final t = j.tester;
   final audio = j.c.read(audioPlayerServiceProvider);
+  final sheet = find.byType(SermonNotesSheet);
+  Finder inSheet(Finder f) => find.descendant(of: sheet, matching: f);
+  final field = inSheet(find.byType(TextField));
+  TextEditingController pad() => t.widget<TextField>(field).controller!;
+
+  Future<void> closeSheet() async {
+    await t.tap(inSheet(find.text('Done')), warnIfMissed: false);
+    await pumpUntil(t, () => sheet.evaluate().isEmpty);
+  }
+
   await tapPlayerAction(t, 'Notes');
-  await pumpUntilFound(t, find.byType(SermonNotesSheet));
-  final add = find.textContaining('Add a note at ');
+  await pumpUntilFound(t, field);
+  // Restored at the end: the notepad may hold the account's own notes.
+  final before = pad().text;
+  final insert = inSheet(find.textContaining(RegExp(r'^Insert \d')));
   j.check(
     await pumpUntil(
       t,
-      () => add.evaluate().isNotEmpty,
+      () => insert.evaluate().isNotEmpty,
       timeout: const Duration(seconds: 5),
     ),
-    'notes sheet offers "Add a note at mm:ss"',
+    'notepad offers "Insert m:ss"',
   );
-  if (add.evaluate().isEmpty) return;
-  final label = t.widget<Text>(add.first).data ?? '';
+  if (insert.evaluate().isEmpty) return closeSheet();
+  final stamp = (t.widget<Text>(insert.first).data ?? '').replaceFirst(
+    'Insert ',
+    '',
+  );
   final atTap = audio.position;
-  await t.tap(add.first, warnIfMissed: false);
-  await pumpUntilFound(t, find.byType(NoteEditorScreen));
-  final body = 'E2E note ${DateTime.now().millisecondsSinceEpoch}';
-  await t.enterText(
-    find.descendant(
-      of: find.byType(NoteEditorScreen),
-      matching: find.byType(TextField),
-    ),
-    body,
-  );
-  await pumpFor(t, const Duration(milliseconds: 400));
-  await t.tap(find.text('Save'), warnIfMissed: false);
-  await pumpUntil(t, () => find.byType(NoteEditorScreen).evaluate().isEmpty);
-  await tapPlayerAction(t, 'Notes');
-  await pumpUntilFound(t, find.byType(SermonNotesSheet));
-  final noteText = find.descendant(
-    of: find.byType(SermonNotesSheet),
-    matching: find.text(body),
-  );
+  // Stamp at the very top, so the stamp's spot on screen is known.
+  pad().selection = const TextSelection.collapsed(offset: 0);
+  await t.tap(insert.first, warnIfMissed: false);
+  await pumpFor(t, const Duration(milliseconds: 300));
   j.check(
-    await pumpUntil(
-      t,
-      () => noteText.evaluate().isNotEmpty,
-      timeout: const Duration(seconds: 15),
-    ),
-    'saved note listed on the message',
+    pad().text.startsWith('[$stamp] '),
+    'Insert writes [$stamp] at the cursor',
   );
-  final stamp = label.replaceFirst('Add a note at ', '');
   final m = RegExp(r'^(?:(\d+):)?(\d+):(\d\d)$').firstMatch(stamp);
   final secs = m == null
       ? null
@@ -347,35 +342,73 @@ Future<void> _checkNotes(Journey j) async {
             int.parse(m.group(3)!);
   j.check(
     secs != null && (secs - atTap.inSeconds).abs() <= 2,
-    'note stamped at the playback time ($stamp vs ${fmt(atTap)})',
+    'stamp is the playback time ($stamp vs ${fmt(atTap)})',
   );
-  await j.shot('note-added');
-  // Swipe to delete (no confirm dialog).
-  if (noteText.evaluate().isNotEmpty) {
-    await t.drag(noteText.first, const Offset(-500, 0), warnIfMissed: false);
+
+  final body = 'E2E note ${DateTime.now().millisecondsSinceEpoch}';
+  await t.enterText(
+    field,
+    '[$stamp] $body${before.isEmpty ? '' : '\n$before'}',
+  );
+  await pumpFor(t, const Duration(milliseconds: 400));
+  await j.shot('notepad-written');
+  await closeSheet();
+  j.check(
+    await pumpUntil(
+      t,
+      () => (j.c.read(notesProvider).valueOrNull ?? const []).any(
+        (n) => n.body.contains(body),
+      ),
+      timeout: const Duration(seconds: 15),
+    ),
+    'closing the notepad saves it',
+  );
+
+  await tapPlayerAction(t, 'Notes');
+  await pumpUntilFound(t, field);
+  j.check(
+    pad().text.contains(body),
+    'the notepad reopens with what was written',
+  );
+
+  // Tapping the stamp seeks back to it.
+  if (secs != null) {
+    await audio.seek(Duration(seconds: secs + 45));
+    await pumpFor(t, const Duration(milliseconds: 800));
+    await t.tapAt(
+      t.getTopLeft(inSheet(find.byType(EditableText))) + const Offset(8, 8),
+    );
+    j.check(
+      await pumpUntil(
+        t,
+        () => (audio.position.inSeconds - secs).abs() <= 3,
+        timeout: const Duration(seconds: 10),
+      ),
+      'tapping [$stamp] seeks there (now ${fmt(audio.position)})',
+    );
   }
+
+  // Put the notepad back as it was (an empty one is deleted on close).
+  await t.enterText(field, before);
+  await pumpFor(t, const Duration(milliseconds: 400));
+  await closeSheet();
   j.check(
     await pumpUntil(
       t,
       () => !(j.c.read(notesProvider).valueOrNull ?? const []).any(
-        (n) => n.body == body,
+        (n) => n.body.contains(body),
       ),
       timeout: const Duration(seconds: 15),
     ),
-    'swiping the note away deletes it',
+    'the test text is gone from the notepad',
   );
   // Leave nothing behind from earlier aborted runs either.
+  final leftover = RegExp(r'^(\[[\d:]+\] )?(E2E|Walkthrough) note ');
   final repo = j.c.read(notesRepositoryProvider);
   for (final n in (j.c.read(notesProvider).valueOrNull ?? const []).where(
-    (n) =>
-        n.body.startsWith('E2E note ') ||
-        n.body.startsWith('Walkthrough note '),
+    (n) => leftover.hasMatch(n.body),
   )) {
     await repo.delete(n.id);
-  }
-  if (find.byType(SermonNotesSheet).evaluate().isNotEmpty) {
-    Navigator.of(t.element(find.byType(SermonNotesSheet))).pop();
-    await pumpFor(t, const Duration(milliseconds: 800));
   }
 }
 
@@ -428,23 +461,23 @@ Future<void> _checkTranscript(Journey j, Random r) async {
       sermon.hasTranscript,
       'app knows "${sermon.title}" has a transcript',
     );
-    final opening = present.text.split(RegExp(r'\s+')).take(6).join(' ');
+    // The sheet shows each stretch's words beside its timestamp, markers
+    // lifted out of the text: look for the opening words of the first one.
+    final opening = Transcript.parse(
+      present.text,
+    ).segments.first.text.split(' ').take(6).join(' ');
     await _openTranscript(j, sermon);
     final body = find.descendant(
       of: find.byType(TranscriptSheet),
-      matching: find.byType(SelectableText),
+      matching: find.textContaining(opening),
     );
     final loaded = await pumpUntil(
       t,
       () => body.evaluate().isNotEmpty,
       timeout: const Duration(seconds: 30),
     );
-    final shown = loaded
-        ? (t.widget<SelectableText>(body.first).data ?? '')
-        : '';
-    String norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
     j.check(
-      loaded && norm(shown).contains(norm(opening)),
+      loaded,
       'transcript sheet shows the R2 transcript (starts "$opening")',
     );
     await j.shot('transcript');

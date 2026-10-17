@@ -9,9 +9,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 /// A member's written note.
 ///
-/// A note is either *anchored* — captured while a sermon was playing, so it
-/// carries [sermonId] and the [positionMs] it was written at — or general,
-/// with both null.
+/// A note tagged to a message — [sermonId] set, [positionMs] null — is that
+/// message's notepad: free text carrying `[m:ss]` timestamp tokens (see
+/// `notepad.dart`). A note with neither is a general note. Notes from older
+/// builds also carry the [positionMs] they were written at, one note per
+/// moment; the notepad folds those in the first time it is opened.
 @immutable
 class Note {
   const Note({
@@ -28,39 +30,35 @@ class Note {
   final String? sermonId;
   final String? sermonTitle;
 
-  /// Playback position, in milliseconds, the note was written at.
-  /// Null for general notes and for notes tagged to a sermon that was not
-  /// playing at the time.
+  /// Playback position, in milliseconds, a legacy one-note-per-moment note
+  /// was written at. Null for notepads and general notes.
   final int? positionMs;
 
   final String body;
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  /// True when this note can seek a sermon back to the moment it was written.
-  bool get isAnchored => sermonId != null && positionMs != null;
-
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'sermonId': sermonId,
-        'sermonTitle': sermonTitle,
-        'positionMs': positionMs,
-        'body': body,
-        'createdAt': createdAt.millisecondsSinceEpoch,
-        'updatedAt': updatedAt.millisecondsSinceEpoch,
-      };
+    'id': id,
+    'sermonId': sermonId,
+    'sermonTitle': sermonTitle,
+    'positionMs': positionMs,
+    'body': body,
+    'createdAt': createdAt.millisecondsSinceEpoch,
+    'updatedAt': updatedAt.millisecondsSinceEpoch,
+  };
 
   /// Reads the local (Hive) representation. Accepts the pre-Firestore `text`
   /// key so notes written by older builds survive the upgrade.
   factory Note.fromMap(Map<String, dynamic> map) => Note(
-        id: map['id'] as String,
-        sermonId: map['sermonId'] as String?,
-        sermonTitle: map['sermonTitle'] as String?,
-        positionMs: (map['positionMs'] as num?)?.toInt(),
-        body: (map['body'] ?? map['text']) as String,
-        createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
-        updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
-      );
+    id: map['id'] as String,
+    sermonId: map['sermonId'] as String?,
+    sermonTitle: map['sermonTitle'] as String?,
+    positionMs: (map['positionMs'] as num?)?.toInt(),
+    body: (map['body'] ?? map['text']) as String,
+    createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+    updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
+  );
 
   Note copyWith({
     String? sermonId,
@@ -68,16 +66,15 @@ class Note {
     int? positionMs,
     String? body,
     DateTime? updatedAt,
-  }) =>
-      Note(
-        id: id,
-        sermonId: sermonId ?? this.sermonId,
-        sermonTitle: sermonTitle ?? this.sermonTitle,
-        positionMs: positionMs ?? this.positionMs,
-        body: body ?? this.body,
-        createdAt: createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
+  }) => Note(
+    id: id,
+    sermonId: sermonId ?? this.sermonId,
+    sermonTitle: sermonTitle ?? this.sermonTitle,
+    positionMs: positionMs ?? this.positionMs,
+    body: body ?? this.body,
+    createdAt: createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 
   @override
   bool operator ==(Object other) => other is Note && other.id == id;
@@ -154,8 +151,8 @@ class NoteRepository {
     this._local, {
     required String? uid,
     FirebaseFirestore? firestore,
-  })  : _uid = (uid == null || uid.isEmpty) ? null : uid,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+  }) : _uid = (uid == null || uid.isEmpty) ? null : uid,
+       _firestore = firestore ?? FirebaseFirestore.instance;
 
   final LocalNoteStore _local;
   final String? _uid;
@@ -211,18 +208,18 @@ class NoteRepository {
         .orderBy('updatedAt', descending: true)
         .snapshots()
         .listen(
-      (snap) {
-        cloud = snap.docs.map(_fromDoc).whereType<Note>().toList();
-        hasCloud = true;
-        emit();
-      },
-      onError: (Object error) {
-        debugPrint('NoteRepository: notes stream failed — $error');
-        cloud = const [];
-        hasCloud = true;
-        emit();
-      },
-    );
+          (snap) {
+            cloud = snap.docs.map(_fromDoc).whereType<Note>().toList();
+            hasCloud = true;
+            emit();
+          },
+          onError: (Object error) {
+            debugPrint('NoteRepository: notes stream failed — $error');
+            cloud = const [];
+            hasCloud = true;
+            emit();
+          },
+        );
 
     controller.onCancel = () async {
       await cloudSub.cancel();
@@ -250,8 +247,8 @@ class NoteRepository {
           .set(_toDoc(note), SetOptions(merge: true))
           .then((_) => _local.delete(note.id))
           .catchError((Object error) {
-        debugPrint('NoteRepository: note upsert rejected — $error');
-      }),
+            debugPrint('NoteRepository: note upsert rejected — $error');
+          }),
     );
   }
 
@@ -261,9 +258,49 @@ class NoteRepository {
     await _local.delete(id);
     final uid = _uid;
     if (uid == null) return;
-    unawaited(_notesOf(uid).doc(id).delete().catchError((Object error) {
-      debugPrint('NoteRepository: note delete rejected — $error');
-    }));
+    unawaited(
+      _notesOf(uid).doc(id).delete().catchError((Object error) {
+        debugPrint('NoteRepository: note delete rejected — $error');
+      }),
+    );
+  }
+
+  /// Saves a message's notepad and retires the notes merged into it.
+  ///
+  /// Nothing in [replaces] is deleted until [pad] is durably written: the
+  /// local copy first (a failed local write throws before anything is
+  /// touched), then, signed in, ONE atomic Firestore batch that sets the
+  /// notepad and deletes the merged notes together — a rejected batch leaves
+  /// every merged note in place. Offline, the batch applies to the cache at
+  /// once and replays on reconnect, like [upsert].
+  Future<void> saveNotepad(
+    Note pad, {
+    Iterable<String> replaces = const [],
+  }) async {
+    final retired = [
+      for (final id in replaces)
+        if (id != pad.id) id,
+    ];
+    await _local.upsert(pad);
+    // The notepad now holds their text on this device; local copies of the
+    // merged notes (written signed out, or not yet acked) can go.
+    await _local.deleteAll(retired);
+
+    final uid = _uid;
+    if (uid == null) return;
+    final notes = _notesOf(uid);
+    final batch = _firestore.batch()
+      ..set(notes.doc(pad.id), _toDoc(pad), SetOptions(merge: true));
+    for (final id in retired) {
+      batch.delete(notes.doc(id));
+    }
+    unawaited(
+      batch.commit().then((_) => _local.delete(pad.id)).catchError((
+        Object error,
+      ) {
+        debugPrint('NoteRepository: notepad save rejected — $error');
+      }),
+    );
   }
 
   /// Uploads everything currently in [LocalNoteStore] to [uid]'s collection.
@@ -304,13 +341,13 @@ class NoteRepository {
   /// with a null ordering field from an ordered query — an offline note would
   /// vanish from the list until it synced.
   Map<String, Object?> _toDoc(Note note) => {
-        'sermonId': note.sermonId,
-        'sermonTitle': note.sermonTitle,
-        'positionMs': note.positionMs,
-        'body': note.body,
-        'createdAt': Timestamp.fromDate(note.createdAt),
-        'updatedAt': Timestamp.fromDate(note.updatedAt),
-      };
+    'sermonId': note.sermonId,
+    'sermonTitle': note.sermonTitle,
+    'positionMs': note.positionMs,
+    'body': note.body,
+    'createdAt': Timestamp.fromDate(note.createdAt),
+    'updatedAt': Timestamp.fromDate(note.updatedAt),
+  };
 
   Note? _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();

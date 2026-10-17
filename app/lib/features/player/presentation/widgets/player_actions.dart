@@ -15,9 +15,9 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 /// Notes · Playlist · Transcript · Share, each an icon over a small muted
 /// label.
 ///
-/// Notes opens [SermonNotesSheet] for the message on screen — everything
-/// already written against it, in timeline order, plus a "add a note at
-/// MM:SS" action stamped with the live playback position. Playlist opens
+/// Notes opens [SermonNotesSheet] for the message on screen — its notepad,
+/// free typing with an Insert action that stamps the live playback position
+/// as a tappable `[m:ss]`. Playlist opens
 /// [AddToPlaylistSheet], filing the message into the member's persisted
 /// playlists. Transcript opens [TranscriptSheet] and only shows up when the
 /// message actually has one (a handful genuinely have none). Share opens the
@@ -37,8 +37,9 @@ class PlayerActions extends ConsumerWidget {
   final Sermon? sermon;
 
   /// The engine that owns playback on the hosting screen, handed through to
-  /// [SermonNotesSheet] so note capture and anchor seeks drive the ACTIVE
-  /// engine. Null means the audio service (the sheet's default).
+  /// [SermonNotesSheet] and [TranscriptSheet] so note capture, transcript
+  /// follow-along and seeks drive the ACTIVE engine. Null means the audio
+  /// service (the sheets' default).
   final NoteTimelineBinding? timeline;
 
   /// Whether the message is being watched, so Share hands out the video link.
@@ -76,7 +77,8 @@ class PlayerActions extends ConsumerWidget {
           _ActionButton(
             icon: Icons.article_outlined,
             label: 'Transcript',
-            onTap: () => TranscriptSheet.show(context, target),
+            onTap: () =>
+                TranscriptSheet.show(context, target, timeline: timeline),
           ),
         if (target != null)
           _ActionButton(
