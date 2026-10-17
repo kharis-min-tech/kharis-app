@@ -13,12 +13,19 @@ final connectRepositoryProvider = Provider<ConnectRepository>(
   (ref) => ConnectRepository(),
 );
 
-/// Testimony categories, as the website and the Studio name them.
+/// Testimony categories, as the website's testimony form (kharis.org →
+/// Elvanto "Testimony Form") lists them; the Studio stores the same strings.
 const List<String> kTestimonyCategories = [
   'Deliverance',
+  'Education',
+  'Family/Marriage',
+  'Finances/Miracle Money',
   'Health/Healing',
   'Housing/Mortgage',
+  'Job/Career',
   'Safe Passage/Protection',
+  'Salvation',
+  'Unusual Favour',
   'Other',
 ];
 

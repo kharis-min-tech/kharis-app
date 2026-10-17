@@ -259,6 +259,7 @@ Future<void> formsJourney(Journey j) async {
     'Branch is required',
     'Add a short title',
     'Please share your testimony',
+    'Please confirm we may share your testimony',
   ]) {
     j.check(_shows(testimony, msg), 'testimony: "$msg"');
   }
@@ -292,6 +293,16 @@ Future<void> formsJourney(Journey j) async {
   await _type(t, summary, 'E2E summary');
   await _type(t, story, 'E2E testimony text, never posted.');
   await _choose(t, testimony, 'Choose your branch', branch.name);
+  FocusManager.instance.primaryFocus?.unfocus();
+  await pumpFor(t, const Duration(milliseconds: 700));
+  await tapVisible(
+    t,
+    find.descendant(
+      of: testimony,
+      matching: find.text('I am happy for Kharis to share my testimony'),
+    ),
+  );
+  await pumpFor(t, const Duration(milliseconds: 400));
   await _submit(t, testimony, 'Share testimony');
   j.check(
     await pumpUntil(

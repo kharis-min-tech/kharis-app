@@ -65,14 +65,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _continueAsGuest() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       await ref.read(authRepositoryProvider).loginAsGuest();
       // Guests skip register's branch step, so ask here; otherwise the
-      // events feed defaults to every campus at once (tester feedback).
+      // events feed defaults to every branch at once (tester feedback).
       if (mounted) context.go('/branch-selection');
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      // A silent failure reads as a dead button (tester feedback), so say so.
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage =
+              'Could not continue as a guest. Check your connection and '
+              'try again.';
+        });
+      }
     }
   }
 
