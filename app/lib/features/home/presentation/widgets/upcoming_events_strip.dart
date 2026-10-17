@@ -28,7 +28,9 @@ String eventWhenLabel(Event event, {DateTime? now}) {
     1 => 'Tomorrow',
     _ => DateFormat('EEE d MMM').format(event.startTime),
   };
-  if (event.recurrenceLabel case final repeats?) return '$dayLabel \u00b7 $repeats';
+  if (event.recurrenceLabel case final repeats?) {
+    return '$dayLabel \u00b7 $repeats';
+  }
   final time = DateFormat('h:mm a');
   final end = event.endTime;
   final range = end != null && DateUtils.isSameDay(end, event.startTime)

@@ -217,15 +217,6 @@ Future<void> _checkAnnouncements(
 ) async {
   final t = j.tester;
   final carousel = find.byType(AnnouncementsCarousel);
-  // Sections sit above the branch card: start from the top.
-  await t.drag(_homeScroll, const Offset(0, 20000), warnIfMissed: false);
-  await pumpFor(t, const Duration(milliseconds: 600));
-  await scrollUntilFound(t, carousel, scrollable: _homeScroll);
-  await pumpUntil(
-    t,
-    () => find.byKey(const Key('announcements-skeleton')).evaluate().isEmpty,
-    timeout: const Duration(seconds: 30),
-  );
   final now = DateTime.now();
   final visible = news.where((n) {
     final b = '${n['branch_name'] ?? n['branch'] ?? ''}'.trim();
@@ -235,20 +226,29 @@ Future<void> _checkAnnouncements(
     return (branch == null || b.isEmpty || b == branch) &&
         (exp == null || exp.isAfter(now));
   }).toList();
+  // Sections sit above the branch card: start from the top.
+  await t.drag(_homeScroll, const Offset(0, 20000), warnIfMissed: false);
+  await pumpFor(t, const Duration(milliseconds: 600));
   if (visible.isEmpty) {
-    final empty = branch == null
-        ? 'No announcements yet.'
-        : 'No announcements for $branch yet.';
+    // Nothing published: Home hides the whole block, heading included.
+    final heading = find.byKey(const Key('home-announcements-see-all'));
     j.note('DATA: no live announcements for ${branch ?? 'All branches'}');
+    await pumpUntil(
+      t,
+      () => heading.evaluate().isEmpty,
+      timeout: const Duration(seconds: 30),
+    );
     j.check(
-      find
-          .descendant(of: carousel, matching: find.text(empty))
-          .evaluate()
-          .isNotEmpty,
-      'announcements empty state "$empty" '
-      '(painted ${paintedTexts(within: carousel)})',
+      heading.evaluate().isEmpty && carousel.evaluate().isEmpty,
+      'Announcements block hidden with nothing to show',
     );
   } else {
+    await scrollUntilFound(t, carousel, scrollable: _homeScroll);
+    await pumpUntil(
+      t,
+      () => find.byKey(const Key('announcements-skeleton')).evaluate().isEmpty,
+      timeout: const Duration(seconds: 30),
+    );
     final title = '${visible.first['title']}'.trim();
     j.check(
       find

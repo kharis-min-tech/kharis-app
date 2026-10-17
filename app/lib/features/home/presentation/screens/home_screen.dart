@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
@@ -16,71 +17,186 @@ import '../widgets/daily_message_card.dart';
 import '../widgets/campus_card.dart';
 import '../widgets/profile_completion_card.dart';
 import '../widgets/news_section.dart';
+import '../widgets/home_hero.dart';
 import '../widgets/upcoming_events_strip.dart';
 
 /// Space under a full-width Home block.
 const EdgeInsets _blockPadding = EdgeInsets.fromLTRB(20, 0, 20, 24);
 
-/// Home tab: the greeting header, then the blocks Content Studio chose for
-/// the member's campus ([effectiveHomeLayoutProvider]), in that order.
+/// Home tab: the full-bleed hero ([HomeHero]) with the logo and bell
+/// floating over it, then the blocks Content Studio chose for the member's
+/// campus ([effectiveHomeLayoutProvider]), in that order. Without hero
+/// slides the greeting header leads instead.
 ///
-/// Conditional blocks (profile nudge, live, continue listening, campus)
-/// render nothing, padding included, when they have nothing to show.
-class HomeScreen extends ConsumerWidget {
+/// Conditional blocks (profile nudge, live, announcements, continue
+/// listening, campus) render nothing, padding included, when they have
+/// nothing to show.
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _scroll = ScrollController();
+
+  /// The hero's media still lies under the status bar.
+  bool _heroUnderStatusBar = true;
+
+  /// Some of the hero's media is still on screen.
+  bool _heroInView = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final media = homeHeroMediaHeight(MediaQuery.sizeOf(context));
+    final offset = _scroll.offset;
+    final under = offset < media - MediaQuery.paddingOf(context).top;
+    final inView = offset < media;
+    if (under != _heroUnderStatusBar || inView != _heroInView) {
+      setState(() {
+        _heroUnderStatusBar = under;
+        _heroInView = inView;
+      });
+    }
+  }
+
   /// Pull-to-refresh reloads everything Home shows and holds the spinner
-  /// until it has all answered: today's reading and message, the campus
-  /// announcements and events, and the branch settings (branches with
-  /// services and giving, and the live stream) behind the layout and the
-  /// campus card.
-  Future<void> _refresh(WidgetRef ref) {
+  /// until it has all answered: today's reading and message, the featured
+  /// video, the campus announcements and events, and the branch settings
+  /// (branches with services and giving, and the live stream) behind the
+  /// layout and the campus card.
+  Future<void> _refresh() {
     ref
       ..invalidate(dailyContentProvider)
       ..invalidate(dailyMessageProvider);
     return Future.wait<void>([
       settleRefresh(ref.refresh(dailyContentProvider.future)),
       settleRefresh(ref.refresh(dailyMessageProvider.future)),
+      settleRefresh(ref.refresh(featuredVideoProvider.future)),
       refreshCampusContent(ref),
       refreshCampusConfig(ref),
     ]);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final sections = ref.watch(effectiveHomeLayoutProvider).visible;
-    return Scaffold(
-      body: RefreshIndicator(
-        color: context.kc.accentInk,
-        backgroundColor: context.kc.surface,
-        edgeOffset: MediaQuery.of(context).padding.top,
-        onRefresh: () => _refresh(ref),
-        child: CustomScrollView(
-          slivers: [
-            // Greeting header
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  MediaQuery.of(context).padding.top + 8,
-                  20,
-                  18,
-                ),
-                child: const _HomeHeader(),
+    final slides = ref.watch(homeHeroSlidesProvider);
+    final hasHero = slides.isNotEmpty;
+    // Light status-bar icons over the hero's dark media; the theme's own
+    // once it has scrolled away (or when there is no hero).
+    final lightIcons =
+        (hasHero && _heroUnderStatusBar) ||
+        Theme.of(context).brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: lightIcons
+            ? Brightness.light
+            : Brightness.dark,
+        statusBarBrightness: lightIcons ? Brightness.dark : Brightness.light,
+      ),
+      child: Scaffold(
+        body: Stack(
+          children: [
+            RefreshIndicator(
+              color: context.kc.accentInk,
+              backgroundColor: context.kc.surface,
+              edgeOffset: MediaQuery.of(context).padding.top,
+              onRefresh: _refresh,
+              child: CustomScrollView(
+                controller: _scroll,
+                slivers: [
+                  if (hasHero) ...[
+                    // Full-bleed from the very top, under the status bar.
+                    SliverToBoxAdapter(
+                      child: HomeHero(
+                        key: const Key('home-hero'),
+                        slides: slides,
+                        inView: _heroInView,
+                        topBar: const _HeroTopBar(),
+                      ),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ] else
+                    // Greeting header
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          MediaQuery.of(context).padding.top + 8,
+                          20,
+                          18,
+                        ),
+                        child: const _HomeHeader(),
+                      ),
+                    ),
+
+                  for (final id in sections)
+                    SliverToBoxAdapter(
+                      key: ValueKey('home-section-${id.name}'),
+                      child: _HomeSection(id),
+                    ),
+
+                  // Bottom safe area: 150 clears mini player + tab bar
+                  const SliverToBoxAdapter(child: SizedBox(height: 150)),
+                ],
               ),
             ),
-
-            for (final id in sections)
-              SliverToBoxAdapter(
-                key: ValueKey('home-section-${id.name}'),
-                child: _HomeSection(id),
+            // Solid backing behind the status bar once the hero has left it,
+            // so the list never shows through under the clock.
+            if (!(hasHero && _heroUnderStatusBar))
+              Positioned(
+                key: const Key('home-status-bar-backing'),
+                top: 0,
+                left: 0,
+                right: 0,
+                height: MediaQuery.paddingOf(context).top,
+                child: ColoredBox(color: context.kc.bg),
               ),
-
-            // Bottom safe area: 150 clears mini player + tab bar
-            const SliverToBoxAdapter(child: SizedBox(height: 150)),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The Announcements heading and carousel; the whole block, heading
+/// included, collapses once the Studio has answered with nothing to show.
+class _AnnouncementsBlock extends ConsumerWidget {
+  const _AnnouncementsBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(campusNewsProvider).valueOrNull;
+    if (items != null && items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          title: 'Announcements',
+          actionKey: const Key('home-announcements-see-all'),
+          // The full announcements list, pushed so Back returns here.
+          onSeeAll: () => context.push('/announcements'),
+        ),
+        // Edge-to-edge carousel with a left pad.
+        const Padding(
+          padding: EdgeInsets.only(left: 20, bottom: 28),
+          child: AnnouncementsCarousel(),
+        ),
+      ],
     );
   }
 }
@@ -107,22 +223,7 @@ class _HomeSection extends StatelessWidget {
           DailyMessageCard(padding: _blockPadding),
         ],
       ),
-      HomeSectionId.announcements => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SectionHeader(
-            title: 'Announcements',
-            actionKey: const Key('home-announcements-see-all'),
-            // The full announcements list, pushed so Back returns here.
-            onSeeAll: () => context.push('/announcements'),
-          ),
-          // Edge-to-edge carousel with a left pad.
-          const Padding(
-            padding: EdgeInsets.only(left: 20, bottom: 28),
-            child: AnnouncementsCarousel(),
-          ),
-        ],
-      ),
+      HomeSectionId.announcements => const _AnnouncementsBlock(),
       HomeSectionId.events => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -198,8 +299,72 @@ class _SectionHeader extends StatelessWidget {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-class _HomeHeader extends ConsumerWidget {
+/// The greeting header Home leads with when there is no hero: dove mark,
+/// greeting, bell.
+class _HomeHeader extends StatelessWidget {
   const _HomeHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Brand dove mark
+        Image.asset(
+          AppAssets.dovePurple,
+          width: 34,
+          height: 34,
+          filterQuality: FilterQuality.medium,
+        ),
+        const SizedBox(width: 12),
+        const Expanded(child: _Greeting()),
+        const _BellButton(),
+      ],
+    );
+  }
+}
+
+/// The header floating over the hero: the dove mark and the bell, each in
+/// a round surface chip so they stay legible on any image without a scrim.
+class _HeroTopBar extends StatelessWidget {
+  const _HeroTopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(3),
+          child: Container(
+            key: const Key('home-hero-logo'),
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.kc.surface,
+              boxShadow: AppShadows.card,
+            ),
+            child: Image.asset(
+              AppAssets.dovePurple,
+              width: 24,
+              height: 24,
+              filterQuality: FilterQuality.medium,
+              semanticLabel: 'Kharis Church',
+            ),
+          ),
+        ),
+        const Spacer(),
+        const _BellButton(),
+      ],
+    );
+  }
+}
+
+/// Where the member belongs (small line) and the greeting (big line), with
+/// their name only when they have told us one.
+class _Greeting extends ConsumerWidget {
+  const _Greeting();
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -219,8 +384,6 @@ class _HomeHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
-    // Small line: where the member belongs. Big line: the greeting, with
-    // their name only when they have told us one.
     final branch = (user?.branch != null && user!.branch!.isNotEmpty)
         ? user.branch!
         : 'Kharis Church';
@@ -229,105 +392,90 @@ class _HomeHeader extends ConsumerWidget {
         ? _greeting()
         : '${_greeting()}, $firstName';
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Brand dove mark
-        Image.asset(
-          AppAssets.dovePurple,
-          width: 34,
-          height: 34,
-          filterQuality: FilterQuality.medium,
+        Text(
+          branch,
+          style: AppTypography.ui(
+            size: 12.5,
+            weight: FontWeight.w500,
+          ).copyWith(color: context.kc.muted, height: 1.1),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
+        const SizedBox(height: 2),
+        Text(
+          greeting,
+          style: AppTypography.display(
+            size: 22,
+            weight: FontWeight.w700,
+          ).copyWith(color: context.kc.onBg, height: 1.15),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
 
-        const SizedBox(width: 12),
+/// Bell button with pink notification dot. Same route as a push tap, so
+/// Back behaves identically however the feed was reached. The 48 px hit
+/// area surrounds the 42 px visual circle.
+class _BellButton extends ConsumerWidget {
+  const _BellButton();
 
-        // Greeting + user name
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(hasPendingNotificationsProvider);
+    return Semantics(
+      button: true,
+      label: pending ? 'Notifications, new items' : 'Notifications',
+      child: GestureDetector(
+        key: const Key('home-bell'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => context.push('/notifications'),
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Text(
-                branch,
-                style: AppTypography.ui(
-                  size: 12.5,
-                  weight: FontWeight.w500,
-                ).copyWith(color: context.kc.muted, height: 1.1),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: context.kc.surface,
+                  boxShadow: AppShadows.card,
+                ),
+                child: Icon(
+                  Icons.notifications_none_rounded,
+                  color: context.kc.onBg,
+                  size: 21,
+                ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                greeting,
-                style: AppTypography.display(
-                  size: 22,
-                  weight: FontWeight.w700,
-                ).copyWith(color: context.kc.onBg, height: 1.15),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              // KA-023: the dot only lights when the feed actually holds
+              // something the member hasn't dismissed.
+              if (pending)
+                Positioned(
+                  key: const Key('home-bell-unread-dot'),
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentPink,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: context.kc.surface, width: 1.5),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
-
-        // Bell button with pink notification dot. Same route as a push tap,
-        // so Back behaves identically however the feed was reached. The
-        // 48 px hit area surrounds the 42 px visual circle.
-        Semantics(
-          button: true,
-          label: ref.watch(hasPendingNotificationsProvider)
-              ? 'Notifications, new items'
-              : 'Notifications',
-          child: GestureDetector(
-            key: const Key('home-bell'),
-            behavior: HitTestBehavior.opaque,
-            onTap: () => context.push('/notifications'),
-            child: Padding(
-              padding: const EdgeInsets.all(3),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: context.kc.surface,
-                      boxShadow: AppShadows.card,
-                    ),
-                    child: Icon(
-                      Icons.notifications_none_rounded,
-                      color: context.kc.onBg,
-                      size: 21,
-                    ),
-                  ),
-                  // KA-023: the dot only lights when the feed actually holds
-                  // something the member hasn't dismissed.
-                  if (ref.watch(hasPendingNotificationsProvider))
-                    Positioned(
-                      key: const Key('home-bell-unread-dot'),
-                      top: 2,
-                      right: 2,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppColors.accentPink,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: context.kc.surface,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

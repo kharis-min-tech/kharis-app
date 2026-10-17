@@ -6,10 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
+import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/continue_listening_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
@@ -254,7 +256,18 @@ void main() {
             branchesProvider.overrideWith(
               (ref) => Stream.value([_branch('London', home: campusHome)]),
             ),
-            newsProvider.overrideWith((ref, b) async => const []),
+            // One live notice, so the Announcements block has something to
+            // show (it hides, heading included, when empty).
+            newsProvider.overrideWith(
+              (ref, b) async => [
+                NewsItem(
+                  id: 'n1',
+                  title: 'Welcome',
+                  type: 'Announcement',
+                  publishedAt: DateTime(2026),
+                ),
+              ],
+            ),
             upcomingEventsProvider.overrideWith(
               (ref, b) => Stream.value(const []),
             ),
@@ -277,6 +290,8 @@ void main() {
             ),
             dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
             continueListeningProvider.overrideWith((ref) => null),
+            featuredVideoProvider.overrideWith((ref) async => null),
+            latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
           ],
           child: const MaterialApp(home: HomeScreen()),
         ),
