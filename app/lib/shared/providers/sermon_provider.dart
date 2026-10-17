@@ -897,7 +897,10 @@ final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
   if (mode.valueOrNull == FeaturedMode.pinned) {
     final pinnedAsync = ref.watch(pinnedFeaturedProvider);
     if (pinnedAsync.isLoading && !pinnedAsync.hasValue) return const [];
-    final pinned = pinnedAsync.valueOrNull ?? const [];
+    final pinned = [
+      for (final s in pinnedAsync.valueOrNull ?? const <Sermon>[])
+        if (!s.isShortClip) s,
+    ];
     if (pinned.isNotEmpty) {
       return _distinct([
         for (final s in pinned.take(kFeaturedLimit)) withAudioTwin(s, twins),
@@ -905,12 +908,16 @@ final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
     }
   }
 
-  final videos = [...ref.watch(videosProvider).valueOrNull ?? const <Sermon>[]]
-    ..sort(
-      (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
-        a.publishedAt ?? DateTime(0),
-      ),
-    );
+  final videos =
+      [
+        for (final v
+            in ref.watch(videosProvider).valueOrNull ?? const <Sermon>[])
+          if (!v.isShortClip) v,
+      ]..sort(
+        (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
+          a.publishedAt ?? DateTime(0),
+        ),
+      );
   return _distinct([
     for (final v in videos.take(kFeaturedLimit)) withAudioTwin(v, twins),
   ]);
@@ -930,12 +937,16 @@ const int kLatestLimit = 3;
 /// The newest messages in the library, newest first, at most [kLatestLimit].
 /// What the Messages tab leads with when Studio turns featured off.
 final latestSermonsProvider = Provider<List<Sermon>>((ref) {
-  final library = [...?ref.watch(sermonsProvider).valueOrNull]
-    ..sort(
-      (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
-        a.publishedAt ?? DateTime(0),
-      ),
-    );
+  final library =
+      [
+        for (final s
+            in ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[])
+          if (!s.isShortClip) s,
+      ]..sort(
+        (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
+          a.publishedAt ?? DateTime(0),
+        ),
+      );
   return library.take(kLatestLimit).toList();
 });
 
@@ -1026,7 +1037,7 @@ final recentlyPlayedProvider = Provider<List<Sermon>>((ref) {
   final out = <Sermon>[];
   for (final id in ids) {
     final sermon = ref.watch(sermonByIdProvider(id)).valueOrNull;
-    if (sermon != null) out.add(sermon);
+    if (sermon != null && !sermon.isShortClip) out.add(sermon);
     if (out.length == 10) break;
   }
   return out;
