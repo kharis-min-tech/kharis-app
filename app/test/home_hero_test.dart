@@ -8,9 +8,11 @@ import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/content_api_provider.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
+import 'support/fake_audio_player_service.dart';
 import 'support/supabase_stub.dart';
 
 /// The Home hero with only the network stubbed: Content Studio rows
@@ -72,10 +74,16 @@ List<Override> _overrides(
   contentApiProvider.overrideWithValue(stub.api()),
   currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
   latestSermonsProvider.overrideWith((ref) => latest),
-  heroVideoSurfaceProvider.overrideWithValue(
-    (videoId, onPlaying) => SizedBox(key: Key('fake-video-$videoId')),
-  ),
+  heroVideoSurfaceProvider.overrideWithValue((videoId, muted, onPlaying) {
+    _reportPlaying = onPlaying;
+    return SizedBox(
+      key: Key('fake-video-$videoId-${muted ? 'muted' : 'sound'}'),
+    );
+  }),
 ];
+
+/// What the stand-in clip last got to report its playing state with.
+ValueChanged<bool>? _reportPlaying;
 
 /// The slides once every feed has answered.
 Future<List<HeroSlide>> _slides(
@@ -134,13 +142,19 @@ Future<void> _pumpHero(
   SupabaseStub stub, {
   bool reduceMotion = false,
   List<Sermon> latest = const [_latest],
+  FakeAudioPlayerService? audio,
 }) async {
   tester.view.physicalSize = const Size(400, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: _overrides(stub, latest: latest),
+      overrides: [
+        ..._overrides(stub, latest: latest),
+        audioPlayerServiceProvider.overrideWithValue(
+          audio ?? FakeAudioPlayerService(),
+        ),
+      ],
       child: MaterialApp(
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
@@ -278,38 +292,153 @@ void main() {
       'news': <Map<String, dynamic>>[],
     };
 
-    testWidgets('plays the clip on its slide, title and Watch below, dots '
-        'for more than one slide', (tester) async {
+    testWidgets('media only: no caption text, the title as the slide\'s '
+        'screen-reader label, dots for more than one slide', (tester) async {
+      final semantics = tester.ensureSemantics();
       await _pumpHero(tester, SupabaseStub(withVideo));
 
       expect(find.byKey(const Key('home-hero')), findsOneWidget);
-      expect(find.byKey(const Key('fake-video-REhGafc8hdg')), findsOneWidget);
+      expect(_clip(muted: true), findsOneWidget);
       // The thumbnail stays until the surface reports frames.
       expect(
         find.byKey(const Key('home-hero-video-thumbnail')),
         findsOneWidget,
       );
-      expect(find.text('App clip'), findsOneWidget);
-      expect(find.text('Watch'), findsOneWidget);
-      expect(find.byKey(const Key('home-hero-play')), findsOneWidget);
+      for (final text in ['App clip', 'Watch', 'Play', 'FEATURED VIDEO']) {
+        expect(find.text(text), findsNothing, reason: text);
+      }
+      expect(find.bySemanticsLabel('App clip'), findsOneWidget);
       expect(find.byKey(const Key('home-hero-dots')), findsOneWidget);
+      semantics.dispose();
     });
 
-    testWidgets('reduced motion: the still thumbnail, no player, no '
-        'auto-advance', (tester) async {
+    testWidgets('the thumbnail covers the clip whenever it is not playing; '
+        'the clip is enlarged to crop the player\'s edges', (tester) async {
+      await _pumpHero(tester, SupabaseStub(withVideo));
+      final thumbnail = find.byKey(const Key('home-hero-video-thumbnail'));
+      expect(thumbnail, findsOneWidget);
+
+      _reportPlaying!(true);
+      await tester.pump();
+      expect(thumbnail, findsNothing);
+
+      // Buffering, paused, cued, ended: YouTube would draw its own UI.
+      _reportPlaying!(false);
+      await tester.pump();
+      expect(thumbnail, findsOneWidget);
+
+      final scale = tester.widget<Transform>(
+        find
+            .ancestor(of: _clip(muted: true), matching: find.byType(Transform))
+            .first,
+      );
+      expect(
+        scale.transform.getMaxScaleOnAxis(),
+        closeTo(kHeroClipCropScale, 1e-9),
+      );
+      expect(kHeroClipCropScale, greaterThan(1));
+    });
+
+    testWidgets('the clip starts muted; the corner chip unmutes and mutes '
+        'it inline', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _pumpHero(tester, SupabaseStub(withVideo));
+
+      expect(_clip(muted: true), findsOneWidget);
+      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
+      expect(find.bySemanticsLabel('Unmute video'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(_clip(muted: false), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
+      expect(find.bySemanticsLabel('Mute video'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(_clip(muted: true), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('unmuting pauses a message playing in the app', (tester) async {
+      final audio = FakeAudioPlayerService()..current = _latest;
+      await _pumpHero(tester, SupabaseStub(withVideo), audio: audio);
+
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(audio.pauseCalls, 1);
+
+      // Muting again leaves the app's audio alone.
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(audio.pauseCalls, 1);
+    });
+
+    testWidgets('nothing playing in the app: unmuting pauses nothing', (
+      tester,
+    ) async {
+      final audio = FakeAudioPlayerService();
+      await _pumpHero(tester, SupabaseStub(withVideo), audio: audio);
+
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(_clip(muted: false), findsOneWidget);
+      expect(audio.pauseCalls, 0);
+    });
+
+    testWidgets('a stopped clip comes back muted: after a slide change and '
+        'after the app was backgrounded', (tester) async {
+      await _pumpHero(tester, SupabaseStub(withVideo));
+      final pager = find.byKey(const Key('home-hero-pager'));
+
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(_clip(muted: false), findsOneWidget);
+
+      await tester.drag(pager, const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      expect(_clipAny, findsNothing);
+      await tester.drag(pager, const Offset(300, 0));
+      await tester.pumpAndSettle();
+      expect(_clip(muted: true), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(_clip(muted: false), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      expect(_clipAny, findsNothing);
+      expect(find.byKey(const Key('home-hero-mute')), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(_clip(muted: true), findsOneWidget);
+      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
+    });
+
+    testWidgets('reduced motion: the still thumbnail, no player, no mute '
+        'button, no auto-advance', (tester) async {
       await _pumpHero(tester, SupabaseStub(withVideo), reduceMotion: true);
 
-      expect(find.byKey(const Key('fake-video-REhGafc8hdg')), findsNothing);
+      expect(_clipAny, findsNothing);
+      expect(find.byKey(const Key('home-hero-mute')), findsNothing);
       expect(
         find.byKey(const Key('home-hero-video-thumbnail')),
         findsOneWidget,
       );
       await tester.pump(kHeroAdvanceInterval * 2);
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('App clip'), findsOneWidget);
+      expect(_slide('App clip'), findsOneWidget);
     });
 
-    testWidgets('image slides advance on their own', (tester) async {
+    testWidgets('image slides advance on their own, without a mute button', (
+      tester,
+    ) async {
       await _pumpHero(
         tester,
         SupabaseStub({
@@ -318,25 +447,26 @@ void main() {
           'news': [],
         }),
       );
-      expect(find.text('Event a'), findsOneWidget);
+      expect(_slide('Event a'), findsOneWidget);
+      expect(find.byKey(const Key('home-hero-mute')), findsNothing);
 
       await tester.pump(kHeroAdvanceInterval);
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Event b'), findsOneWidget);
-      expect(find.text('Event a'), findsNothing);
+      expect(_slide('Event b'), findsOneWidget);
+      expect(_slide('Event a'), findsNothing);
+      expect(find.text('Event b'), findsNothing, reason: 'no caption');
     });
 
-    testWidgets('the latest-message fallback offers Play, without dots', (
-      tester,
-    ) async {
+    testWidgets('the latest-message fallback: artwork only, no text, no '
+        'dots', (tester) async {
       await _pumpHero(
         tester,
         SupabaseStub({'featured_videos': [], 'events': [], 'news': []}),
       );
 
-      expect(find.text('LATEST MESSAGE'), findsOneWidget);
-      expect(find.text('Walking by faith'), findsOneWidget);
-      expect(find.text('Play'), findsOneWidget);
+      expect(_slide('Walking by faith'), findsOneWidget);
+      expect(find.text('Walking by faith'), findsNothing);
+      expect(find.text('LATEST MESSAGE'), findsNothing);
       expect(find.byKey(const Key('home-hero-dots')), findsNothing);
     });
 
@@ -352,3 +482,18 @@ void main() {
     });
   });
 }
+
+/// The stand-in clip, in the given sound state.
+Finder _clip({required bool muted}) =>
+    find.byKey(Key('fake-video-REhGafc8hdg-${muted ? 'muted' : 'sound'}'));
+
+final Finder _clipAny = find.byWidgetPredicate(
+  (w) =>
+      w.key is ValueKey<String> &&
+      (w.key! as ValueKey<String>).value.startsWith('fake-video-'),
+);
+
+/// The current slide, by the title it gives screen readers.
+Finder _slide(String title) => find.byWidgetPredicate(
+  (w) => w is Semantics && w.properties.label == title,
+);

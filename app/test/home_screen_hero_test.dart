@@ -82,7 +82,7 @@ Future<void> _pumpHome(
         featuredVideoProvider.overrideWith((ref) async => video),
         latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
         heroVideoSurfaceProvider.overrideWithValue(
-          (videoId, onPlaying) => const ColoredBox(color: Colors.black),
+          (videoId, muted, onPlaying) => const ColoredBox(color: Colors.black),
         ),
       ],
       child: const MaterialApp(home: HomeScreen()),
@@ -126,6 +126,7 @@ void main() {
 
   testWidgets('a vertical drag on any hero slide scrolls Home; a horizontal '
       'one changes slide', (tester) async {
+    final semantics = tester.ensureSemantics();
     await _pumpHome(
       tester,
       events: [_flyerEvent],
@@ -153,13 +154,14 @@ void main() {
     // Sideways to the flyer.
     await tester.dragFrom(_onHero(tester), const Offset(-300, 0));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Harvest Sunday'), findsOneWidget);
+    expect(find.bySemanticsLabel('Harvest Sunday'), findsOneWidget);
     expect(_homeScroll(tester).pixels, 0);
 
     // On the flyer slide.
     await tester.dragFrom(_onHero(tester), const Offset(0, -120));
     await tester.pump(const Duration(seconds: 1));
     expect(_homeScroll(tester).pixels, greaterThan(80));
+    semantics.dispose();
   });
 
   testWidgets('logo and bell float over the top of the hero, below the '
@@ -167,6 +169,11 @@ void main() {
     await _pumpHome(tester);
 
     final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
+    // The mute chip sits in the hero's bottom-right corner.
+    final mute = tester.getRect(find.byKey(const Key('home-hero-mute')));
+    expect(media.contains(mute.center), isTrue);
+    expect(mute.center.dx, greaterThan(media.width - 60));
+    expect(mute.center.dy, greaterThan(media.bottom - 60));
     for (final key in const [Key('home-hero-logo'), Key('home-bell')]) {
       expect(find.byKey(key).hitTestable(), findsOneWidget, reason: '$key');
       final chip = tester.getRect(find.byKey(key));

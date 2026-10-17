@@ -15,11 +15,11 @@ import 'package:kharis_app/features/home/data/featured_video_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'announcement_detail.dart';
-import 'upcoming_events_strip.dart';
 
 // ── Slides ────────────────────────────────────────────────────────────────────
 
@@ -122,11 +122,12 @@ final homeHeroSlidesProvider = Provider<List<HeroSlide>>((ref) {
 
 // ── Video surface ─────────────────────────────────────────────────────────────
 
-/// Builds the live clip for [videoId]. It must call [onPlaying] with `true`
-/// once frames are showing and `false` when playback stops or fails; until
-/// then the hero keeps the thumbnail over it.
+/// Builds the live clip for [videoId], muted while `muted` is true (it
+/// starts muted). It must call `onPlaying` with `true` while frames are
+/// moving and `false` in every other state (loading, buffering, paused,
+/// ended, failed); the hero keeps the thumbnail over it until `true`.
 typedef HeroVideoSurfaceBuilder =
-    Widget Function(String videoId, ValueChanged<bool> onPlaying);
+    Widget Function(String videoId, bool muted, ValueChanged<bool> onPlaying);
 
 /// The hero's live clip. Null shows the thumbnail only: on web, where the
 /// iframe player's platform view fails silently in release builds (see
@@ -134,8 +135,11 @@ typedef HeroVideoSurfaceBuilder =
 final heroVideoSurfaceProvider = Provider<HeroVideoSurfaceBuilder?>(
   (ref) => kIsWeb
       ? null
-      : (videoId, onPlaying) =>
-            _YoutubeHeroSurface(videoId: videoId, onPlaying: onPlaying),
+      : (videoId, muted, onPlaying) => _YoutubeHeroSurface(
+          videoId: videoId,
+          muted: muted,
+          onPlaying: onPlaying,
+        ),
 );
 
 /// Neutral backdrop behind the media: flyers are letterboxed on it, never
@@ -155,11 +159,11 @@ const double kHeroTopBarExtent = 58;
 
 /// Full-bleed paged banner at the very top of Home, under the status bar:
 /// [slides] (see [homeHeroSlidesProvider]) with [topBar] floating over the
-/// top, then the current slide's title, date and action below the media,
-/// then page dots.
+/// top, then page dots below the media. No titles: each slide is media
+/// only, tapped to open, with its title as its screen-reader label.
 ///
-/// Text never sits on the media. The clip plays only while its slide is
-/// current, the hero is [inView], Home is the visible tab with nothing
+/// The clip plays (muted unless the member unmutes it) only while its slide
+/// is current, the hero is [inView], Home is the visible tab with nothing
 /// pushed over it ([TickerMode]), the app is in the foreground, and the
 /// member has not asked for reduced motion; otherwise it is disposed and the
 /// thumbnail shows. Image slides advance every [kHeroAdvanceInterval] until
@@ -278,7 +282,6 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
     final padding = MediaQuery.paddingOf(context);
     final mediaHeight = homeHeroMediaHeight(MediaQuery.sizeOf(context));
     final canPlay = _canPlay(context);
-    final current = slides[_index.clamp(0, slides.length - 1)];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -325,10 +328,6 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
             ],
           ),
         ),
-        _HeroCaption(
-          slide: current,
-          onOpen: () => _openSlide(context, ref, current),
-        ),
         if (slides.length > 1)
           _HeroDots(
             count: slides.length,
@@ -340,8 +339,8 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
   }
 }
 
-/// What tapping a slide (or its caption action) does: the full video, the
-/// event detail, the announcement, or the message in the player.
+/// What tapping a slide does: the full video, the event detail, the
+/// announcement, or the message in the player.
 void _openSlide(BuildContext context, WidgetRef ref, HeroSlide slide) {
   switch (slide) {
     case VideoHeroSlide(:final video):
@@ -394,9 +393,9 @@ class _SlideMedia extends StatelessWidget {
     final media = switch (slide) {
       VideoHeroSlide(:final video) => _VideoMedia(
         video: video,
+        title: title,
         active: active,
         onPlayingChanged: onPlayingChanged,
-        onPlay: onOpen,
       ),
       EventHeroSlide(:final event) => _FlyerMedia(
         url: event.imageUrl!,
@@ -406,20 +405,15 @@ class _SlideMedia extends StatelessWidget {
         url: usableMediaUrl(item.imageUrl)!,
         topInset: topInset,
       ),
-      LatestMessageHeroSlide(:final sermon) => Stack(
-        fit: StackFit.expand,
-        children: [
-          _FlyerMedia(
-            url: usableMediaUrl(sermon.artworkUrl)!,
-            topInset: topInset,
-          ),
-          Center(
-            child: _PlayButton(label: 'Play $title', onTap: onOpen),
-          ),
-        ],
+      LatestMessageHeroSlide(:final sermon) => _FlyerMedia(
+        url: usableMediaUrl(sermon.artworkUrl)!,
+        topInset: topInset,
       ),
     };
+    // The title is what a screen reader says for the slide; nothing is
+    // written on or under the media.
     return Semantics(
+      container: true,
       button: true,
       label: title,
       child: GestureDetector(
@@ -454,21 +448,25 @@ class _FlyerMedia extends StatelessWidget {
   }
 }
 
-/// The featured clip filling the media: its thumbnail until the live
-/// surface reports frames (and whenever it is inactive or has failed), with
-/// the round play button opening the full video.
+/// The featured clip filling the media, with its thumbnail over it whenever
+/// the live surface is not playing (and while it is inactive or has
+/// failed), and, while the clip is live, a mute toggle in the bottom-right
+/// corner. The slide tap opens the full video.
+///
+/// The clip is always muted when it starts: going inactive (slide changed,
+/// scrolled away, another tab, app in the background) resets it.
 class _VideoMedia extends ConsumerStatefulWidget {
   const _VideoMedia({
     required this.video,
+    required this.title,
     required this.active,
     required this.onPlayingChanged,
-    required this.onPlay,
   });
 
   final FeaturedVideo video;
+  final String title;
   final bool active;
   final ValueChanged<bool> onPlayingChanged;
-  final VoidCallback onPlay;
 
   @override
   ConsumerState<_VideoMedia> createState() => _VideoMediaState();
@@ -476,19 +474,32 @@ class _VideoMedia extends ConsumerStatefulWidget {
 
 class _VideoMediaState extends ConsumerState<_VideoMedia> {
   bool _playing = false;
+  bool _muted = true;
 
   @override
   void didUpdateWidget(_VideoMedia oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Going inactive disposes the surface: the next activation starts on the
-    // thumbnail again.
-    if (!widget.active) _playing = false;
+    // thumbnail again, and silent.
+    if (!widget.active) {
+      _playing = false;
+      _muted = true;
+    }
   }
 
   void _onPlaying(bool playing) {
     if (!mounted || !widget.active) return;
     widget.onPlayingChanged(playing);
     if (playing != _playing) setState(() => _playing = playing);
+  }
+
+  void _toggleMute() {
+    if (_muted) {
+      // One sound at a time: a message playing in the app pauses first.
+      final audio = ref.read(audioPlayerServiceProvider);
+      if (audio.currentSermon != null) unawaited(audio.pause());
+    }
+    setState(() => _muted = !_muted);
   }
 
   @override
@@ -501,7 +512,7 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
           IgnorePointer(
             child: _CoverBox(
               key: const Key('home-hero-video-surface'),
-              child: surface(widget.video.videoId, _onPlaying),
+              child: surface(widget.video.videoId, _muted, _onPlaying),
             ),
           ),
         if (surface == null || !_playing)
@@ -512,19 +523,70 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
             gaplessPlayback: true,
             errorBuilder: (_, _, _) => const SizedBox.expand(),
           ),
-        Center(
-          child: _PlayButton(
-            label: 'Watch ${widget.video.title}',
-            onTap: widget.onPlay,
+        if (surface != null)
+          Positioned(
+            right: 17,
+            bottom: 13,
+            child: _MuteButton(muted: _muted, onTap: _toggleMute),
           ),
-        ),
       ],
     );
   }
 }
 
+/// Round surface chip, like the floating logo and bell, that mutes and
+/// unmutes the clip inline. 48 px hit area around the 42 px circle.
+class _MuteButton extends StatelessWidget {
+  const _MuteButton({required this.muted, required this.onTap});
+
+  final bool muted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    return Semantics(
+      container: true,
+      button: true,
+      label: muted ? 'Unmute video' : 'Mute video',
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: const Key('home-hero-mute'),
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: kc.surface,
+              boxShadow: AppShadows.card,
+            ),
+            child: Icon(
+              muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: kc.onBg,
+              size: 21,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// How far the clip is enlarged past covering the hero, around its centre,
+/// so YouTube's own edge chrome (the title bar across the top, the
+/// watermark and "More videos" corners) falls outside the clip.
+const double kHeroClipCropScale = 1.25;
+
+/// How long before its end the clip jumps back to the start.
+const Duration kHeroLoopLead = Duration(milliseconds: 1500);
+
 /// Sizes a 16:9 child to cover the box (centred, overflow clipped) without
-/// scaling it, so the platform view renders at its real size.
+/// scaling its layout, so the platform view renders at its real size, then
+/// enlarges it by [kHeroClipCropScale] to crop the player's edges.
 class _CoverBox extends StatelessWidget {
   const _CoverBox({super.key, required this.child});
 
@@ -544,42 +606,10 @@ class _CoverBox extends StatelessWidget {
             maxWidth: width,
             minHeight: height,
             maxHeight: height,
-            child: child,
+            child: Transform.scale(scale: kHeroClipCropScale, child: child),
           ),
         );
       },
-    );
-  }
-}
-
-/// Round, surface-coloured play button.
-class _PlayButton extends StatelessWidget {
-  const _PlayButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: Material(
-        key: const Key('home-hero-play'),
-        color: kc.surface,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: SizedBox(
-            width: 64,
-            height: 64,
-            child: Icon(Icons.play_arrow_rounded, size: 34, color: kc.onBg),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -594,9 +624,16 @@ class _PlayButton extends StatelessWidget {
 /// [IgnorePointer], swallowed vertical drags (Home would not scroll from the
 /// clip) and covered the logo and bell.
 class _YoutubeHeroSurface extends StatefulWidget {
-  const _YoutubeHeroSurface({required this.videoId, required this.onPlaying});
+  const _YoutubeHeroSurface({
+    required this.videoId,
+    required this.muted,
+    required this.onPlaying,
+  });
 
   final String videoId;
+
+  /// Starts muted; flips sound inline without reloading the clip.
+  final bool muted;
   final ValueChanged<bool> onPlaying;
 
   @override
@@ -617,6 +654,13 @@ try {
 
   late final YoutubePlayerController _controller;
   late final StreamSubscription<YoutubePlayerValue> _values;
+  late final StreamSubscription<YoutubeVideoState> _positions;
+
+  /// The clip's length once the player has reported it.
+  Duration _duration = Duration.zero;
+
+  /// A loop seek is in flight; cleared once playback is back before the end.
+  bool _looping = false;
 
   @override
   void initState() {
@@ -624,8 +668,8 @@ try {
     _controller = YoutubePlayerController.fromVideoId(
       videoId: widget.videoId,
       autoPlay: true,
-      params: const YoutubePlayerParams(
-        mute: true,
+      params: YoutubePlayerParams(
+        mute: widget.muted,
         showControls: false,
         showFullscreenButton: false,
         enableCaption: false,
@@ -637,6 +681,7 @@ try {
       ),
     );
     _values = _controller.stream.listen(_onValue);
+    _positions = _controller.videoStateStream.listen(_onPosition);
     unawaited(
       _controller.webViewController
           .setBackgroundColor(_kBackdrop)
@@ -651,6 +696,10 @@ try {
   }
 
   void _onValue(YoutubePlayerValue value) {
+    _duration = value.metaData.duration;
+    // The thumbnail covers the surface whenever frames are not moving
+    // (unstarted, buffering, paused, cued, ended, failed): YouTube draws its
+    // own pause glyph, spinner or end screen in those states.
     if (value.error != YoutubeError.none) {
       widget.onPlaying(false);
       return;
@@ -664,17 +713,58 @@ try {
         );
         widget.onPlaying(true);
       case PlayerState.ended:
-        // Loop: the iframe's own `loop` only works for playlists.
-        unawaited(_controller.seekTo(seconds: 0, allowSeekAhead: true));
-        unawaited(_controller.playVideo());
+        // Backstop for a missed early loop.
+        widget.onPlaying(false);
+        _restart();
       default:
-        break;
+        widget.onPlaying(false);
+    }
+  }
+
+  /// Loops [kHeroLoopLead] before the end, so YouTube's end screen ("More
+  /// videos", related clips) never appears. The iframe's own `loop` only
+  /// works for playlists.
+  void _onPosition(YoutubeVideoState state) {
+    final duration = _duration;
+    if (duration <= kHeroLoopLead) return;
+    final nearEnd = state.position >= duration - kHeroLoopLead;
+    if (nearEnd && !_looping) {
+      _looping = true;
+      _restart();
+    } else if (!nearEnd) {
+      _looping = false;
+    }
+  }
+
+  void _restart() {
+    unawaited(
+      _controller
+          .seekTo(seconds: 0, allowSeekAhead: true)
+          .then((_) => _controller.playVideo())
+          .catchError((Object _) {}),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_YoutubeHeroSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.muted == oldWidget.muted) return;
+    if (widget.muted) {
+      unawaited(_controller.mute().catchError((Object _) {}));
+    } else {
+      unawaited(
+        _controller
+            .unMute()
+            .then((_) => _controller.setVolume(100))
+            .catchError((Object _) {}),
+      );
     }
   }
 
   @override
   void dispose() {
     unawaited(_values.cancel());
+    unawaited(_positions.cancel());
     unawaited(_controller.close());
     super.dispose();
   }
@@ -685,95 +775,7 @@ try {
   }
 }
 
-// ── Caption + dots ────────────────────────────────────────────────────────────
-
-/// The current slide's kind, title and date (or speaker), with its action,
-/// directly below the media.
-class _HeroCaption extends StatelessWidget {
-  const _HeroCaption({required this.slide, required this.onOpen});
-
-  final HeroSlide slide;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    final (kicker, detail, action) = switch (slide) {
-      VideoHeroSlide() => ('Featured video', null, 'Watch'),
-      EventHeroSlide(:final event) => ('Event', eventWhenLabel(event), null),
-      AnnouncementHeroSlide(:final item) => (item.type, null, null),
-      LatestMessageHeroSlide(:final sermon) => (
-        'Latest message',
-        sermon.speaker.trim().isEmpty ? null : sermon.speaker.trim(),
-        'Play',
-      ),
-    };
-    return Padding(
-      key: const Key('home-hero-caption'),
-      padding: const EdgeInsets.fromLTRB(20, 14, 12, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onOpen,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    kicker.toUpperCase(),
-                    style: AppTypography.ui(
-                      size: 11,
-                      weight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                    ).copyWith(color: kc.muted, height: 1.2),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _slideTitle(slide),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.display(
-                      size: 20,
-                      weight: FontWeight.w700,
-                    ).copyWith(color: kc.onBg, height: 1.2),
-                  ),
-                  if (detail != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      detail,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.ui(
-                        size: 13,
-                        weight: FontWeight.w500,
-                      ).copyWith(color: kc.muted, height: 1.3),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (action != null)
-            TextButton(
-              key: const Key('home-hero-action'),
-              onPressed: onOpen,
-              style: TextButton.styleFrom(foregroundColor: kc.accentInk),
-              child: Text(
-                action,
-                style: AppTypography.ui(
-                  size: 14,
-                  weight: FontWeight.w700,
-                ).copyWith(color: kc.accentInk),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
+// ── Dots ──────────────────────────────────────────────────────────────────────
 
 class _HeroDots extends StatelessWidget {
   const _HeroDots({
