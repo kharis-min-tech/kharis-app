@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// Shortest run-time treated as a real message. Anything below is a Short
 /// or music clip.
-const Duration kMinMessageLength = Duration(minutes: 2);
+const Duration kMinMessageLength = Duration(minutes: 3);
 
 @immutable
 class Sermon {
