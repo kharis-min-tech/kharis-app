@@ -18,10 +18,11 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
+import 'support/fake_note_repository.dart';
 
-/// The member's notes as pins on the player's seek bar: one per anchored
-/// note on the message on screen, on the timeline of the engine playing it,
-/// live as notes come and go.
+/// The member's notes as pins on the player's seek bar: one per moment the
+/// notes mark on the message on screen — notepad stamps and older timed
+/// notes — on the timeline of the engine playing it, live as notes change.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
@@ -75,7 +76,8 @@ void main() {
         overrides: [
           audioPlayerServiceProvider.overrideWithValue(audio),
           cacheServiceProvider.overrideWithValue(FakeCacheService()),
-          // The notes stream the sheet's adds and deletes surface through.
+          notesRepositoryProvider.overrideWithValue(FakeNoteRepository()),
+          // The notes stream the sheet's saves surface through.
           notesProvider.overrideWith((ref) async* {
             yield initial;
             yield* notes.stream;
@@ -159,6 +161,28 @@ void main() {
         isTrue,
       );
     });
+
+    testWidgets('every stamp in the notepad pins its moment', (tester) async {
+      audio.current = service;
+      await open(tester, MediaMode.audio, [
+        note('n1', 'yt_abc123', tenMinutes),
+        Note(
+          id: 'pad',
+          sermonId: 'yt_abc123',
+          sermonTitle: service.title,
+          body: 'Opening prayer\n[2:00] Grace\nNo stamp here [12:30] mercy',
+          createdAt: DateTime(2026, 3, 1),
+          updatedAt: DateTime(2026, 3, 1),
+        ),
+      ]);
+
+      // The notepad (no position) sorts ahead of the older timed note.
+      expect(audioPins(tester), [
+        const Duration(minutes: 2),
+        const Duration(minutes: 12, seconds: 30),
+        const Duration(minutes: 10),
+      ]);
+    });
   });
 
   group('video mode (videoStart 8:07)', () {
@@ -214,10 +238,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Notes'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('10:00'));
+      await tapFirstStamp(tester);
       await tester.pumpAndSettle();
 
-      // The pin and the anchor seek agree on where the note lives.
+      // The pin and the stamp's seek agree on where the moment lives.
       expect(seeks, MediaPlayerScreen.debugLastVideoPins);
     });
   });
