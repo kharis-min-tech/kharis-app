@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
+import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
@@ -101,7 +102,11 @@ Future<void> displayJourney(Journey j) async {
     await _sweep(j, GivingScreen, 'large-giving');
     await tapNav(t, 'More');
     await _sweep(j, SettingsScreen, 'large-more');
+    // More's Bible row opens the book list; Daily reading the reader.
     await openMoreRow(t, 'Bible');
+    await _sweep(j, BibleBooksScreen, 'large-bible-books');
+    await tapBack(t);
+    await openMoreRow(t, 'Daily reading');
     await _sweep(j, ReadingScreen, 'large-bible');
   } finally {
     t.platformDispatcher.clearTextScaleFactorTestValue();

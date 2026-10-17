@@ -177,7 +177,9 @@ Future<void> _choose(
   await tapVisible(t, find.descendant(of: screen, matching: find.text(hint)));
   await pumpFor(t, const Duration(milliseconds: 800));
   final entry = find.text(item);
-  await pumpUntilFound(t, entry);
+  // The open menu only builds the rows on screen; branches further down
+  // the alphabet (e.g. Northampton) must be scrolled to first.
+  await scrollUntilFound(t, entry, scrollable: find.byType(Scrollable).last);
   await t.tap(entry.last, warnIfMissed: false);
   await pumpFor(t, const Duration(milliseconds: 800));
 }

@@ -8,6 +8,7 @@ import 'package:kharis_app/features/connect/presentation/screens/new_here_screen
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
+import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
@@ -235,7 +236,8 @@ Future<void> moreMenuJourney(Journey j) async {
   }
 
   await pushed('Daily reading', find.byType(ReadingScreen));
-  await pushed('Bible', find.byType(ReadingScreen));
+  // More's Bible row opens on the book list; Close returns straight to More.
+  await pushed('Bible', find.byType(BibleBooksScreen));
   await pushed('My notes', find.byType(NotesScreen));
   await pushed('Favourites', find.byType(FavoritesScreen));
   await pushed('My playlists', find.byType(PlaylistsScreen));

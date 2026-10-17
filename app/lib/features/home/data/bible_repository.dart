@@ -12,8 +12,15 @@ import 'package:kharis_app/core/constants/bible_books.dart';
 class BibleRepository {
   /// [appKey] defaults to the build-time `YOUVERSION_API_KEY` define.
   BibleRepository({Dio? dio, String? appKey})
-    : _dio = dio ?? Dio(),
+    : _dio = dio ?? Dio(_dioOptions),
       _key = appKey ?? _appKey;
+
+  /// Bounds every request so a stalled connection ends in the reader's
+  /// error view with Retry instead of a spinner that never resolves.
+  static final BaseOptions _dioOptions = BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 20),
+  );
 
   static const _base = 'https://api.youversion.com/v1';
   static const _appKey = String.fromEnvironment('YOUVERSION_API_KEY');

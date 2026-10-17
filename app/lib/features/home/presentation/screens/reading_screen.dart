@@ -73,7 +73,11 @@ Color _scriptureInk(BuildContext context) =>
 /// previous/next chapter, reference search and translation choice.
 /// Design-handoff v3: calm, scripture-forward, Newsreader serif on light warm.
 class ReadingScreen extends ConsumerStatefulWidget {
-  const ReadingScreen({super.key});
+  const ReadingScreen({super.key, this.browse = false});
+
+  /// Opens on the book list instead of today's reading (More's Bible row);
+  /// backing out of it leaves the reader.
+  final bool browse;
 
   @override
   ConsumerState<ReadingScreen> createState() => _ReadingScreenState();
@@ -94,6 +98,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   /// The chapter being browsed; null while on today's reading.
   BibleLocation? _browsing;
 
+  /// Showing the book list as the reader's first screen, before any chapter
+  /// was chosen ([ReadingScreen.browse]).
+  late bool _choosingBook = widget.browse;
+
   BibleIndex _index(int bibleId) =>
       ref.read(bibleIndexProvider(bibleId)).valueOrNull ?? BibleIndex.bundled();
 
@@ -105,6 +113,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   void _go(BibleLocation to) {
     final today = _today;
     setState(() {
+      _choosingBook = false;
       // Landing on today's chapter (without a verse) is today's reading.
       final isToday =
           today != null &&
@@ -114,6 +123,30 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _backToToday() => setState(() => _browsing = null);
+
+  /// Reached from a push tap with nothing underneath, a bare pop would leave
+  /// a blank screen; fall back to Home.
+  void _close() {
+    final router = GoRouter.of(context);
+    router.canPop() ? router.pop() : router.go('/home');
+  }
+
+  Future<void> _openInBibleApp(Uri uri) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    ).catchError((Object _) => false);
+    if (opened) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Could not open the Bible app. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
 
   Future<void> _pickChapter(BibleLocation? current) async {
     final picked = await pickBibleChapter(context, current: current);
@@ -137,6 +170,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_choosingBook) {
+      return BibleBooksScreen(onPicked: _go, onClose: _close);
+    }
     final contentAsync = ref.watch(dailyContentProvider);
     final version = ref.watch(selectedBibleProvider);
     final index =
@@ -154,12 +190,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         leading: IconButton(
           tooltip: 'Close',
           icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.kc.onBg),
-          // Reached from a push tap with nothing underneath, a bare pop would
-          // leave a blank screen; fall back to Home.
-          onPressed: () {
-            final router = GoRouter.of(context);
-            router.canPop() ? router.pop() : router.go('/home');
-          },
+          onPressed: _close,
         ),
         actions: [
           IconButton(
@@ -176,12 +207,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             onPressed: current == null
                 ? null
                 : () => unawaited(
-                    launchUrl(
+                    _openInBibleApp(
                       Uri.parse(
                         'https://www.bible.com/bible/${version.id}/'
                         '${current.passageId}',
                       ),
-                      mode: LaunchMode.externalApplication,
                     ),
                   ),
           ),
