@@ -301,23 +301,23 @@ class _ReadingCard extends StatelessWidget {
             ],
           ],
 
-          if (reading != null) ...[
-            const SizedBox(height: 14),
-            _Pill(
-              label: 'Read now',
-              icon: Icons.arrow_forward_rounded,
-              onTap: open,
-            ),
-          ],
+          const SizedBox(height: 14),
+          _Pill(
+            label: reading == null ? 'Pray now' : 'Read now',
+            icon: Icons.arrow_forward_rounded,
+            onTap: open,
+          ),
         ],
       ),
     );
 
-    // A prayer on its own has nothing more to open.
-    if (reading == null) return card;
+    // The whole card opens the reader; with only a prayer it shows the
+    // prayer in full there.
     return Semantics(
       button: true,
-      label: "Today's reading: ${reading.title}. Read now",
+      label: reading == null
+          ? "Today's prayer: ${prayer?.title ?? ''}. Pray now"
+          : "Today's reading: ${reading.title}. Read now",
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: open,
