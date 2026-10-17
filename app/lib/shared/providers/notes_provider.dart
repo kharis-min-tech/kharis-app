@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/notes/data/note_repository.dart';
+import '../../features/notes/data/notepad.dart';
 import '../../features/notes/data/note_timeline_key.dart';
 import '../models/sermon.dart';
 import 'auth_provider.dart';
@@ -33,9 +34,20 @@ final notesProvider = StreamProvider<List<Note>>((ref) {
   return ref.watch(notesRepositoryProvider).watchNotes();
 });
 
-/// Notes anchored to one message, in timeline order (a sermon-wide note with
-/// no position sorts first). Derived from [notesProvider] so opening the
-/// player costs no extra reads and works offline.
+/// The notebook screen's entries: one per message (its notes folded into one
+/// notepad), one per general note, newest edit first. The catalogue links
+/// legacy notes stored under a variant's raw id to their message.
+final notebookProvider = Provider<AsyncValue<List<NotebookEntry>>>((ref) {
+  final catalogue = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+  return ref
+      .watch(notesProvider)
+      .whenData((notes) => groupNotebook(notes, catalogue));
+});
+
+/// Every note on one message — its notepad, plus any one-note-per-moment
+/// notes from older builds the notepad has not folded in yet — in timeline
+/// order (notes with no position first). Derived from [notesProvider] so
+/// opening the player costs no extra reads and works offline.
 ///
 /// Keyed by [NoteTimelineKey], not the raw sermon id: the audio and video
 /// variants of the same message carry different ids, and this is what folds
@@ -48,17 +60,23 @@ final notesProvider = StreamProvider<List<Note>>((ref) {
 /// catalogue, so any loaded sermon sharing this key's canonical contributes
 /// its own raw id as an accepted alias. Offline or while the catalogue loads
 /// this degrades to key-only matching, never breaking the direct cases.
-final sermonNotesProvider =
-    Provider.autoDispose.family<List<Note>, NoteTimelineKey>((ref, key) {
-  final all = ref.watch(notesProvider).valueOrNull ?? const <Note>[];
-  final catalogue = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
-  final aliases = <String>{
-    for (final sermon in catalogue)
-      if (NoteTimelineKey.of(sermon).canonical == key.canonical) sermon.id,
-  };
-  final scoped = all
-      .where((n) => key.matches(n.sermonId) || aliases.contains(n.sermonId))
-      .toList()
-    ..sort((a, b) => (a.positionMs ?? -1).compareTo(b.positionMs ?? -1));
-  return scoped;
-});
+final sermonNotesProvider = Provider.autoDispose
+    .family<List<Note>, NoteTimelineKey>((ref, key) {
+      final all = ref.watch(notesProvider).valueOrNull ?? const <Note>[];
+      final catalogue =
+          ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+      final aliases = <String>{
+        for (final sermon in catalogue)
+          if (NoteTimelineKey.of(sermon).canonical == key.canonical) sermon.id,
+      };
+      final scoped =
+          all
+              .where(
+                (n) => key.matches(n.sermonId) || aliases.contains(n.sermonId),
+              )
+              .toList()
+            ..sort(
+              (a, b) => (a.positionMs ?? -1).compareTo(b.positionMs ?? -1),
+            );
+      return scoped;
+    });

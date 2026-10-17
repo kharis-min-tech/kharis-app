@@ -3,22 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/features/notes/data/note_repository.dart';
+import 'package:kharis_app/features/notes/data/notepad.dart';
 import 'package:kharis_app/features/notes/presentation/note_anchor.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/note_anchor_chip.dart';
+import 'package:kharis_app/features/notes/presentation/widgets/notepad_text.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 
 import 'note_editor_screen.dart';
+import 'notepad_screen.dart';
 
 /// The member's whole notebook, newest edit first: the "go to their notes and
-/// read as they go through" view. Notes anchored to a message carry a chip that
-/// jumps playback back to the moment they were written.
+/// read as they go through" view. Each message is ONE entry — its notepad —
+/// whose timestamps play the message from that moment.
 class NotesScreen extends ConsumerWidget {
   const NotesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notesAsync = ref.watch(notesProvider);
+    final notebook = ref.watch(notebookProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -34,7 +36,7 @@ class NotesScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: notesAsync.when(
+      body: notebook.when(
         loading: () => Center(
           child: CircularProgressIndicator(
             color: context.kc.accentInk,
@@ -49,19 +51,19 @@ class NotesScreen extends ConsumerWidget {
           actionLabel: 'Retry',
           onAction: () => ref.invalidate(notesProvider),
         ),
-        data: (notes) => notes.isEmpty
+        data: (entries) => entries.isEmpty
             ? _buildMessage(
                 context,
                 Icons.notes_outlined,
                 'Take notes while you listen to any message. They will appear here.',
               )
-            : _buildList(context, ref, notes),
+            : _buildList(context, ref, entries),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'New note',
         backgroundColor: context.kc.accent,
         foregroundColor: context.kc.onAccent,
-        onPressed: () => _openEditor(context),
+        onPressed: () => _open(context, null),
         child: const Icon(Icons.edit_outlined),
       ),
     );
@@ -107,7 +109,11 @@ class NotesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildList(BuildContext context, WidgetRef ref, List<Note> notes) {
+  Widget _buildList(
+    BuildContext context,
+    WidgetRef ref,
+    List<NotebookEntry> entries,
+  ) {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.marginMobile,
@@ -115,37 +121,55 @@ class NotesScreen extends ConsumerWidget {
         AppSpacing.marginMobile,
         96,
       ),
-      itemCount: notes.length,
+      itemCount: entries.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
       itemBuilder: (context, index) {
-        final note = notes[index];
+        final entry = entries[index];
+        final key = entry.messageKey;
         return _NoteCard(
-          note: note,
-          onTap: () => _openEditor(context, note: note),
-          onPlay: note.isAnchored
-              ? () => _playAnchor(context, ref, note)
-              : null,
-          onDelete: () => ref.read(notesRepositoryProvider).delete(note.id),
+          // Keyed on the message (or the general note), so a card keeps its
+          // identity while the notes behind it change.
+          key: ValueKey(key ?? entry.notes.single.id),
+          entry: entry,
+          onTap: () => _open(context, entry),
+          onTimestampTap: key == null
+              ? null
+              : (position) => _play(context, ref, key, position),
+          onDelete: () {
+            final repo = ref.read(notesRepositoryProvider);
+            for (final note in entry.notes) {
+              repo.delete(note.id);
+            }
+          },
         );
       },
     );
   }
 
-  void _openEditor(BuildContext context, {Note? note}) {
+  /// A message's notepad, a general note, or (null) a new general note.
+  void _open(BuildContext context, NotebookEntry? entry) {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => NoteEditorScreen(existingNote: note),
+        builder: (_) => switch (entry?.messageKey) {
+          final key? => NotepadScreen(
+            messageKey: key,
+            notes: entry!.notes,
+            title: entry.title,
+          ),
+          null => NoteEditorScreen(existingNote: entry?.notes.single),
+        },
       ),
     );
   }
 
-  Future<void> _playAnchor(
+  Future<void> _play(
     BuildContext context,
     WidgetRef ref,
-    Note note,
+    String key,
+    Duration position,
   ) async {
-    final result = await NoteAnchor.play(ref, note);
+    final result = await NoteAnchor.play(ref, key, position);
     if (!context.mounted) return;
     if (result == NoteAnchorResult.started) {
       context.push('/player');
@@ -153,11 +177,7 @@ class NotesScreen extends ConsumerWidget {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          result == NoteAnchorResult.playbackFailed
-              ? 'Couldn\u2019t play that message. Please try again.'
-              : 'That message is no longer available',
-        ),
+        content: Text(NoteAnchor.failureMessage(result)),
         backgroundColor: AppColors.errorContainer,
         behavior: SnackBarBehavior.floating,
       ),
@@ -169,23 +189,25 @@ class NotesScreen extends ConsumerWidget {
 
 class _NoteCard extends StatelessWidget {
   const _NoteCard({
-    required this.note,
+    super.key,
+    required this.entry,
     required this.onTap,
     required this.onDelete,
-    this.onPlay,
+    this.onTimestampTap,
   });
 
-  final Note note;
+  final NotebookEntry entry;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
-  /// Non-null only for notes anchored to a playback position.
-  final VoidCallback? onPlay;
+  /// Non-null for a message's notepad: plays the message from a timestamp.
+  final ValueChanged<Duration>? onTimestampTap;
 
   @override
   Widget build(BuildContext context) {
+    final title = entry.title;
     return Dismissible(
-      key: ValueKey(note.id),
+      key: ValueKey('dismiss-${entry.messageKey ?? entry.notes.single.id}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -196,6 +218,8 @@ class _NoteCard extends StatelessWidget {
         ),
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
+      // A notepad holds everything written on a message: ask first.
+      confirmDismiss: entry.isMessage ? (_) => _confirmDelete(context) : null,
       onDismissed: (_) => onDelete(),
       child: GestureDetector(
         onTap: onTap,
@@ -209,16 +233,15 @@ class _NoteCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Body text preview
-              Text(
-                note.body,
+              NotepadText(
+                entry.text.trim(),
                 style: AppTypography.ui(
                   size: 15,
                   color: context.kc.onBg,
                   height: 1.4,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                maxLines: 3,
+                onTimestampTap: onTimestampTap,
               ),
               const SizedBox(height: AppSpacing.xs),
               // Footer row. The chip region takes the free width (the chip
@@ -226,20 +249,16 @@ class _NoteCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: note.sermonTitle == null
+                    child: title == null
                         ? const SizedBox.shrink()
                         : Align(
                             alignment: Alignment.centerLeft,
-                            child: NoteAnchorChip(
-                              title: note.sermonTitle!,
-                              positionMs: note.positionMs,
-                              onTap: onPlay,
-                            ),
+                            child: NoteAnchorChip(title: title),
                           ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    _relativeDate(note.updatedAt),
+                    _relativeDate(entry.updatedAt),
                     style: AppTypography.ui(size: 12, color: context.kc.muted),
                   ),
                 ],
@@ -249,6 +268,68 @@ class _NoteCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: dialogContext.kc.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        title: Text(
+          'Delete these notes?',
+          style: AppTypography.display(
+            size: 20,
+            weight: FontWeight.w700,
+            color: dialogContext.kc.onBg,
+          ),
+        ),
+        content: Text(
+          entry.title == null
+              ? 'Everything you wrote on this message will be deleted.'
+              : 'Everything you wrote on "${entry.title}" will be deleted.',
+          style: AppTypography.bodySm.copyWith(
+            fontSize: 14,
+            height: 1.5,
+            color: dialogContext.kc.muted,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Cancel',
+              style: AppTypography.ui(
+                size: 14,
+                weight: FontWeight.w600,
+                color: dialogContext.kc.muted,
+              ),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+              ),
+            ),
+            child: Text(
+              'Delete',
+              style: AppTypography.ui(
+                size: 14,
+                weight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   String _relativeDate(DateTime dt) {
