@@ -24,6 +24,7 @@ import 'package:kharis_app/features/home/presentation/widgets/news_section.dart'
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/features/shared_links/presentation/shared_link_screens.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
@@ -33,6 +34,8 @@ import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/bible_provider.dart';
+import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 
 import 'support/fake_cache_service.dart';
@@ -50,6 +53,16 @@ final _prayerNight = Event(
   branch: 'London',
   startTime: _now.add(const Duration(days: 3)),
   endTime: _now.add(const Duration(days: 3, hours: 2)),
+);
+
+/// A weekly Studio event: one event, dated at its next occurrence, under its
+/// plain Studio uuid.
+final _sundayService = Event(
+  id: '3f6c2a9e-1b7d-4c55-9a0e-6d2f8b1c4e77',
+  title: 'Sunday Service',
+  branch: 'London',
+  startTime: DateTime(_now.year, _now.month, _now.day + 4, 9),
+  recurrenceDays: const [0],
 );
 
 final _allCampusConference = Event(
@@ -86,11 +99,15 @@ NewsItem _news(
 );
 
 const _reading = DailyContent(
-  reading: BibleReading(book: '2 Corinthians', chapter: 13, verse: '1-end'),
-  prayer: 'Lord, make us complete.',
-  prayerReference: '2 Corinthians 13:11',
-  planDay: 13,
-  planDays: 13,
+  reading: DailyEntry(
+    title: 'Be made complete',
+    reference: '2 Corinthians 13',
+    body: 'Paul closes his letter.',
+  ),
+  prayer: DailyEntry(
+    title: 'Lord, make us complete.',
+    reference: '2 Corinthians 13:11',
+  ),
 );
 
 // ── Harness ───────────────────────────────────────────────────────────────────
@@ -120,6 +137,7 @@ GoRouter _router(String initial, Widget Function() start) => GoRouter(
         initial: state.extra is Event ? state.extra as Event : null,
       ),
     ),
+    ...sharedLinkRoutes,
     GoRoute(
       path: '/reading',
       builder: (_, _) => const Scaffold(body: Text('reader')),
@@ -135,7 +153,7 @@ Future<void> _pump(
   List<NewsItem> news = const [],
   Future<List<NewsItem>> Function()? loadNews,
   List<Event> events = const [],
-  Stream<DailyContent>? reading,
+  Stream<DailyContent?>? reading,
   void Function(GoRouter router)? beforeMount,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -154,7 +172,15 @@ Future<void> _pump(
         currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
         currentUserProvider.overrideWith((ref) => Stream.value(null)),
         branchesProvider.overrideWith(
-          (ref) => Stream.value(BranchRepository.seedBranches),
+          (ref) => Stream.value(const [
+            Branch(
+              id: 'london',
+              name: 'London',
+              subtitle: 'United Kingdom',
+              gradientStart: Color(0xFF3B2A6B),
+              gradientEnd: Color(0xFF7C3AED),
+            ),
+          ]),
         ),
         newsProvider.overrideWith(
           (ref, b) async => loadNews == null ? news : await loadNews(),
@@ -170,8 +196,12 @@ Future<void> _pump(
         dailyContentProvider.overrideWith(
           (ref) => reading ?? Stream.value(_reading),
         ),
+        dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
         // Nothing to resume: the card collapses (its engine is WP2's).
         continueListeningProvider.overrideWith((ref) => null),
+        // No hero: these tests drive the sections under it.
+        featuredVideoProvider.overrideWith((ref) async => null),
+        latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
@@ -313,6 +343,21 @@ void main() {
       // Pushed above Home: Back has somewhere to go.
       expect(router.canPop(), isTrue);
     });
+
+    for (final path in ['/events', '/e']) {
+      testWidgets('$path/<uuid> opens a weekly event with its label', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          start: () => const HomeScreen(),
+          initial: '$path/${_sundayService.id}',
+          events: [_sundayService],
+        );
+        expect(find.text('Sunday Service'), findsWidgets);
+        expect(find.text('Every Sunday \u00b7 9:00 AM'), findsOneWidget);
+      });
+    }
 
     testWidgets('a push opened from another tab is stacked over Home', (
       tester,
@@ -514,19 +559,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 150));
     });
 
-    testWidgets('reading card: failure shows an error card with Retry, '
-        'never a made-up reading', (tester) async {
-      var subscriptions = 0;
+    testWidgets('reading card: a failed load hides the card, never a '
+        'made-up reading', (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
-            dailyContentProvider.overrideWith((ref) {
-              subscriptions++;
-              return Stream<DailyContent>.error(Exception('offline'));
-            }),
+            dailyContentProvider.overrideWith(
+              (ref) => Stream<DailyContent?>.error(Exception('offline')),
+            ),
           ],
           child: const MaterialApp(home: Scaffold(body: TodaysReadingCard())),
         ),
@@ -534,19 +577,12 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.byKey(const Key('reading-card-error')), findsOneWidget);
-      expect(
-        find.text('We couldn\u2019t load today\u2019s reading.'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Psalm'), findsNothing);
-
-      await tester.tap(find.text('Retry'));
-      await tester.pump();
-      expect(subscriptions, 2);
+      expect(find.byKey(const Key('reading-card-loading')), findsNothing);
+      expect(find.text('Read now'), findsNothing);
+      expect(find.text('Retry'), findsNothing);
     });
 
-    testWidgets('reading card: skeleton while loading, plan day once loaded', (
+    testWidgets('reading card: skeleton while loading, the entry once loaded', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -568,9 +604,10 @@ void main() {
       expect(find.text('Loading...'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 150));
-      // The real plan position, not the day of the year.
-      expect(find.text("TODAY'S READING \u00b7 DAY 13 OF 13"), findsOneWidget);
+      expect(find.text("TODAY'S READING"), findsOneWidget);
+      expect(find.text('Be made complete'), findsOneWidget);
       expect(find.text('2 Corinthians 13'), findsOneWidget);
+      expect(find.text('Lord, make us complete.'), findsOneWidget);
     });
   });
 
@@ -598,7 +635,7 @@ void main() {
       expect(container.read(readingMarksProvider), isEmpty);
     });
 
-    testWidgets('a reading past the end of its book explains itself', (
+    testWidgets('a reference that cannot be opened shows the Studio text', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -607,16 +644,17 @@ void main() {
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            bibleIndexProvider.overrideWith(
+              (ref, id) async => BibleIndex.bundled(),
+            ),
             dailyContentProvider.overrideWith(
               (ref) => Stream.value(
                 const DailyContent(
-                  reading: BibleReading(
-                    book: '2 Corinthians',
-                    chapter: 17,
-                    verse: '1-end',
+                  reading: DailyEntry(
+                    title: 'Finish well',
+                    reference: '2 Corinthians 17',
+                    body: 'The book has thirteen chapters.',
                   ),
-                  prayer: '',
-                  prayerReference: '',
                 ),
               ),
             ),
@@ -627,14 +665,10 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(
-        find.text('Today\u2019s reading isn\u2019t available'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('2 Corinthians has 13 chapters'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('reading-today-text')), findsOneWidget);
+      expect(find.text('Finish well'), findsOneWidget);
+      expect(find.text('The book has thirteen chapters.'), findsOneWidget);
+      expect(find.text('Browse the Bible'), findsOneWidget);
       expect(find.text('Retry'), findsNothing);
     });
   });
@@ -952,66 +986,6 @@ void main() {
     });
   });
 
-  group('admin guard (U12)', () {
-    Future<GoRouter> guarded(WidgetTester tester, {required bool admin}) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final prefs = await SharedPreferences.getInstance();
-      late GoRouter router;
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            sharedPreferencesProvider.overrideWithValue(prefs),
-            currentUserProvider.overrideWith(
-              (ref) => Stream.value(
-                User(
-                  id: 'u1',
-                  email: 'a@kharis.org',
-                  displayName: 'A',
-                  role: admin ? 'admin' : 'member',
-                  createdAt: DateTime(2024),
-                ),
-              ),
-            ),
-            isAdminProvider.overrideWith((ref) async => admin),
-          ],
-          child: Consumer(
-            builder: (context, ref, _) {
-              router = GoRouter(
-                initialLocation: '/home',
-                redirect: ref.read(routerNotifierProvider).redirect,
-                routes: [
-                  GoRoute(path: '/home', builder: (_, _) => const Text('home')),
-                  GoRoute(
-                    path: '/admin',
-                    builder: (_, _) => const Text('admin'),
-                  ),
-                ],
-              );
-              return MaterialApp.router(routerConfig: router);
-            },
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      return router;
-    }
-
-    testWidgets('a member is bounced off /admin', (tester) async {
-      final router = await guarded(tester, admin: false);
-      router.go('/admin');
-      await tester.pumpAndSettle();
-      expect(find.text('admin'), findsNothing);
-      expect(find.text('home'), findsOneWidget);
-    });
-
-    testWidgets('an admin gets in', (tester) async {
-      final router = await guarded(tester, admin: true);
-      router.go('/admin');
-      await tester.pumpAndSettle();
-      expect(find.text('admin'), findsOneWidget);
-    });
-  });
-
   group('welcome redirect on a fresh install', () {
     Future<void> launchAt(
       WidgetTester tester, {
@@ -1028,7 +1002,6 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             cacheServiceProvider.overrideWithValue(FakeCacheService()),
             currentUserProvider.overrideWith((ref) => Stream.value(user)),
-            isAdminProvider.overrideWith((ref) async => false),
           ],
           child: Consumer(
             builder: (context, ref, _) {

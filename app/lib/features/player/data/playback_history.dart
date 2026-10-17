@@ -27,6 +27,31 @@ class UnfinishedPlay {
   }
 }
 
+/// How far the member has got through one message, for list rows.
+sealed class ListeningProgress {
+  const ListeningProgress();
+}
+
+/// Never played, or not past [PlaybackHistory.resumeFloor].
+class NotStarted extends ListeningProgress {
+  const NotStarted();
+}
+
+/// Started and not finished. [remaining] and [fraction] are null when the
+/// message's length is unknown.
+class InProgress extends ListeningProgress {
+  const InProgress({required this.position, this.remaining, this.fraction});
+
+  final Duration position;
+  final Duration? remaining;
+  final double? fraction;
+}
+
+/// Played to the end (and not restarted since).
+class Finished extends ListeningProgress {
+  const Finished();
+}
+
 /// Resume points, "Recently played" and the sermon snapshots that let recents
 /// resolve before the archive has hydrated. Shared by the audio engine and
 /// the video engine so both write ONE history for a message.
@@ -74,20 +99,75 @@ class PlaybackHistory {
 
   // ── Positions ──────────────────────────────────────────────────────────────
 
-  /// Persists [position] for [sermon] when it is past [resumeFloor].
+  /// Preference key of the canonical keys of messages played to the end.
+  static const String finishedKey = 'finished_sermons';
+
+  /// Bumped on every write, so list rows can redraw their progress.
+  final ValueNotifier<int> changes = ValueNotifier(0);
+
+  /// Persists [position] for [sermon] when it is past [resumeFloor]. A
+  /// finished message being played again is no longer "finished".
   void savePosition(Sermon sermon, Duration position) {
     if (position <= resumeFloor) return;
+    _setFinished(sermon, finished: false, notify: false);
     _write(sermon, position.inMilliseconds);
   }
 
-  /// Forgets the resume point, e.g. after the message played to the end.
-  void clearPosition(Sermon sermon) => _write(sermon, 0);
+  /// The message played to the end: forget the resume point so the next
+  /// play starts from the top, and remember it was finished.
+  void markFinished(Sermon sermon) {
+    if (_isLive(sermon)) return;
+    _setFinished(sermon, finished: true, notify: false);
+    _write(sermon, 0);
+  }
 
   void _write(Sermon sermon, int ms) {
     if (_isLive(sermon)) return;
     for (final key in _keys(sermon)) {
       _cache.cachePlaybackPosition(key, ms);
     }
+    changes.value++;
+  }
+
+  Set<String> _finished() => {
+    ...?(_cache.getPreference<Object?>(finishedKey, null) as List?)
+        ?.whereType<String>(),
+  };
+
+  /// Callers that go on to [_write] pass `notify: false`, so listeners hear
+  /// one change per save with both writes already done.
+  void _setFinished(
+    Sermon sermon, {
+    required bool finished,
+    bool notify = true,
+  }) {
+    final all = _finished();
+    final key = NoteTimelineKey.of(sermon).canonical;
+    final changed = finished ? all.add(key) : all.remove(key);
+    if (!changed) return;
+    _cache.cachePreference(finishedKey, all.toList());
+    if (notify) changes.value++;
+  }
+
+  /// Where the member is with [sermon], for the "28 min left" and
+  /// "Finished" labels on list rows.
+  ListeningProgress progressOf(Sermon sermon) {
+    if (_isLive(sermon)) return const NotStarted();
+    if (_finished().contains(NoteTimelineKey.of(sermon).canonical)) {
+      return const Finished();
+    }
+    final saved = savedPosition(sermon);
+    if (saved <= resumeFloor) return const NotStarted();
+    final total = sermon.duration;
+    if (total == null || total <= Duration.zero) {
+      return InProgress(position: saved);
+    }
+    if (saved >= total - endGuard) return const Finished();
+    return InProgress(
+      position: saved,
+      remaining: total - saved,
+      fraction: saved.inMilliseconds / total.inMilliseconds,
+    );
   }
 
   /// The last saved position, or zero. The canonical key wins; the raw id is

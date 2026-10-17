@@ -217,76 +217,6 @@ paths:
                 live:
                   value: { error: date must be YYYY-MM-DD }
         '405': { $ref: '#/components/responses/MethodNotAllowed' }
-  /searchYouTube:
-    get:
-      tags: [Functions]
-      operationId: searchYouTube
-      summary: Admin-only search over the church YouTube channel
-      description: Each call spends about 101 YouTube Data API quota units. Caller must be a super admin (`users/{uid}.role == 'admin'` or claim `admin`).
-      security:
-        - firebaseIdToken: []
-      parameters:
-        - name: q
-          in: query
-          description: Empty lists newest uploads; non-empty searches by relevance.
-          schema: { type: string }
-        - name: pageToken
-          in: query
-          schema: { type: string }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
-      responses:
-        '200':
-          description: Videos
-          headers:
-            Cache-Control:
-              description: '`private, no-store`'
-              schema: { type: string }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/YouTubeSearchResponse' }
-              examples:
-                from-code:
-                  summary: Built from sync-youtube.ts
-                  value:
-                    videos:
-                      - videoId: VdGcMD4Rwy8
-                        title: 'Christ: The Eternally Blessed God'
-                        description: ''
-                        thumbnailUrl: https://i.ytimg.com/vi/VdGcMD4Rwy8/hqdefault.jpg
-                        publishedAt: '2026-09-27T12:00:00Z'
-                        duration: 2945
-                        inLibrary: true
-                        isFeatured: false
-                    nextPageToken: CBkQAA
-                    totalResults: 812
-                    count: 1
-        '401':
-          description: Missing or invalid ID token
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-              examples:
-                live:
-                  value: { error: Sign-in required }
-        '403':
-          description: Signed in but not a super admin
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-              example: { error: Admin only }
-        '405': { $ref: '#/components/responses/MethodNotAllowed' }
-        '500':
-          description: Server YouTube key not configured
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '502':
-          description: YouTube API error
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
   /sermonApiProxy/{resource}/:
     get:
       tags: [Functions]
@@ -595,11 +525,6 @@ paths:
         '404':
           description: No transcript for this sermon
 components:
-  securitySchemes:
-    firebaseIdToken:
-      type: http
-      scheme: bearer
-      bearerFormat: Firebase ID token
   headers:
     CacheFiveMinutes:
       description: '`public, max-age=300`'
@@ -834,32 +759,6 @@ components:
         readings:
           type: array
           items: { $ref: '#/components/schemas/ResolvedReading' }
-        count: { type: integer }
-    YouTubeVideo:
-      type: object
-      required: [videoId, title, description, thumbnailUrl, publishedAt, duration, inLibrary, isFeatured]
-      properties:
-        videoId: { type: string }
-        title: { type: string }
-        description: { type: string }
-        thumbnailUrl: { type: [string, 'null'] }
-        publishedAt: { type: string, format: date-time }
-        duration:
-          type: integer
-          description: Seconds; 0 when unknown.
-        inLibrary:
-          type: boolean
-          description: '`sermons/yt_<videoId>` exists.'
-        isFeatured: { type: boolean }
-    YouTubeSearchResponse:
-      type: object
-      required: [videos, nextPageToken, totalResults, count]
-      properties:
-        videos:
-          type: array
-          items: { $ref: '#/components/schemas/YouTubeVideo' }
-        nextPageToken: { type: [string, 'null'] }
-        totalResults: { type: [integer, 'null'] }
         count: { type: integer }
     PageEnvelope:
       type: object

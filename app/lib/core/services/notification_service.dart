@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../constants/app_links.dart';
 import 'firebase_service.dart';
 
 /// Messenger used to surface foreground pushes as in-app banners.
@@ -37,11 +38,6 @@ class KharisTopics {
   static const String serviceReminders = 'service_reminders';
   static const String events = 'events';
   static const String dailyReading = 'daily_reading';
-
-  /// Staff devices: every device signed in as a Studio user (super or branch
-  /// admin) follows it, so Studio can send a test push before going wide.
-  /// MUST match `STUDIO_TEST_TOPIC` in `backend/functions/src/notifications.ts`.
-  static const String studioTest = 'studio_test';
 
   /// Maps a `notificationPrefsProvider` key to the topic it gates.
   static const Map<String, String> byPreference = <String, String>{
@@ -102,9 +98,7 @@ class NotificationTarget {
 /// backend: `pushPendingAnnouncements` sends `{type: 'announcement', newsId}`,
 /// `onEventWritten` sends `{type: 'event', eventId}`, `pushServiceReminders`
 /// sends `{type: 'service_reminder', branch}`, the reading job sends
-/// `{type: 'reading'}`, venue changes send `{type: 'venue'}` and Studio
-/// notifications (`notifications.ts`) send `{type: 'studio', notificationId,
-/// link?}`. Adding a type server-side without a case here drops the member
+/// `{type: 'reading'}` and venue changes send `{type: 'venue'}`. Adding a type server-side without a case here drops the member
 /// on `/home`.
 NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
   String? id(String key) {
@@ -148,59 +142,9 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
     case 'reading':
     case KharisTopics.dailyReading:
       return const NotificationTarget('/reading', overlay: true);
-    case 'studio':
-      // Studio notifications carry an optional `link`; one the app cannot
-      // open itself (a web address) is launched by [NotificationService], and
-      // without a link the tap shows the notification in the inbox.
-      final link = id('link');
-      return (link == null ? null : notificationLinkTarget(link)) ??
-          const NotificationTarget('/notifications', overlay: true);
     default:
       return const NotificationTarget('/home');
   }
-}
-
-/// Tab roots a Studio link switches to; every other in-app path is pushed
-/// above `/home`.
-const Set<String> _tabRoots = {
-  '/home',
-  '/messages',
-  '/giving',
-  '/calendar',
-  '/more',
-};
-
-/// The in-app screen a Studio notification's `link` opens: an app path
-/// (`/m/<id>`, `/e/<id>`, `/a/<id>`, `/giving`, `/reading`, ...) or a shared
-/// link on [AppLinks.host], which opens in the app like its path. Null for
-/// any other web address (see [externalNotificationUri]) or a malformed link.
-NotificationTarget? notificationLinkTarget(String link) {
-  final trimmed = link.trim();
-  final uri = Uri.tryParse(trimmed);
-  if (uri == null) return null;
-  if (uri.hasScheme) {
-    final ownLink =
-        (uri.isScheme('https') || uri.isScheme('http')) &&
-        uri.host == AppLinks.host &&
-        AppLinks.isSharedPath(uri.path);
-    if (!ownLink) return null;
-  } else if (!trimmed.startsWith('/') || trimmed.startsWith('//')) {
-    return null;
-  }
-  final location = Uri(
-    path: uri.path,
-    query: uri.hasQuery ? uri.query : null,
-  ).toString();
-  return NotificationTarget(location, overlay: !_tabRoots.contains(uri.path));
-}
-
-/// A Studio link that leaves the app: an http(s) address that
-/// [notificationLinkTarget] does not open in the app.
-Uri? externalNotificationUri(String link) {
-  if (notificationLinkTarget(link) != null) return null;
-  final uri = Uri.tryParse(link.trim());
-  if (uri == null || uri.host.isEmpty) return null;
-  return uri.isScheme('https') || uri.isScheme('http') ? uri : null;
 }
 
 /// Opens [target] without leaving a one-page stack: overlays are pushed above
@@ -222,6 +166,48 @@ void openNotificationTarget(GoRouter router, NotificationTarget target) {
   // A go to the current location schedules nothing; make sure a frame comes.
   binding.ensureVisualUpdate();
 }
+
+/// What the OS lets the app do with notifications, as far as the member's
+/// next step is concerned.
+enum NotificationPermission {
+  /// Allowed (iOS provisional included).
+  granted,
+
+  /// Not allowed, and asking may still show the OS sheet: iOS before the
+  /// first answer, and Android, which reports every not-granted state as
+  /// "denied" (when it will not ask again the request simply returns).
+  askable,
+
+  /// Refused on iOS. The sheet is shown once per install, so only system
+  /// settings can turn notifications on.
+  blocked,
+
+  /// Unknown (Firebase disabled or the plugin failed): nothing to offer.
+  unavailable,
+}
+
+/// Maps the plugin's [status] to the member's next step on [platform].
+NotificationPermission notificationPermissionFor(
+  AuthorizationStatus status,
+  TargetPlatform platform,
+) {
+  switch (status) {
+    case AuthorizationStatus.authorized:
+    case AuthorizationStatus.provisional:
+      return NotificationPermission.granted;
+    case AuthorizationStatus.notDetermined:
+      return NotificationPermission.askable;
+    case AuthorizationStatus.denied:
+      return platform == TargetPlatform.iOS
+          ? NotificationPermission.blocked
+          : NotificationPermission.askable;
+  }
+}
+
+/// Opens this app's notification settings on Android (see `MainActivity`).
+const MethodChannel _systemSettingsChannel = MethodChannel(
+  'com.kharis.church/system_settings',
+);
 
 class NotificationService {
   NotificationService({this.router, this.onContentPush});
@@ -349,6 +335,30 @@ class NotificationService {
     }
   }
 
+  /// Opens the system settings page where the member can allow Kharis
+  /// notifications, for when the OS will no longer show its own prompt.
+  /// Returns whether a settings page opened. Never throws.
+  Future<bool> openSystemSettings() async {
+    try {
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.iOS:
+          // UIApplication.openSettingsURLString: this app's page in Settings,
+          // with Notifications at the top.
+          return await launchUrl(Uri.parse('app-settings:'));
+        case TargetPlatform.android:
+          return await _systemSettingsChannel.invokeMethod<bool>(
+                'openNotificationSettings',
+              ) ??
+              false;
+        default:
+          return false;
+      }
+    } catch (e) {
+      debugPrint('[FCM] openSystemSettings error: $e');
+      return false;
+    }
+  }
+
   /// Applies the whole notification-preference map to this device's topics.
   ///
   /// Unknown keys are ignored, so adding a preference without a topic is safe.
@@ -391,11 +401,6 @@ class NotificationService {
   Future<void> _setTopic(String topic, bool enabled) =>
       enabled ? subscribeToTopic(topic) : unsubscribeFromTopic(topic);
 
-  /// Follows [KharisTopics.studioTest] while the signed-in user may use
-  /// Studio, and leaves it when they lose access or sign out.
-  Future<void> syncStudioTestTopic({required bool canUseStudio}) =>
-      _setTopic(KharisTopics.studioTest, canUseStudio);
-
   void _handleForegroundMessage(RemoteMessage message) {
     onContentPush?.call(message.data['type'] as String?);
     final title = message.notification?.title;
@@ -423,17 +428,6 @@ class NotificationService {
   }
 
   void _open(RemoteMessage message) {
-    final link = message.data['link'];
-    final external = message.data['type'] == 'studio' && link is String
-        ? externalNotificationUri(link)
-        : null;
-    if (external != null) {
-      launchUrl(
-        external,
-        mode: LaunchMode.externalApplication,
-      ).catchError((Object _) => false);
-      return;
-    }
     final router = this.router;
     if (router == null) return;
     openNotificationTarget(router, notificationTargetFor(message.data));

@@ -1,50 +1,71 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:kharis_app/core/services/content_api.dart';
+import 'package:kharis_app/features/messages/data/kharis_api_sermon_repository.dart'
+    show youTubeVideoId;
 
 @immutable
 class LiveStatus {
-  const LiveStatus({
-    required this.isLive,
-    this.videoId,
-    this.title,
-  });
+  const LiveStatus({required this.isLive, this.videoId, this.title, this.url});
 
   final bool isLive;
+
+  /// YouTube id of the stream, when [url] is a YouTube video link.
   final String? videoId;
   final String? title;
 
+  /// The stream link as the Studio stored it.
+  final String? url;
+
   static const notLive = LiveStatus(isLive: false);
+
+  /// The Content Studio `app_config` value under key `live_stream`:
+  /// `{url, title, enabled | is_live}`. Off, missing or unreadable is
+  /// [notLive].
+  static LiveStatus fromConfig(Object? value) {
+    if (value is! Map) return notLive;
+    final on = value['enabled'] == true || value['is_live'] == true;
+    if (!on) return notLive;
+    final url = _text(value['url']);
+    return LiveStatus(
+      isLive: true,
+      url: url,
+      videoId: youTubeVideoId(url),
+      title: _text(value['title']),
+    );
+  }
+
+  static String? _text(Object? v) {
+    if (v is! String) return null;
+    final t = v.trim();
+    return t.isEmpty ? null : t;
+  }
 }
 
-/// Watches the `config/live` Firestore document for realtime live-stream state.
+/// Reads the live-stream switch from the Content Studio `app_config` table.
 class LiveRepository {
-  LiveRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  LiveRepository({required this._api});
 
-  final FirebaseFirestore _firestore;
+  final ContentApi _api;
 
-  /// Emits [LiveStatus] updates from `config/live`.
-  /// Missing doc or fields map to [LiveStatus.notLive].
-  /// Any error swallowed to a single non-live emission.
+  static const _query = {'key': 'eq.live_stream'};
+
+  /// The Studio's current state. Read from the network only: a saved "live"
+  /// would announce a stream long after it ended. Any failure reads as
+  /// [LiveStatus.notLive].
   Stream<LiveStatus> watchLiveStatus() async* {
     try {
-      yield* _firestore
-          .collection('config')
-          .doc('live')
-          .snapshots()
-          .map((doc) {
-        if (!doc.exists || doc.data() == null) return LiveStatus.notLive;
-        final data = doc.data()!;
-        final isLive = data['isLive'] as bool? ?? false;
-        if (!isLive) return LiveStatus.notLive;
-        return LiveStatus(
-          isLive: true,
-          videoId: data['videoId'] as String?,
-          title: data['title'] as String?,
-        );
-      });
+      yield fromRows(await _api.fetch('app_config', query: _query));
     } catch (_) {
       yield LiveStatus.notLive;
     }
+  }
+
+  static LiveStatus fromRows(List<Map<String, dynamic>> rows) {
+    for (final row in rows) {
+      if (row['key'] == 'live_stream') {
+        return LiveStatus.fromConfig(row['value']);
+      }
+    }
+    return LiveStatus.notLive;
   }
 }

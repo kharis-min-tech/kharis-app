@@ -15,7 +15,6 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
-import 'package:kharis_app/features/giving/presentation/screens/giving_webview_screen.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/branch_selection_screen.dart';
@@ -38,6 +37,8 @@ import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 class _FakeAuth implements AuthRepository {
   final resetEmails = <String>[];
   int logouts = 0;
+  int guestLogins = 0;
+  bool guestFails = false;
 
   @override
   Future<void> sendPasswordResetEmail(String email) async {
@@ -60,7 +61,11 @@ class _FakeAuth implements AuthRepository {
   }) => throw UnimplementedError();
 
   @override
-  Future<User> loginAsGuest() => throw UnimplementedError();
+  Future<User> loginAsGuest() async {
+    guestLogins++;
+    if (guestFails) throw Exception('network');
+    return _guest;
+  }
 
   @override
   bool get usesPasswordSignIn => false;
@@ -125,6 +130,9 @@ const _branches = [
 /// URLs handed to url_launcher (method-channel implementation in tests).
 final _launched = <String>[];
 
+/// Full argument maps of [_launched] (launch mode flags included).
+final _launchArgs = <Map<String, Object?>>[];
+
 /// Text written to the system clipboard.
 final _clipboard = <String>[];
 
@@ -135,7 +143,9 @@ void _mockPlatformChannels() {
     const MethodChannel('plugins.flutter.io/url_launcher'),
     (call) async {
       if (call.method == 'launch') {
-        _launched.add((call.arguments as Map)['url'] as String);
+        final args = Map<String, Object?>.from(call.arguments as Map);
+        _launched.add(args['url']! as String);
+        _launchArgs.add(args);
       }
       return true;
     },
@@ -163,13 +173,14 @@ List<Override> _baseOverrides({
   sharedPreferencesProvider.overrideWithValue(prefs),
   firestoreProvider.overrideWithValue(db),
   currentUserProvider.overrideWith((ref) => Stream.value(user)),
-  isAdminProvider.overrideWith((ref) => false),
   branchesProvider.overrideWith((ref) => Stream.value(branches)),
   notificationServiceProvider.overrideWithValue(_QuietNotifications()),
   notificationPrefsProvider.overrideWith(
     (ref) => Stream.value(const <String, bool>{}),
   ),
-  notificationPermissionProvider.overrideWith((ref) async => true),
+  notificationPermissionProvider.overrideWith(
+    (ref) async => NotificationPermission.granted,
+  ),
   if (auth != null) authRepositoryProvider.overrideWithValue(auth),
 ];
 
@@ -188,6 +199,7 @@ Future<GoRouter> _pumpMore(
       GoRoute(path: '/more', builder: (_, _) => const SettingsScreen()),
       for (final path in [
         '/reading',
+        '/bible',
         '/notes',
         '/favorites',
         '/playlists',
@@ -230,6 +242,7 @@ void main() {
 
   setUp(() {
     _launched.clear();
+    _launchArgs.clear();
     _clipboard.clear();
     _mockPlatformChannels();
     PackageInfo.setMockInitialValues(
@@ -244,6 +257,7 @@ void main() {
   group('More', () {
     for (final (label, route) in [
       ('Daily reading', '/reading'),
+      ('Bible', '/bible'),
       ('My notes', '/notes'),
       ('Favourites', '/favorites'),
       ('My playlists', '/playlists'),
@@ -397,18 +411,20 @@ void main() {
       expect(find.text('Bank details copied'), findsOneWidget);
     });
 
-    testWidgets('Giving to opens the shared campus sheet and persists', (
-      tester,
-    ) async {
-      final prefs = await pumpGiving(tester);
-      await tester.tap(find.byKey(const ValueKey('giving-branch-selector')));
-      await tester.pumpAndSettle();
-      expect(find.text('Choose your branch'), findsOneWidget);
+    testWidgets('Give securely opens kharis.org in the browser; no branch '
+        'picker', (tester) async {
+      await pumpGiving(tester);
+      expect(find.text('GIVING TO'), findsNothing);
+      expect(find.text('Change'), findsNothing);
+      expect(find.text('London'), findsNothing);
+      expect(find.text('Opens kharis.org in your browser'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('branch-choice-Manchester')));
+      await tester.tap(find.text('Give securely'));
       await tester.pumpAndSettle();
-      expect(prefs.getString('onboarding_branch'), 'Manchester');
-      expect(find.text('Manchester'), findsOneWidget);
+      expect(_launched, ['https://kharis.org/giving/']);
+      // External browser: neither Safari View Controller nor a web view.
+      expect(_launchArgs.single['useSafariVC'], isFalse);
+      expect(_launchArgs.single['useWebView'], isFalse);
     });
 
     test('the secure giving URL is the live giving page', () {
@@ -416,16 +432,7 @@ void main() {
       expect(kBuiltInGiving.url, kGivingUrl);
     });
 
-    testWidgets('a campus with no account of its own gives church-wide', (
-      tester,
-    ) async {
-      await pumpGiving(tester);
-      expect(find.text('London'), findsOneWidget);
-      expect(find.text('Kharis Church account'), findsOneWidget);
-      expect(find.text('To Kharis Church'), findsOneWidget);
-    });
-
-    testWidgets('a campus account names the campus and replaces every row', (
+    testWidgets('a branch account never replaces the church-wide details', (
       tester,
     ) async {
       final prefs = await _prefs({'onboarding_branch': 'London'});
@@ -443,10 +450,7 @@ void main() {
                 gradientEnd: Color(0xFF451EBB),
                 giving: GivingDetails(
                   accountName: 'Kharis London',
-                  sortCode: '11-22-33',
                   accountNumber: '12345678',
-                  reference: 'LONDON TITHE',
-                  note: 'Gift Aid forms are at the welcome desk.',
                 ),
               ),
             ],
@@ -456,79 +460,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('London account'), findsOneWidget);
-      expect(find.text('To London'), findsOneWidget);
-      // No campus giving page: nothing to open securely.
-      expect(find.text('Give securely'), findsNothing);
-      expect(
-        find.text('Gift Aid forms are at the welcome desk.'),
-        findsOneWidget,
-      );
-      expect(find.text('Kharis Ministries'), findsNothing);
-
-      final button = find.text('Copy bank details');
-      await tester.ensureVisible(button);
-      await tester.tap(button);
-      await tester.pumpAndSettle();
-      expect(
-        _clipboard.last,
-        [
-          'Account name: Kharis London',
-          'Account number: 12345678',
-          'Sort code: 11-22-33',
-          'Reference: LONDON TITHE',
-        ].join('\n'),
-      );
-    });
-
-    testWidgets('config/giving is the church-wide account when set', (
-      tester,
-    ) async {
-      final prefs = await _prefs({'onboarding_branch': 'London'});
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            ..._baseOverrides(prefs: prefs, db: FakeFirebaseFirestore()),
-            churchGivingProvider.overrideWith(
-              (ref) => Stream.value(
-                const GivingDetails(
-                  url: 'https://give.example.org',
-                  accountName: 'Kharis Church UK',
-                  accountNumber: '87654321',
-                ),
-              ),
-            ),
-          ],
-          child: const MaterialApp(home: GivingScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Kharis Church UK'), findsOneWidget);
-      expect(find.text('Kharis Ministries'), findsNothing);
-      expect(find.text('Kharis Church account'), findsOneWidget);
+      expect(find.text('To Kharis Church'), findsOneWidget);
+      expect(find.text('Kharis Ministries'), findsOneWidget);
+      expect(find.text('Kharis London'), findsNothing);
       expect(find.text('Give securely'), findsOneWidget);
-      expect(
-        find.text('Opens the secure Kharis Church giving page'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('the giving page error state retries', (tester) async {
-      var retries = 0;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: GivingLoadError(
-              onRetry: () => retries++,
-              onOpenInBrowser: () {},
-            ),
-          ),
-        ),
-      );
-      expect(find.text('We could not open the giving page'), findsOneWidget);
-      await tester.tap(find.text('Retry'));
-      expect(retries, 1);
     });
   });
 
@@ -713,6 +648,64 @@ void main() {
       expect(prefs.getString('onboarding_branch'), 'Manchester');
       expect(prefs.containsKey('onboarding_role'), isFalse);
       expect(find.text('More'), findsOneWidget, reason: 'pops back to More');
+    });
+
+    group('Continue as guest', () {
+      Future<void> pumpLogin(WidgetTester tester, _FakeAuth auth) async {
+        final prefs = await _prefs();
+        final router = GoRouter(
+          initialLocation: '/login',
+          routes: [
+            GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+            GoRoute(
+              path: '/branch-selection',
+              builder: (_, _) => const Scaffold(body: Text('Pick a branch')),
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              sharedPreferencesProvider.overrideWithValue(prefs),
+              authRepositoryProvider.overrideWithValue(auth),
+            ],
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      Finder guestButton() => find.ancestor(
+        of: find.text('Continue as guest'),
+        matching: find.byType(OutlinedButton),
+      );
+
+      testWidgets('a tap anywhere on the button signs in and asks for a '
+          'branch', (tester) async {
+        final auth = _FakeAuth();
+        await pumpLogin(tester, auth);
+        await tester.ensureVisible(guestButton());
+        // Tap the button's edge, not its label: the whole box is the target.
+        final box = tester.getRect(guestButton());
+        await tester.tapAt(box.centerLeft + const Offset(12, 0));
+        await tester.pumpAndSettle();
+        expect(auth.guestLogins, 1);
+        expect(find.text('Pick a branch'), findsOneWidget);
+      });
+
+      testWidgets('a failed guest sign-in says so and re-enables the button', (
+        tester,
+      ) async {
+        final auth = _FakeAuth()..guestFails = true;
+        await pumpLogin(tester, auth);
+        await tester.ensureVisible(guestButton());
+        await tester.tap(guestButton());
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Could not continue as a guest'), findsOne);
+        expect(find.text('Pick a branch'), findsNothing);
+        expect(tester.widget<OutlinedButton>(guestButton()).enabled, isTrue);
+      });
     });
   });
 }

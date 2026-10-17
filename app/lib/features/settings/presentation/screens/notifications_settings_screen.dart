@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
+import 'package:kharis_app/shared/widgets/notification_permission_card.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -35,19 +37,10 @@ class _NotificationsSettingsScreenState
     }
   }
 
-  Future<void> _requestPermission() async {
-    // Taken before the OS sheet opens: the member can leave this screen
-    // while it is up, after which this widget's `ref` is dead. The follow-up
-    // runs on its own provider, so the topics are still re-applied.
-    final service = ref.read(notificationServiceProvider);
-    final onAnswer = ref.read(notificationPermissionAnsweredProvider);
-    await onAnswer(await service.requestPermission());
-  }
-
   @override
   Widget build(BuildContext context) {
     final prefsAsync = ref.watch(notificationPrefsProvider);
-    final permitted = ref.watch(notificationPermissionProvider).valueOrNull;
+    final permission = ref.watch(notificationPermissionProvider).valueOrNull;
 
     // Hydrate local copy once from the first Firestore emission.
     if (_prefs == null) {
@@ -96,8 +89,8 @@ class _NotificationsSettingsScreenState
                 // The prefs stream falls back to defaults for guests; a read
                 // failure for a member still shows working switches (they
                 // apply to this device's topics) rather than a blank page.
-                error: (_, _) => _toggles(_prefs ?? const {}, permitted),
-                data: (_) => _toggles(_prefs ?? const {}, permitted),
+                error: (_, _) => _toggles(_prefs ?? const {}, permission),
+                data: (_) => _toggles(_prefs ?? const {}, permission),
               ),
             ),
           ],
@@ -106,15 +99,21 @@ class _NotificationsSettingsScreenState
     );
   }
 
-  Widget _toggles(Map<String, bool> prefs, bool? permitted) {
+  Widget _toggles(Map<String, bool> prefs, NotificationPermission? permission) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
           // Toggles can't deliver anything while the OS blocks
           // us, so say so rather than lying with three switches.
-          if (permitted == false) ...[
-            _PermissionNotice(onEnable: _requestPermission),
+          if (permission == NotificationPermission.askable ||
+              permission == NotificationPermission.blocked) ...[
+            NotificationPermissionCard(
+              permission: permission!,
+              message:
+                  'Your device is blocking Kharis notifications. Turn them on '
+                  'to get the alerts you pick below.',
+            ),
             const SizedBox(height: 14),
           ],
           _ToggleRow(
@@ -136,60 +135,6 @@ class _NotificationsSettingsScreenState
             subtitle: 'Today\u2019s Bible reading at 7am (UK time)',
             value: prefs['dailyReading'] ?? true,
             onChanged: (v) => _onToggle('dailyReading', v),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── OS permission notice ──────────────────────────────────────────────────────
-
-/// Shown when the OS is blocking notifications, so the toggles below can't
-/// deliver anything regardless of their state.
-class _PermissionNotice extends StatelessWidget {
-  const _PermissionNotice({required this.onEnable});
-
-  final Future<void> Function() onEnable;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Notifications are turned off',
-            style: AppTypography.ui(
-              size: 15,
-              weight: FontWeight.w600,
-            ).copyWith(color: context.kc.onBg),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Your device is blocking Kharis notifications. Allow them to start '
-            'receiving the alerts you pick below.',
-            style: AppTypography.ui(size: 12).copyWith(color: context.kc.muted),
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: onEnable,
-              child: Text(
-                'Allow notifications',
-                style: AppTypography.ui(
-                  size: 13,
-                  weight: FontWeight.w600,
-                ).copyWith(color: context.kc.accentInk),
-              ),
-            ),
           ),
         ],
       ),

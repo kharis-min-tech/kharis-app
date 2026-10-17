@@ -1,13 +1,13 @@
 # Kharis API reference
 
-Every remote surface the Flutter app (`app/`) and the Content Studio (`admin/index.html` plus the in-app Studio under `app/lib/features/admin`) read from or write to.
+Every remote surface the Flutter app (`app/`) reads from or writes to. Content (branches, services, venues, events, announcements, featured videos, live) is managed in the Kharis Content Studio (https://kharis-content.itadmin-a94.workers.dev, Supabase). This repo has no Studio of its own and no admin roles; pushes composed in a Studio are not available until the Content Studio supports them.
 
 Related documents:
 
 - [`openapi.yaml`](openapi.yaml) is the OpenAPI 3.1 description of the HTTP endpoints in sections 1 to 3.
 - [`MOBILE-INTEGRATION.md`](MOBILE-INTEGRATION.md) maps each app repository and provider to the endpoints and collections below, and covers timeouts, fallbacks, caching and testing.
 
-Terminology: a church location is a **Branch**. Stored data keeps its original names. That includes the `branch` field, `adminBranchIds`, `adminBranchNames`, the role id `campus_admin` (shown to people as "Branch admin"), FCM topic ids, and code identifiers such as `CampusVenue`.
+Terminology: a church location is a **Branch**. Stored data keeps its original names. That includes the `branch` field, FCM topic ids, and code identifiers such as `CampusVenue`.
 
 Where examples come from:
 
@@ -238,64 +238,7 @@ Field notes:
 - The current source also returns `planDay` and `planDays` (for example "Day 3 of 13"; both `null` for a `day` reading). The deployed build predates these fields.
 - The chapter shown in the live response is what production currently resolves for this plan.
 
-### 1.5 GET /searchYouTube (admin only)
-
-The Content Studio's channel browser (`admin/index.html`, `YT_SEARCH_URL`) uses this endpoint. It runs a live search over all uploads on the Kharis Church channel (`UC4l8WmdF9ivMDQHHVOdYKqQ`). Source: `sync-youtube.ts`.
-
-Auth:
-
-- Send `Authorization: Bearer <Firebase ID token>`.
-- The caller must have `users/{uid}.role == 'admin'` or the custom claim `admin: true`.
-- Branch admins (`campus_admin`) get `403`.
-- Every call spends YouTube quota (see [section 4](#4-youtube-data-api)).
-
-| Query param | Type | Default | Notes |
-|---|---|---|---|
-| `q` | string | empty | Empty: newest uploads (`order=date`). Non-empty: `order=relevance`. |
-| `pageToken` | string | none | The `nextPageToken` from the previous page. |
-| `limit` | int | 25 | Capped at 50. |
-
-Caching: `Cache-Control: private, no-store`.
-
-Response (code: `sync-youtube.ts`):
-
-```json
-{
-  "videos": [
-    {
-      "videoId": "VdGcMD4Rwy8",
-      "title": "Christ: The Eternally Blessed God",
-      "description": "…",
-      "thumbnailUrl": "https://i.ytimg.com/vi/VdGcMD4Rwy8/hqdefault.jpg",
-      "publishedAt": "2026-09-27T12:00:00Z",
-      "duration": 2945,
-      "inLibrary": true,
-      "isFeatured": false
-    }
-  ],
-  "nextPageToken": "CBkQAA",
-  "totalResults": 812,
-  "count": 1
-}
-```
-
-Field notes:
-
-- `duration` is in seconds, and is 0 when the details lookup fails.
-- `inLibrary` means `sermons/yt_<videoId>` exists.
-- `isFeatured` mirrors that doc's `isFeatured`.
-
-Errors:
-
-| Status | Body | Cause |
-|---|---|---|
-| 401 | `{"error":"Sign-in required"}` | Missing or invalid token (live) |
-| 403 | `{"error":"Admin only"}` | Signed in but not a super admin |
-| 405 | `{"error":"Method Not Allowed"}` | Method other than GET |
-| 500 | `{"error":"YOUTUBE_API_KEY not configured"}` | Server key missing |
-| 502 | `{"error":"YouTube API error <status>"}` | Upstream YouTube error |
-
-### 1.6 GET /sermonApiProxy/{resource}/
+### 1.5 GET /sermonApiProxy/{resource}/
 
 A CORS proxy that lets web builds reach the public sermon API ([section 2](#2-public-sermon-api-yetanothersermonhost)). Source: `sermon-proxy.ts`. Native builds call the upstream directly.
 
@@ -308,17 +251,14 @@ A CORS proxy that lets web builds reach the public sermon API ([section 2](#2-pu
 - Links: absolute upstream URLs in the body (`next`, `previous`) are rewritten to the proxy base, so following `next` stays on the proxy.
 - CORS: limited to an allow-list of origins:
   - `https://kharis-app-47c49.web.app` and `.firebaseapp.com`
-  - `https://kharis-app-admin.web.app` and `.firebaseapp.com`
   - `http://localhost:*` and `http://127.0.0.1:*`
-
-  The `kharis-church-admin` hosting site (`admin/firebase.kharis-church.json`) is **not** on this list.
 - Caching: `Cache-Control: public, max-age=300` on upstream 2xx responses. Upstream errors are passed through with `no-store`.
 - Errors: when the upstream fetch throws, the proxy returns `502 {"error":"Upstream fetch failed: <message>"}`.
 - The response body has the same shape as [2.1](#21-get-sermons).
 
 Deployment status on 2026-10-05: `GET /sermonApiProxy/sermons/?page=2` returned Google's HTML `404 Page not found`, which means the function is not deployed yet. Until it is, web builds cannot reach the sermon API, and the Messages tab on web shows the bundled archive.
 
-### 1.7 GET /feedProxy
+### 1.6 GET /feedProxy
 
 A CORS-safe pass-through for the church's RSS/Atom feeds. Source: `feed-proxy.ts`.
 
@@ -554,7 +494,7 @@ Page 1 (no `url`, no `search`):
    This is returned as a single page with `nextUrl = null` and `totalCount` set to the merged length.
 4. When the mirror fails, times out, is empty or is malformed, page 1 falls back to the sermon API. The app awaits the API head request (or retries it) and continues the normal paged walk through `next`. On web this is always the path today, because the bucket sends no CORS headers. **Web builds therefore show no transcripts.**
 
-Searches and `next` links always go to the API. With no network at all, `loadCatalogue()` serves the bundled archive `app/assets/data/kharis_sermons.json`.
+Searches and `next` links always go to the API. With no network and no saved archive, the library is empty and marked offline; the Messages screen offers Retry. No sermon catalogue is bundled with the app.
 
 Transcript URLs are resolved against `kR2BucketBaseUrl`, giving `https://pub-…r2.dev/transcripts/<id>.txt`.
 
@@ -567,18 +507,17 @@ Two callers. Both use YouTube Data API v3 at `https://www.googleapis.com/youtube
 | Caller | Calls | Key | Quota per run |
 |---|---|---|---|
 | `syncYouTube` (scheduler, `sync-youtube.ts`) | `search?part=id,snippet&channelId=…&order=date&type=video&maxResults=50`, then `videos?part=contentDetails&id=…` | Functions param `YOUTUBE_API_KEY` (`defineString`) | 100 (search) + 1 (videos) = **101 units per hour**, about 2,424 per day |
-| `searchYouTube` (HTTP, admin) | the same `search` with `q` / `pageToken`, then `videos` | same | **101 units per call** |
 | App `VideoRepository` (`video_repository.dart`) | `playlistItems?part=snippet,contentDetails&playlistId=UU4l8WmdF9ivMDQHHVOdYKqQ&maxResults=20`, then `videos?part=contentDetails` | build-time `YOUTUBE_API_KEY` from `env.json` | 2 units per load, per device |
 
 The quota figures use the standard costs: `search.list` is 100 units, and `playlistItems.list` and `videos.list` are 1 unit each. The default project quota is 10,000 units per day.
 
-The hourly sync uses about a quarter of that. Each Studio search uses about 1%, so roughly 75 searches per day fit alongside the sync. `searchYouTube` is gated to super admins for this reason.
+The hourly sync uses about a quarter of that.
 
 `syncYouTube` writes `sermons/yt_<videoId>` with `{merge: true}`:
 
 - Fields: title, `speaker: "David Antwi"`, description, videoId, thumbnailUrl, duration, publishedAt, `source: "youtube"`, `type: "video"`, `playCount: 0`, createdAt, updatedAt.
 - Empty values are dropped before the write.
-- Because it merges, an admin's `isFeatured` survives the sync.
+- Because it merges, an `isFeatured` set in the Firebase console survives the sync.
 
 The app's video fallbacks are, in order:
 
@@ -605,8 +544,6 @@ All functions run in `us-central1` (the default region) unless noted. Times are 
 | `purgePushLog` | `every day 03:30` | Deletes `pushLog` markers older than 30 days, at most 10 batches of 500 per run. | none | n/a |
 | `syncYouTube` | every 60 minutes (America/New_York) | Upserts the newest 50 channel uploads into `sermons/yt_<videoId>` ([section 4](#4-youtube-data-api)). | none | Deterministic doc ids plus merge |
 | `syncWebsiteEvents` | every 60 minutes | Imports kharis.org events from EventON (this month plus 2 more) into `events/web_<wpId>[_<ri>][_<branchSlug>]`. Fields: title, start and end times, location, address, description, `source:'website'`, `sourceId`, `sourceUrl`, `syncedAt`. The Branch is mapped from the WordPress `event_type`. Upcoming imports that disappear from the site are deleted. | none (its creates are not pushed by `onEventWritten`) | Doc ids derived from the WordPress id. Unchanged events are not rewritten. Admin-owned fields (`branch`, `imageUrl`, `isFeatured`) are kept. `hidden: true` tombstones are never rewritten. |
-| `onNotificationWritten` (**new in this release**) | Firestore `notifications/{id}` write | Sends a Studio notification as soon as it is `scheduled` with `sendAt <= now` ("Send now"). See [7.3](#73-studio-notification-service-new-in-this-release). | from `audience` | Transactional claim `scheduled → sending` |
-| `sendDueNotifications` (**new in this release**) | every 5 minutes | Sends future-dated `scheduled` notifications that are now due, oldest first, up to 100 per run. | from `audience` | Same claim |
 
 `onEventWritten` sends nothing in these cases:
 
@@ -624,15 +561,7 @@ All functions run in `us-central1` (the default region) unless noted. Times are 
 
 Rules: `backend/firestore.rules`.
 
-Roles:
-
-- **Super admin**: custom claim `admin == true`, or `users/{uid}.role == 'admin'`.
-- **Branch admin**: `users/{uid}.role == 'campus_admin'`. A Branch admin carries:
-  - `adminBranchIds`: the ids of the Branch docs they manage
-  - `adminBranchNames`: the matching Branch names, which is what `news.branch` and `events.branch` hold
-
-  A Branch admin manages only content scoped to their Branch names, and only the non-identity fields of their own Branch docs.
-- **Member**: any other signed-in user. Anonymous guests count as signed in.
+No client writes content and there are no admin roles: content is managed in the Kharis Content Studio. Members cannot set or change their own `role`.
 
 The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is denied.
 
@@ -640,23 +569,22 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 
 | Collection | Read | Create / update / delete |
 |---|---|---|
-| `users/{uid}` | owner, super admin | Create: owner only, with `role` in `member`/`guest`/`new_here` and no admin lists. Update: owner (cannot change `role`, `adminBranchIds` or `adminBranchNames`) or super admin. Delete: owner (in-app account deletion) or super admin. |
+| `users/{uid}` | owner | Create: owner only, with `role` in `member`/`guest`/`new_here`. Update: owner, who cannot change `role`. Delete: owner (in-app account deletion). |
 | `users/{uid}/notes/{id}` | owner only (not admins) | Owner. `body` must be 1..20000 chars; `updatedAt` must be a timestamp. |
 | `users/{uid}/playlists/{id}` | owner only | Owner. `name` 1..80 chars, `sermonIds` a list, `createdAt` and `updatedAt` timestamps. |
-| `branches/{id}` | public | Create and delete: super admin. Update: super admin, or a Branch admin for an id in `adminBranchIds` who does not change `name`, `order`, `group` or `isActive`. `giving` and `home` are shape-checked for every writer. |
-| `news/{id}` | public | Super admin, or a Branch admin when both the stored and the new `branch` are theirs. Church-wide items are super admin only. `branch` must be absent, null or a string. `eventId` ≤200 chars, `ctaLabel` ≤24, `linkUrl` http(s). |
-| `events/{id}` | public | Same Branch rule as `news`. `address` ≤300 chars. `web_*` docs are written by `syncWebsiteEvents`. |
-| `sermons/{id}` | public | super admin |
-| `dailyContent/{YYYY-MM-DD}` | public | super admin |
-| `readingPlans/{id}` | public | Super admin. `startDate` must be `YYYY-MM-DD`, `book` non-empty, `days` 1..400. |
-| `config/{doc}` | public | Super admin. `featured.mode` must be `auto`, `pinned` or `off`. `giving` and `home` are shape-checked. |
-| `visitors/{id}` | super admin | Create: anyone. Needs `name` (1..199 chars) and `createdAt`. |
-| `testimonies/{id}` | super admin | Create: anyone. Needs `text` (1..2000 chars) and `createdAt`. |
-| `app_feedback/{id}` | super admin | Create: any signed-in user. Keys are limited to `uid, rating, comment, source, platform, createdAt`. `uid` must be the caller, `rating` an int 1..5, `comment` ≤2000 chars, `source` `prompt` or `settings`, `platform` ≤20 chars, `createdAt == request.time`. |
-| `rsvps/{uid}_{eventId}` | get: owner (by id prefix) or super admin. list: queries constrained to `userId == auth.uid`, or super admin. | Create: signed-in user, `userId == uid`, id `{uid}_{eventId}`. Update: never. Delete: owner or super admin. |
-| `notifications/{id}` (**new**) | Super admin or any Branch admin: all docs. Everyone else: only `status == 'sent'` with `audience.type` `all` or `branch`. | Create: `draft` or `scheduled`, closed keys, `createdBy == uid`, and an audience the caller manages. Update: only from `draft` or `scheduled`, to `draft`, `scheduled` or `cancelled`, with `createdBy` and `createdAt` unchanged and both audiences managed. Delete: never. See [7.3](#73-studio-notification-service-new-in-this-release). |
+| `branches/{id}` | public | nobody (Firebase console / Admin SDK only) |
+| `news/{id}` | public | nobody (`pushPendingAnnouncements` writes push fields through the Admin SDK) |
+| `events/{id}` | public | nobody (`web_*` docs are written by `syncWebsiteEvents`) |
+| `sermons/{id}` | public | nobody (`syncYouTube` writes `yt_*` docs) |
+| `dailyContent/{YYYY-MM-DD}` | public | nobody (Firebase console) |
+| `readingPlans/{id}` | public | nobody (Firebase console). A plan needs `startDate` (`YYYY-MM-DD`), a non-empty `book` and `days` 1..400 to resolve. |
+| `config/{doc}` | public | nobody (Firebase console). `featured.mode` is `auto`, `pinned` or `off`. |
+| `app_feedback/{id}` | nobody | Create: any signed-in user. Keys are limited to `uid, rating, comment, source, platform, createdAt`. `uid` must be the caller, `rating` an int 1..5, `comment` ≤2000 chars, `source` `prompt` or `settings`, `platform` ≤20 chars, `createdAt == request.time`. |
+| `rsvps/{uid}_{eventId}` | get: owner (by id prefix). list: queries constrained to `userId == auth.uid`. | Create: signed-in user, `userId == uid`, id `{uid}_{eventId}`. Update: never. Delete: owner. |
 | `pushLog`, `dailyReadingPushes` | nobody | Admin SDK only |
 | `birthdayPushes` | nobody (default deny) | Admin SDK only |
+
+The member app no longer reads `branches`, `news`, `events` or `config/live|giving|home` (6.2 to 6.5): branches with their services and venues, events, announcements and the live stream come from the Kharis Content Studio (Supabase tables `branches`, `services`, `venues`, `events`, `news`, `app_config`), as described in [MOBILE-INTEGRATION.md §1](MOBILE-INTEGRATION.md#1-repository-map). The collections below remain for the Cloud Functions that still use them.
 
 ### 6.2 branches
 
@@ -669,19 +597,15 @@ The doc id is a slug (e.g. `london-hq`) or an auto id. Fields as written by the 
 | `group` | `Kharis` \| `KP2` | |
 | `isActive` | bool | |
 | `subtitle`, `shortDescription`, `description` | string | The app shows `subtitle`, falling back to the others in that order |
-| `imageUrl` | string | Asset path or URL |
+| `imageUrl` | string | URL |
 | `gradientStart`, `gradientEnd` | `#RRGGBB` | Also under `branding` |
 | `address`, `meetingDays`, `meetingTime` | string | Venue summary. These drive service reminders and venue pushes. `meetingTime` is `2:00 PM` or `14:00`. |
-| `contact` | `{email, phone}` | `CampusContact` |
+| `contact` | `{email, phone}` | |
 | `instagram` | string | |
-| `venues[]` | `{id, name, addressLine1, addressLine2, city, postcode, country, latitude, longitude, parkingInfo, publicTransportInfo, directionsText}` | `CampusVenue` |
-| `services[]` | `{id, name, type, day, startTime, endTime, venueId, description, order, isActive}` | `CampusService`. Only active services are shown, sorted by `order`. |
-| `giving` | `{url?, bankName?, accountName?, sortCode?, accountNumber?, swiftBic?, iban?, reference?, note?}` | `GivingDetails`. Absent means `config/giving` is used. |
-| `home` | `{sections: [{id, enabled}]}` | `HomeLayout`. Valid ids: `profileCompletion, live, reading, announcements, events, campus, continueListening, giving`. Absent means `config/home` is used. |
-| `hero`, `featuredVideo`, `pastor`, `galleryImages` | map / list | Written by the web Studio |
+| `venues[]` | `{id, name, addressLine1, addressLine2, city, postcode, country, latitude, longitude, parkingInfo, publicTransportInfo, directionsText}` | |
+| `services[]` | `{id, name, type, day, startTime, endTime, venueId, description, order, isActive}` | |
+| `hero`, `featuredVideo`, `pastor`, `galleryImages` | map / list | Written by the former web Studio |
 | `updatedAt`, `createdAt` | timestamp | |
-
-The models are in `app/lib/shared/models/campus_config.dart`.
 
 ### 6.3 news
 
@@ -695,16 +619,16 @@ Fields: `title`, `description`, `location` (venue name), `address`, `branch` (na
 
 Website imports add `source: 'website'`, `sourceId`, `sourceUrl` and `syncedAt`.
 
-A Studio delete of a `web_*` doc writes `{hidden: true, hiddenAt}` instead of deleting it.
+A removed `web_*` doc carries `{hidden: true, hiddenAt}` instead of being deleted, so the hourly sync does not recreate it.
 
 ### 6.5 config
 
 | Doc | Shape | Reader | Writer |
 |---|---|---|---|
-| `config/featured` | `{mode: 'auto'\|'pinned'\|'off', setAt}` | `CurationRepository` (missing or error → `auto`) | `ContentConfigRepository.setFeaturedMode` |
-| `config/live` | `{isLive: bool, videoId, title}` | `LiveRepository` | web Studio / console |
-| `config/giving` | `GivingDetails` | `ChurchConfigRepository` | `ContentConfigRepository.setChurchGiving`. Empty deletes the doc. |
-| `config/home` | `{sections: [{id, enabled}]}` | `ChurchConfigRepository` | `ContentConfigRepository.setChurchHome` |
+| `config/featured` | `{mode: 'auto'\|'pinned'\|'off', setAt}` | `CurationRepository` (missing or error → `auto`) | Firebase console |
+| `config/live` | `{isLive: bool, videoId, title}` | not read by the app (live comes from the Content Studio `app_config`) | Firebase console |
+| `config/giving` | `{url?, bankName?, accountName?, sortCode?, accountNumber?, swiftBic?, iban?, reference?, note?}` | not read by the app | none |
+| `config/home` | `{sections: [{id, enabled}]}` | not read by the app | none |
 
 ### 6.6 readingPlans and dailyContent
 
@@ -718,7 +642,7 @@ A Studio delete of a `web_*` doc writes `{hidden: true, hiddenAt}` instead of de
 
 ### 6.7 sermons
 
-- Admin-created audio: `source` is `audio` or `admin`. Fields: title, speaker, audioUrl, thumbnailUrl, artworkUrl, duration (seconds), publishedAt, series, description, category, videoId, isFeatured, createdAt.
+- Hand-added audio (written by the former Studio): `source` is `audio` or `admin`. Fields: title, speaker, audioUrl, thumbnailUrl, artworkUrl, duration (seconds), publishedAt, series, description, category, videoId, isFeatured, createdAt.
 - YouTube mirrors: `yt_<videoId>`, `source: 'youtube'` ([section 4](#4-youtube-data-api)).
 - `isFeatured: true` docs feed the carousel in `pinned` mode.
 
@@ -727,8 +651,7 @@ A Studio delete of a `web_*` doc writes `{hidden: true, hiddenAt}` instead of de
 | Field | Writer |
 |---|---|
 | `email`, `displayName`, `photoUrl`, `createdAt` | app at registration (`FirebaseAuthRepository`) |
-| `role` | Set at registration (`member`/`guest`/`new_here`; a requested `admin` is downgraded to `member`). After that, only a super admin can change it, to `member`, `guest`, `new_here`, `campus_admin` (label "Branch admin") or `admin`. |
-| `adminBranchIds`, `adminBranchNames` | Super admin (`UserAdminRepository.setRole`). Both lists are present only for `campus_admin`, are non-empty, and are the same length. |
+| `role` | Set at registration (`member`/`guest`/`new_here`; a requested `admin` is downgraded to `member`). No client can change it afterwards. |
 | `branch` | owner; the selected Branch name, or null for all Branches |
 | `phone`, `dob` (`yyyy-MM-dd`) | owner |
 | `notificationPrefs` | owner, `Map<String,bool>` |
@@ -741,13 +664,11 @@ A Studio delete of a `web_*` doc writes `{hidden: true, hiddenAt}` instead of de
 3. Firebase Auth `currentUser.delete()`. On `requires-recent-login` the app asks for the password and retries the whole sequence, which is idempotent.
 4. Clears the device's notes box and saved onboarding role and Branch, then returns to Welcome.
 
-`app_feedback`, `visitors` and `testimonies` are create-only for members and are not removed.
+`app_feedback` is create-only for members and is not removed.
 
-### 6.9 rsvps, visitors, testimonies, app_feedback, pushLog
+### 6.9 rsvps, app_feedback, pushLog
 
 - `rsvps/{uid}_{eventId}`: `{userId, eventId, branch, eventStartTime, createdAt}`.
-- `visitors`: `{name, phone, email, branch, firstVisitDate, createdAt}`.
-- `testimonies`: `{name, email, branch, text, status: 'pending', createdAt}`.
 - `app_feedback`: `{uid, rating, comment, source, platform, createdAt}`, where `platform` is `web`, `iOS`, `android` and so on.
 - `pushLog/{key}`: `{claimedAt, target, title, body, messageId, sentAt}`. Server only.
 
@@ -761,12 +682,11 @@ Server: `backend/functions/src/topics.ts`. Client: `KharisTopics` in `app/lib/co
 
 | Topic | Who is subscribed | Publishers |
 |---|---|---|
-| `all` | every device, always | church-wide announcements, Studio notifications to Everyone |
-| `branch_<slug>` | devices whose member picked that Branch. The slug is `name.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-')`, e.g. `KP2 London` → `branch_kp2-london` | Branch announcements, venue changes, Studio Branch notifications, and the branch half of event and reminder conditions |
+| `all` | every device, always | church-wide announcements |
+| `branch_<slug>` | devices whose member picked that Branch. The slug is `name.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-')`, e.g. `KP2 London` → `branch_kp2-london` | Branch announcements, venue changes, and the branch half of event and reminder conditions |
 | `events` | the Events preference toggle | `onEventWritten` (condition with the Branch topic) |
 | `service_reminders` | the Service Reminders toggle | `pushServiceReminders` (condition) |
 | `daily_reading` | the Daily Reading toggle | `pushDailyReading` |
-| `studio_test` (**new**) | Studio users only (`scope.canUseStudio`). The app unsubscribes when access is lost. | Studio notifications with audience Test |
 
 Members on "All Branches" follow no `branch_*` topic, so they only receive church-wide pushes.
 
@@ -781,123 +701,11 @@ The data payload's `type` selects the screen (`notificationTargetFor`):
 | `service_reminder`, `venue` | `/home` (Branch card) |
 | `reading` | `/reading` |
 | `sermon` | `/messages` |
-| `studio` (**new**) | The payload's `link` (`notificationLinkTarget`). In-app paths open in the app, and so does a shared link on the app's own host. Any other http(s) address is launched externally. With no link, the tap opens `/notifications`. |
 | anything else | `/home` |
 
-### 7.3 Studio notification service (new in this release)
+### 7.3 Studio-composed pushes
 
-Content Studio admins compose these pushes in the web Studio "Notifications" section (`admin/index.html`) and the in-app Studio. Sources:
-
-- `backend/functions/src/notifications.ts` (sending)
-- the `notifications` block in `backend/firestore.rules`
-- `app/lib/features/home/data/studio_notification_repository.dart` (app reads and writes)
-- `app/lib/shared/providers/notification_feed_provider.dart` (inbox)
-
-Collection `notifications/{id}`. Keys are closed: a client write may contain only the client fields below.
-
-| Field | Type | Written by | Notes |
-|---|---|---|---|
-| `title` | string, non-blank, ≤65 | client | |
-| `body` | string, non-blank, ≤240 | client | |
-| `link` | string or null, optional, ≤500 | client | See "Link format" below. |
-| `audience` | `{type:'all'}` \| `{type:'branch', branch:<Branch name>}` \| `{type:'test'}` | client | Closed keys. `branch` must be non-blank. `test` goes to Studio staff devices only. |
-| `status` | `draft` \| `scheduled` \| `sending` \| `sent` \| `failed` \| `cancelled` | client: `draft`, `scheduled`, `cancelled`. Server: `sending`, `sent`, `failed`. | |
-| `sendAt` | timestamp | client | Required when `scheduled`. For "Send now", the app writes `serverTimestamp()` (`StudioNotificationRepository.schedule` with `sendAt == null`). Scheduled times are picked in Europe/London. |
-| `createdAt` | timestamp | client | Immutable after create |
-| `createdBy` | string (uid) | client | Must equal the caller on create. Immutable after create. |
-| `createdByName` | string ≤200, optional | client | |
-| `updatedAt` | timestamp | client and server | |
-| `sentAt` | timestamp | server | |
-| `result` | `{messageId}` or `{error}` (error text ≤500 chars) | server | |
-
-Link format:
-
-- **Rules:** a path starting with a single `/`, or an `http(s)://` URL.
-- **Function (`isValidLink`):** the same, and also rejects whitespace.
-- **App and web Studio composers:** only accept web addresses that start with `https://`.
-- **App routing:** in-app paths such as `/m/<sermonId>`, `/e/<eventId>`, `/a/<newsId>`, `/giving`, `/reading`, `/calendar` and `/messages` are resolved by `notificationLinkTarget` in `notification_service.dart`.
-
-Lifecycle:
-
-```mermaid
-stateDiagram-v2
-  [*] --> draft
-  draft --> scheduled
-  draft --> cancelled
-  scheduled --> cancelled
-  scheduled --> sending: due (sendAt <= now + 30s), transactional claim
-  scheduled --> failed: server validation rejects
-  sending --> sent
-  sending --> failed: FCM error (not retried)
-```
-
-Delivery:
-
-- `onNotificationWritten` runs on every write. If the doc is `scheduled` and due, it calls `deliverNotification`.
-- `sendDueNotifications` runs every 5 minutes. It queries `status == 'scheduled' && sendAt <= now + 30s`, ordered by `sendAt`, limit 100.
-- `deliverNotification` runs a Firestore transaction:
-  1. Re-reads the doc, re-validates it, and moves it to `sending`, or to `failed` with `result.error` when it is invalid.
-  2. Outside the transaction, sends one FCM topic message.
-  3. Writes `sent` + `sentAt` + `result.messageId`, or `failed` + `result.error`.
-
-  Because the claim is a transaction, a redelivered trigger or an overlapping scheduler run sends nothing.
-- `CLOCK_SKEW_MS = 30000` lets a "Send now" whose server timestamp is slightly ahead of the function's clock go out immediately.
-
-FCM message (`buildMessage`):
-
-```json
-{
-  "topic": "branch_london",
-  "notification": { "title": "Prayer meeting moved", "body": "Tonight's prayer meeting is at 8pm." },
-  "data": { "type": "studio", "notificationId": "aB3…", "link": "/e/web_1234" },
-  "android": { "priority": "high" },
-  "apns": { "payload": { "aps": { "sound": "default" } } }
-}
-```
-
-The topic is `all`, `branch_<slug(branch)>` or `studio_test`.
-
-Rules (`backend/firestore.rules`, `match /notifications/{notificationId}`):
-
-- **Read.**
-  - Super admins and Branch admins (`campus_admin`) can read every doc. The rule is `isCampusAdmin()` with no Branch check, so Branch admins see the whole Studio history.
-  - Anyone else, signed in or not, can read only docs with `status == 'sent'` and `audience.type` `all` or `branch`. List queries must therefore filter on both fields, as `watchSent` does.
-  - `test` and unsent docs are never public.
-- **Create.**
-  - Allowed shapes: the doc passes the shape check (closed keys, field limits as above), `status` is `draft` or `scheduled`, and `createdBy == request.auth.uid`.
-  - Allowed audiences: a super admin may use any audience. A Branch admin may use `branch` with a Branch in their `adminBranchNames`, or `test` if their `adminBranchNames` is non-empty.
-- **Update.**
-  - Allowed only while the stored status is `draft` or `scheduled`.
-  - The new doc must pass the same shape check, so the new status is `draft`, `scheduled` or `cancelled`.
-  - `createdBy` and `createdAt` must stay unchanged.
-  - The caller must be allowed to manage both the stored and the new audience, so a Branch admin cannot take over or retarget another Branch's notification.
-  - Once a doc is `sending`, `sent`, `failed` or `cancelled`, clients cannot change it.
-- **Delete.** Denied to everyone. Cancel instead.
-
-Composite indexes (`backend/firestore.indexes.json`), one per query:
-
-| Fields | Query |
-|---|---|
-| `status` ASC, `sendAt` ASC | `sendDueNotifications` |
-| `status` ASC, `audience.type` ASC, `sentAt` DESC | app inbox, Everyone |
-| `status` ASC, `audience.type` ASC, `audience.branch` ASC, `sentAt` DESC | app inbox, one Branch |
-
-Studio history (`watchHistory`) orders by `createdAt` DESC, limit 50, and uses the automatic single-field index.
-
-App writes (`StudioNotificationRepository`):
-
-- `schedule()` always creates the doc as `scheduled`. `sendAt` is `serverTimestamp()` for "Send now", or the chosen time. It also writes `createdAt`/`updatedAt` with `serverTimestamp()`.
-- `cancel()` sets `status: 'cancelled'` and `updatedAt`.
-- Neither the app nor the web Studio creates `draft` docs today, although the rules allow it.
-
-App inbox:
-
-- `inboxNotificationsProvider` merges two `watchSent` streams: one for `{type:'all'}` and, when the member has picked a Branch, one for `{type:'branch', branch:<name>}`. Each stream runs `status == 'sent'`, ordered by `sentAt` DESC, limit 50.
-- `mergeSentNotifications` de-duplicates by id, sorts newest `sentAt` first, and caps the result at 50.
-- Members on "All Branches" see only church-wide notifications, which matches the pushes they receive.
-- The Notifications screen shows these rows next to the existing announcement and event rows. Row ids are `studio:<id>`, which is what the dismissed set uses.
-- `hasPendingNotificationsProvider` counts undismissed Studio rows for the Home bell.
-- Tapping a row opens its `link`.
+Not available. Pushes composed in a Studio (the former Firebase `notifications` service with its `studio_test` topic) were removed with the old Studio; they return when the Kharis Content Studio supports them. Until then the Notifications screen lists upcoming events and live announcements, and only the automatic pushes above are sent. Devices that followed `studio_test` stay subscribed, but nothing publishes to it.
 
 ---
 
@@ -916,7 +724,6 @@ Native builds are unaffected.
 Origins:
 
 - the hosted app (`app/firebase.json`, site `kharis-app-47c49`)
-- the Studio sites (`admin/firebase.json` → `kharis-app-admin`, `admin/firebase.kharis-church.json` → `kharis-church-admin`), each on both default Firebase Hosting domains
 - local `flutter run -d chrome` ports
 
 Origins cannot contain a port wildcard, so list each dev port you use.
@@ -929,10 +736,6 @@ Origins cannot contain a port wildcard, so list each dev port you use.
         "origins": [
           "https://kharis-app-47c49.web.app",
           "https://kharis-app-47c49.firebaseapp.com",
-          "https://kharis-app-admin.web.app",
-          "https://kharis-app-admin.firebaseapp.com",
-          "https://kharis-church-admin.web.app",
-          "https://kharis-church-admin.firebaseapp.com",
           "http://localhost:5000",
           "http://localhost:8080",
           "http://127.0.0.1:5000"
@@ -958,7 +761,7 @@ curl -sI -H 'Origin: https://kharis-app-47c49.web.app' \
 
 The last command should print `access-control-allow-origin: https://kharis-app-47c49.web.app`. Propagation can take up to 30 seconds. No app change is needed: once the header is present, `R2MessagesRepository` uses the mirror on web as well, and web shows transcripts.
 
-Related: deploy `sermonApiProxy` ([1.6](#16-get-sermonapiproxyresource)) so that web has a working API fallback. Consider adding `kharis-church-admin` to `SERMON_PROXY_ORIGINS`.
+Related: deploy `sermonApiProxy` ([1.5](#15-get-sermonapiproxyresource)) so that web has a working API fallback.
 
 ---
 
@@ -972,9 +775,8 @@ Every export of `backend/functions/src/index.ts`:
 | `getBranches` | HTTP | [1.2](#12-get-getbranches) |
 | `getEvents` | HTTP | [1.3](#13-get-getevents) |
 | `getDailyReading` | HTTP | [1.4](#14-get-getdailyreading) |
-| `searchYouTube` | HTTP (admin) | [1.5](#15-get-searchyoutube-admin-only) |
-| `sermonApiProxy` | HTTP | [1.6](#16-get-sermonapiproxyresource) |
-| `feedProxy` | HTTP (europe-west1) | [1.7](#17-get-feedproxy) |
+| `sermonApiProxy` | HTTP | [1.5](#15-get-sermonapiproxyresource) |
+| `feedProxy` | HTTP (europe-west1) | [1.6](#16-get-feedproxy) |
 | `pushPendingAnnouncements` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `pushDailyReading` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `pushBirthdays` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
@@ -984,5 +786,3 @@ Every export of `backend/functions/src/index.ts`:
 | `syncWebsiteEvents` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `onEventWritten` | Firestore trigger | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `onBranchVenueWritten` | Firestore trigger | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `onNotificationWritten` (new) | Firestore trigger | [7.3](#73-studio-notification-service-new-in-this-release) |
-| `sendDueNotifications` (new) | scheduler | [7.3](#73-studio-notification-service-new-in-this-release) |

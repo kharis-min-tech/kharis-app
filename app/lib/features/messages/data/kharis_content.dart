@@ -1,5 +1,4 @@
-// Real Kharis YouTube content. Audio episodes live in
-// assets/data/kharis_sermons.json (full 500-episode catalogue).
+// Real Kharis YouTube content.
 
 const String kharisChannelId = 'UC4l8WmdF9ivMDQHHVOdYKqQ';
 

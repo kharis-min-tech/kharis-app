@@ -17,8 +17,4 @@ void main() {
     expect(Branch.parseHex(null, fallback), fallback);
     expect(Branch.parseHex('not-a-colour', fallback), fallback);
   });
-
-  test('toHex round-trips a colour', () {
-    expect(Branch.toHex(const Color(0xFF5D3FD3)), '#5D3FD3');
-  });
 }

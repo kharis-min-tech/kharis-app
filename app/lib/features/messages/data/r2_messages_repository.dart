@@ -93,10 +93,6 @@ class R2MessagesRepository extends AbstractSermonRepository {
     if (sermons.isEmpty) throw StateError('empty messages.json');
     return sermons;
   }
-
-  /// Offline fallback: the bundled archive, never the network.
-  @override
-  Future<List<Sermon>> loadCatalogue() => _api.loadCatalogue();
 }
 
 /// Maps `messages.json` records. Top-level so [compute] can run it in a

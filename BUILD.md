@@ -9,7 +9,7 @@ local builds that behave exactly like CI and production.
 | Bundle ID / package name | `com.kharis.church` (iOS and Android) |
 | Apple team | `Z9TTRH45X3` |
 | Web app | https://kharis-app-47c49.web.app (Hosting site `kharis-app-47c49`, config `app/firebase.json`) |
-| Content Studio (admin) | Hosting site `kharis-app-admin` (config `admin/firebase.json`) |
+| Content Studio | https://kharis-content.itadmin-a94.workers.dev (Supabase; deployed outside this repo) |
 | Flutter | **3.44.1** stable (Dart 3.12.1), pinned in `app/.fvmrc` |
 | Node (Cloud Functions) | **24** (`engines.node` in `backend/functions/package.json`) |
 
@@ -166,28 +166,16 @@ never send a deploy to another project.
 
 ---
 
-## Step 3: Content Studio (admin)
+## Step 3: Content
 
-`admin/index.html` already carries the `kharis-app-47c49` web config.
-
-```bash
-cd admin
-docker compose up --build                                     # local, http://localhost:8080
-firebase deploy --only hosting --project kharis-app-47c49      # deploys site kharis-app-admin
-```
-
-Admins need the `admin: true` custom claim (Firestore rules check it). Set it
-with the Admin SDK and a service account:
-
-```typescript
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-
-initializeApp({ credential: cert('./serviceAccountKey.json') });
-await getAuth().setCustomUserClaims('USER_UID_HERE', { admin: true });
-```
-
-The user must sign out and back in for the token to refresh.
+Nothing to deploy from this repo. Branches, services, venues, events,
+announcements, featured videos and live are managed in the Kharis Content
+Studio (https://kharis-content.itadmin-a94.workers.dev, Supabase), which the
+app reads directly. This repo no longer ships a Studio of its own (web or
+in-app), and there are no admin roles in the app or Firestore rules. Pushes
+composed in a Studio are not available until the Content Studio supports them;
+the automatic pushes (daily reading, birthdays, service reminders,
+announcements, events) still come from Cloud Functions.
 
 ---
 
@@ -410,9 +398,6 @@ Signed iOS builds and store uploads are still done locally
 
 **Functions deploy fails with billing error**
 - The project must be on the Blaze plan. Upgrade in Firebase Console → Project Settings → Usage and billing
-
-**Admin custom claim not taking effect**
-- The user must sign out and sign back in after the claim is set — Firebase ID tokens are cached for 1 hour
 
 ---
 

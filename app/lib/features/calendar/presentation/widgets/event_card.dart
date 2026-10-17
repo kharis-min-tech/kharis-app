@@ -57,7 +57,7 @@ class EventCard extends ConsumerWidget {
     final month = DateFormat('MMM').format(event.startTime).toUpperCase();
     final weekday = DateFormat('EEE').format(event.startTime);
     final time = DateFormat('h:mm a').format(event.startTime);
-    final whenText = '$weekday \u00b7 $time';
+    final whenText = event.recurrenceLabel ?? '$weekday \u00b7 $time';
     final place = eventPlaceLabel(event);
     final isPast = event.isPastAt(DateTime.now());
     final isRsvped = ref.watch(isEventRsvpedProvider(event.id));
@@ -249,7 +249,9 @@ Future<void> addEventToCalendar(BuildContext context, Event event) async {
   ].map((s) => s?.trim() ?? '').where((s) => s.isNotEmpty).join(', ');
   final calEvent = add2cal.Event(
     title: event.title,
-    description: event.description,
+    description: event.isWeekly
+        ? [?event.description, 'Repeats weekly: ${event.recurrenceLabel}.'].join('\n\n')
+        : event.description,
     location: where.isEmpty ? event.branch : where,
     startDate: event.startTime,
     endDate: event.endTime ?? event.startTime.add(const Duration(hours: 1)),

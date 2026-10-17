@@ -28,6 +28,7 @@ import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_audio_player_service.dart';
+import 'support/fake_sermon_repository.dart';
 import 'support/fake_cache_service.dart';
 
 /// Favorites (the player's heart) live at `users/{uid}/playlists/liked` but
@@ -83,9 +84,17 @@ void main() {
   }
 
   List<Override> overridesFor(FakeFirebaseFirestore db) => [
+    // List rows show listening progress from the playback history.
+    cacheServiceProvider.overrideWithValue(FakeCacheService()),
     firestoreProvider.overrideWithValue(db),
     currentUserProvider.overrideWith((ref) => Stream.value(member)),
     sermonsProvider.overrideWith((ref) async => library),
+    // Playlist artwork resolves messages by id through the library; keep it
+    // off the network so no retry timer outlives the test.
+    sermonRepositoryProvider.overrideWithValue(
+      FakePagedSermonRepository([library]),
+    ),
+    sermonArchiveAutoHydrateProvider.overrideWithValue(false),
     videosProvider.overrideWith((ref) async => const <Sermon>[]),
     currentSermonProvider.overrideWith((ref) => null),
     playerStateProvider.overrideWith(
@@ -153,6 +162,43 @@ void main() {
       // Only the one real playlist is offered (plus the "New playlist" row).
       expect(find.byIcon(Icons.add_circle_outline_rounded), findsOneWidget);
       expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+    });
+
+    testWidgets('the sheet\'s My notes row closes it and opens the notes', (
+      tester,
+    ) async {
+      final db = await seededDb();
+      final container = ProviderContainer(overrides: overridesFor(db));
+      addTearDown(container.dispose);
+      var opened = 0;
+      await tester.runAsync(() => container.read(currentUserProvider.future));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showAddToPlaylistSheet(
+                    context,
+                    sermonId: 's1',
+                    sermonTitle: 'Message 1',
+                    onOpenNotes: () => opened++,
+                  ),
+                  child: const Text('more'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('more'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('My notes'));
+      await tester.pumpAndSettle();
+
+      expect(opened, 1);
+      expect(find.text('Add to playlist'), findsNothing);
     });
 
     testWidgets('Playlists pins a distinct Favorites tile above the grid, '

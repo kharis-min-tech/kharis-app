@@ -20,10 +20,17 @@ abstract final class ApiConfig {
   static const String _base =
       'https://$region-$backendProjectId.cloudfunctions.net';
 
-  static const String getAnnouncements = '$_base/getAnnouncements';
-  static const String getBranches = '$_base/getBranches';
-  static const String getEvents = '$_base/getEvents';
-  static const String getDailyReading = '$_base/getDailyReading';
+  /// Kharis Content Studio (https://kharis-content.itadmin-a94.workers.dev)
+  /// data: branches, services, venues, events, announcements, the live
+  /// stream and the daily reading, prayer and message, read over Supabase
+  /// REST (`{supabaseUrl}/rest/v1/{table}`).
+  static const String supabaseUrl = 'https://cqgyiqxhpxwasogpdghx.supabase.co';
+
+  /// Supabase publishable (anon) key. Public by design: it ships in the
+  /// Studio's own web bundle and row-level security only grants reads of
+  /// published content.
+  static const String supabasePublishableKey =
+      'sb_publishable_fT5_NGYsk0Uh4IO_uYfXvg_ZhR8bl7K';
 
   /// The public sermon API (yetanothersermon.host), called directly on
   /// mobile with a browser User-Agent.

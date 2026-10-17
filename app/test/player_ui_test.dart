@@ -134,14 +134,11 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('replace the ±seconds skips; Next walks the queue', (
+    testWidgets('Next walks the queue; Previous restarts or steps back', (
       tester,
     ) async {
       await audio.play(_library.first, queue: _library);
       await pump(tester);
-
-      expect(find.byIcon(Icons.replay_rounded), findsNothing);
-      expect(find.byIcon(Icons.forward_rounded), findsNothing);
 
       // First message at 0:00: Previous is disabled.
       await tester.tap(find.byIcon(Icons.skip_previous_rounded));
@@ -242,6 +239,16 @@ void main() {
       await tester.tap(find.text(label));
       await tester.pumpAndSettle();
     }
+
+    testWidgets('the page clamps: no rubber-band under the artwork', (
+      tester,
+    ) async {
+      await open(tester, MediaMode.audio);
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.byKey(const Key('player-scroll')),
+      );
+      expect(scroll.physics, isA<ClampingScrollPhysics>());
+    });
 
     testWidgets('audio -> video starts the video at the live audio position', (
       tester,
@@ -787,9 +794,9 @@ void main() {
 
   // ── Notes ───────────────────────────────────────────────────────────────────
 
-  group('note anchors', () {
+  group('note timestamps', () {
     testWidgets(
-      'an anchor plays its message from the note time, resolving it from '
+      'a timestamp plays its message from that moment, resolving it from '
       'recent snapshots before the archive loads',
       (tester) async {
         final target = _sermon(8);
@@ -811,15 +818,8 @@ void main() {
 
         final result = await NoteAnchor.play(
           captured,
-          Note(
-            id: 'n1',
-            sermonId: 's8',
-            sermonTitle: 'Message 8',
-            positionMs: 754000,
-            body: 'Hold this',
-            createdAt: DateTime(2026),
-            updatedAt: DateTime(2026),
-          ),
+          's8',
+          const Duration(minutes: 12, seconds: 34),
         );
 
         expect(result, NoteAnchorResult.started);
@@ -828,57 +828,6 @@ void main() {
           audio.calls.single.startAt,
           const Duration(minutes: 12, seconds: 34),
         );
-      },
-    );
-  });
-
-  group('notes sheet', () {
-    testWidgets(
-      'swiping a note away deletes it without the late stream tripping the '
-      'Dismissible assertion',
-      (tester) async {
-        final notes = _RecordingNotes();
-        final sermon = _sermon(6);
-        final note = Note(
-          id: 'n1',
-          sermonId: 's6',
-          sermonTitle: 'Message 6',
-          positionMs: 750000,
-          body: 'Grace is enough',
-          createdAt: DateTime(2026),
-          updatedAt: DateTime(2026),
-        );
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              ...overrides(),
-              // A stream that has not caught up with the delete yet.
-              notesProvider.overrideWith((ref) => Stream.value([note])),
-              notesRepositoryProvider.overrideWithValue(notes),
-            ],
-            child: MaterialApp(
-              home: Scaffold(
-                body: Builder(
-                  builder: (context) => TextButton(
-                    onPressed: () => SermonNotesSheet.show(context, sermon),
-                    child: const Text('notes'),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-        await tester.tap(find.text('notes'));
-        await tester.pumpAndSettle();
-        expect(find.text('Grace is enough'), findsOneWidget);
-        expect(find.text('12:30'), findsOneWidget, reason: 'anchor listed');
-
-        await tester.drag(find.text('Grace is enough'), const Offset(-600, 0));
-        await tester.pumpAndSettle();
-
-        expect(tester.takeException(), isNull);
-        expect(notes.deleted, ['n1']);
-        expect(find.text('Grace is enough'), findsNothing);
       },
     );
   });
@@ -991,15 +940,4 @@ void main() {
       expect(audio.calls.single.sermon.id, 's3');
     });
   });
-}
-
-/// Records deletes; never touches a store, so the notes stream stays stale.
-class _RecordingNotes implements NoteRepository {
-  final List<String> deleted = [];
-
-  @override
-  Future<void> delete(String id) async => deleted.add(id);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

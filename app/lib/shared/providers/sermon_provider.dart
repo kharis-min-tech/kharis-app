@@ -10,17 +10,18 @@ import '../../features/calendar/data/event_repository.dart';
 import '../../features/calendar/data/rsvp_repository.dart';
 import '../../features/home/data/daily_content_repository.dart';
 import '../../features/home/data/news_repository.dart';
-import '../../features/home/data/kharis_api_announcement_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/curation_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
 import '../../features/messages/data/r2_messages_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
+import '../../features/home/data/featured_video_repository.dart';
 import '../models/sermon.dart';
 import 'audio_provider.dart';
 import 'branch_provider.dart';
 import 'cache_provider.dart';
+import 'content_api_provider.dart';
 import 'onboarding_provider.dart';
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -30,8 +31,8 @@ final sermonRepositoryProvider = Provider<AbstractSermonRepository>((ref) {
   // transcripts in one request), headed by the live API's page 1 so arrivals
   // since the Worker's last run still show. Falls back to the paged public
   // API (yetanothersermon.host; the sermonApiProxy function on web) when R2
-  // is unreachable, and the notifier falls back to the bundled catalogue
-  // when both are.
+  // is unreachable. With both down and nothing saved, the notifier reports
+  // offline and the Messages screen offers Retry.
   return R2MessagesRepository();
 });
 
@@ -45,7 +46,6 @@ class SermonLibrary {
     this.totalCount = 0,
     this.isLoadingMore = false,
     this.loaded = false,
-    this.usedFallback = false,
     this.offline = false,
     this.hydrating = false,
     this.hydrationFailed = false,
@@ -65,12 +65,9 @@ class SermonLibrary {
   /// A scroll-triggered page is currently in flight.
   final bool isLoadingMore;
 
-  /// Something (cache, page 1 or the fallback) is on screen.
+  /// Page 1 or the saved archive is on screen, or page 1 has failed with
+  /// nothing saved (then [sermons] is empty and [offline] is set).
   final bool loaded;
-
-  /// Page 1 failed with no cached archive, so the bundled offline catalogue
-  /// is being shown instead of the live library.
-  final bool usedFallback;
 
   /// The last attempt to reach the API failed; what is shown may be stale.
   final bool offline;
@@ -108,7 +105,6 @@ class SermonLibrary {
     int? totalCount,
     bool? isLoadingMore,
     bool? loaded,
-    bool? usedFallback,
     bool? offline,
     bool? hydrating,
     bool? hydrationFailed,
@@ -120,7 +116,6 @@ class SermonLibrary {
     totalCount: totalCount ?? this.totalCount,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     loaded: loaded ?? this.loaded,
-    usedFallback: usedFallback ?? this.usedFallback,
     offline: offline ?? this.offline,
     hydrating: hydrating ?? this.hydrating,
     hydrationFailed: hydrationFailed ?? this.hydrationFailed,
@@ -207,12 +202,13 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   late final Future<void> _firstLoad;
   final Completer<void> _ready = Completer<void>();
 
-  /// Completes when page 1 (or the offline fallback) has been attempted.
+  /// Completes when page 1 has been attempted.
   Future<void> get firstLoad => _firstLoad;
 
-  /// Completes as soon as anything is on screen: the cached archive, page 1
-  /// or the fallback. Waiting on [firstLoad] instead would hide a cached
-  /// archive behind a network round-trip.
+  /// Completes as soon as the library has settled: the cached archive or
+  /// page 1 is on screen, or page 1 failed with nothing saved. Waiting on
+  /// [firstLoad] instead would hide a cached archive behind a network
+  /// round-trip.
   Future<void> get ready => _ready.future;
 
   @override
@@ -241,22 +237,21 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   }
 
   /// Fetches page 1 and lays it over what is shown. Returns false on failure,
-  /// after showing the bundled catalogue if nothing else is on screen.
+  /// leaving whatever is shown (possibly nothing) marked [SermonLibrary.offline].
   Future<bool> _loadFirstPage() async {
     try {
       final page = await _repo.fetchPage();
       if (!mounted) return false;
       _firstPage = page;
       _attempt = 0;
-      // Page 1 carries the newest arrivals; a cached tail follows it. The
-      // bundled fallback is a different catalogue, so it is replaced.
-      final tail = state.usedFallback ? const <Sermon>[] : state.sermons;
+      // Page 1 carries the newest arrivals; a cached tail follows it.
+      final tail = state.sermons;
       final seen = <String>{};
       final merged = [
         ...page.sermons.where((s) => seen.add(s.id)),
         ...tail.where((s) => seen.add(s.id)),
       ];
-      final hasArchive = state.fetchedAt != null && !state.usedFallback;
+      final hasArchive = state.fetchedAt != null;
       // A held count that differs from the server's either way (a skipped
       // record, or one deleted upstream) is walked again, never trusted.
       final complete =
@@ -265,15 +260,13 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
       // Page 1 only adds new arrivals at the head. A walk already past it
       // (running, or paused between retries) keeps its cursor: pointing it
       // back at page 2 would re-fetch every page the library already holds.
-      final resume =
-          !state.usedFallback && (_hydrating || state.nextUrl != null);
+      final resume = _hydrating || state.nextUrl != null;
       state = state.copyWith(
         sermons: merged,
         nextUrl: resume ? null : page.nextUrl,
         clearNextUrl: complete,
         totalCount: page.totalCount,
         loaded: true,
-        usedFallback: false,
         offline: false,
       );
       if (page.nextUrl == null) {
@@ -283,23 +276,9 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
       return true;
     } catch (_) {
       if (!mounted) return false;
-      if (!state.loaded) {
-        // Offline / CI fallback: never leaves the member on an empty screen.
-        try {
-          final catalogue = await _repo.loadCatalogue();
-          if (!mounted) return false;
-          state = SermonLibrary(
-            sermons: catalogue,
-            totalCount: catalogue.length,
-            loaded: true,
-            usedFallback: true,
-          );
-        } catch (_) {
-          if (!mounted) return false;
-          state = state.copyWith(loaded: true);
-        }
-      }
-      state = state.copyWith(offline: true);
+      // Nothing saved and no network: settle on an empty, offline library so
+      // the screen shows the offline state with Retry instead of a spinner.
+      state = state.copyWith(loaded: true, offline: true);
       if (_attempt + 1 >= maxAttempts) {
         // Stop polling; the offline banner's Retry takes over.
         _attempt = 0;
@@ -315,7 +294,7 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   /// Brings the rest of the archive in, or re-walks it when the cached copy
   /// is stale (or [revalidate] is set). Safe to call repeatedly.
   Future<void> hydrateArchive({bool revalidate = false}) async {
-    if (_hydrating || !mounted || !state.loaded || state.usedFallback) return;
+    if (_hydrating || !mounted || !state.loaded) return;
     if (_firstPage == null) return;
     final fetchedAt = state.fetchedAt;
     final stale = fetchedAt == null || _clock().difference(fetchedAt) > maxAge;
@@ -333,7 +312,7 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   /// walk skipped. Automatic gap fills spend the session's
   /// [maxGapFillWalks]; a [manual] one (the footer's Retry) does not.
   Future<void> _fillGap({bool manual = false}) async {
-    if (_hydrating || !mounted || !state.loaded || state.usedFallback) return;
+    if (_hydrating || !mounted || !state.loaded) return;
     if (state.hasMore || !state.countMismatch) return;
     if (!manual) {
       if (_gapFillWalks >= maxGapFillWalks) {
@@ -472,7 +451,7 @@ class SermonLibraryNotifier extends StateNotifier<SermonLibrary> {
   void _persist() {
     final cache = this.cache;
     final fetchedAt = state.fetchedAt;
-    if (cache == null || fetchedAt == null || state.usedFallback) return;
+    if (cache == null || fetchedAt == null) return;
     if (state.sermons.isEmpty || state.sermons.length == _persistedCount) {
       return;
     }
@@ -849,31 +828,21 @@ Sermon withAudioTwin(Sermon sermon, Map<String, Sermon> twins) {
 
 // ── CMS (Firestore realtime) ──────────────────────────────────────────────────
 
-/// The Firestore-backed sermon repository used by the CMS.
+/// The Firestore `sermons` collection (hand-added sermons, YouTube mirrors
+/// and starred features).
 ///
 /// Deliberately separate from [sermonRepositoryProvider]: the public library
-/// reads the external Kharis sermon API, while every admin write/delete must
-/// land in the Firestore `sermons` collection.
-final adminSermonRepositoryProvider = Provider<FirestoreSermonRepository>(
+/// reads the external Kharis sermon API.
+final firestoreSermonRepositoryProvider = Provider<FirestoreSermonRepository>(
   (ref) => FirestoreSermonRepository(firestore: ref.watch(firestoreProvider)),
 );
-
-/// Admin-only realtime stream of every `sermons` doc for the Studio.
-final adminSermonsProvider = StreamProvider<List<Sermon>>((ref) {
-  if (!kUseFirebase) return Stream.value(const []);
-  try {
-    return ref.watch(adminSermonRepositoryProvider).watchSermons();
-  } catch (_) {
-    return Stream.value(const []);
-  }
-});
 
 /// Hand-added CMS sermons for the member library. Filtered by source, so the
 /// YouTube mirrors in the same collection cannot fill the window.
 final cmsSermonsProvider = StreamProvider<List<Sermon>>((ref) {
   if (!kUseFirebase) return Stream.value(const []);
   try {
-    return ref.watch(adminSermonRepositoryProvider).watchCmsSermons();
+    return ref.watch(firestoreSermonRepositoryProvider).watchCmsSermons();
   } catch (_) {
     return Stream.value(const []);
   }
@@ -899,7 +868,7 @@ final featuredModeProvider = StreamProvider<FeaturedMode>((ref) {
 final pinnedFeaturedProvider = StreamProvider<List<Sermon>>((ref) {
   if (!kUseFirebase) return Stream.value(const []);
   try {
-    return ref.watch(adminSermonRepositoryProvider).watchPinnedFeatured();
+    return ref.watch(firestoreSermonRepositoryProvider).watchPinnedFeatured();
   } catch (_) {
     return Stream.value(const []);
   }
@@ -928,7 +897,10 @@ final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
   if (mode.valueOrNull == FeaturedMode.pinned) {
     final pinnedAsync = ref.watch(pinnedFeaturedProvider);
     if (pinnedAsync.isLoading && !pinnedAsync.hasValue) return const [];
-    final pinned = pinnedAsync.valueOrNull ?? const [];
+    final pinned = [
+      for (final s in pinnedAsync.valueOrNull ?? const <Sermon>[])
+        if (!s.isShortClip) s,
+    ];
     if (pinned.isNotEmpty) {
       return _distinct([
         for (final s in pinned.take(kFeaturedLimit)) withAudioTwin(s, twins),
@@ -936,12 +908,16 @@ final featuredSermonsProvider = Provider<List<Sermon>>((ref) {
     }
   }
 
-  final videos = [...ref.watch(videosProvider).valueOrNull ?? const <Sermon>[]]
-    ..sort(
-      (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
-        a.publishedAt ?? DateTime(0),
-      ),
-    );
+  final videos =
+      [
+        for (final v
+            in ref.watch(videosProvider).valueOrNull ?? const <Sermon>[])
+          if (!v.isShortClip) v,
+      ]..sort(
+        (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
+          a.publishedAt ?? DateTime(0),
+        ),
+      );
   return _distinct([
     for (final v in videos.take(kFeaturedLimit)) withAudioTwin(v, twins),
   ]);
@@ -961,12 +937,16 @@ const int kLatestLimit = 3;
 /// The newest messages in the library, newest first, at most [kLatestLimit].
 /// What the Messages tab leads with when Studio turns featured off.
 final latestSermonsProvider = Provider<List<Sermon>>((ref) {
-  final library = [...?ref.watch(sermonsProvider).valueOrNull]
-    ..sort(
-      (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
-        a.publishedAt ?? DateTime(0),
-      ),
-    );
+  final library =
+      [
+        for (final s
+            in ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[])
+          if (!s.isShortClip) s,
+      ]..sort(
+        (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
+          a.publishedAt ?? DateTime(0),
+        ),
+      );
   return library.take(kLatestLimit).toList();
 });
 
@@ -989,7 +969,9 @@ final _cmsSermonDocProvider = FutureProvider.autoDispose
     .family<Sermon?, String>((ref, id) async {
       if (!kUseFirebase) return null;
       try {
-        return await ref.watch(adminSermonRepositoryProvider).getSermonById(id);
+        return await ref
+            .watch(firestoreSermonRepositoryProvider)
+            .getSermonById(id);
       } catch (_) {
         return null;
       }
@@ -1055,7 +1037,7 @@ final recentlyPlayedProvider = Provider<List<Sermon>>((ref) {
   final out = <Sermon>[];
   for (final id in ids) {
     final sermon = ref.watch(sermonByIdProvider(id)).valueOrNull;
-    if (sermon != null) out.add(sermon);
+    if (sermon != null && !sermon.isShortClip) out.add(sermon);
     if (out.length == 10) break;
   }
   return out;
@@ -1267,11 +1249,11 @@ final recentSearchesProvider =
 // ── Events ────────────────────────────────────────────────────────────────────
 
 final eventRepositoryProvider = Provider<EventRepository>((ref) {
-  return EventRepository();
+  return EventRepository(api: ref.watch(contentApiProvider));
 });
 
-/// Upcoming events, optionally filtered by branch. Realtime: re-emits on
-/// every Firestore change so admin-panel edits appear without refresh.
+/// Upcoming Content Studio events (weekly ones at their next date), optionally
+/// filtered by branch name: the saved list first, then the current one.
 final upcomingEventsProvider = StreamProvider.family<List<Event>, String?>((
   ref,
   branch,
@@ -1280,9 +1262,9 @@ final upcomingEventsProvider = StreamProvider.family<List<Event>, String?>((
   return repo.watchUpcomingEvents(branch: branch);
 });
 
-/// The [EventRepository.pastEventLimit] most recent past events, optionally
-/// filtered by branch. Realtime, most recent first.
-/// An event only lands here once its end time has passed.
+/// The [EventRepository.pastEventLimit] most recent past one-off events,
+/// optionally filtered by branch, most recent first. An event only lands
+/// here once its end time has passed.
 final pastEventsProvider = StreamProvider.family<List<Event>, String?>((
   ref,
   branch,
@@ -1317,8 +1299,8 @@ final isEventRsvpedProvider = Provider.autoDispose.family<bool, String>((
 
 /// The events behind [myRsvpsProvider], split into upcoming and past on the
 /// same cutoff the Events tabs use, so an RSVP'd event whose date has passed
-/// is never shown as upcoming. Resolved in `whereIn` batches, so the cost is
-/// O(n / 30) reads. RSVPs whose event has since been deleted drop out.
+/// is never shown as upcoming. RSVPs whose event has since been deleted drop
+/// out.
 ///
 /// The past group carries the same [EventRepository.pastEventLimit] cap as
 /// the Past tab — a member with years of RSVPs sees the recent ones, not an
@@ -1339,61 +1321,57 @@ final myRsvpEventsProvider = FutureProvider<RsvpEvents>((ref) async {
 // ── Daily content ─────────────────────────────────────────────────────────────
 
 final dailyContentRepositoryProvider = Provider<DailyContentRepository>((ref) {
-  return DailyContentRepository();
+  return DailyContentRepository(api: ref.watch(contentApiProvider));
 });
 
-/// Today's reading + prayer. Realtime snapshot of dailyContent/{today}.
-final dailyContentProvider = StreamProvider<DailyContent>((ref) {
-  final repo = ref.watch(dailyContentRepositoryProvider);
-  return repo.watchTodaysContent();
+/// Today's Content Studio reading + prayer; `null` when the Studio has none
+/// (the reading card hides).
+final dailyContentProvider = StreamProvider<DailyContent?>((ref) {
+  return ref.watch(dailyContentRepositoryProvider).watchTodaysContent();
+});
+
+/// Today's Content Studio Daily Message; `null` when there is none.
+final dailyMessageProvider = StreamProvider<DailyMessage?>((ref) {
+  return ref.watch(dailyContentRepositoryProvider).watchTodaysMessage();
 });
 
 // ── News ──────────────────────────────────────────────────────────────────────
 
 final newsRepositoryProvider = Provider<NewsRepository>((ref) {
-  return NewsRepository();
+  return NewsRepository(api: ref.watch(contentApiProvider));
 });
 
-/// News & announcements — API-first (getAnnouncements) with Firestore fallback.
-final announcementApiRepositoryProvider =
-    Provider<KharisApiAnnouncementRepository>((ref) {
-      return KharisApiAnnouncementRepository();
-    });
-
-/// Live announcements for a campus, expired items removed. Pass the member's
-/// active branch (`currentBranchProvider`) and the API returns that branch's
-/// announcements plus all-campus ones; pass null for the unscoped feed. The
-/// scoping is server-side, so a branch notice is never lost behind a global
-/// page limit and callers must not re-filter by branch.
-///
-/// `expiresAt` is set by the web admin portal; anything past it must never
-/// reach the UI.
+/// Live Content Studio announcements for a branch: that branch's plus those
+/// for all branches; pass null for every announcement. Scheduled and expired
+/// items never reach the UI. Empty when the Studio has none.
 final newsProvider = FutureProvider.family<List<NewsItem>, String?>((
   ref,
   branch,
-) async {
-  final items = await ref
-      .watch(announcementApiRepositoryProvider)
-      .getAnnouncements(branch: branch);
-  return items.where((n) => !n.isExpired).toList();
+) {
+  return ref.watch(newsRepositoryProvider).getAnnouncements(branch: branch);
 });
 
-/// Admin-only realtime announcement list — Firestore direct, expired items
-/// INCLUDED so a lapsed notice stays editable, and live so a CMS write shows
-/// up immediately (the member-facing [newsProvider] is a cached API future).
-final adminNewsProvider = StreamProvider<List<NewsItem>>((ref) {
-  return ref
-      .watch(newsRepositoryProvider)
-      .watchNews(limit: 100, includeExpired: true);
+// ── Featured video ────────────────────────────────────────────────────────────
+
+final featuredVideoRepositoryProvider = Provider<FeaturedVideoRepository>((
+  ref,
+) {
+  return FeaturedVideoRepository(api: ref.watch(contentApiProvider));
+});
+
+/// The Content Studio clip the app features (the Home hero's video), or
+/// null when the Studio has none for the app.
+final featuredVideoProvider = FutureProvider<FeaturedVideo?>((ref) {
+  return ref.watch(featuredVideoRepositoryProvider).getFeaturedVideo();
 });
 
 // ── Live status ───────────────────────────────────────────────────────────────
 
 final liveRepositoryProvider = Provider<LiveRepository>((ref) {
-  return LiveRepository();
+  return LiveRepository(api: ref.watch(contentApiProvider));
 });
 
-/// Realtime stream of whether a service is currently live on YouTube.
+/// Whether a service is live, from the Content Studio `live_stream` setting.
 final liveStatusProvider = StreamProvider<LiveStatus>((ref) {
   return ref.watch(liveRepositoryProvider).watchLiveStatus();
 });

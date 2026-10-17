@@ -3,8 +3,7 @@ import 'package:kharis_app/core/utils/service_time.dart';
 
 void main() {
   group('formatServiceTime', () {
-    test('converts the web portal 24-hour shape to 12-hour', () {
-      // admin/index.html uses <input type="time">, which yields '14:00'.
+    test('converts the 24-hour shape to 12-hour', () {
       expect(formatServiceTime('14:00'), '2:00 PM');
       expect(formatServiceTime('14:00:00'), '2:00 PM');
       expect(formatServiceTime('09:05'), '9:05 AM');

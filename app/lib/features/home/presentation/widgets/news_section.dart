@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
-import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
 
@@ -15,8 +14,8 @@ const double _kImageHeight = 92;
 
 /// "Announcements" horizontal carousel: exactly what Content Studio has
 /// published for the member's campus plus all-campus notices
-/// ([campusNewsProvider]). Loading, empty and failed are three different
-/// states — "No announcements" is only ever said when it is true.
+/// ([campusNewsProvider]). Loading and failed are distinct states; with
+/// nothing published it renders nothing (Home hides the block).
 class AnnouncementsCarousel extends ConsumerWidget {
   const AnnouncementsCarousel({super.key});
 
@@ -37,15 +36,8 @@ class AnnouncementsCarousel extends ConsumerWidget {
       return const _CarouselSkeleton();
     }
 
-    if (items.isEmpty) {
-      final branch = ref.watch(currentBranchProvider).valueOrNull;
-      return _CarouselMessage(
-        icon: Icons.campaign_outlined,
-        text: branch == null
-            ? 'No announcements yet.'
-            : 'No announcements for $branch yet.',
-      );
-    }
+    // Nothing published: Home hides the whole block, heading included.
+    if (items.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
       height: _kCardHeight,

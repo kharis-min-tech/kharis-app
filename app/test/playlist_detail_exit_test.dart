@@ -3,6 +3,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
@@ -15,6 +16,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'support/fake_cache_service.dart';
 
 /// Regression guard for the "playlist view overtakes the page and cannot be
 /// exited" complaint: every playlist surface is a *pushed* route with a
@@ -50,6 +52,8 @@ void main() {
   }
 
   List<Override> overridesFor(FakeFirebaseFirestore db) => [
+    // List rows show listening progress from the playback history.
+    cacheServiceProvider.overrideWithValue(FakeCacheService()),
     firestoreProvider.overrideWithValue(db),
     currentUserProvider.overrideWith((ref) => Stream.value(member)),
     sermonsProvider.overrideWith(

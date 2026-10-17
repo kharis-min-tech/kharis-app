@@ -50,7 +50,9 @@ void main() {
               'dailyReading': true,
             }),
           ),
-          notificationPermissionProvider.overrideWith((ref) async => false),
+          notificationPermissionProvider.overrideWith(
+            (ref) async => NotificationPermission.askable,
+          ),
         ],
         child: MaterialApp(
           home: Builder(
@@ -69,7 +71,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Allow notifications'));
+    await tester.tap(find.text('Turn on notifications'));
     await tester.pump();
     // The member backs out while the system sheet is still showing.
     await tester.tap(find.byIcon(Icons.arrow_back_ios_new));

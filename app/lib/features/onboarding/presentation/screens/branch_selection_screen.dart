@@ -34,9 +34,8 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final branches =
-        ref.watch(branchesProvider).valueOrNull ??
-        BranchRepository.seedBranches;
+    final branchesAsync = ref.watch(branchesProvider);
+    final branches = branchesAsync.valueOrNull ?? const <Branch>[];
 
     final q = _query.trim().toLowerCase();
     final filtered = q.isEmpty
@@ -93,17 +92,22 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
                 children: [
+                  if (branches.isEmpty)
+                    _BranchesStatus(
+                      failed: branchesAsync.hasError || branchesAsync.hasValue,
+                      onRetry: () => ref.invalidate(branchesProvider),
+                    ),
                   ..._section(
                     context,
                     ref,
                     'BRANCHES',
-                    filtered.where((b) => b.group != 'KP2'),
+                    filtered.where((b) => b.group != Branch.phaseTwoGroup),
                   ),
                   ..._section(
                     context,
                     ref,
                     'KHARIS PHASE TWO',
-                    filtered.where((b) => b.group == 'KP2'),
+                    filtered.where((b) => b.group == Branch.phaseTwoGroup),
                   ),
                 ],
               ),
@@ -176,13 +180,44 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
           child: BranchTile(
             name: b.name.startsWith('KP2 ') ? b.name.substring(4) : b.name,
             region: _region(b.subtitle),
-            gradientColors: b.gradient,
-            imageUrl: b.imageUrl,
             isHq: _isHq(b.subtitle),
             onTap: () => _confirm(context, ref, b),
           ),
         ),
     ];
+  }
+}
+
+/// Stands in for the list until branches arrive: a spinner while loading,
+/// a retry once loading has failed (no connection and nothing saved).
+class _BranchesStatus extends StatelessWidget {
+  const _BranchesStatus({required this.failed, required this.onRetry});
+
+  final bool failed;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!failed) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 40),
+      child: Column(
+        children: [
+          Text(
+            'Branches could not load. Check your connection.',
+            textAlign: TextAlign.center,
+            style: AppTypography.bodySm.copyWith(color: context.kc.muted),
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+    );
   }
 }
 

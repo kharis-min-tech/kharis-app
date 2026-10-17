@@ -60,8 +60,10 @@ class PlaybackFailure {
 /// the UI can show it and offer [retry]. Every failed load releases the
 /// native player, and [resume] reloads when there is nothing live to resume.
 class AudioPlayerService {
-  AudioPlayerService(this._cache)
-    : _history = PlaybackHistory(_cache),
+  /// [history] is the app's shared [PlaybackHistory] so list rows hear about
+  /// positions this engine saves; a private one is made when omitted.
+  AudioPlayerService(this._cache, {PlaybackHistory? history})
+    : _history = history ?? PlaybackHistory(_cache),
       _player = AudioPlayer(
         // Send the Cloudflare-passing browser UA natively — ExoPlayer's
         // setUserAgent on Android, AVURLAssetHTTPUserAgentKey on iOS — by
@@ -149,7 +151,7 @@ class AudioPlayerService {
         if (sermon == null) return;
         if (state.processingState == ProcessingState.completed) {
           // Reset so the next play() starts from the beginning.
-          _history.clearPosition(sermon);
+          _history.markFinished(sermon);
           return;
         }
         // The engine is the ground truth: once this message is ready and
@@ -180,7 +182,7 @@ class AudioPlayerService {
       _player.positionDiscontinuityStream.listen((event) {
         if (event.reason != PositionDiscontinuityReason.autoAdvance) return;
         final finished = _sermonAtNative(event.previousEvent.currentIndex);
-        if (finished != null) _history.clearPosition(finished);
+        if (finished != null) _history.markFinished(finished);
       }, onError: _ignore),
     );
 

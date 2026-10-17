@@ -7,7 +7,6 @@ import 'package:kharis_app/features/playlists/presentation/widgets/playlist_card
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/playlist_name_dialog.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
-import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 /// Bottom sheet that files a message into the member's playlists.
 ///
@@ -18,13 +17,17 @@ Future<void> showAddToPlaylistSheet(
   BuildContext context, {
   required String sermonId,
   required String sermonTitle,
+  VoidCallback? onOpenNotes,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) =>
-        AddToPlaylistSheet(sermonId: sermonId, sermonTitle: sermonTitle),
+    builder: (_) => AddToPlaylistSheet(
+      sermonId: sermonId,
+      sermonTitle: sermonTitle,
+      onOpenNotes: onOpenNotes,
+    ),
   );
 }
 
@@ -33,10 +36,14 @@ class AddToPlaylistSheet extends ConsumerWidget {
     super.key,
     required this.sermonId,
     required this.sermonTitle,
+    this.onOpenNotes,
   });
 
   final String sermonId;
   final String sermonTitle;
+
+  /// Opens this message's notes without playing it; null hides the row.
+  final VoidCallback? onOpenNotes;
 
   Future<void> _createAndAdd(BuildContext context, WidgetRef ref) async {
     final repo = ref.read(playlistRepositoryProvider);
@@ -109,6 +116,35 @@ class AddToPlaylistSheet extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (onOpenNotes != null)
+                ListTile(
+                  key: const Key('sheet-open-notes'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onOpenNotes!();
+                  },
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: context.kc.surfaceAlt,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Icon(
+                      Icons.notes_rounded,
+                      color: context.kc.accentInk,
+                      size: 22,
+                    ),
+                  ),
+                  title: Text(
+                    'My notes',
+                    style: AppTypography.ui(
+                      size: 15,
+                      weight: FontWeight.w700,
+                      color: context.kc.onBg,
+                    ),
+                  ),
+                ),
               if (!repo.hasUser)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -175,10 +211,10 @@ class AddToPlaylistSheet extends ConsumerWidget {
                           leading: SizedBox(
                             width: 44,
                             height: 44,
-                            child: ArtworkImage(
-                              url: null,
-                              gradientIndex: playlistGradientIndex(playlist.id),
+                            child: PlaylistArt(
+                              playlist: playlist,
                               radius: AppRadius.md,
+                              glyphSize: 22,
                             ),
                           ),
                           title: Text(

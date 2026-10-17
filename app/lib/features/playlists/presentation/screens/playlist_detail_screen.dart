@@ -388,6 +388,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 artworkUrl: sermon.artworkUrl,
                 listIndex: index,
                 isPlaying: isPlaying,
+                listening: ref.watch(listeningProgressProvider(sermon)),
                 onTap: () =>
                     startPlayback(context, ref, sermon, queue: sermons),
                 onMoreTap: () => _removeSermon(context, ref, sermon),

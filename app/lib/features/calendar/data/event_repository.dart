@@ -1,9 +1,7 @@
-import 'dart:math' as math;
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:kharis_app/core/constants/api_config.dart';
+import 'package:intl/intl.dart';
+import 'package:kharis_app/core/services/content_api.dart';
+import 'package:kharis_app/core/utils/media_url.dart';
 
 @immutable
 class Event {
@@ -18,37 +16,66 @@ class Event {
     this.branch,
     this.imageUrl,
     this.isFeatured = false,
+    this.recurrenceDays = const [],
   });
 
+  /// The Studio event id.
   final String id;
   final String title;
   final String? description;
 
-  /// Venue name, e.g. "Kensington Town Hall".
+  /// Where it happens, as the Studio wrote it.
   final String? location;
 
   /// Street address of [location], for maps and the event detail screen.
   final String? address;
 
-  /// Branch / campus this event belongs to (e.g. "London", "Manchester").
+  /// Branch name this event belongs to (e.g. "London", "Manchester").
   /// `null` means the event applies to all branches; a blank stored value is
-  /// read as `null` too, exactly as the API reads it.
+  /// read as `null` too.
   final String? branch;
 
-  /// True when a member whose campus is [memberBranch] should see this event:
-  /// its campus is theirs, it is all-campus, or they follow all campuses.
+  /// True when a member whose branch is [memberBranch] should see this event:
+  /// its branch is theirs, it is for all branches, or they follow all
+  /// branches.
   bool isVisibleTo(String? memberBranch) =>
       memberBranch == null || branch == null || branch == memberBranch;
 
   final DateTime startTime;
 
-  /// Optional end instant. The backend declares `endTime` as optional
-  /// (`backend/functions/src/types.ts`) and older documents omit it, so this
-  /// must never be assumed present — use [effectiveEndTime] instead.
+  /// Optional end instant; use [effectiveEndTime].
   final DateTime? endTime;
 
   final String? imageUrl;
   final bool isFeatured;
+
+  /// Weekdays a weekly event repeats on (0 = Sunday ... 6 = Saturday),
+  /// sorted; empty for a one-off event. For a weekly event [startTime] is its
+  /// next occurrence.
+  final List<int> recurrenceDays;
+
+  bool get isWeekly => recurrenceDays.isNotEmpty;
+
+  static const _weekdays = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ];
+
+  /// "Every Sunday · 9:00 AM", "Every Sunday and Wednesday · 9:00 AM";
+  /// null for a one-off event.
+  String? get recurrenceLabel {
+    if (!isWeekly) return null;
+    final names = [for (final d in recurrenceDays) _weekdays[d]];
+    final days = names.length == 1
+        ? names.single
+        : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+    return 'Every $days · ${DateFormat('h:mm a').format(startTime)}';
+  }
 
   /// The instant the event is over. Events with no explicit end are treated
   /// as ending when they start.
@@ -69,348 +96,210 @@ class Event {
   String toString() => 'Event(id: $id, title: $title, branch: $branch)';
 }
 
-/// Reads events from the `getEvents` API with a realtime Firestore fallback.
+/// Reads events from the Content Studio `events` table, one [Event] per row,
+/// exactly as the Studio wrote it.
 ///
-/// Both an upcoming and a past view are supported. Past-ness is decided by
-/// [Event.effectiveEndTime], not by `startTime`, so an in-progress event does
-/// not vanish from "Upcoming" the moment it begins.
+/// A weekly event (`recurrence == "weekly"`) stays one event, dated at its
+/// next occurrence on its `recurrence_days` and dropped once
+/// `recurrence_until` has passed. Past-ness is decided by
+/// [Event.effectiveEndTime], so an in-progress event stays in "Upcoming"
+/// until it ends.
 class EventRepository {
-  /// [dio] is the client for the `getEvents` API; tests pass one with a stub
-  /// adapter so the Firestore path is exercised without the network.
-  EventRepository({FirebaseFirestore? firestore, Dio? dio})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _dio = dio ?? _defaultDio;
+  EventRepository({required this._api, DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now;
 
-  final FirebaseFirestore _firestore;
-  final Dio _dio;
+  final ContentApi _api;
+  final DateTime Function() _clock;
 
-  static const String _apiUrl = ApiConfig.getEvents;
+  static const _table = 'events';
+  static const _query = {'order': 'start_time.asc'};
 
-  /// Firestore can only range-filter on `startTime`, so the upcoming query
-  /// reaches this far back to pick up events that have already started but
-  /// have not finished. Bounded to keep the query cheap; anything longer than
-  /// this is treated as past once the window slides past it.
-  static const Duration _inProgressLookback = Duration(days: 2);
-
-  /// The Past view is a capped archive, not a full history: only the 15 most
-  /// recent finished events are ever fetched or shown. Older events stay in
-  /// Firestore — this is a view cap, and it also bounds the query cost.
-  /// Mirrors `PAST_EVENT_LIMIT` in `backend/functions/src/index.ts`.
+  /// The Past view is a capped list, not a full history.
   static const int pastEventLimit = 15;
-
-  /// `whereIn` accepts at most 30 values per query.
-  static const int _whereInChunk = 30;
-
-  static final Dio _defaultDio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 12),
-      receiveTimeout: const Duration(seconds: 15),
-    ),
-  );
 
   // ── Reads ──────────────────────────────────────────────────────────────────
 
-  /// How many recent past events a branch-scoped Past view reads before the
-  /// in-memory branch filter, so other campuses' events cannot crowd a
-  /// campus's own history out of the [pastEventLimit] cap.
-  static const int _scopedPastWindow = 60;
+  /// Upcoming events visible to [branch], soonest (next occurrence) first:
+  /// the saved list first when there is one, then the Studio's current one.
+  Stream<List<Event>> watchUpcomingEvents({String? branch}) => _api
+      .watch(_table, query: _query)
+      .map((rows) => upcoming(rows, branch: branch, now: _clock()));
 
-  /// Realtime stream of upcoming events, optionally branch-filtered: that
-  /// campus's events plus all-campus ones (null, blank or absent `branch`).
-  Stream<List<Event>> watchUpcomingEvents({String? branch}) =>
-      _watchEvents(branch: branch, past: false);
+  /// The [pastEventLimit] most recently finished one-off events visible to
+  /// [branch], most recent first. Weekly events are left out.
+  Stream<List<Event>> watchPastEvents({String? branch}) => _api
+      .watch(_table, query: _query)
+      .map((rows) => past(rows, branch: branch, now: _clock()));
 
-  /// Realtime stream of the [pastEventLimit] most recent finished events.
-  Stream<List<Event>> watchPastEvents({String? branch}) =>
-      _watchEvents(branch: branch, past: true);
-
-  Stream<List<Event>> _watchEvents({
-    required String? branch,
-    required bool past,
-  }) async* {
-    // API-first: one-shot fetch from the Cloud Functions endpoint so content
-    // appears even when Firestore is cold/unreachable, then hand over to the
-    // realtime Firestore stream below.
-    final apiEvents = await _fetchFromApi(branch: branch, past: past);
-    if (apiEvents != null && apiEvents.isNotEmpty) yield apiEvents;
-    try {
-      // One unfiltered window, scoped in memory: an equality filter on
-      // `branch` can never match a doc with no `branch` key, which is how
-      // all-campus events written before the field existed are stored.
-      yield* _windowQuery(
-        now: DateTime.now(),
-        past: past,
-        pastLimit: branch == null ? pastEventLimit : _scopedPastWindow,
-      ).snapshots().map((snap) {
-        // Re-evaluate past-ness against the current clock on every snapshot so
-        // an event moves between tabs as it starts and finishes.
-        final at = DateTime.now();
-        final events = _mapDocs(
-          snap.docs,
-          now: at,
-          past: past,
-        ).where((e) => e.isVisibleTo(branch)).toList();
-        return _sorted(events, past: past);
-      });
-    } catch (_) {
-      yield const [];
-    }
-  }
-
-  /// The Firestore range window for a view. Client-side filtering on
-  /// [Event.isPastAt] narrows this to the exact set.
-  ///
-  /// The past window is bounded at [pastLimit] documents so the query
-  /// itself — not just the rendered list — stays capped. An event that has
-  /// started but not finished falls inside the range yet is filtered out as
-  /// not-past, so a running event can leave the Past tab one short; that is
-  /// the deliberate cost of not paying for a wider read.
-  Query<Map<String, dynamic>> _windowQuery({
-    required DateTime now,
-    required bool past,
-    int pastLimit = pastEventLimit,
-  }) {
-    final events = _firestore.collection('events');
-    if (past) {
-      return events
-          .where('startTime', isLessThan: Timestamp.fromDate(now))
-          .orderBy('startTime', descending: true)
-          .limit(pastLimit);
-    }
-    return events
-        .where(
-          'startTime',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(
-            now.subtract(_inProgressLookback),
-          ),
-        )
-        .orderBy('startTime');
-  }
-
-  /// Fetches events by document ID, chunked to Firestore's `whereIn` limit so
-  /// resolving an RSVP list costs O(n / 30) reads instead of one read each.
-  /// Missing IDs are simply absent from the result.
+  /// Resolves event ids; unknown ids are dropped.
   Future<List<Event>> getEventsByIds(List<String> ids) async {
-    final unique = ids.toSet().toList(growable: false);
+    final unique = ids.toSet();
     if (unique.isEmpty) return const [];
     try {
-      final chunks = <List<String>>[];
-      for (var i = 0; i < unique.length; i += _whereInChunk) {
-        chunks.add(
-          unique.sublist(i, math.min(i + _whereInChunk, unique.length)),
-        );
-      }
-      final snaps = await Future.wait(
-        chunks.map(
-          (chunk) => _firestore
-              .collection('events')
-              .where(FieldPath.documentId, whereIn: chunk)
-              .get(),
-        ),
-      );
-      return [
-        for (final snap in snaps)
-          ...snap.docs.map(_docToEvent).whereType<Event>(),
-      ];
+      final rows = await _api.load(_table, query: _query);
+      final now = _clock();
+      return [for (final id in unique) ?resolve(rows, id, now: now)];
     } catch (_) {
       return const [];
     }
   }
 
-  /// Fetches a single event by its Firestore document ID.
+  /// One event by its Studio id.
   Future<Event?> getEventById(String id) async {
     try {
-      final doc = await _firestore.collection('events').doc(id).get();
-      final data = doc.data();
-      if (!doc.exists || data == null) return null;
-      return _mapData(doc.id, data);
+      final rows = await _api.load(_table, query: _query);
+      return resolve(rows, id, now: _clock());
     } catch (_) {
       return null;
     }
   }
 
-  /// One-shot fetch from the `getEvents` API. Returns `null` on any failure
-  /// so callers fall straight through to Firestore.
-  Future<List<Event>?> _fetchFromApi({
+  // ── Mapping (pure; tested directly) ────────────────────────────────────────
+
+  static List<Event> upcoming(
+    List<Map<String, dynamic>> rows, {
     required String? branch,
-    required bool past,
-  }) async {
-    try {
-      final res = await _dio.get<Map<String, dynamic>>(
-        _apiUrl,
-        queryParameters: {
-          'branch': ?branch,
-          'when': past ? 'past' : 'upcoming',
-          'limit': past ? pastEventLimit : 50,
-        },
-      );
-      final raw = (res.data?['events'] as List?) ?? const [];
-      final now = DateTime.now();
-      final events = raw
-          .whereType<Map<String, dynamic>>()
-          .map(_mapApi)
-          .whereType<Event>()
-          .where((e) => e.isPastAt(now) == past)
-          .toList();
-      return _sorted(events, past: past);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // ── Admin writes ────────────────────────────────────────────────────────────
-
-  /// Creates an event. Blank optional strings are stored as `null`; a blank
-  /// [branch] means all-campus.
-  Future<void> addEvent({
-    required String title,
-    String? description,
-    String? location,
-    String? address,
-    String? branch,
-    required DateTime startTime,
-    required DateTime endTime,
-    String? imageUrl,
-    bool isFeatured = false,
-  }) {
-    return _firestore.collection('events').add({
-      'title': title,
-      'description': _blankToNull(description),
-      'location': _blankToNull(location),
-      'address': _blankToNull(address),
-      'branch': _blankToNull(branch),
-      'startTime': Timestamp.fromDate(startTime),
-      'endTime': Timestamp.fromDate(endTime),
-      'imageUrl': _blankToNull(imageUrl),
-      'isFeatured': isFeatured,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  /// Partial update: only the arguments that are passed are written.
-  ///
-  /// `null` means "leave as stored", so a form that does not edit the banner
-  /// or the featured flag can never wipe them, and a campus-scoped screen
-  /// cannot silently re-scope an all-campus event. To CLEAR an optional
-  /// string pass `''`, which is stored as `null` (for [branch]: all-campus).
-  Future<void> updateEvent(
-    String id, {
-    String? title,
-    String? description,
-    String? location,
-    String? address,
-    String? branch,
-    DateTime? startTime,
-    DateTime? endTime,
-    String? imageUrl,
-    bool? isFeatured,
-  }) {
-    final data = <String, Object?>{
-      'title': ?title,
-      if (description != null) 'description': _blankToNull(description),
-      if (location != null) 'location': _blankToNull(location),
-      if (address != null) 'address': _blankToNull(address),
-      if (branch != null) 'branch': _blankToNull(branch),
-      if (startTime != null) 'startTime': Timestamp.fromDate(startTime),
-      if (endTime != null) 'endTime': Timestamp.fromDate(endTime),
-      if (imageUrl != null) 'imageUrl': _blankToNull(imageUrl),
-      'isFeatured': ?isFeatured,
-    };
-    if (data.isEmpty) return Future.value();
-    return _firestore.collection('events').doc(id).update(data);
-  }
-
-  /// Deletes an event. A website import (`web_*`) is hidden instead: the
-  /// hourly sync recreates any missing `web_*` doc, but keeps a `hidden`
-  /// tombstone hidden, and every reader drops it.
-  Future<void> deleteEvent(String id) {
-    final ref = _firestore.collection('events').doc(id);
-    if (!id.startsWith('web_')) return ref.delete();
-    return ref.update({
-      'hidden': true,
-      'hiddenAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  static String? _blankToNull(String? value) {
-    final trimmed = value?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
-  }
-
-  // ── Mapping ────────────────────────────────────────────────────────────────
-
-  /// Maps documents and keeps only those on the requested side of [now].
-  List<Event> _mapDocs(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, {
     required DateTime now,
-    required bool past,
-  }) => docs
-      .map(_docToEvent)
-      .whereType<Event>()
-      .where((e) => e.isPastAt(now) == past)
-      .toList();
-
-  /// Orders a page and, for the Past view, applies [pastEventLimit]. Every
-  /// read path — Firestore one-shot, Firestore stream and the API fetch —
-  /// returns through here, so the cap cannot be bypassed by adding a caller.
-  List<Event> _sorted(List<Event> events, {required bool past}) {
-    final sorted = [...events]
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
-    if (!past) return sorted;
-    return sorted.reversed.take(pastEventLimit).toList();
+  }) {
+    final events = [
+      for (final row in rows) ?fromRow(row, now: now),
+    ].where((e) => !e.isPastAt(now) && e.isVisibleTo(branch)).toList();
+    return events..sort((a, b) => a.startTime.compareTo(b.startTime));
   }
 
-  Event? _docToEvent(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
-      _mapData(doc.id, doc.data());
-
-  /// Returns `null` when the document has no usable `startTime` — a single
-  /// malformed document must never take out the whole list — or is a hidden
-  /// tombstone (a removed website event, see [deleteEvent]). `endTime` is
-  /// genuinely optional, so its absence is not a failure.
-  Event? _mapData(String id, Map<String, dynamic> data) {
-    if (data['hidden'] == true) return null;
-    final start = _toDate(data['startTime']);
-    if (start == null) return null;
-    return Event(
-      id: id,
-      title: data['title'] as String? ?? '',
-      description: data['description'] as String?,
-      location: _blankToNull(data['location'] as String?),
-      address: _blankToNull(data['address'] as String?),
-      branch: _blankToNull(data['branch'] as String?),
-      startTime: start,
-      endTime: _toDate(data['endTime']),
-      imageUrl: _blankToNull(data['imageUrl'] as String?),
-      isFeatured: data['isFeatured'] as bool? ?? false,
-    );
+  static List<Event> past(
+    List<Map<String, dynamic>> rows, {
+    required String? branch,
+    required DateTime now,
+  }) {
+    final events = [
+      for (final row in rows)
+        if (!_isWeekly(row)) ?_single(row),
+    ].where((e) => e.isPastAt(now) && e.isVisibleTo(branch)).toList();
+    events.sort((a, b) => b.startTime.compareTo(a.startTime));
+    return events.take(pastEventLimit).toList();
   }
 
-  Event? _mapApi(Map<String, dynamic> j) {
-    final id = j['id'] as String?;
-    final title = j['title'] as String?;
-    if (id == null || title == null) return null;
-    final start = _toDate(j['startTime']);
-    if (start == null) return null;
+  /// The event [id] names in [rows], or null.
+  static Event? resolve(
+    List<Map<String, dynamic>> rows,
+    String id, {
+    required DateTime now,
+  }) {
+    for (final r in rows) {
+      if (r['id'] == id) return fromRow(r, now: now);
+    }
+    return null;
+  }
+
+  /// Studio sites that the app shows: "Mobile app", and the shared General
+  /// workspace.
+  static const appSites = {'app', 'general'};
+
+  /// Whether the Studio's "Show on" list includes the app. Unpublishing in
+  /// the Studio empties the list, so an unpublished row is hidden too; a
+  /// website-only row (`kharis`, `kp2`) is not the app's.
+  static bool shownInApp(Map<String, dynamic> row) {
+    final sites = row['sites'];
+    return sites is List && sites.any(appSites.contains);
+  }
+
+  /// A row as one event. A weekly event is dated at its next (or running)
+  /// occurrence; once `recurrence_until` is behind it, it is null. A weekly
+  /// row without days reads as a one-off. Null when the Studio does not show
+  /// the row in the app (see [shownInApp]).
+  static Event? fromRow(Map<String, dynamic> row, {required DateTime now}) {
+    final base = _single(row);
+    if (base == null) return null;
+    if (!_isWeekly(row)) return base;
+    final days = _recurrenceDays(row);
+    if (days.isEmpty) return base;
+    final s = base.startTime;
+    final length = base.endTime?.difference(s);
+    final until = _until(row);
+    var day = _dateOnly(now).subtract(const Duration(days: 1));
+    if (day.isBefore(_dateOnly(s))) day = _dateOnly(s);
+    for (var i = 0; i < 9; i++) {
+      if (until != null && day.isAfter(until)) return null;
+      if (days.contains(day.weekday % 7)) {
+        final start = DateTime(day.year, day.month, day.day, s.hour, s.minute);
+        final end = length == null ? null : start.add(length);
+        if (!(end ?? start).isBefore(now)) {
+          return Event(
+            id: base.id,
+            title: base.title,
+            startTime: start,
+            endTime: end,
+            description: base.description,
+            location: base.location,
+            address: base.address,
+            branch: base.branch,
+            imageUrl: base.imageUrl,
+            isFeatured: base.isFeatured,
+            recurrenceDays: days.toList()..sort(),
+          );
+        }
+      }
+      day = DateTime(day.year, day.month, day.day + 1);
+    }
+    return null;
+  }
+
+  /// A row as a one-off event; null when the Studio does not show it in the
+  /// app (see [shownInApp]) or it lacks an id, title or start.
+  static Event? _single(Map<String, dynamic> row) {
+    if (!shownInApp(row)) return null;
+    final id = _text(row['id']);
+    final title = _text(row['title']);
+    final start = _instant(row['start_time']);
+    if (id == null || title == null || start == null) return null;
     return Event(
       id: id,
       title: title,
-      description: j['description'] as String?,
-      location: _blankToNull(j['location'] as String?),
-      address: _blankToNull(j['address'] as String?),
-      branch: _blankToNull(j['branch'] as String?),
+      description: _text(row['description']),
+      location: _text(row['location']),
+      branch: _text(row['branch_name']),
       startTime: start,
-      endTime: _toDate(j['endTime']),
-      imageUrl: _blankToNull(j['imageUrl'] as String?),
-      isFeatured: j['isFeatured'] as bool? ?? false,
+      endTime: _instant(row['end_time']),
+      imageUrl: usableMediaUrl(_text(row['image_url'])),
+      isFeatured: row['is_featured'] == true,
     );
   }
 
-  static DateTime? _toDate(Object? value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is DateTime) return value;
-    // API instants are ISO-8601 UTC ('...Z'); render them on the device clock
-    // like Firestore Timestamps, or a 19:00 BST event reads as 18:00.
-    if (value is String) return DateTime.tryParse(value)?.toLocal();
-    return null;
+  static bool _isWeekly(Map<String, dynamic> row) =>
+      _text(row['recurrence'])?.toLowerCase() == 'weekly';
+
+  /// `recurrence_days` as 0 = Sunday ... 6 = Saturday.
+  static Set<int> _recurrenceDays(Map<String, dynamic> row) {
+    final raw = row['recurrence_days'];
+    if (raw is! List) return const {};
+    return {
+      for (final d in raw)
+        if (d is num && d >= 0 && d <= 6) d.toInt(),
+    };
+  }
+
+  /// Last day (local date) a weekly event may occur on, or null.
+  static DateTime? _until(Map<String, dynamic> row) {
+    final raw = _text(row['recurrence_until']);
+    if (raw == null) return null;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return null;
+    // A bare date is a calendar day; a timestamp is an instant.
+    return _dateOnly(raw.length <= 10 ? parsed : parsed.toLocal());
+  }
+
+  static DateTime _dateOnly(DateTime t) => DateTime(t.year, t.month, t.day);
+
+  /// ISO instants render on the device clock.
+  static DateTime? _instant(Object? raw) {
+    final t = _text(raw);
+    return t == null ? null : DateTime.tryParse(t)?.toLocal();
+  }
+
+  static String? _text(Object? v) {
+    if (v is! String) return null;
+    final t = v.trim();
+    return t.isEmpty ? null : t;
   }
 }

@@ -1,120 +1,45 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
-import 'package:dio/dio.dart';
-import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/features/home/data/kharis_api_announcement_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// End-to-end proof of the homepage announcements pipeline with only the
-/// network stubbed: getAnnouncements JSON (the live kharis-church response
-/// shape) → [KharisApiAnnouncementRepository] → [newsProvider] (expiry
-/// filter) → [AnnouncementsCarousel] on the home screen.
-///
-/// Seed data matches backend/functions/scripts/seed-announcements.mjs, so
-/// these tests prove exactly what a member sees after that script runs.
+import 'support/fake_cache_service.dart';
+import 'support/supabase_stub.dart';
 
-/// Serves canned getAnnouncements JSON and records every request, so tests
-/// can assert both what rendered and what the app asked the API for.
-class _StubAdapter implements HttpClientAdapter {
-  _StubAdapter(this.announcements);
+/// The homepage announcements pipeline with only the network stubbed:
+/// Content Studio `news` rows → [NewsRepository] → [newsProvider] →
+/// [AnnouncementsCarousel].
 
-  final List<Map<String, dynamic>> announcements;
-  final List<RequestOptions> requests = [];
+final _past = DateTime.utc(2026, 8, 4).toIso8601String();
+const _future = '2036-01-01T00:00:00Z';
 
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    requests.add(options);
-    // Same envelope as the live endpoint.
-    final body = jsonEncode({
-      'announcements': announcements,
-      'count': announcements.length,
-      'timestamp': DateTime.now().toUtc().toIso8601String(),
-    });
-    return ResponseBody.fromString(
-      body,
-      200,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-/// Fails every request, forcing the repository onto its Firestore fallback.
-class _OfflineAdapter implements HttpClientAdapter {
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) {
-    throw DioException.connectionError(
-      requestOptions: options,
-      reason: 'offline',
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-/// The live payload shape returned by
-/// getAnnouncements on kharis-church, seeded by seed-announcements.mjs.
-Map<String, dynamic> _announcementJson({
-  String id = 'welcome-new-app',
+Map<String, dynamic> _row({
+  String id = 'welcome',
   String title = 'Welcome to the new Kharis app',
-  String? expiresAt,
+  Map<String, dynamic> extra = const {},
 }) => {
   'id': id,
   'title': title,
-  'body': 'Announcements from your campus now appear here — stay tuned.',
-  'type': 'Announcement',
-  'branch': null,
-  'imageUrl': null,
-  'publishedAt': '2026-08-04T20:19:05.000Z',
-  'expiresAt': expiresAt,
+  'workspace': 'app',
+  'created_at': _past,
+  ...extra,
 };
 
-KharisApiAnnouncementRepository _repository(HttpClientAdapter adapter) =>
-    KharisApiAnnouncementRepository(
-      dio: Dio()..httpClientAdapter = adapter,
-      fallback: NewsRepository(firestore: FakeFirebaseFirestore()),
-    );
-
-Widget _homeHarness(
-  KharisApiAnnouncementRepository repository, {
-  String? branch,
-}) {
+Widget _homeHarness(SupabaseStub stub, {String? branch}) {
   return ProviderScope(
     overrides: [
-      announcementApiRepositoryProvider.overrideWithValue(repository),
+      newsRepositoryProvider.overrideWithValue(NewsRepository(api: stub.api())),
       currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
     ],
     child: const MaterialApp(home: Scaffold(body: AnnouncementsCarousel())),
   );
 }
 
-/// [currentBranchProvider]'s emission (and the Firestore fallback stream)
-/// land on microtasks that schedule no frame while `pumpAndSettle` is
-/// polling; the extra pump picks them up, the final settle renders the
-/// resulting fetch.
 Future<void> _settle(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.pump(const Duration(milliseconds: 100));
@@ -124,106 +49,171 @@ Future<void> _settle(WidgetTester tester) async {
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  test(
-    'repository maps the live getAnnouncements JSON onto NewsItem',
-    () async {
-      final repo = _repository(
-        _StubAdapter([
-          _announcementJson(expiresAt: '2036-01-01T00:00:00.000Z'),
-        ]),
-      );
+  group('NewsRepository mapping', () {
+    test('only Mobile App and General announcements reach the app', () {
+      final live = NewsRepository.liveFor([
+        _row(id: 'app'),
+        _row(id: 'general', extra: {'workspace': 'general'}),
+        _row(id: 'kharis', extra: {'workspace': 'kharis'}),
+        _row(id: 'kp2', extra: {'workspace': 'kp2'}),
+        _row(id: 'none', extra: {'workspace': null}),
+      ], branch: null);
+      expect(live.map((n) => n.id), unorderedEquals(['app', 'general']));
+    });
 
-      final items = await repo.getAnnouncements();
+    test('reads every known column name and filters bad image URLs', () {
+      final item = NewsRepository.fromRow(
+        _row(
+          extra: {
+            'content': 'Body text',
+            'image_url': 'assets/design/city-brighton.jpg',
+            'branch_name': ' ',
+            'expires_at': _future,
+            'status': 'published',
+            'link_url': 'https://kharis.org/x',
+            'cta_label': 'Read',
+          },
+        ),
+      )!;
 
-      final item = items.single;
-      expect(item.id, 'welcome-new-app');
-      expect(item.title, 'Welcome to the new Kharis app');
-      expect(item.type, 'Announcement');
-      expect(item.branch, isNull);
-      expect(item.publishedAt.toUtc().year, 2026);
+      expect(item.id, 'welcome');
+      expect(item.body, 'Body text');
+      expect(item.imageUrl, isNull, reason: 'app paths are not usable');
+      expect(item.branch, isNull, reason: 'blank is all branches');
       expect(item.expiresAt?.toUtc().year, 2036);
-      expect(item.isExpired, isFalse);
-    },
-  );
+      expect(item.publishedAt.toUtc(), DateTime.utc(2026, 8, 4));
+      expect(item.linkUrl, 'https://kharis.org/x');
+      expect(item.ctaLabel, 'Read');
+      expect(item.type, 'Announcement');
+    });
 
-  testWidgets('seeded announcements render on the homepage carousel', (
+    test('keeps https images and drops localhost ones', () {
+      expect(
+        NewsRepository.fromRow(
+          _row(extra: {'image_url': 'https://cdn.kharis.org/a.jpg'}),
+        )!.imageUrl,
+        'https://cdn.kharis.org/a.jpg',
+      );
+      expect(
+        NewsRepository.fromRow(
+          _row(extra: {'image_url': 'http://localhost:3002/a.jpg'}),
+        )!.imageUrl,
+        isNull,
+      );
+    });
+
+    test(
+      'drafts, rows without a title, scheduled and expired are not live',
+      () {
+        final items = NewsRepository.liveFor([
+          _row(id: 'ok'),
+          _row(id: 'draft', extra: {'status': 'draft'}),
+          {'id': 'untitled', 'created_at': _past},
+          _row(id: 'scheduled', extra: {'published_at': _future}),
+          _row(id: 'expired', extra: {'expires_at': _past}),
+        ], branch: null);
+
+        expect(items.map((n) => n.id), ['ok']);
+      },
+    );
+
+    test('branch scoping: own branch plus all branches', () {
+      final rows = [
+        _row(id: 'all'),
+        _row(id: 'london', extra: {'branch_name': 'London'}),
+        _row(id: 'leeds', extra: {'branch_name': 'Leeds'}),
+      ];
+
+      expect(
+        NewsRepository.liveFor(rows, branch: 'London').map((n) => n.id),
+        unorderedEquals(['all', 'london']),
+      );
+      expect(NewsRepository.liveFor(rows, branch: null), hasLength(3));
+    });
+
+    test('an empty table is an empty list', () async {
+      final repo = NewsRepository(api: SupabaseStub({'news': []}).api());
+      expect(await repo.getAnnouncements(), isEmpty);
+    });
+
+    test('offline serves the copy saved by the last good fetch', () async {
+      final stub = SupabaseStub({
+        'news': [_row()],
+      });
+      final repo = NewsRepository(api: stub.api(cache: FakeCacheService()));
+      final cache = FakeCacheService();
+      final cached = NewsRepository(api: stub.api(cache: cache));
+      await cached.getAnnouncements();
+
+      stub.offline = true;
+
+      expect(
+        (await cached.getAnnouncements()).single.title,
+        'Welcome to the new Kharis app',
+      );
+      await expectLater(repo.getAnnouncements(), throwsA(anything));
+    });
+  });
+
+  testWidgets('Studio announcements render on the homepage carousel', (
     tester,
   ) async {
-    final adapter = _StubAdapter([
-      _announcementJson(),
-      _announcementJson(
-        id: 'messages-on-the-go',
-        title: 'Listen to messages on the go',
-      ),
-    ]);
-    await tester.pumpWidget(_homeHarness(_repository(adapter)));
+    final stub = SupabaseStub({
+      'news': [
+        _row(),
+        _row(id: 'go', title: 'Listen to messages on the go'),
+        _row(
+          id: 'old',
+          title: 'Old expired notice',
+          extra: {'expires_at': _past},
+        ),
+      ],
+    });
+    await tester.pumpWidget(_homeHarness(stub));
     await _settle(tester);
 
     expect(find.text('Welcome to the new Kharis app'), findsOneWidget);
     expect(find.text('Listen to messages on the go'), findsOneWidget);
-    expect(find.textContaining('No announcements'), findsNothing);
-  });
-
-  testWidgets('expired announcements never reach the carousel', (tester) async {
-    final adapter = _StubAdapter([
-      _announcementJson(),
-      _announcementJson(
-        id: 'lapsed',
-        title: 'Old expired notice',
-        expiresAt: '2020-01-01T00:00:00.000Z',
-      ),
-    ]);
-    await tester.pumpWidget(_homeHarness(_repository(adapter)));
-    await _settle(tester);
-
-    expect(find.text('Welcome to the new Kharis app'), findsOneWidget);
     expect(find.text('Old expired notice'), findsNothing);
+    expect(
+      stub.requests.single.headers['apikey'],
+      isNotEmpty,
+      reason: 'Supabase needs the publishable key',
+    );
   });
 
-  testWidgets('member branch is forwarded to the API for server-side scoping', (
+  testWidgets('another branch\'s announcement stays off the carousel', (
     tester,
   ) async {
-    final adapter = _StubAdapter([_announcementJson()]);
-    await tester.pumpWidget(
-      _homeHarness(_repository(adapter), branch: 'london-hq'),
-    );
-    await _settle(tester);
-
-    expect(
-      adapter.requests.last.queryParameters['branch'],
-      'london-hq',
-      reason: 'scoping is server-side: the app must not re-filter by branch',
-    );
-    expect(find.text('Welcome to the new Kharis app'), findsOneWidget);
-  });
-
-  // Plain test zone: watchNews's stream never delivers under flutter_test's
-  // FakeAsync zone, so the offline path is proven at the repository boundary.
-  // The carousel rendering of repository output is covered by the widget
-  // tests above — together they cover API-down → fallback → homepage.
-  test('API down → repository serves the Firestore fallback', () async {
-    final firestore = FakeFirebaseFirestore();
-    await firestore.collection('news').doc('welcome-new-app').set({
-      'title': 'Welcome to the new Kharis app',
-      'body': 'Announcements from your campus now appear here — stay tuned.',
-      'type': 'Announcement',
-      'publishedAt': Timestamp.fromDate(DateTime.utc(2026, 8, 4)),
+    final stub = SupabaseStub({
+      'news': [
+        _row(
+          id: 'mine',
+          title: 'London notice',
+          extra: {'branch_name': 'London'},
+        ),
+        _row(
+          id: 'theirs',
+          title: 'Leeds notice',
+          extra: {'branch_name': 'Leeds'},
+        ),
+      ],
     });
-    final repo = KharisApiAnnouncementRepository(
-      dio: Dio()..httpClientAdapter = _OfflineAdapter(),
-      fallback: NewsRepository(firestore: firestore),
-    );
-
-    final items = await repo.getAnnouncements();
-
-    expect(items.single.title, 'Welcome to the new Kharis app');
-    expect(items.single.isExpired, isFalse);
-  });
-
-  testWidgets('empty feed shows the quiet empty state', (tester) async {
-    await tester.pumpWidget(_homeHarness(_repository(_StubAdapter([]))));
+    await tester.pumpWidget(_homeHarness(stub, branch: 'London'));
     await _settle(tester);
 
-    expect(find.textContaining('No announcements'), findsOneWidget);
+    expect(find.text('London notice'), findsOneWidget);
+    expect(find.text('Leeds notice'), findsNothing);
+  });
+
+  testWidgets('empty table renders nothing (Home hides the block)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_homeHarness(SupabaseStub({'news': []})));
+    await _settle(tester);
+
+    expect(find.textContaining('No announcements'), findsNothing);
+    expect(find.byKey(const Key('announcements-skeleton')), findsNothing);
+    expect(find.byType(ListView), findsNothing);
   });
 }

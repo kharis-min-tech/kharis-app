@@ -1,26 +1,22 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 
-/// A branch row (design-handoff v3): a rounded city-landmark thumbnail, the
-/// branch name and region, and a gold **HQ** badge for the headquarters (warm
-/// tint). Tapping the row selects and proceeds.
+/// A branch row: the branch name and region, and a gold **HQ** badge for the
+/// headquarters (warm tint). Tapping the row selects and proceeds. No photo:
+/// most branches share one placeholder image in the Content Studio, so a
+/// thumbnail only repeated the same picture down the list.
 class BranchTile extends StatelessWidget {
   const BranchTile({
     super.key,
     required this.name,
     required this.region,
-    required this.gradientColors,
     required this.onTap,
-    this.imageUrl,
     this.isHq = false,
   });
 
   final String name;
   final String region;
-  final List<Color> gradientColors;
   final VoidCallback onTap;
-  final String? imageUrl;
   final bool isHq;
 
   @override
@@ -46,8 +42,6 @@ class BranchTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _Thumb(imageUrl: imageUrl, gradientColors: gradientColors),
-              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,47 +90,6 @@ class BranchTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Thumb extends StatelessWidget {
-  const _Thumb({required this.imageUrl, required this.gradientColors});
-
-  final String? imageUrl;
-  final List<Color> gradientColors;
-
-  @override
-  Widget build(BuildContext context) {
-    final gradient = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradientColors,
-        ),
-      ),
-    );
-    return ClipRRect(
-      borderRadius: AppRadius.tileBorder,
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: (imageUrl == null || imageUrl!.isEmpty)
-            ? gradient
-            : imageUrl!.startsWith('assets/')
-            ? Image.asset(
-                imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => gradient,
-              )
-            : CachedNetworkImage(
-                imageUrl: imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => gradient,
-                errorWidget: (_, _, _) => gradient,
-              ),
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
+import 'package:kharis_app/features/notes/data/notepad.dart' show noteMoments;
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart'
     show NoteTimelineBinding;
 import 'package:kharis_app/features/player/data/audio_player_service.dart';
@@ -89,8 +90,8 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
   static bool debugDisableVideoEngine = false;
 
   /// Stands in for the video engine's note binding while
-  /// [debugDisableVideoEngine] is on, so tests can prove note capture and
-  /// anchor seeks route to the video engine. Its position stream also feeds
+  /// [debugDisableVideoEngine] is on, so tests can prove timestamp inserts
+  /// and timestamp seeks route to the video engine. Its position stream also feeds
   /// the screen's video position persistence.
   @visibleForTesting
   static NoteTimelineBinding? debugVideoNoteBinding;
@@ -221,20 +222,19 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   /// An audio-timeline position mapped onto the running video's timeline.
   Duration _toVideo(Duration audio) => audio + _videoOffset;
 
-  /// This message's anchored notes as seek-bar pins, on the timeline of the
-  /// engine on screen. Notes live on the AUDIO timeline (one per message), so
-  /// video mode shifts them by the same offset the handoff and the notes
-  /// binding use. General notes carry no position and pin nothing. Watching
-  /// the notes keeps the pins live as the notes sheet adds or deletes one.
+  /// Every moment marked in this message's notes as seek-bar pins — each
+  /// `[m:ss]` stamp in its notepad, and the position of any older
+  /// one-note-per-moment note — on the timeline of the engine on screen.
+  /// Notes live on the AUDIO timeline (one per message), so video mode shifts
+  /// them by the same offset the handoff and the notes binding use. Watching
+  /// the notes keeps the pins live as the notepad saves.
   List<Duration> _notePins() {
     final notes = ref.watch(sermonNotesProvider(NoteTimelineKey.of(_sermon)));
     final isVideo = _mode == MediaMode.video;
     return [
       for (final note in notes)
-        if (note.positionMs case final ms?)
-          isVideo
-              ? _toVideo(Duration(milliseconds: ms))
-              : Duration(milliseconds: ms),
+        for (final moment in noteMoments(note))
+          isVideo ? _toVideo(moment) : moment,
     ];
   }
 
@@ -407,7 +407,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         // Forget the last tick too: later saves (dispose, switch, skip) must
         // not write the finished point back over the cleared one.
         _videoPosition = Duration.zero;
-        _history.clearPosition(_sermon);
+        _history.markFinished(_sermon);
         if (_audio.repeatOne) {
           final controller = _youtubeController;
           if (controller != null) {
@@ -581,19 +581,19 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   /// the sheet's own audio-service default is already the audio engine.
   ///
   /// Video mode must pass a binding: the audio source is fully stopped here,
-  /// so without one a note would be written unstamped and an anchor tap would
+  /// so without one Insert would have no position and a timestamp tap would
   /// wake audio playback underneath the video.
   ///
-  /// Notes share the audio timeline (one timeline per message), so the
-  /// binding stamps `video - videoStart` and seeks to `anchor + videoStart`.
+  /// Notes share the audio timeline (one notepad per message), so the
+  /// binding stamps `video - videoStart` and seeks to `stamp + videoStart`.
   NoteTimelineBinding? _videoNoteBinding() {
     if (_mode != MediaMode.video) return null;
     final NoteTimelineBinding? engine;
     if (MediaPlayerScreen.debugDisableVideoEngine) {
       engine = MediaPlayerScreen.debugVideoNoteBinding;
     } else if (kIsWeb) {
-      // The iframe embed has no JS bridge: no live position (notes are
-      // written unstamped), and a seek recreates the embed at the anchor via
+      // The iframe embed has no JS bridge: no live position (Insert is
+      // unavailable), and a seek recreates the embed at the stamp via
       // the keyed start parameter.
       engine = NoteTimelineBinding(
         seek: (target) async {
@@ -627,7 +627,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   /// PLAYING — the iframe clears its update interval on every other state —
   /// and, as a broadcast stream, never replays to a new subscriber. A sheet
   /// opened over a PAUSED video (the natural note-taking moment) would
-  /// therefore never see a position and the note would be saved unstamped.
+  /// therefore never see a position and Insert would stay unavailable.
   /// Seed the stream with a one-shot `currentTime` query so the paused case
   /// is covered, then follow the live ticks.
   Stream<Duration> _videoNotePositions(
@@ -637,8 +637,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       final seconds = await controller.currentTime;
       yield Duration(milliseconds: (seconds * 1000).round());
     } catch (_) {
-      // Bridge gone / not ready: fall through to the live stream so the
-      // button degrades to the unstamped "Add a note", as before.
+      // Bridge gone / not ready: fall through to the live stream; Insert
+      // waits for the first tick.
     }
     yield* controller.videoStateStream.map((state) => state.position);
   }
@@ -694,7 +694,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                 child: _buildVideoSurface(),
               ),
             Expanded(
+              // Clamping: the page only scrolls when it truly overflows (small
+              // screens) and never rubber-bands the artwork (tester feedback).
               child: SingleChildScrollView(
+                key: const Key('player-scroll'),
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -745,7 +749,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   Widget _buildVideoSurface() {
     final Widget player;
     if (kIsWeb) {
-      // Keyed on the start position: a note-anchor seek bumps
+      // Keyed on the start position: a timestamp seek bumps
       // _webStartSeconds, and the fresh key rebuilds the iframe at that
       // moment — the embed has no JS bridge to seek in place.
       player = YoutubeWebEmbed(
@@ -1142,6 +1146,9 @@ class _VideoTransport extends StatelessWidget {
                     onToggleRepeat: onToggleRepeat,
                     onPrevious: skips.previous,
                     onNext: skips.next,
+                    onSeekBy: (offset) => _seek(
+                      PlayerControls.skipTarget(position, offset, duration),
+                    ),
                   ),
                 ),
               ],

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/services/firebase_service.dart';
@@ -92,8 +93,8 @@ final notificationPermissionGateProvider = Provider<void>((ref) {
 });
 
 /// The follow-up to an answered OS permission prompt, shared by
-/// [notificationPermissionGateProvider] and the Notification settings
-/// screen's "Allow notifications".
+/// [notificationPermissionGateProvider] and the "Turn on notifications" card
+/// (notifications inbox and Notification settings).
 ///
 /// Read it BEFORE showing the prompt and call it with the answer: it runs on
 /// this provider's own `ref`, so it still works after the screen that asked
@@ -131,8 +132,7 @@ final notificationPermissionAnsweredProvider =
 // ── Preference enforcement ────────────────────────────────────────────────────
 
 /// Keeps this device's preference-gated FCM topics in step with the user's
-/// saved notification preferences, and the staff test topic in step with
-/// Studio access.
+/// saved notification preferences.
 ///
 /// Without this the toggles in Notification settings would only ever write to
 /// Firestore. Watched by `KharisApp` so it applies on launch and on every
@@ -147,36 +147,57 @@ final notificationTopicSyncProvider = Provider<void>((ref) {
     final prefs = next.valueOrNull;
     if (prefs != null) service.applyPreferences(prefs);
   }, fireImmediately: true);
-  // Studio test pushes reach staff devices only: subscribe once the scope
-  // says this user may use Studio, unsubscribe when that stops (role removed,
-  // signed out). Null while the scope loads, which changes nothing.
-  ref.listen<bool?>(
-    adminScopeProvider.select((scope) => scope.valueOrNull?.canUseStudio),
-    (previous, next) {
-      if (next == null || next == previous) return;
-      service.syncStudioTestTopic(canUseStudio: next);
-    },
-    fireImmediately: true,
-  );
 });
 
 // ── Permission ────────────────────────────────────────────────────────────────
 
-/// Whether the user has granted notification permission.
+/// What the OS currently lets the app do with notifications.
 ///
 /// Queries the current [AuthorizationStatus] without re-requesting. Until
 /// [notificationPermissionGateProvider] opens nothing has asked yet, so this
-/// reads `false`; the
-/// Notification settings screen offers its own "Allow notifications" action.
-/// Returns `false` when Firebase is disabled ([kUseFirebase] == false) or
-/// when permission is denied/undetermined.
-final notificationPermissionProvider = FutureProvider<bool>((ref) async {
-  if (!kUseFirebase) return false;
+/// reads [NotificationPermission.askable]; the notifications inbox and the
+/// Notification settings screen offer their own "Turn on notifications"
+/// (`NotificationPermissionCard`). [NotificationPermission.unavailable] when
+/// Firebase is disabled ([kUseFirebase] == false) or the query fails.
+final notificationPermissionProvider = FutureProvider<NotificationPermission>((
+  ref,
+) async {
+  if (!kUseFirebase) return NotificationPermission.unavailable;
   try {
     final settings = await FirebaseMessaging.instance.getNotificationSettings();
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+    return notificationPermissionFor(
+      settings.authorizationStatus,
+      defaultTargetPlatform,
+    );
   } catch (_) {
-    return false;
+    return NotificationPermission.unavailable;
   }
 });
+
+const _kPromptDeclinedKey = 'notification_prompt_declined';
+
+/// Whether the member answered "Not now" to the inbox's "Turn on
+/// notifications" card. Remembered on this device so the inbox never asks
+/// again; Notification settings keeps its own notice for when they change
+/// their mind.
+class NotificationPromptDeclinedController extends StateNotifier<bool> {
+  NotificationPromptDeclinedController(this._ref)
+    : super(
+        _ref.read(sharedPreferencesProvider).getBool(_kPromptDeclinedKey) ??
+            false,
+      );
+
+  final Ref _ref;
+
+  Future<void> decline() async {
+    state = true;
+    await _ref
+        .read(sharedPreferencesProvider)
+        .setBool(_kPromptDeclinedKey, true);
+  }
+}
+
+final notificationPromptDeclinedProvider =
+    StateNotifierProvider<NotificationPromptDeclinedController, bool>(
+      NotificationPromptDeclinedController.new,
+    );

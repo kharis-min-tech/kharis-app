@@ -95,12 +95,15 @@ jobs:
         run: |
           # With GOOGLE_APPLICATION_CREDENTIALS set, firebase-tools picks the
           # service account up automatically and --token is unnecessary.
+          # --force lets a non-interactive deploy delete functions that are no
+          # longer exported (e.g. the retired Studio's onNotificationWritten,
+          # sendDueNotifications and searchYouTube) instead of failing.
           if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
             npx firebase-tools deploy --only functions,firestore \
-              --project kharis-app-47c49 --non-interactive
+              --project kharis-app-47c49 --non-interactive --force
           else
             npx firebase-tools deploy --only functions,firestore \
-              --project kharis-app-47c49 --token "$FIREBASE_TOKEN" --non-interactive
+              --project kharis-app-47c49 --token "$FIREBASE_TOKEN" --non-interactive --force
           fi
 
       - name: Scrub credentials

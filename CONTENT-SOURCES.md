@@ -37,6 +37,13 @@
 - **URL:** [open.spotify.com/show/6EfmpLAHngHDBsLjrQwnS7](https://open.spotify.com/show/6EfmpLAHngHDBsLjrQwnS7)
 - **Note:** Read-only source. Can link to Spotify but cannot play inline without Spotify SDK.
 
+### 4. YouVersion Platform (Bible text)
+- **API:** `https://api.youversion.com/v1`, header `x-yvp-app-key` (`YOUVERSION_API_KEY` dart-define, from `app/env.json`)
+- **Used by:** the in-app Bible reader (More > Bible, Home's Today's reading, `/reading`, `/bible`)
+- `/bibles` lists the licensed versions (NIV default; the member's choice is remembered on the device)
+- `/bibles/{id}/books` gives each version's books, chapters and verse counts (versions differ: NT-only, partial OT, deuterocanon); the bundled 66-book table in `app/lib/core/constants/bible_books.dart` is the offline fallback
+- `/bibles/{id}/passages/{BOOK.chapter}?format=html` gives chapter text; cached in memory per version, one retry on a dropped connection
+
 ---
 
 ## Backend API Requirements
@@ -95,6 +102,7 @@ Events / News ──→ [Admin Dashboard] ──→ Firestore ──→ App
 | Firebase | google-services.json / GoogleService-Info.plist | Firebase Console |
 | SoundCloud | None needed (RSS is public) | — |
 | FCM | Server key | Firebase Console |
+| YouVersion Platform | App key (`YOUVERSION_API_KEY`) | [platform.youversion.com](https://platform.youversion.com) |
 
 ---
 
