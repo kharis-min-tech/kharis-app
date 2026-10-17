@@ -172,7 +172,9 @@ List<Override> _baseOverrides({
   notificationPrefsProvider.overrideWith(
     (ref) => Stream.value(const <String, bool>{}),
   ),
-  notificationPermissionProvider.overrideWith((ref) async => true),
+  notificationPermissionProvider.overrideWith(
+    (ref) async => NotificationPermission.granted,
+  ),
   if (auth != null) authRepositoryProvider.overrideWithValue(auth),
 ];
 

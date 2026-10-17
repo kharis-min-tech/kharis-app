@@ -4,13 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
+import 'package:kharis_app/features/settings/presentation/screens/notifications_settings_screen.dart';
 import 'package:kharis_app/shared/providers/dismissed_notifications_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
+import 'package:kharis_app/shared/providers/notification_provider.dart';
+import 'package:kharis_app/shared/widgets/notification_permission_card.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 /// What a feed row came from. Carries its own iconography and eyebrow label so
@@ -182,6 +186,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             events: eventsAsync.valueOrNull ?? const [],
             dismissed: dismissed,
           );
+    // An empty inbox on a device that blocks pushes reads as "nothing will
+    // ever come", so say what the member would get and how to turn it on,
+    // until they turn it on or say "Not now".
+    final permission = widget.announcementsOnly
+        ? null
+        : ref.watch(notificationPermissionProvider).valueOrNull;
+    final offerPermission =
+        (permission == NotificationPermission.askable ||
+            permission == NotificationPermission.blocked) &&
+        !ref.watch(notificationPromptDeclinedProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -211,20 +225,58 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 ),
               ),
             ),
+          if (!widget.announcementsOnly)
+            IconButton(
+              tooltip: 'Notification settings',
+              icon: Icon(Icons.tune_rounded, color: context.kc.onBg),
+              onPressed: _openPreferences,
+            ),
         ],
       ),
-      body: loading
-          ? const _FeedSkeleton()
-          : RefreshIndicator(
-              color: context.kc.accentInk,
-              backgroundColor: context.kc.surface,
-              onRefresh: () => refreshCampusContent(ref),
-              child: _body(
-                failed: failed,
-                items: items,
-                hasDismissed: dismissed.isNotEmpty,
+      body: Column(
+        children: [
+          if (offerPermission)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: NotificationPermissionCard(
+                permission: permission!,
+                message:
+                    'Get a reminder before your branch\u2019s service, '
+                    'event updates, the daily Bible reading and church '
+                    'announcements. You choose which ones.',
+                onPreferences: _openPreferences,
+                onNotNow: () => ref
+                    .read(notificationPromptDeclinedProvider.notifier)
+                    .decline(),
               ),
             ),
+          Expanded(
+            child: loading
+                ? const _FeedSkeleton()
+                : RefreshIndicator(
+                    color: context.kc.accentInk,
+                    backgroundColor: context.kc.surface,
+                    onRefresh: () => refreshCampusContent(ref),
+                    child: _body(
+                      failed: failed,
+                      items: items,
+                      hasDismissed: dismissed.isNotEmpty,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Notification preferences: what this member can choose to receive.
+  void _openPreferences() {
+    unawaited(
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const NotificationsSettingsScreen(),
+        ),
+      ),
     );
   }
 
