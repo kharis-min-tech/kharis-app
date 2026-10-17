@@ -164,6 +164,43 @@ void main() {
       expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
     });
 
+    testWidgets('the sheet\'s My notes row closes it and opens the notes', (
+      tester,
+    ) async {
+      final db = await seededDb();
+      final container = ProviderContainer(overrides: overridesFor(db));
+      addTearDown(container.dispose);
+      var opened = 0;
+      await tester.runAsync(() => container.read(currentUserProvider.future));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showAddToPlaylistSheet(
+                    context,
+                    sermonId: 's1',
+                    sermonTitle: 'Message 1',
+                    onOpenNotes: () => opened++,
+                  ),
+                  child: const Text('more'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('more'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('My notes'));
+      await tester.pumpAndSettle();
+
+      expect(opened, 1);
+      expect(find.text('Add to playlist'), findsNothing);
+    });
+
     testWidgets('Playlists pins a distinct Favorites tile above the grid, '
         'which lists only real playlists, and the tile opens /favorites', (
       tester,
