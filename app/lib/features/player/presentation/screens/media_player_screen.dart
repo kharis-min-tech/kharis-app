@@ -694,7 +694,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                 child: _buildVideoSurface(),
               ),
             Expanded(
+              // Clamping: the page only scrolls when it truly overflows (small
+              // screens) and never rubber-bands the artwork (tester feedback).
               child: SingleChildScrollView(
+                key: const Key('player-scroll'),
+                physics: const ClampingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

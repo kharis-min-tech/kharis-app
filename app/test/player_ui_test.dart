@@ -243,6 +243,16 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('the page clamps: no rubber-band under the artwork', (
+      tester,
+    ) async {
+      await open(tester, MediaMode.audio);
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.byKey(const Key('player-scroll')),
+      );
+      expect(scroll.physics, isA<ClampingScrollPhysics>());
+    });
+
     testWidgets('audio -> video starts the video at the live audio position', (
       tester,
     ) async {
