@@ -23,23 +23,56 @@ class MessagesScreen extends ConsumerStatefulWidget {
 
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   final _listHeaderKey = GlobalKey();
+  final _scrollCtrl = ScrollController();
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
+  bool _showBackToTop = false;
 
   static final _count = NumberFormat.decimalPattern();
+
+  /// "Back to top" appears once the member is well down the archive and
+  /// hides again near the top; the gap between the two stops it flickering.
+  static const _backToTopShowAt = 1400.0;
+  static const _backToTopHideAt = 700.0;
 
   @override
   void initState() {
     super.initState();
     // Recent searches show while the empty field is focused.
     _searchFocus.addListener(() => setState(() {}));
+    _scrollCtrl.addListener(_updateBackToTop);
+    // A restored scroll offset (tab switch) fires no scroll event.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateBackToTop());
   }
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _updateBackToTop() {
+    if (!mounted || !_scrollCtrl.hasClients) return;
+    final offset = _scrollCtrl.offset;
+    final show = _showBackToTop
+        ? offset > _backToTopHideAt
+        : offset > _backToTopShowAt;
+    if (show != _showBackToTop) setState(() => _showBackToTop = show);
+  }
+
+  void _scrollToTop() {
+    if (!_scrollCtrl.hasClients) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scrollCtrl.jumpTo(0);
+    } else {
+      _scrollCtrl.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _scrollToList() {
@@ -155,546 +188,648 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final libraryNotifier = ref.read(sermonLibraryProvider.notifier);
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: NotificationListener<ScrollNotification>(
-          // Near the bottom: pull the next archive page, or the next page of
-          // server search hits. Both self-guard against repeats.
-          onNotification: (n) {
-            if (n.metrics.axis != Axis.vertical) return false;
-            if (n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
-              if (isSearching) {
-                ref.read(remoteSearchProvider.notifier).loadMore();
-              } else {
-                libraryNotifier.loadMore();
-              }
-            }
-            return false;
-          },
-          child: RefreshIndicator(
-            color: context.kc.accentInk,
-            onRefresh: libraryNotifier.refresh,
-            child: CustomScrollView(
-              // Retain scroll offset across tab switches and rebuilds.
-              key: const PageStorageKey<String>('messages-scroll'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                // ── 1. Header + Search ─────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Messages',
-                          style: AppTypography.display(
-                            size: 30,
-                            weight: FontWeight.w700,
-                            height: 1.0,
-                            color: context.kc.onBg,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Sermons and teaching from Kharis Church',
-                          style: AppTypography.bodySm.copyWith(
-                            fontSize: 13,
-                            color: context.kc.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _SearchBar(
-                          controller: _searchCtrl,
-                          focusNode: _searchFocus,
-                          onChanged: (v) =>
-                              ref.read(sermonSearchProvider.notifier).state = v,
-                          onSubmitted: (v) =>
-                              ref.read(recentSearchesProvider.notifier).add(v),
-                          onCleared: () => _setQuery(''),
-                        ),
-                        if (library.offline) ...[
-                          const SizedBox(height: 12),
-                          _OfflineBanner(
-                            empty: library.sermons.isEmpty,
-                            onRetry: libraryNotifier.refresh,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-                // ── Recent searches (focused, empty field) ─────────────────
-                if (showRecents)
-                  SliverToBoxAdapter(
-                    child: _RecentSearches(
-                      searches: recentSearches,
-                      onSelect: _setQuery,
-                      onRemove: (q) =>
-                          ref.read(recentSearchesProvider.notifier).remove(q),
-                      onClear: () =>
-                          ref.read(recentSearchesProvider.notifier).clear(),
-                    ),
-                  ),
-
-                // ── Search results (when searching) ────────────────────────
-                if (isSearching) ...[
-                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                  // The count line is dropped for zero results: the empty
-                  // state below already says "No messages match".
-                  if (searchLoading || searchResults.isNotEmpty)
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: NotificationListener<ScrollNotification>(
+              // Near the bottom: pull the next archive page, or the next page of
+              // server search hits. Both self-guard against repeats.
+              onNotification: (n) {
+                if (n.metrics.axis != Axis.vertical) return false;
+                if (n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
+                  if (isSearching) {
+                    ref.read(remoteSearchProvider.notifier).loadMore();
+                  } else {
+                    libraryNotifier.loadMore();
+                  }
+                }
+                return false;
+              },
+              child: RefreshIndicator(
+                color: context.kc.accentInk,
+                onRefresh: libraryNotifier.refresh,
+                child: CustomScrollView(
+                  controller: _scrollCtrl,
+                  // Retain scroll offset across tab switches and rebuilds.
+                  key: const PageStorageKey<String>('messages-scroll'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // ── 1. Header + Search ─────────────────────────────────────
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                searchLoading && searchResults.isEmpty
-                                    ? 'Searching the archive for "${searchQuery.trim()}"'
-                                    : '${_count.format(searchResults.length)} result${searchResults.length == 1 ? '' : 's'} for "${searchQuery.trim()}"',
-                                style: AppTypography.bodySm.copyWith(
-                                  color: context.kc.muted,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            if (searchLoading && searchResults.isNotEmpty)
-                              const _SmallSpinner(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  if (searchResults.isEmpty && searchLoading)
-                    const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.only(top: 48),
-                        child: Center(child: _SmallSpinner(size: 26)),
-                      ),
-                    )
-                  else if (searchResults.isEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(32, 60, 32, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.search_off_rounded,
-                              size: 32,
-                              color: context.kc.muted,
-                            ),
-                            const SizedBox(height: 10),
                             Text(
-                              'No messages match "${searchQuery.trim()}"',
-                              textAlign: TextAlign.center,
-                              style: AppTypography.bodyLg.copyWith(
+                              'Messages',
+                              style: AppTypography.display(
+                                size: 30,
+                                weight: FontWeight.w700,
+                                height: 1.0,
                                 color: context.kc.onBg,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Try a title, a speaker or a series name.',
-                              textAlign: TextAlign.center,
+                              'Sermons and teaching from Kharis Church',
                               style: AppTypography.bodySm.copyWith(
+                                fontSize: 13,
                                 color: context.kc.muted,
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            _SearchBar(
+                              controller: _searchCtrl,
+                              focusNode: _searchFocus,
+                              onChanged: (v) =>
+                                  ref
+                                          .read(sermonSearchProvider.notifier)
+                                          .state =
+                                      v,
+                              onSubmitted: (v) => ref
+                                  .read(recentSearchesProvider.notifier)
+                                  .add(v),
+                              onCleared: () => _setQuery(''),
+                            ),
+                            if (library.offline) ...[
+                              const SizedBox(height: 12),
+                              _OfflineBanner(
+                                empty: library.sermons.isEmpty,
+                                onRetry: libraryNotifier.refresh,
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                    )
-                  else ...[
-                    SliverList.builder(
-                      itemCount: searchResults.length,
-                      itemBuilder: (context, index) {
-                        final sermon = searchResults[index];
-                        return _sermonRow(
-                          sermon,
-                          index,
-                          currentId: currentSermon?.id,
-                          playing: playing,
-                          onTap: () => _playFromSearch(sermon, searchResults),
-                        );
-                      },
                     ),
-                    if (remoteSearch.isLoadingMore)
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(child: _SmallSpinner()),
+
+                    // ── Recent searches (focused, empty field) ─────────────────
+                    if (showRecents)
+                      SliverToBoxAdapter(
+                        child: _RecentSearches(
+                          searches: recentSearches,
+                          onSelect: _setQuery,
+                          onRemove: (q) => ref
+                              .read(recentSearchesProvider.notifier)
+                              .remove(q),
+                          onClear: () =>
+                              ref.read(recentSearchesProvider.notifier).clear(),
                         ),
                       ),
-                  ],
-                ]
-                // ── Normal browse mode ─────────────────────────────────────
-                else ...[
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-                  // ── 2. Featured hero carousel, or the latest messages ────
-                  if (featured.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _FeaturedCarousel(
-                        sermons: featured,
-                        currentSermonId: currentSermon?.id,
-                        isPlaying: playing,
-                        onPlay: (sermon) => startPlayback(
-                          context,
-                          ref,
-                          sermon,
-                          queue: featured,
-                        ),
-                      ),
-                    ),
-                  // Studio turned the carousel off: lead with what is new.
-                  if (latest.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      key: const ValueKey('messages-latest'),
-                      child: _SectionTitle('Latest messages'),
-                    ),
-                    SliverList.builder(
-                      itemCount: latest.length,
-                      itemBuilder: (context, index) {
-                        final sermon = latest[index];
-                        return _sermonRow(
-                          sermon,
-                          index,
-                          currentId: currentSermon?.id,
-                          playing: playing,
-                          onTap: () => startPlayback(
-                            context,
-                            ref,
-                            sermon,
-                            queue: latest,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-
-                  // ── 3. Recently played ───────────────────────────────────
-                  if (recentlyPlayed.isNotEmpty) ...[
-                    const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                    SliverToBoxAdapter(child: _SectionTitle('Recently played')),
-                    SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 160,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.marginMobile,
-                          ),
-                          scrollDirection: Axis.horizontal,
-                          itemCount: recentlyPlayed.length,
-                          itemBuilder: (context, index) {
-                            final sermon = recentlyPlayed[index];
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                right: index < recentlyPlayed.length - 1
-                                    ? 12
-                                    : 0,
-                              ),
-                              child: _RecentlyPlayedCard(
-                                sermon: sermon,
-                                isPlaying:
-                                    currentSermon?.id == sermon.id && playing,
-                                onTap: () => startPlayback(
-                                  context,
-                                  ref,
-                                  sermon,
-                                  queue: recentlyPlayed,
+                    // ── Search results (when searching) ────────────────────────
+                    if (isSearching) ...[
+                      const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                      // The count line is dropped for zero results: the empty
+                      // state below already says "No messages match".
+                      if (searchLoading || searchResults.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    searchLoading && searchResults.isEmpty
+                                        ? 'Searching the archive for "${searchQuery.trim()}"'
+                                        : '${_count.format(searchResults.length)} result${searchResults.length == 1 ? '' : 's'} for "${searchQuery.trim()}"',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: context.kc.muted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
+                                if (searchLoading && searchResults.isNotEmpty)
+                                  const _SmallSpinner(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (searchResults.isEmpty && searchLoading)
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 48),
+                            child: Center(child: _SmallSpinner(size: 26)),
+                          ),
+                        )
+                      else if (searchResults.isEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(32, 60, 32, 0),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.search_off_rounded,
+                                  size: 32,
+                                  color: context.kc.muted,
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'No messages match "${searchQuery.trim()}"',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.bodyLg.copyWith(
+                                    color: context.kc.onBg,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Try a title, a speaker or a series name.',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: context.kc.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else ...[
+                        SliverList.builder(
+                          itemCount: searchResults.length,
+                          itemBuilder: (context, index) {
+                            final sermon = searchResults[index];
+                            return _sermonRow(
+                              sermon,
+                              index,
+                              currentId: currentSermon?.id,
+                              playing: playing,
+                              onTap: () =>
+                                  _playFromSearch(sermon, searchResults),
+                            );
+                          },
+                        ),
+                        if (remoteSearch.isLoadingMore)
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24),
+                              child: Center(child: _SmallSpinner()),
+                            ),
+                          ),
+                      ],
+                    ]
+                    // ── Normal browse mode ─────────────────────────────────────
+                    else ...[
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+                      // ── 2. Featured hero carousel, or the latest messages ────
+                      if (featured.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: _FeaturedCarousel(
+                            sermons: featured,
+                            currentSermonId: currentSermon?.id,
+                            isPlaying: playing,
+                            onPlay: (sermon) => startPlayback(
+                              context,
+                              ref,
+                              sermon,
+                              queue: featured,
+                            ),
+                          ),
+                        ),
+                      // Studio turned the carousel off: lead with what is new.
+                      if (latest.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          key: const ValueKey('messages-latest'),
+                          child: _SectionTitle('Latest messages'),
+                        ),
+                        SliverList.builder(
+                          itemCount: latest.length,
+                          itemBuilder: (context, index) {
+                            final sermon = latest[index];
+                            return _sermonRow(
+                              sermon,
+                              index,
+                              currentId: currentSermon?.id,
+                              playing: playing,
+                              onTap: () => startPlayback(
+                                context,
+                                ref,
+                                sermon,
+                                queue: latest,
                               ),
                             );
                           },
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
 
-                  // ── 4. Topics ────────────────────────────────────────────
-                  const SliverToBoxAdapter(child: SizedBox(height: 18)),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 14, 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Browse by topic',
-                              style: AppTypography.bodyLg.copyWith(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: context.kc.onBg,
-                                letterSpacing: -0.18,
+                      // ── 3. Recently played ───────────────────────────────────
+                      if (recentlyPlayed.isNotEmpty) ...[
+                        const SliverToBoxAdapter(child: SizedBox(height: 28)),
+                        SliverToBoxAdapter(
+                          child: _SectionTitle('Recently played'),
+                        ),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: 160,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.marginMobile,
                               ),
-                            ),
-                          ),
-                          _HeaderLink(
-                            label: 'Playlists',
-                            color: context.kc.accentInk,
-                            weight: FontWeight.w700,
-                            // Root-navigator route: overlays the shell with
-                            // its own back affordance.
-                            onTap: () => context.push('/playlists'),
-                          ),
-                          const SizedBox(width: 4),
-                          _HeaderLink(
-                            label: 'See all',
-                            color: context.kc.muted,
-                            weight: FontWeight.w600,
-                            onTap: () {
-                              ref
-                                      .read(selectedCategoryProvider.notifier)
-                                      .state =
-                                  'All';
-                              _scrollToList();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (categories.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _PillRow(
-                        spacing: 12,
-                        children: [
-                          for (final cat in categories)
-                            _TopicCard(
-                              category: cat,
-                              count: categoryCounts[cat] ?? 0,
-                              active: selectedCategory == cat,
-                              onTap: () {
-                                ref
-                                    .read(selectedCategoryProvider.notifier)
-                                    .state = selectedCategory == cat
-                                    ? 'All'
-                                    : cat;
-                                _scrollToList();
+                              scrollDirection: Axis.horizontal,
+                              itemCount: recentlyPlayed.length,
+                              itemBuilder: (context, index) {
+                                final sermon = recentlyPlayed[index];
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    right: index < recentlyPlayed.length - 1
+                                        ? 12
+                                        : 0,
+                                  ),
+                                  child: _RecentlyPlayedCard(
+                                    sermon: sermon,
+                                    isPlaying:
+                                        currentSermon?.id == sermon.id &&
+                                        playing,
+                                    onTap: () => startPlayback(
+                                      context,
+                                      ref,
+                                      sermon,
+                                      queue: recentlyPlayed,
+                                    ),
+                                  ),
+                                );
                               },
                             ),
-                        ],
-                      ),
-                    ),
+                          ),
+                        ),
+                      ],
 
-                  // ── 4b. Series ───────────────────────────────────────────
-                  if (seriesList.isNotEmpty) ...[
-                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                    SliverToBoxAdapter(child: _SectionTitle('Series')),
-                    SliverToBoxAdapter(
-                      child: _PillRow(
-                        children: [
-                          for (final series in seriesList)
-                            _SortPill(
-                              label: '${series.name} (${series.count})',
-                              active: selectedSeries == series.name,
-                              onTap: () {
-                                ref
-                                    .read(selectedSeriesProvider.notifier)
-                                    .state = selectedSeries == series.name
-                                    ? null
-                                    : series.name;
-                                _scrollToList();
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // ── 5. "All Messages" + sort pills ───────────────────────
-                  const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      key: _listHeaderKey,
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                      // ── 4. Topics ────────────────────────────────────────────
+                      const SliverToBoxAdapter(child: SizedBox(height: 18)),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 14, 4),
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
                                 child: Text(
-                                  [
-                                    if (selectedSeries != null)
-                                      selectedSeries
-                                    else if (isFiltered)
-                                      selectedCategory
-                                    else
-                                      'All messages',
-                                    if (selectedYear != null) '$selectedYear',
-                                  ].join(' \u00b7 '),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  'Browse by topic',
                                   style: AppTypography.bodyLg.copyWith(
-                                    fontSize: 19,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.w800,
                                     color: context.kc.onBg,
                                     letterSpacing: -0.18,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              _SortPill(
-                                label: 'Newest',
-                                active: sort == SermonSort.newest,
-                                onTap: () =>
-                                    ref
-                                            .read(sermonSortProvider.notifier)
-                                            .state =
-                                        SermonSort.newest,
+                              _HeaderLink(
+                                label: 'Playlists',
+                                color: context.kc.accentInk,
+                                weight: FontWeight.w700,
+                                // Root-navigator route: overlays the shell with
+                                // its own back affordance.
+                                onTap: () => context.push('/playlists'),
                               ),
-                              const SizedBox(width: 8),
-                              _SortPill(
-                                label: 'Oldest',
-                                active: sort == SermonSort.oldest,
-                                onTap: () =>
-                                    ref
-                                            .read(sermonSortProvider.notifier)
-                                            .state =
-                                        SermonSort.oldest,
+                              const SizedBox(width: 4),
+                              _HeaderLink(
+                                label: 'See all',
+                                color: context.kc.muted,
+                                weight: FontWeight.w600,
+                                onTap: () {
+                                  ref
+                                          .read(
+                                            selectedCategoryProvider.notifier,
+                                          )
+                                          .state =
+                                      'All';
+                                  _scrollToList();
+                                },
                               ),
                             ],
                           ),
-                          if (isFiltered || selectedSeries != null) ...[
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                if (isFiltered)
-                                  _FilterChip(
-                                    label: selectedCategory,
-                                    count: sermons.length,
-                                    onClear: () =>
-                                        ref
-                                                .read(
-                                                  selectedCategoryProvider
-                                                      .notifier,
-                                                )
-                                                .state =
-                                            'All',
-                                  ),
-                                if (selectedSeries != null)
-                                  _FilterChip(
-                                    label: selectedSeries,
-                                    count: sermons.length,
-                                    onClear: () =>
-                                        ref
-                                                .read(
-                                                  selectedSeriesProvider
-                                                      .notifier,
-                                                )
-                                                .state =
-                                            null,
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                      if (categories.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: _PillRow(
+                            spacing: 12,
+                            children: [
+                              for (final cat in categories)
+                                _TopicCard(
+                                  category: cat,
+                                  count: categoryCounts[cat] ?? 0,
+                                  active: selectedCategory == cat,
+                                  onTap: () {
+                                    ref
+                                        .read(selectedCategoryProvider.notifier)
+                                        .state = selectedCategory == cat
+                                        ? 'All'
+                                        : cat;
+                                    _scrollToList();
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
 
-                  // ── 5b. Jump to year ─────────────────────────────────────
-                  if (archiveYears.length > 1)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _PillRow(
-                          children: [
-                            _SortPill(
-                              label: 'All years',
-                              active: selectedYear == null,
-                              onTap: () =>
-                                  ref
+                      // ── 4b. Series ───────────────────────────────────────────
+                      if (seriesList.isNotEmpty) ...[
+                        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                        SliverToBoxAdapter(child: _SectionTitle('Series')),
+                        SliverToBoxAdapter(
+                          child: _PillRow(
+                            children: [
+                              for (final series in seriesList)
+                                _SortPill(
+                                  label: '${series.name} (${series.count})',
+                                  active: selectedSeries == series.name,
+                                  onTap: () {
+                                    ref
+                                        .read(selectedSeriesProvider.notifier)
+                                        .state = selectedSeries == series.name
+                                        ? null
+                                        : series.name;
+                                    _scrollToList();
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // ── 5. "All Messages" + sort pills ───────────────────────
+                      const SliverToBoxAdapter(child: SizedBox(height: 28)),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          key: _listHeaderKey,
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      [
+                                        if (selectedSeries != null)
+                                          selectedSeries
+                                        else if (isFiltered)
+                                          selectedCategory
+                                        else
+                                          'All messages',
+                                        if (selectedYear != null)
+                                          '$selectedYear',
+                                      ].join(' \u00b7 '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.bodyLg.copyWith(
+                                        fontSize: 19,
+                                        fontWeight: FontWeight.w800,
+                                        color: context.kc.onBg,
+                                        letterSpacing: -0.18,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  _SortPill(
+                                    label: 'Newest',
+                                    active: sort == SermonSort.newest,
+                                    onTap: () =>
+                                        ref
+                                            .read(sermonSortProvider.notifier)
+                                            .state = SermonSort
+                                            .newest,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _SortPill(
+                                    label: 'Oldest',
+                                    active: sort == SermonSort.oldest,
+                                    onTap: () =>
+                                        ref
+                                            .read(sermonSortProvider.notifier)
+                                            .state = SermonSort
+                                            .oldest,
+                                  ),
+                                ],
+                              ),
+                              if (isFiltered || selectedSeries != null) ...[
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    if (isFiltered)
+                                      _FilterChip(
+                                        label: selectedCategory,
+                                        count: sermons.length,
+                                        onClear: () =>
+                                            ref
+                                                    .read(
+                                                      selectedCategoryProvider
+                                                          .notifier,
+                                                    )
+                                                    .state =
+                                                'All',
+                                      ),
+                                    if (selectedSeries != null)
+                                      _FilterChip(
+                                        label: selectedSeries,
+                                        count: sermons.length,
+                                        onClear: () =>
+                                            ref
+                                                    .read(
+                                                      selectedSeriesProvider
+                                                          .notifier,
+                                                    )
+                                                    .state =
+                                                null,
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // ── 5b. Jump to year ─────────────────────────────────────
+                      if (archiveYears.length > 1)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _PillRow(
+                              children: [
+                                _SortPill(
+                                  label: 'All years',
+                                  active: selectedYear == null,
+                                  onTap: () =>
+                                      ref
+                                              .read(
+                                                selectedArchiveYearProvider
+                                                    .notifier,
+                                              )
+                                              .state =
+                                          null,
+                                ),
+                                for (final year in archiveYears)
+                                  _SortPill(
+                                    label:
+                                        '$year (${archiveYearCounts[year] ?? 0})',
+                                    active: selectedYear == year,
+                                    onTap: () {
+                                      ref
                                           .read(
                                             selectedArchiveYearProvider
                                                 .notifier,
                                           )
-                                          .state =
-                                      null,
+                                          .state = selectedYear == year
+                                          ? null
+                                          : year;
+                                      _scrollToList();
+                                    },
+                                  ),
+                              ],
                             ),
-                            for (final year in archiveYears)
-                              _SortPill(
-                                label: '$year (${archiveYearCounts[year] ?? 0})',
-                                active: selectedYear == year,
-                                onTap: () {
-                                  ref
-                                      .read(
-                                        selectedArchiveYearProvider.notifier,
-                                      )
-                                      .state = selectedYear == year
-                                      ? null
-                                      : year;
-                                  _scrollToList();
-                                },
+                          ),
+                        ),
+
+                      // ── 6. Sermon list ───────────────────────────────────────
+                      if (sermons.isEmpty && !sermonsAsync.hasValue)
+                        SliverList.builder(
+                          itemCount: 6,
+                          itemBuilder: (_, _) => const _SermonRowSkeleton(),
+                        )
+                      else if (sermons.isEmpty && !library.isFilling)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 40,
+                            ),
+                            child: Text(
+                              library.offline && library.sermons.isEmpty
+                                  ? 'Messages will appear here once you are '
+                                        'back online.'
+                                  : 'No messages for this filter.',
+                              textAlign: TextAlign.center,
+                              style: AppTypography.bodySm.copyWith(
+                                color: context.kc.muted,
                               ),
-                          ],
+                            ),
+                          ),
+                        )
+                      else
+                        SliverList.builder(
+                          itemCount: sermons.length,
+                          itemBuilder: (context, index) {
+                            final sermon = sermons[index];
+                            return _sermonRow(
+                              sermon,
+                              index,
+                              currentId: currentSermon?.id,
+                              playing: playing,
+                              onTap: () => startPlayback(
+                                context,
+                                ref,
+                                sermon,
+                                queue: sermons,
+                              ),
+                            );
+                          },
+                        ),
+
+                      // ── 7. Archive footer ────────────────────────────────────
+                      SliverToBoxAdapter(
+                        child: _ArchiveFooter(
+                          library: library,
+                          shown: sermons.length,
+                          onRetry: libraryNotifier.retryHydration,
                         ),
                       ),
-                    ),
+                    ],
 
-                  // ── 6. Sermon list ───────────────────────────────────────
-                  if (sermons.isEmpty && !sermonsAsync.hasValue)
-                    SliverList.builder(
-                      itemCount: 6,
-                      itemBuilder: (_, _) => const _SermonRowSkeleton(),
-                    )
-                  else if (sermons.isEmpty && !library.isFilling)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 40,
-                        ),
-                        child: Text(
-                          library.offline && library.sermons.isEmpty
-                              ? 'Messages will appear here once you are '
-                                    'back online.'
-                              : 'No messages for this filter.',
-                          textAlign: TextAlign.center,
-                          style: AppTypography.bodySm.copyWith(
-                            color: context.kc.muted,
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    SliverList.builder(
-                      itemCount: sermons.length,
-                      itemBuilder: (context, index) {
-                        final sermon = sermons[index];
-                        return _sermonRow(
-                          sermon,
-                          index,
-                          currentId: currentSermon?.id,
-                          playing: playing,
-                          onTap: () => startPlayback(
-                            context,
-                            ref,
-                            sermon,
-                            queue: sermons,
-                          ),
-                        );
-                      },
-                    ),
+                    // ── Bottom pad ─────────────────────────────────────────────
+                    const SliverPadding(padding: EdgeInsets.only(bottom: 150)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Floats above the docked mini player and tab bar: the shell's
+          // extendBody reports their height as bottom padding.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: MediaQuery.paddingOf(context).bottom + 16,
+            child: Center(
+              child: _BackToTopPill(
+                visible: _showBackToTop,
+                onTap: _scrollToTop,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-                  // ── 7. Archive footer ────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: _ArchiveFooter(
-                      library: library,
-                      shown: sermons.length,
-                      onRetry: libraryNotifier.retryHydration,
-                    ),
+// ── Floating "Back to top" pill ───────────────────────────────────────────────
+
+class _BackToTopPill extends StatelessWidget {
+  const _BackToTopPill({required this.visible, required this.onTap});
+
+  final bool visible;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
+    return IgnorePointer(
+      ignoring: !visible,
+      child: ExcludeSemantics(
+        excluding: !visible,
+        child: AnimatedSlide(
+          offset: visible ? Offset.zero : const Offset(0, 0.4),
+          duration: duration,
+          curve: Curves.easeOut,
+          child: AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: duration,
+            child: Semantics(
+              button: true,
+              label: 'Back to top',
+              excludeSemantics: true,
+              child: GestureDetector(
+                key: const Key('messages-back-to-top'),
+                onTap: onTap,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  decoration: BoxDecoration(
+                    color: kc.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    border: Border.all(color: kc.outline),
                   ),
-                ],
-
-                // ── Bottom pad ─────────────────────────────────────────────
-                const SliverPadding(padding: EdgeInsets.only(bottom: 150)),
-              ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.arrow_upward_rounded,
+                        size: 18,
+                        color: kc.onBg,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Back to top',
+                        style: AppTypography.labelMd.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kc.onBg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),
