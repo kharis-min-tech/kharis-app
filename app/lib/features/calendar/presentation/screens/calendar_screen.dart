@@ -6,6 +6,7 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/data/rsvp_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
@@ -99,6 +100,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           // Not a dead end: past events are one tap away.
           emptyActionLabel: 'See past events',
           onEmptyAction: () => setState(() => _tab = _EventTab.past),
+          // A quiet week still says when the branch meets.
+          emptyFooter: const CampusCard(padding: EdgeInsets.only(top: 24)),
         );
       case _EventTab.past:
         return _eventsSliver(
@@ -134,6 +137,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     required String emptySubtitle,
     String? emptyActionLabel,
     VoidCallback? onEmptyAction,
+    Widget? emptyFooter,
     String? capNote,
   }) {
     return async.when(
@@ -156,6 +160,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             subtitle: emptySubtitle,
             actionLabel: emptyActionLabel,
             onAction: onEmptyAction,
+            footer: emptyFooter,
           );
         }
         final note = events.length >= EventRepository.pastEventLimit
@@ -284,6 +289,7 @@ Widget _messageSliver(
   required String subtitle,
   String? actionLabel,
   VoidCallback? onAction,
+  Widget? footer,
 }) {
   return SliverToBoxAdapter(
     child: Padding(
@@ -319,6 +325,7 @@ Widget _messageSliver(
               ),
             ),
           ],
+          ?footer,
         ],
       ),
     ),

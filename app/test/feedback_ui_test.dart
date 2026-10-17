@@ -14,10 +14,12 @@ import 'package:kharis_app/features/connect/presentation/screens/testimony_scree
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/playlist_card.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -59,6 +61,7 @@ void main() {
     Future<void> pump(
       WidgetTester tester, {
       List<Event> events = const [],
+      Branch? campus,
     }) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
@@ -75,6 +78,7 @@ void main() {
               AsyncValue.data(events),
             ),
             myRsvpsProvider.overrideWith((ref) => Stream.value(const <Rsvp>[])),
+            currentCampusProvider.overrideWithValue(campus),
           ],
           child: const MaterialApp(home: CalendarScreen()),
         ),
@@ -117,6 +121,31 @@ void main() {
       await pump(tester);
       expect(find.text('No upcoming events'), findsOneWidget);
       expect(find.text('WEEKLY SERVICES'), findsNothing);
+      expect(find.byKey(const Key('campus-card')), findsNothing);
+    });
+
+    testWidgets('no events still shows when the branch meets', (tester) async {
+      await pump(
+        tester,
+        campus: const Branch(
+          id: 'london',
+          name: 'London',
+          subtitle: '',
+          gradientStart: Colors.black,
+          gradientEnd: Colors.black,
+          services: [
+            CampusService(
+              id: 'sun',
+              name: 'Sunday Service',
+              day: 'Sunday',
+              startTime: '10:00',
+            ),
+          ],
+        ),
+      );
+      expect(find.text('No upcoming events'), findsOneWidget);
+      expect(find.byKey(const Key('campus-card')), findsOneWidget);
+      expect(find.byKey(const Key('campus-service-sun')), findsOneWidget);
     });
   });
 
@@ -177,10 +206,19 @@ void main() {
         reason: 'one image fills the square',
       );
       expect(await tiles(tester, [a, b]), [a, b]);
-      expect(tester.getSize(find.byType(ArtworkImage).first), const Size(60, 120));
+      expect(
+        tester.getSize(find.byType(ArtworkImage).first),
+        const Size(60, 120),
+      );
       expect(await tiles(tester, [a, b, c]), [a, b, c]);
-      expect(tester.getSize(find.byType(ArtworkImage).first), const Size(60, 120));
-      expect(tester.getSize(find.byType(ArtworkImage).last), const Size(60, 60));
+      expect(
+        tester.getSize(find.byType(ArtworkImage).first),
+        const Size(60, 120),
+      );
+      expect(
+        tester.getSize(find.byType(ArtworkImage).last),
+        const Size(60, 60),
+      );
       expect(await tiles(tester, [a, b, c, d]), [a, b, c, d]);
       for (final e in find.byType(ArtworkImage).evaluate()) {
         expect(e.size, const Size(60, 60));
