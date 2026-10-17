@@ -54,6 +54,10 @@ dependencies:
   cloud_firestore: ^5.6.12
   firebase_messaging: ^15.2.10
   youtube_player_iframe: ^6.0.2
+  # The Home hero renders the YouTube controller's WebView inline (the
+  # package's YoutubePlayer floats it in an overlay above the page, where it
+  # swallows scroll drags). Same version youtube_player_iframe resolves.
+  webview_flutter: ^4.13.1
   web: ^1.1.1
   firebase_analytics: ^11.6.0
   firebase_auth: ^5.5.1

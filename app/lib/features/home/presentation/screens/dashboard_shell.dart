@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -118,6 +119,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 
   void _onTap(int index) {
+    _setBarVisible(true);
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == widget.navigationShell.currentIndex,
@@ -125,10 +127,62 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     ref.read(cacheServiceProvider).cachePreference('last_tab', index);
   }
 
+  // ── Hide on scroll ──────────────────────────────────────────────────────────
+  //
+  // The tab bar (and the mini player docked on it) slides away while the
+  // member scrolls a tab's list down and returns on any scroll up, at the
+  // top of the list, and on a tab tap or route change. It never needs an
+  // edge swipe to come back: that is the system home gesture.
+
+  bool _barVisible = true;
+
+  @override
+  void didUpdateWidget(DashboardShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final before = oldWidget.navigationShell;
+    final after = widget.navigationShell;
+    if (before.currentIndex != after.currentIndex ||
+        before.shellRouteContext.routerState.uri !=
+            after.shellRouteContext.routerState.uri) {
+      _barVisible = true;
+    }
+  }
+
+  void _setBarVisible(bool visible) {
+    if (visible != _barVisible) setState(() => _barVisible = visible);
+  }
+
+  /// Reads the active tab's primary (vertical, outermost) scroll view only;
+  /// pagers and carousels inside it are ignored.
+  bool _onTabScroll(ScrollNotification n) {
+    final metrics = n.metrics;
+    if (n.depth != 0 || metrics.axis != Axis.vertical) return false;
+    if (n is UserScrollNotification) {
+      // Fires as a drag starts, before the offset moves: the direction
+      // decides, even at the top.
+      switch (n.direction) {
+        case ScrollDirection.reverse:
+          if (metrics.maxScrollExtent > metrics.minScrollExtent) {
+            _setBarVisible(false);
+          }
+        case ScrollDirection.forward:
+          _setBarVisible(true);
+        case ScrollDirection.idle:
+          break;
+      }
+    } else if (metrics.pixels <= metrics.minScrollExtent) {
+      _setBarVisible(true);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentSermon = ref.watch(currentSermonProvider);
     final safeBottom = MediaQuery.of(context).padding.bottom;
+    // Screen-reader navigation keeps the bar put: a bar that moves out from
+    // under the focus is worse than one that takes some room.
+    final hidden = !_barVisible && !MediaQuery.accessibleNavigationOf(context);
 
     return ReviewPromptListener(
       // Never interrupt a member mid-gift.
@@ -136,71 +190,99 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           widget.navigationShell.currentIndex != _givingTabIndex,
       child: Scaffold(
         extendBody: true,
-        body: widget.navigationShell,
+        body: NotificationListener<ScrollNotification>(
+          onNotification: _onTabScroll,
+          child: widget.navigationShell,
+        ),
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // The bar docks on every tab except Giving: testers couldn't push
-            // it away there and it crowded the bank details mid-gift (KA-001).
-            // Audio keeps playing — only the bar hides; any other tab brings
-            // it back, and swipe-down still dismisses it outright.
-            if (currentSermon != null &&
-                widget.navigationShell.currentIndex != _givingTabIndex)
-              const MiniPlayer(),
-            Container(
-              decoration: BoxDecoration(
-                color: context.kc.surface,
-                border: Border(
-                  top: BorderSide(color: context.kc.divider, width: 1),
+            // Slides (a paint transform: no relayout) within its own clip;
+            // the body shows through, and receives taps, where it was.
+            ClipRect(
+              child: AnimatedSlide(
+                key: const Key('dashboard-bottom-bar'),
+                offset: hidden ? const Offset(0, 1) : Offset.zero,
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // The bar docks on every tab except Giving: testers
+                    // couldn't push it away there and it crowded the bank
+                    // details mid-gift (KA-001). Audio keeps playing — only
+                    // the bar hides; any other tab brings it back, and
+                    // swipe-down still dismisses it outright.
+                    if (currentSermon != null &&
+                        widget.navigationShell.currentIndex != _givingTabIndex)
+                      const MiniPlayer(),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: context.kc.surface,
+                        border: Border(
+                          top: BorderSide(color: context.kc.divider, width: 1),
+                        ),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _TabItem(
+                            icon: Icons.home_outlined,
+                            activeIcon: Icons.home,
+                            label: 'Home',
+                            index: 0,
+                            currentIndex: widget.navigationShell.currentIndex,
+                            onTap: _onTap,
+                          ),
+                          _TabItem(
+                            icon: Icons.play_circle_outline,
+                            activeIcon: Icons.play_circle,
+                            label: 'Messages',
+                            index: 1,
+                            currentIndex: widget.navigationShell.currentIndex,
+                            onTap: _onTap,
+                          ),
+                          _TabItem(
+                            icon: Icons.volunteer_activism_outlined,
+                            activeIcon: Icons.volunteer_activism,
+                            label: 'Giving',
+                            index: 2,
+                            currentIndex: widget.navigationShell.currentIndex,
+                            onTap: _onTap,
+                          ),
+                          _TabItem(
+                            icon: Icons.calendar_today_outlined,
+                            activeIcon: Icons.calendar_today,
+                            label: 'Events',
+                            index: 3,
+                            currentIndex: widget.navigationShell.currentIndex,
+                            onTap: _onTap,
+                          ),
+                          _TabItem(
+                            icon: Icons.more_horiz,
+                            activeIcon: Icons.more_horiz,
+                            label: 'More',
+                            index: 4,
+                            currentIndex: widget.navigationShell.currentIndex,
+                            onTap: _onTap,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              padding: EdgeInsets.fromLTRB(6, 10, 6, 12 + safeBottom),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _TabItem(
-                    icon: Icons.home_outlined,
-                    activeIcon: Icons.home,
-                    label: 'Home',
-                    index: 0,
-                    currentIndex: widget.navigationShell.currentIndex,
-                    onTap: _onTap,
-                  ),
-                  _TabItem(
-                    icon: Icons.play_circle_outline,
-                    activeIcon: Icons.play_circle,
-                    label: 'Messages',
-                    index: 1,
-                    currentIndex: widget.navigationShell.currentIndex,
-                    onTap: _onTap,
-                  ),
-                  _TabItem(
-                    icon: Icons.volunteer_activism_outlined,
-                    activeIcon: Icons.volunteer_activism,
-                    label: 'Giving',
-                    index: 2,
-                    currentIndex: widget.navigationShell.currentIndex,
-                    onTap: _onTap,
-                  ),
-                  _TabItem(
-                    icon: Icons.calendar_today_outlined,
-                    activeIcon: Icons.calendar_today,
-                    label: 'Events',
-                    index: 3,
-                    currentIndex: widget.navigationShell.currentIndex,
-                    onTap: _onTap,
-                  ),
-                  _TabItem(
-                    icon: Icons.more_horiz,
-                    activeIcon: Icons.more_horiz,
-                    label: 'More',
-                    index: 4,
-                    currentIndex: widget.navigationShell.currentIndex,
-                    onTap: _onTap,
-                  ),
-                ],
-              ),
             ),
+            // The system gesture area stays padded on the bar's surface
+            // whether or not the bar is showing.
+            if (safeBottom > 0)
+              ColoredBox(
+                color: context.kc.surface,
+                child: SizedBox(height: safeBottom, width: double.infinity),
+              ),
           ],
         ),
       ),
