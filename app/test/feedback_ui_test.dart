@@ -280,12 +280,14 @@ void main() {
       WidgetTester tester,
       Widget screen, {
       bool offline = false,
+      bool rlsDenied = false,
     }) async {
       tester.view.physicalSize = const Size(1200, 3200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final stub = SupabaseStub({'testimonies': [], 'visitors': []})
-        ..offline = offline;
+        ..offline = offline
+        ..rlsDenied = rlsDenied;
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -318,9 +320,10 @@ void main() {
       matching: find.byType(TextFormField),
     );
 
-    testWidgets('testimony: required fields, then the website payload', (
-      tester,
-    ) async {
+    const consent = 'I am happy for Kharis to share my testimony';
+
+    testWidgets('testimony: the website categories, required fields, then '
+        'the website payload', (tester) async {
       final stub = await pumpForm(tester, const TestimonyScreen());
       await tester.tap(find.text('Share testimony'));
       await tester.pumpAndSettle();
@@ -328,15 +331,30 @@ void main() {
       expect(find.text('Branch is required'), findsOneWidget);
       expect(find.text('Add a short title'), findsOneWidget);
       expect(find.text('Please share your testimony'), findsOneWidget);
+      expect(
+        find.text('Please confirm we may share your testimony'),
+        findsOneWidget,
+      );
       expect(stub.requests, isEmpty);
+
+      // Every kharis.org testimony category is offered.
+      await tester.tap(find.text('Choose a category'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      for (final c in kTestimonyCategories) {
+        expect(find.text(c), findsWidgets, reason: c);
+      }
+      await tester.tap(find.text('Unusual Favour').last);
+      await tester.pumpAndSettle();
 
       await tester.enterText(field('Full name *').first, 'Ada');
       await tester.enterText(field('Email address').first, 'ada@example.com');
       await tester.enterText(field('Short title / summary *').first, 'Healed');
       await tester.enterText(field('Your testimony *').first, 'God healed me.');
       await choose(tester, 'Choose your branch', 'KP2 Barking');
-      await choose(tester, 'Choose a category', 'Health/Healing');
+      await choose(tester, 'Unusual Favour', 'Health/Healing');
       await tester.tap(find.text('Share anonymously'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(consent));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Share testimony'));
       await tester.tap(find.text('Share testimony'));
@@ -363,17 +381,37 @@ void main() {
       expect(find.text('Thank you for sharing'), findsOneWidget);
     });
 
-    testWidgets('a failed testimony never claims success', (tester) async {
-      await pumpForm(tester, const TestimonyScreen(), offline: true);
+    Future<void> fillTestimony(WidgetTester tester) async {
       await tester.enterText(field('Full name *').first, 'Ada');
       await tester.enterText(field('Short title / summary *').first, 'Healed');
       await tester.enterText(field('Your testimony *').first, 'God healed me.');
       await choose(tester, 'Choose your branch', 'London');
+      await tester.tap(find.text(consent));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Share testimony'));
       await tester.tap(find.text('Share testimony'));
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('a failed testimony never claims success', (tester) async {
+      await pumpForm(tester, const TestimonyScreen(), offline: true);
+      await fillTestimony(tester);
       expect(find.text('Thank you for sharing'), findsNothing);
       expect(find.textContaining('was not sent'), findsOneWidget);
+    });
+
+    testWidgets('a Studio refusal (RLS 401) shows the failure and keeps the '
+        'text', (tester) async {
+      final stub = await pumpForm(
+        tester,
+        const TestimonyScreen(),
+        rlsDenied: true,
+      );
+      await fillTestimony(tester);
+      expect(stub.requests.single.uri.path, '/rest/v1/testimonies');
+      expect(find.text('Thank you for sharing'), findsNothing);
+      expect(find.textContaining('was not sent'), findsOneWidget);
+      expect(find.text('God healed me.'), findsOneWidget);
     });
 
     testWidgets('new here: every field is labelled the same way and the '

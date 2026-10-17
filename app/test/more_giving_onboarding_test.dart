@@ -37,6 +37,8 @@ import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 class _FakeAuth implements AuthRepository {
   final resetEmails = <String>[];
   int logouts = 0;
+  int guestLogins = 0;
+  bool guestFails = false;
 
   @override
   Future<void> sendPasswordResetEmail(String email) async {
@@ -59,7 +61,11 @@ class _FakeAuth implements AuthRepository {
   }) => throw UnimplementedError();
 
   @override
-  Future<User> loginAsGuest() => throw UnimplementedError();
+  Future<User> loginAsGuest() async {
+    guestLogins++;
+    if (guestFails) throw Exception('network');
+    return _guest;
+  }
 
   @override
   bool get usesPasswordSignIn => false;
@@ -640,6 +646,64 @@ void main() {
       expect(prefs.getString('onboarding_branch'), 'Manchester');
       expect(prefs.containsKey('onboarding_role'), isFalse);
       expect(find.text('More'), findsOneWidget, reason: 'pops back to More');
+    });
+
+    group('Continue as guest', () {
+      Future<void> pumpLogin(WidgetTester tester, _FakeAuth auth) async {
+        final prefs = await _prefs();
+        final router = GoRouter(
+          initialLocation: '/login',
+          routes: [
+            GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+            GoRoute(
+              path: '/branch-selection',
+              builder: (_, _) => const Scaffold(body: Text('Pick a branch')),
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              sharedPreferencesProvider.overrideWithValue(prefs),
+              authRepositoryProvider.overrideWithValue(auth),
+            ],
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      Finder guestButton() => find.ancestor(
+        of: find.text('Continue as guest'),
+        matching: find.byType(OutlinedButton),
+      );
+
+      testWidgets('a tap anywhere on the button signs in and asks for a '
+          'branch', (tester) async {
+        final auth = _FakeAuth();
+        await pumpLogin(tester, auth);
+        await tester.ensureVisible(guestButton());
+        // Tap the button's edge, not its label: the whole box is the target.
+        final box = tester.getRect(guestButton());
+        await tester.tapAt(box.centerLeft + const Offset(12, 0));
+        await tester.pumpAndSettle();
+        expect(auth.guestLogins, 1);
+        expect(find.text('Pick a branch'), findsOneWidget);
+      });
+
+      testWidgets('a failed guest sign-in says so and re-enables the button', (
+        tester,
+      ) async {
+        final auth = _FakeAuth()..guestFails = true;
+        await pumpLogin(tester, auth);
+        await tester.ensureVisible(guestButton());
+        await tester.tap(guestButton());
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Could not continue as a guest'), findsOne);
+        expect(find.text('Pick a branch'), findsNothing);
+        expect(tester.widget<OutlinedButton>(guestButton()).enabled, isTrue);
+      });
     });
   });
 }
