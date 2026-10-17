@@ -9,8 +9,10 @@ import 'package:kharis_app/shared/widgets/shake_effect.dart';
 
 enum _FormState { form, sending, success }
 
-/// "Share a testimony": the website's testimony form (the Studio
-/// `testimonies` schema). Submissions land unpublished for review.
+/// "Share a testimony": the website's testimony form (kharis.org → Elvanto)
+/// mapped onto the Studio `testimonies` columns. Submissions land
+/// unpublished for review. The website's sharing question is a required
+/// consent here: the app only collects testimonies the team may share.
 class TestimonyScreen extends ConsumerStatefulWidget {
   const TestimonyScreen({super.key});
 
@@ -272,6 +274,15 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
                   style: AppTypography.ui(size: 13, color: context.kc.muted),
                 ),
               ),
+              _ConsentField(
+                title: 'I am happy for Kharis to share my testimony',
+                subtitle:
+                    'In services, in the app and online, after our team '
+                    'reviews it',
+                validator: (agreed) => agreed
+                    ? null
+                    : 'Please confirm we may share your testimony',
+              ),
               const SizedBox(height: 24),
 
               // Submit
@@ -306,6 +317,62 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A required tick box that validates with the form, styled like the
+/// anonymous switch above it.
+class _ConsentField extends StatelessWidget {
+  const _ConsentField({
+    required this.title,
+    required this.subtitle,
+    required this.validator,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? Function(bool agreed) validator;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    return FormField<bool>(
+      initialValue: false,
+      validator: (v) => validator(v ?? false),
+      builder: (state) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CheckboxListTile.adaptive(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            controlAffinity: ListTileControlAffinity.trailing,
+            value: state.value ?? false,
+            onChanged: (v) => state.didChange(v ?? false),
+            activeColor: kc.accent,
+            checkColor: kc.onAccent,
+            title: Text(
+              title,
+              style: AppTypography.ui(
+                size: 15,
+                weight: FontWeight.w600,
+                color: kc.onBg,
+              ),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: AppTypography.ui(size: 13, color: kc.muted),
+            ),
+          ),
+          if (state.hasError)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                state.errorText!,
+                style: AppTypography.ui(size: 12, color: kc.danger),
+              ),
+            ),
+        ],
       ),
     );
   }

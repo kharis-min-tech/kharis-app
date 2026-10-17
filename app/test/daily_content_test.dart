@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/daily_message_card.dart';
@@ -240,6 +241,47 @@ void main() {
       expect(find.text('Read it slowly.'), findsOneWidget);
       expect(find.textContaining('DAILY PRAYER'), findsNothing);
       expect(find.text('Read now'), findsOneWidget);
+    });
+
+    testWidgets('tapping the prayer opens the reader, prayer-only too', (
+      tester,
+    ) async {
+      for (final content in const [
+        DailyContent(
+          prayer: DailyEntry(title: 'A morning prayer', body: 'Lord, lead.'),
+        ),
+        DailyContent(
+          reading: DailyEntry(title: 'God so loved', reference: 'John 3:16'),
+          prayer: DailyEntry(title: 'A morning prayer', body: 'Lord, lead.'),
+        ),
+      ]) {
+        final router = GoRouter(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (_, _) => const Scaffold(body: TodaysReadingCard()),
+            ),
+            GoRoute(
+              path: '/reading',
+              builder: (_, _) => const Scaffold(body: Text('reader')),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            key: UniqueKey(),
+            overrides: [
+              dailyContentProvider.overrideWith((ref) => Stream.value(content)),
+            ],
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+        await tester.tap(find.text('Lord, lead.'));
+        await tester.pumpAndSettle();
+        expect(find.text('reader'), findsOneWidget);
+      }
     });
 
     testWidgets('the message card shows its sermon and note, and hides '

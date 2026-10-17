@@ -10,6 +10,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
+import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../widgets/sermon_list_item.dart';
@@ -129,6 +130,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         context,
         sermonId: sermon.id,
         sermonTitle: sermon.title,
+        onOpenNotes: () => SermonNotesSheet.show(context, sermon),
       ),
     );
   }
@@ -684,7 +686,23 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                   ),
                               ],
                             ),
-                          ),
+                            for (final year in archiveYears)
+                              _SortPill(
+                                label:
+                                    '$year (${archiveYearCounts[year] ?? 0})',
+                                active: selectedYear == year,
+                                onTap: () {
+                                  ref
+                                      .read(
+                                        selectedArchiveYearProvider.notifier,
+                                      )
+                                      .state = selectedYear == year
+                                      ? null
+                                      : year;
+                                  _scrollToList();
+                                },
+                              ),
+                          ],
                         ),
 
                       // ── 6. Sermon list ───────────────────────────────────────

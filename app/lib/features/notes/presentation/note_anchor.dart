@@ -1,43 +1,39 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 enum NoteAnchorResult {
-  /// Playback is running at the note's timestamp.
+  /// Playback is running at the requested moment.
   started,
 
-  /// The note is not anchored to a sermon position — nothing to seek to.
-  notAnchored,
-
-  /// The sermon the note was written against is no longer in the library.
+  /// The message the notes were written against is no longer in the library.
   sermonUnavailable,
 
-  /// The sermon exists but its audio would not load.
+  /// The message exists but its audio would not load.
   playbackFailed,
 }
 
-/// Jumps playback back to the moment a note was written.
+/// Plays a message from a moment written in its notes.
 ///
-/// Used by both note surfaces — the overall list and the per-sermon sheet —
-/// so "tap a note, hear what you were listening to" behaves identically.
+/// Used wherever a timestamp is tapped outside a live player engine — the
+/// notebook, a notepad opened from it, the player's notepad in audio mode —
+/// so "tap a time, hear that moment" behaves identically.
 abstract final class NoteAnchor {
-  static Future<NoteAnchorResult> play(WidgetRef ref, Note note) async {
-    final sermonId = note.sermonId;
-    final positionMs = note.positionMs;
-    if (sermonId == null || positionMs == null) {
-      return NoteAnchorResult.notAnchored;
-    }
-
+  /// Plays the message stored under [sermonId] (canonical key or a legacy
+  /// alias) from [position], loading it if it is not the one playing.
+  static Future<NoteAnchorResult> play(
+    WidgetRef ref,
+    String sermonId,
+    Duration position,
+  ) async {
     final audio = ref.read(audioPlayerServiceProvider);
-    final target = Duration(milliseconds: positionMs);
 
     // Already loaded: play() attaches to the live source and seeks in place
     // rather than reloading. Matched through NoteTimelineKey, because the
-    // note may be stored under the canonical `yt_` key while the loaded
+    // notes may be stored under the canonical `yt_` key while the loaded
     // variant carries its raw id.
     final playing = audio.currentSermon;
     final sermon =
@@ -49,13 +45,22 @@ abstract final class NoteAnchor {
     if (sermon == null) return NoteAnchorResult.sermonUnavailable;
 
     // startAt wins over the saved resume point, and play() returns as soon
-    // as the engine is running, so the caller can close its sheet right away.
-    // A failed load must not read as started.
-    if (!await audio.play(sermon, startAt: target, queue: audio.queue?.items)) {
+    // as the engine is running. A failed load must not read as started.
+    if (!await audio.play(
+      sermon,
+      startAt: position,
+      queue: audio.queue?.items,
+    )) {
       return NoteAnchorResult.playbackFailed;
     }
     return NoteAnchorResult.started;
   }
+
+  /// The snackbar copy for a [play] that did not start.
+  static String failureMessage(NoteAnchorResult result) =>
+      result == NoteAnchorResult.playbackFailed
+      ? 'Couldn\u2019t play that message. Please try again.'
+      : 'That message is no longer available';
 
   /// The audio recording a note belongs to: the loaded library first, then
   /// the snapshots of recently played messages, which resolve before the

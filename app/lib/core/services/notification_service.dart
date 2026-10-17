@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'firebase_service.dart';
 
@@ -164,6 +167,48 @@ void openNotificationTarget(GoRouter router, NotificationTarget target) {
   binding.ensureVisualUpdate();
 }
 
+/// What the OS lets the app do with notifications, as far as the member's
+/// next step is concerned.
+enum NotificationPermission {
+  /// Allowed (iOS provisional included).
+  granted,
+
+  /// Not allowed, and asking may still show the OS sheet: iOS before the
+  /// first answer, and Android, which reports every not-granted state as
+  /// "denied" (when it will not ask again the request simply returns).
+  askable,
+
+  /// Refused on iOS. The sheet is shown once per install, so only system
+  /// settings can turn notifications on.
+  blocked,
+
+  /// Unknown (Firebase disabled or the plugin failed): nothing to offer.
+  unavailable,
+}
+
+/// Maps the plugin's [status] to the member's next step on [platform].
+NotificationPermission notificationPermissionFor(
+  AuthorizationStatus status,
+  TargetPlatform platform,
+) {
+  switch (status) {
+    case AuthorizationStatus.authorized:
+    case AuthorizationStatus.provisional:
+      return NotificationPermission.granted;
+    case AuthorizationStatus.notDetermined:
+      return NotificationPermission.askable;
+    case AuthorizationStatus.denied:
+      return platform == TargetPlatform.iOS
+          ? NotificationPermission.blocked
+          : NotificationPermission.askable;
+  }
+}
+
+/// Opens this app's notification settings on Android (see `MainActivity`).
+const MethodChannel _systemSettingsChannel = MethodChannel(
+  'com.kharis.church/system_settings',
+);
+
 class NotificationService {
   NotificationService({this.router, this.onContentPush});
 
@@ -286,6 +331,30 @@ class NotificationService {
           settings.authorizationStatus == AuthorizationStatus.provisional;
     } catch (e) {
       debugPrint('[FCM] requestPermission error: $e');
+      return false;
+    }
+  }
+
+  /// Opens the system settings page where the member can allow Kharis
+  /// notifications, for when the OS will no longer show its own prompt.
+  /// Returns whether a settings page opened. Never throws.
+  Future<bool> openSystemSettings() async {
+    try {
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.iOS:
+          // UIApplication.openSettingsURLString: this app's page in Settings,
+          // with Notifications at the top.
+          return await launchUrl(Uri.parse('app-settings:'));
+        case TargetPlatform.android:
+          return await _systemSettingsChannel.invokeMethod<bool>(
+                'openNotificationSettings',
+              ) ??
+              false;
+        default:
+          return false;
+      }
+    } catch (e) {
+      debugPrint('[FCM] openSystemSettings error: $e');
       return false;
     }
   }
