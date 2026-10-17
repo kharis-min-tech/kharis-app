@@ -18,7 +18,6 @@ const double _kTileHeight = 104;
 /// "Today", "Tomorrow", else "Sat 11 Oct", then the start (and end, when
 /// set) time: `Tomorrow · 7:00 PM – 9:00 PM`. A weekly event shows its
 /// next day and its rule: `Sun 18 Oct · Every Sunday · 10:00 AM`.
-@visibleForTesting
 String eventWhenLabel(Event event, {DateTime? now}) {
   final today = DateUtils.dateOnly(now ?? DateTime.now());
   final day = DateUtils.dateOnly(event.startTime);
@@ -28,7 +27,9 @@ String eventWhenLabel(Event event, {DateTime? now}) {
     1 => 'Tomorrow',
     _ => DateFormat('EEE d MMM').format(event.startTime),
   };
-  if (event.recurrenceLabel case final repeats?) return '$dayLabel \u00b7 $repeats';
+  if (event.recurrenceLabel case final repeats?) {
+    return '$dayLabel \u00b7 $repeats';
+  }
   final time = DateFormat('h:mm a');
   final end = event.endTime;
   final range = end != null && DateUtils.isSameDay(end, event.startTime)

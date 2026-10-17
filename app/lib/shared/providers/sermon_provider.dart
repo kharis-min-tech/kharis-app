@@ -16,6 +16,7 @@ import '../../features/messages/data/firestore_sermon_repository.dart';
 import '../../features/messages/data/r2_messages_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
+import '../../features/home/data/featured_video_repository.dart';
 import '../models/sermon.dart';
 import 'audio_provider.dart';
 import 'branch_provider.dart';
@@ -1337,6 +1338,20 @@ final newsProvider = FutureProvider.family<List<NewsItem>, String?>((
   branch,
 ) {
   return ref.watch(newsRepositoryProvider).getAnnouncements(branch: branch);
+});
+
+// ── Featured video ────────────────────────────────────────────────────────────
+
+final featuredVideoRepositoryProvider = Provider<FeaturedVideoRepository>((
+  ref,
+) {
+  return FeaturedVideoRepository(api: ref.watch(contentApiProvider));
+});
+
+/// The Content Studio clip the app features (the Home hero's video), or
+/// null when the Studio has none for the app.
+final featuredVideoProvider = FutureProvider<FeaturedVideo?>((ref) {
+  return ref.watch(featuredVideoRepositoryProvider).getFeaturedVideo();
 });
 
 // ── Live status ───────────────────────────────────────────────────────────────

@@ -206,10 +206,14 @@ void main() {
     expect(find.text('Leeds notice'), findsNothing);
   });
 
-  testWidgets('empty table shows the quiet empty state', (tester) async {
+  testWidgets('empty table renders nothing (Home hides the block)', (
+    tester,
+  ) async {
     await tester.pumpWidget(_homeHarness(SupabaseStub({'news': []})));
     await _settle(tester);
 
-    expect(find.textContaining('No announcements'), findsOneWidget);
+    expect(find.textContaining('No announcements'), findsNothing);
+    expect(find.byKey(const Key('announcements-skeleton')), findsNothing);
+    expect(find.byType(ListView), findsNothing);
   });
 }

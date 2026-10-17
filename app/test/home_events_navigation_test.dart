@@ -199,6 +199,9 @@ Future<void> _pump(
         dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
         // Nothing to resume: the card collapses (its engine is WP2's).
         continueListeningProvider.overrideWith((ref) => null),
+        // No hero: these tests drive the sections under it.
+        featuredVideoProvider.overrideWith((ref) async => null),
+        latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
