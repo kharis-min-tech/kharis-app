@@ -235,10 +235,7 @@ void main() {
 
     expect(repo.requested.where((u) => u == null), hasLength(pageOnes + 1));
     expect(short, findsNothing);
-    expect(
-      find.text('You\'ve reached the beginning \u00b7 25 messages'),
-      findsOneWidget,
-    );
+    expect(find.text('That\'s all 25 messages'), findsOneWidget);
   });
 
   group('featured mode', () {
@@ -368,31 +365,29 @@ void main() {
     ];
 
     /// The label is laid out at its full height and sits wholly inside its
-    /// pill and its row: nothing cuts the text.
-    void expectUnclipped(WidgetTester tester, String label) {
-      final text = find.text(label);
+    /// nearest [box] ancestor: nothing cuts the text.
+    void expectUnclipped(WidgetTester tester, Finder text, Type box) {
       final paragraph = tester.renderObject<RenderParagraph>(text);
       final full = paragraph.getMaxIntrinsicHeight(paragraph.size.width);
       expect(
         paragraph.size.height,
         greaterThanOrEqualTo(full - 0.5),
-        reason: '"$label" squeezed to ${paragraph.size.height} of $full',
+        reason: '$text squeezed to ${paragraph.size.height} of $full',
       );
       final rect = tester.getRect(text);
-      for (final outer in [
-        find.ancestor(of: text, matching: find.byType(AnimatedContainer)).first,
-        find
-            .ancestor(of: text, matching: find.byType(SingleChildScrollView))
-            .first,
-      ]) {
-        final box = tester.getRect(outer);
-        expect(rect.top, greaterThanOrEqualTo(box.top - 0.5), reason: label);
-        expect(rect.bottom, lessThanOrEqualTo(box.bottom + 0.5), reason: label);
-      }
+      final outer = tester.getRect(
+        find.ancestor(of: text, matching: find.byType(box)).first,
+      );
+      expect(rect.top, greaterThanOrEqualTo(outer.top - 0.5), reason: '$text');
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(outer.bottom + 0.5),
+        reason: '$text',
+      );
     }
 
     for (final scale in [1.0, 2.0]) {
-      testWidgets('series, year and topic rows at ${scale}x text', (
+      testWidgets('filter sheet choices and active chips at ${scale}x text', (
         tester,
       ) async {
         tester.view.physicalSize = const Size(1170, 2532);
@@ -428,16 +423,27 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final scroll = find.byType(Scrollable).first;
-        for (final label in ['Faith Walk (2)', 'All years', '2025 (1)']) {
-          await tester.scrollUntilVisible(
-            find.text(label),
-            200,
-            scrollable: scroll,
-          );
+        final filters = find.byKey(const Key('messages-filters-button'));
+        await tester.scrollUntilVisible(
+          filters,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(filters);
+        await tester.pumpAndSettle();
+        for (final label in ['All years', '2025 (1)', 'Newest']) {
+          await tester.ensureVisible(find.text(label));
           await tester.pumpAndSettle();
-          expectUnclipped(tester, label);
+          expectUnclipped(tester, find.text(label), AnimatedContainer);
         }
+        await tester.tap(find.text('2025 (1)'));
+        await tester.tap(find.byKey(const Key('message-filters-apply')));
+        await tester.pumpAndSettle();
+
+        // The year chip (the header reads "All messages · 2025").
+        expectUnclipped(tester, find.text('2025'), Container);
+        expectUnclipped(tester, find.text('Filters \u00b7 1'), Container);
         expect(tester.takeException(), isNull);
       });
     }
@@ -489,6 +495,366 @@ void main() {
         lessThanOrEqualTo(tester.getRect(row).bottom + 0.5),
       );
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  ProviderContainer containerOf(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(find.byType(MessagesScreen)));
+
+  /// A phone-sized view, so the sheet holds every section.
+  void phone(WidgetTester tester) {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+  }
+
+  /// A view tall enough that the first pages fit without scrolling, so only
+  /// the Load more button (not the near-the-end scroll) adds rows.
+  void tallView(WidgetTester tester) {
+    tester.view.physicalSize = const Size(1000, 10000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+  }
+
+  Future<void> openFilters(WidgetTester tester) async {
+    final button = find.byKey(const Key('messages-filters-button'));
+    await tester.scrollUntilVisible(
+      button,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> tapInSheet(WidgetTester tester, Finder target) async {
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pump();
+  }
+
+  Future<void> apply(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('message-filters-apply')));
+    await tester.pumpAndSettle();
+  }
+
+  group('filter sheet', () {
+    final catalogue = [
+      testSermon(
+        's1',
+        title: 'Faith one',
+        series: 'Faith Walk',
+        publishedAt: DateTime(2025, 3, 2),
+      ),
+      testSermon(
+        's2',
+        title: 'Faith two',
+        series: 'Faith Walk',
+        speaker: 'Grace Owusu',
+        publishedAt: DateTime(2026, 2, 1),
+      ),
+      testSermon(
+        's3',
+        title: 'Kingdom one',
+        series: 'Kingdom Life',
+        speaker: 'Grace Owusu',
+        publishedAt: DateTime(2026, 5, 1),
+      ),
+      testSermon('s4', title: 'Loose message', publishedAt: DateTime(2024, 6)),
+    ];
+
+    testWidgets('replaces the inline series, sort and year rows', (
+      tester,
+    ) async {
+      phone(tester);
+      await tester.pumpWidget(app(FakePagedSermonRepository([catalogue])));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Series'), findsNothing);
+      expect(find.text('All years'), findsNothing);
+      expect(find.text('Oldest'), findsNothing);
+      expect(find.text('Filters'), findsOneWidget);
+      expect(find.text('Newest first'), findsOneWidget);
+
+      await openFilters(tester);
+      for (final section in ['Sort', 'Year', 'Speaker', 'Series']) {
+        await tester.ensureVisible(find.text(section));
+        expect(find.text(section), findsOneWidget);
+      }
+      expect(find.text('Grace Owusu (2)'), findsOneWidget);
+      expect(find.text('David Antwi (2)'), findsOneWidget);
+    });
+
+    testWidgets('applies year and series, badges the count and shows '
+        'removable chips', (tester) async {
+      phone(tester);
+      await tester.pumpWidget(app(FakePagedSermonRepository([catalogue])));
+      await tester.pumpAndSettle();
+      await openFilters(tester);
+
+      await tapInSheet(tester, find.text('2026 (2)'));
+      await tapInSheet(
+        tester,
+        find.byKey(const ValueKey('series-option-Faith Walk')),
+      );
+      // Nothing is applied until Apply.
+      final c = containerOf(tester);
+      expect(c.read(selectedArchiveYearProvider), isNull);
+      await apply(tester);
+
+      expect(c.read(selectedArchiveYearProvider), 2026);
+      expect(c.read(selectedSeriesProvider), 'Faith Walk');
+      expect(c.read(librarySermonsProvider).map((s) => s.id), ['s2']);
+      expect(find.text('Filters \u00b7 2'), findsOneWidget);
+      expect(find.text('Faith Walk \u00b7 2026'), findsOneWidget);
+      expect(find.text('Clear all'), findsOneWidget);
+
+      await tester.tap(find.text('2026'));
+      await tester.pumpAndSettle();
+      expect(c.read(selectedArchiveYearProvider), isNull);
+      expect(find.text('Filters \u00b7 1'), findsOneWidget);
+      expect(c.read(librarySermonsProvider).map((s) => s.id), ['s2', 's1']);
+
+      await tester.tap(find.text('Faith Walk').last);
+      await tester.pumpAndSettle();
+      expect(c.read(selectedSeriesProvider), isNull);
+      expect(find.text('Filters'), findsOneWidget);
+    });
+
+    testWidgets('filters by speaker and sorts oldest first', (tester) async {
+      phone(tester);
+      await tester.pumpWidget(app(FakePagedSermonRepository([catalogue])));
+      await tester.pumpAndSettle();
+      // The sort label opens the same sheet.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('messages-sort-button')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('messages-sort-button')));
+      await tester.pumpAndSettle();
+
+      await tapInSheet(tester, find.text('Oldest'));
+      await tapInSheet(tester, find.text('Grace Owusu (2)'));
+      await apply(tester);
+
+      final c = containerOf(tester);
+      expect(c.read(sermonSortProvider), SermonSort.oldest);
+      expect(c.read(selectedSpeakerProvider), 'Grace Owusu');
+      expect(c.read(librarySermonsProvider).map((s) => s.id), ['s2', 's3']);
+      expect(find.text('Oldest first'), findsOneWidget);
+      expect(find.text('Filters \u00b7 1'), findsOneWidget);
+      expect(find.text('Grace Owusu'), findsOneWidget);
+    });
+
+    testWidgets('Reset clears the draft; dismissing changes nothing', (
+      tester,
+    ) async {
+      phone(tester);
+      await tester.pumpWidget(app(FakePagedSermonRepository([catalogue])));
+      await tester.pumpAndSettle();
+      final c = containerOf(tester);
+      c.read(selectedArchiveYearProvider.notifier).state = 2025;
+      c.read(selectedSeriesProvider.notifier).state = 'Faith Walk';
+      c.read(selectedSpeakerProvider.notifier).state = 'David Antwi';
+      c.read(sermonSortProvider.notifier).state = SermonSort.oldest;
+      await tester.pumpAndSettle();
+      expect(find.text('Filters \u00b7 3'), findsOneWidget);
+
+      // Dismissed without Apply: the draft is dropped.
+      await openFilters(tester);
+      await tapInSheet(tester, find.text('2024 (1)'));
+      await tester.tapAt(const Offset(195, 20));
+      await tester.pumpAndSettle();
+      expect(c.read(selectedArchiveYearProvider), 2025);
+
+      await openFilters(tester);
+      await tester.tap(find.byKey(const Key('message-filters-reset')));
+      await tester.pump();
+      expect(c.read(selectedSeriesProvider), 'Faith Walk');
+      await apply(tester);
+
+      expect(c.read(selectedArchiveYearProvider), isNull);
+      expect(c.read(selectedSeriesProvider), isNull);
+      expect(c.read(selectedSpeakerProvider), isNull);
+      expect(c.read(sermonSortProvider), SermonSort.newest);
+      expect(find.text('Filters'), findsOneWidget);
+      expect(find.text('Newest first'), findsOneWidget);
+      expect(c.read(librarySermonsProvider), hasLength(4));
+    });
+
+    testWidgets('a long series list is searchable, accents ignored', (
+      tester,
+    ) async {
+      phone(tester);
+      final many = [
+        for (var i = 1; i <= 10; i++)
+          testSermon(
+            'r$i',
+            series: 'Series $i',
+            publishedAt: DateTime(2026, 1, i),
+          ),
+        testSermon(
+          'g',
+          series: 'Grâce Abounding',
+          publishedAt: DateTime(2026, 2),
+        ),
+      ];
+      await tester.pumpWidget(app(FakePagedSermonRepository([many])));
+      await tester.pumpAndSettle();
+      await openFilters(tester);
+
+      final search = find.byKey(const Key('message-filters-series-search'));
+      await tester.ensureVisible(search);
+      await tester.enterText(search, 'grace');
+      await tester.pumpAndSettle();
+      expect(find.text('Grâce Abounding'), findsOneWidget);
+      expect(find.text('Series 3'), findsNothing);
+
+      await tester.enterText(search, 'zzz');
+      await tester.pumpAndSettle();
+      expect(find.text('No series match "zzz"'), findsOneWidget);
+
+      await tester.enterText(search, 'abound');
+      await tester.pumpAndSettle();
+      await tapInSheet(
+        tester,
+        find.byKey(const ValueKey('series-option-Grâce Abounding')),
+      );
+      await apply(tester);
+      expect(
+        containerOf(tester).read(librarySermonsProvider).map((s) => s.id),
+        ['g'],
+      );
+    });
+  });
+
+  group('paging', () {
+    final many = [
+      for (var i = 1; i <= 75; i++)
+        testSermon(
+          'p$i',
+          title: 'Paged message $i',
+          publishedAt: DateTime(2025, 1, 1).add(Duration(days: i)),
+        ),
+    ];
+
+    testWidgets('renders 30 rows; Load more adds 30; the end marker closes '
+        'the list', (tester) async {
+      tallView(tester);
+      await tester.pumpWidget(app(FakePagedSermonRepository([many])));
+      await tester.pumpAndSettle();
+      final c = containerOf(tester);
+
+      expect(c.read(libraryVisibleCountProvider), 30);
+      expect(find.text('Showing 30 of 75'), findsOneWidget);
+      expect(find.text('Paged message 46'), findsOneWidget);
+      expect(find.text('Paged message 45'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('messages-load-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('Showing 60 of 75'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('messages-load-more')));
+      await tester.pumpAndSettle();
+      expect(c.read(libraryVisibleCountProvider), 75);
+      expect(find.byKey(const Key('messages-load-more')), findsNothing);
+      expect(find.text('That\'s all 75 messages'), findsOneWidget);
+    });
+
+    testWidgets('a filter or sort change starts again at one page', (
+      tester,
+    ) async {
+      tallView(tester);
+      await tester.pumpWidget(app(FakePagedSermonRepository([many])));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('messages-load-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('Showing 60 of 75'), findsOneWidget);
+
+      await openFilters(tester);
+      await tapInSheet(tester, find.text('Oldest'));
+      await apply(tester);
+      expect(find.text('Showing 30 of 75'), findsOneWidget);
+      expect(find.text('Paged message 1'), findsOneWidget);
+    });
+
+    testWidgets('scrolling near the end loads the next page, and back to '
+        'top still returns', (tester) async {
+      await tester.pumpWidget(app(FakePagedSermonRepository([many])));
+      await tester.pumpAndSettle();
+      final c = containerOf(tester);
+      expect(c.read(libraryVisibleCountProvider), 30);
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('messages-end')),
+        600,
+        scrollable: find.byType(Scrollable).first,
+        maxScrolls: 200,
+      );
+      await tester.pumpAndSettle();
+      expect(c.read(libraryVisibleCountProvider), 75);
+      expect(find.text('That\'s all 75 messages'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('messages-back-to-top')));
+      await tester.pumpAndSettle();
+      final scrollable = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      expect(scrollable.position.pixels, 0);
+    });
+  });
+
+  group('search', () {
+    final library = [
+      for (var i = 1; i <= 45; i++)
+        testSermon(
+          'g$i',
+          title: 'Walking in Grâce, part $i',
+          publishedAt: DateTime(2025, 1, 1).add(Duration(days: i)),
+        ),
+      testSermon(
+        'x',
+        title: 'Unrelated message',
+        speaker: 'Grace Owusu',
+        publishedAt: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    testWidgets('every word matches anywhere, any case or accent, and '
+        'results page like the list', (tester) async {
+      tallView(tester);
+      await tester.pumpWidget(
+        app(FakePagedSermonRepository([library]), debounce: Duration.zero),
+      );
+      await tester.pumpAndSettle();
+      final field = find.byType(TextField);
+
+      await tester.enterText(field, 'GRACE walk');
+      await tester.pumpAndSettle();
+      expect(find.text('45 results for "GRACE walk"'), findsOneWidget);
+      expect(find.text('Showing 30 of 45'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('messages-load-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('That\'s all 45 results'), findsOneWidget);
+
+      // A new query starts again at one page; mid-word fragments match.
+      await tester.enterText(field, 'alking part');
+      await tester.pumpAndSettle();
+      expect(find.text('45 results for "alking part"'), findsOneWidget);
+      expect(find.text('Showing 30 of 45'), findsOneWidget);
+
+      // Speaker words count too, and every word must match.
+      await tester.enterText(field, 'owusu unrelated');
+      await tester.pumpAndSettle();
+      expect(find.text('1 result for "owusu unrelated"'), findsOneWidget);
+      expect(find.text('That\'s the only result'), findsOneWidget);
+
+      await tester.enterText(field, 'grace zebra');
+      await tester.pumpAndSettle();
+      expect(find.text('No messages match "grace zebra"'), findsOneWidget);
     });
   });
 }

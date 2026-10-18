@@ -215,6 +215,27 @@ void main() {
       expect(sermonMatchesQuery(quoted, "god's"), isTrue);
     });
 
+    test('words match anywhere in a word, in any order', () {
+      expect(sermonMatchesQuery(s, 'blessed christ'), isTrue);
+      expect(sermonMatchesQuery(s, 'ternal'), isTrue);
+      expect(sermonMatchesQuery(s, 'GOD   blessed'), isTrue);
+      expect(sermonMatchesQuery(s, 'blessed zebra'), isFalse);
+    });
+
+    test('accents are ignored on either side', () {
+      final accented = testSermon(
+        '3',
+        title: 'Grâce Abondante',
+        speaker: 'Zoë Mensah',
+      );
+      expect(sermonMatchesQuery(accented, 'grace abondante'), isTrue);
+      expect(sermonMatchesQuery(accented, 'zoe'), isTrue);
+      expect(sermonMatchesQuery(s, 'Évernally'), isFalse);
+      expect(sermonMatchesQuery(s, 'ÉTERNALLY'), isTrue);
+      // Decomposed (NFD) input folds the same way.
+      expect(sermonMatchesQuery(accented, 'gra\u0302ce'), isTrue);
+    });
+
     test('empty query matches nothing', () {
       expect(sermonMatchesQuery(s, '   '), isFalse);
     });

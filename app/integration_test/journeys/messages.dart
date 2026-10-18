@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
@@ -39,12 +40,59 @@ Future<void> _tapRailPill(Journey j, String label, RegExp railPattern) async {
   await pumpFor(t, const Duration(seconds: 2));
 }
 
+Finder get _sheetScroll => find.byKey(const Key('message-filters-scroll'));
+
+/// Opens the filter sheet from the control row under "All messages".
+Future<void> _openFilterSheet(Journey j) async {
+  final t = j.tester;
+  final button = find.byKey(const Key('messages-filters-button'));
+  await scrollUntilFound(
+    t,
+    button,
+    scrollable: messagesScroll,
+    step: const Offset(0, -150),
+  );
+  await t.ensureVisible(button);
+  await pumpFor(t, const Duration(milliseconds: 300));
+  await t.tap(button, warnIfMissed: false);
+  await pumpUntilFound(
+    t,
+    find.byKey(const Key('message-filters-apply')),
+    reason: 'filter sheet',
+  );
+  await pumpFor(t, const Duration(milliseconds: 500));
+}
+
+/// Scrolls the open filter sheet to [target] and taps it.
+Future<void> _tapInSheet(Journey j, Finder target) async {
+  final t = j.tester;
+  await scrollUntilFound(
+    t,
+    target,
+    scrollable: _sheetScroll,
+    step: const Offset(0, -150),
+  );
+  await t.ensureVisible(target.first);
+  await pumpFor(t, const Duration(milliseconds: 300));
+  await t.tap(target.first, warnIfMissed: false);
+  await pumpFor(t, const Duration(milliseconds: 300));
+}
+
+Future<void> _applyFilters(Journey j) async {
+  await j.tester.tap(
+    find.byKey(const Key('message-filters-apply')),
+    warnIfMissed: false,
+  );
+  await pumpFor(j.tester, const Duration(seconds: 2));
+}
+
 List<Sermon> _list(Journey j) => j.c.read(librarySermonsProvider);
 
 /// (d) Messages: the archive hydrates to the live API total; a search for a
-/// word from a live title hits it, nonsense shows the empty state; topic,
-/// series and year filters each narrow the list to what they say; Oldest /
-/// Newest order it; pull to refresh refetches.
+/// word from a live title hits it, nonsense shows the empty state; the list
+/// pages 30 at a time with "Showing n of total" and Load more; topic cards
+/// and the filter sheet's series and year each narrow the list to what they
+/// say; the sheet's Oldest / Newest order it; pull to refresh refetches.
 Future<void> messagesJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'messages');
@@ -163,21 +211,80 @@ Future<void> messagesJourney(Journey j) async {
     await openMessagesReset(j);
   }
 
+  // ── Paging ───────────────────────────────────────────────────────────────
+  if (all > kMessagesPageSize) {
+    j.check(
+      j.c.read(libraryVisibleCountProvider) == kMessagesPageSize,
+      'the list opens on one page of $kMessagesPageSize rows',
+    );
+    // Small steps: the next page renders as soon as the footer's status line
+    // is in view, so a big step can skip past it.
+    final status = find.byKey(const Key('messages-page-status'));
+    await scrollUntilFound(
+      t,
+      status,
+      scrollable: messagesScroll,
+      step: const Offset(0, -120),
+      timeout: const Duration(seconds: 60),
+    );
+    final text = t.widget<Text>(status).data ?? '';
+    final total = NumberFormat.decimalPattern().format(all);
+    j.check(
+      RegExp('^Showing [\\d,]+ of ${RegExp.escape(total)}\$').hasMatch(text),
+      'footer reads "Showing n of $total" (got "$text")',
+    );
+    // Reaching the footer renders the next page itself; Load more is the
+    // fallback. Either way the list grows past one page.
+    final loadMore = find.byKey(const Key('messages-load-more'));
+    if (loadMore.evaluate().isNotEmpty) {
+      await t.tap(loadMore, warnIfMissed: false);
+    }
+    await pumpFor(t, const Duration(seconds: 1));
+    j.check(
+      j.c.read(libraryVisibleCountProvider) > kMessagesPageSize,
+      'the list grows past one page near its end '
+      '(${j.c.read(libraryVisibleCountProvider)} rows)',
+    );
+    await j.shot('paging');
+    await openMessagesReset(j);
+  }
+
   // ── Series ───────────────────────────────────────────────────────────────
   final series = j.c.read(seriesListProvider);
+  await _openFilterSheet(j);
   if (series.isEmpty) {
     j.note('DATA: no message in the library carries a series');
     j.check(
       find.text('Series').evaluate().isEmpty,
-      'no Series rail when nothing has a series',
+      'no Series section when nothing has a series',
     );
+    await _applyFilters(j);
   } else {
     final s = pick(r, series.take(12).toList());
-    await _tapRailPill(j, '${s.name} (${s.count})', RegExp(r'^.+ \(\d+\)$'));
+    // Past eight series the sheet offers a search field.
+    if (series.length > 8) {
+      final search = find.byKey(const Key('message-filters-series-search'));
+      await scrollUntilFound(
+        t,
+        search,
+        scrollable: _sheetScroll,
+        step: const Offset(0, -150),
+      );
+      await t.ensureVisible(search);
+      await t.enterText(search, s.name);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await pumpFor(t, const Duration(milliseconds: 600));
+    }
+    await _tapInSheet(j, find.byKey(ValueKey('series-option-${s.name}')));
+    await _applyFilters(j);
     final rows = _list(j);
     j.check(
       rows.length == s.count && rows.every((x) => x.series == s.name),
       'series "${s.name}" lists its ${s.count} messages (got ${rows.length})',
+    );
+    j.check(
+      find.text('Filters \u00b7 1').evaluate().isNotEmpty,
+      'Filters button counts the series filter',
     );
     await j.shot('series');
     await openMessagesReset(j);
@@ -192,15 +299,13 @@ Future<void> messagesJourney(Journey j) async {
       .toSet();
   j.check(
     years.toSet().containsAll(yearsFromApiData),
-    'year rail offers every year in the archive ($years)',
+    'the sheet offers every year in the archive ($years)',
   );
   if (years.length > 1) {
     final year = pick(r, years);
-    await _tapRailPill(
-      j,
-      '$year (${yearCounts[year]})',
-      RegExp(r'^(All years|\d{4} \(\d+\))$'),
-    );
+    await _openFilterSheet(j);
+    await _tapInSheet(j, find.text('$year (${yearCounts[year]})'));
+    await _applyFilters(j);
     final rows = _list(j);
     final expected = lib.sermons
         .where((s) => s.publishedAt?.year == year)
@@ -227,16 +332,14 @@ Future<void> messagesJourney(Journey j) async {
     return dates.length > 1;
   }
 
-  final oldest = find.text('Oldest');
-  await scrollUntilFound(
-    t,
-    oldest,
-    scrollable: messagesScroll,
-    step: const Offset(0, -150),
-  );
-  await t.tap(oldest.first, warnIfMissed: false);
-  await pumpFor(t, const Duration(seconds: 2));
+  await _openFilterSheet(j);
+  await _tapInSheet(j, find.text('Oldest'));
+  await _applyFilters(j);
   j.check(ordered(_list(j), ascending: true), 'Oldest lists oldest first');
+  j.check(
+    find.text('Oldest first').evaluate().isNotEmpty,
+    'the control row shows "Oldest first"',
+  );
   await scrollUntilFound(
     t,
     find.byType(SermonListItem),
@@ -251,15 +354,9 @@ Future<void> messagesJourney(Journey j) async {
     '(painted "${firstPainted.title}")',
   );
   await j.shot('sort-oldest');
-  final newest = find.text('Newest');
-  await scrollUntilFound(
-    t,
-    newest,
-    scrollable: messagesScroll,
-    step: const Offset(0, 150),
-  );
-  await t.tap(newest.first, warnIfMissed: false);
-  await pumpFor(t, const Duration(seconds: 2));
+  await _openFilterSheet(j);
+  await _tapInSheet(j, find.text('Newest'));
+  await _applyFilters(j);
   j.check(ordered(_list(j), ascending: false), 'Newest lists newest first');
 
   // ── Pull to refresh ──────────────────────────────────────────────────────
