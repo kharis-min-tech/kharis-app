@@ -22,7 +22,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile
 
@@ -61,7 +61,6 @@ jobs:
             -k build \
             build.keychain
 
-          echo "===== SIGNING IDENTITIES ====="
           security find-identity -v -p codesigning
 
       - name: Install Provisioning Profile
@@ -79,41 +78,3 @@ jobs:
         id: build
         run: |
           BUILD_NUMBER=$(( ${{ github.run_number }} + 4 ))
-          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-
-      - name: Install CocoaPods
-        working-directory: app/ios
-        run: |
-          pod install
-
-      - name: Build IPA
-        working-directory: app
-        run: |
-          flutter build ipa \
-            --release \
-            --build-number=${{ steps.build.outputs.build_number }} \
-            --dart-define-from-file=env.json
-
-      - name: Configure App Store Connect API Key
-        env:
-          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-
-          cat > ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8 <<EOF
-          $APPSTORE_PRIVATE_KEY
-          EOF
-
-      - name: Upload to TestFlight
-        env:
-          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-        run: |
-          IPA_PATH=$(find app/build/ios/ipa -name "*.ipa" | head -n 1)
-
-          echo "Uploading: $IPA_PATH"
-
-          xcrun altool \
-            --upload-app \
-     
