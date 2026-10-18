@@ -14,8 +14,9 @@ import 'cache_service.dart';
 ///
 /// The last good response of each table is kept in [CacheService], so a cold
 /// launch without a connection still shows the last known branches, events
-/// and announcements. Every table is read with one fixed query, so one cache
-/// entry per table is exact.
+/// and announcements. Each cache entry holds the rows of one query: by default
+/// the entry is the table's (every table is read with one fixed query), and a
+/// table read with several queries names each one with a `cacheKey`.
 class ContentApi {
   ContentApi({Dio? dio, this._cache}) : _dio = dio ?? Dio(_options);
 
@@ -33,13 +34,15 @@ class ContentApi {
   final Dio _dio;
   final CacheService? _cache;
 
-  static String _cacheKey(String table) => 'content_cache.$table';
+  static String _cacheKey(String key) => 'content_cache.$key';
 
   /// Rows of [table] from the network. Throws when the request fails or the
-  /// body is not a JSON array; a success replaces the cached copy.
+  /// body is not a JSON array; a success replaces the copy cached under
+  /// [cacheKey] (default: [table]).
   Future<List<Map<String, dynamic>>> fetch(
     String table, {
     Map<String, String> query = const {},
+    String? cacheKey,
   }) async {
     final res = await _dio.get<Object?>(
       '${ApiConfig.supabaseUrl}/rest/v1/$table',
@@ -52,16 +55,17 @@ class ContentApi {
       throw FormatException('Expected a JSON array from $table');
     }
     final rows = decoded.whereType<Map<String, dynamic>>().toList();
-    _write(table, rows);
+    _write(cacheKey ?? table, rows);
     return rows;
   }
 
-  /// The last good rows of [table] saved on this device, or null.
-  List<Map<String, dynamic>>? cached(String table) {
+  /// The last good rows saved on this device under [key] (a table name or a
+  /// `cacheKey`), or null.
+  List<Map<String, dynamic>>? cached(String key) {
     final cache = _cache;
     if (cache == null) return null;
     try {
-      final raw = cache.getPreference<String?>(_cacheKey(table), null);
+      final raw = cache.getPreference<String?>(_cacheKey(key), null);
       if (raw == null) return null;
       final decoded = jsonDecode(raw);
       if (decoded is! List) return null;
@@ -77,11 +81,12 @@ class ContentApi {
   Future<List<Map<String, dynamic>>> load(
     String table, {
     Map<String, String> query = const {},
+    String? cacheKey,
   }) async {
     try {
-      return await fetch(table, query: query);
+      return await fetch(table, query: query, cacheKey: cacheKey);
     } catch (_) {
-      final saved = cached(table);
+      final saved = cached(cacheKey ?? table);
       if (saved != null) return saved;
       rethrow;
     }
@@ -93,19 +98,20 @@ class ContentApi {
   Stream<List<Map<String, dynamic>>> watch(
     String table, {
     Map<String, String> query = const {},
+    String? cacheKey,
   }) async* {
-    final saved = cached(table);
+    final saved = cached(cacheKey ?? table);
     if (saved != null) yield saved;
     try {
-      yield await fetch(table, query: query);
+      yield await fetch(table, query: query, cacheKey: cacheKey);
     } catch (_) {
       if (saved == null) rethrow;
     }
   }
 
-  void _write(String table, List<Map<String, dynamic>> rows) {
+  void _write(String key, List<Map<String, dynamic>> rows) {
     try {
-      _cache?.cachePreference(_cacheKey(table), jsonEncode(rows));
+      _cache?.cachePreference(_cacheKey(key), jsonEncode(rows));
     } catch (_) {
       // Caching is best effort; the fresh rows are still returned.
     }

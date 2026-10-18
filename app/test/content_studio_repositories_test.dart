@@ -403,6 +403,57 @@ void main() {
       );
       expect((await repo.getEventById('one'))?.title, 'Event one');
     });
+
+    test('queries are ordered and bounded on the server', () async {
+      final stub = SupabaseStub({
+        'events': [weekly],
+      });
+      final repo = EventRepository(api: stub.api(), clock: () => _now);
+      await repo.watchUpcomingEvents().last;
+      await repo.watchPastEvents().last;
+
+      final utcNow = _now.toUtc().toIso8601String();
+      final dayAgo = _now
+          .subtract(EventRepository.upcomingWindow)
+          .toUtc()
+          .toIso8601String();
+      final upcoming = stub.requests[0].uri.queryParameters;
+      expect(upcoming['order'], 'start_time.asc,id.asc');
+      expect(
+        upcoming['or'],
+        '(recurrence.eq.weekly,start_time.gte.$dayAgo,end_time.gte.$utcNow)',
+      );
+      final past = stub.requests[1].uri.queryParameters;
+      expect(past['order'], 'start_time.desc,id.desc');
+      expect(past['start_time'], 'lt.$utcNow');
+      expect(past['limit'], '${EventRepository.pastRowLimit}');
+    });
+
+    test('upcoming and past keep separate saved copies', () async {
+      final finished = _event('old', start: _at(2026, 10, 1, 19));
+      final soon = _event('one', start: _at(2026, 10, 20, 19));
+      final cache = FakeCacheService();
+      final stub = SupabaseStub({
+        'events': [soon],
+      });
+      final repo = EventRepository(
+        api: stub.api(cache: cache),
+        clock: () => _now,
+      );
+      await repo.watchUpcomingEvents().last;
+      stub.tables['events'] = [finished];
+      await repo.watchPastEvents().last;
+
+      stub.offline = true;
+      expect(
+        (await repo.watchUpcomingEvents().last).map((e) => e.id),
+        ['one'],
+        reason: 'the past fetch did not overwrite the upcoming copy',
+      );
+      expect((await repo.watchPastEvents().last).map((e) => e.id), ['old']);
+      expect((await repo.getEventById('old'))?.id, 'old');
+      expect((await repo.getEventById('one'))?.id, 'one');
+    });
   });
 
   group('LiveRepository', () {

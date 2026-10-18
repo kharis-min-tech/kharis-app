@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -78,5 +80,27 @@ void main() {
       throwsA(isA<DioException>()),
     );
     expect(adapter.calls, 2);
+  });
+
+  test('an empty versions list is an error, and Retry asks again', () async {
+    var calls = 0;
+    var body = '{"data":[]}';
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            calls++;
+            handler.resolve(
+              Response(requestOptions: options, data: jsonDecode(body)),
+            );
+          },
+        ),
+      );
+    final repo = BibleRepository(dio: dio, appKey: 'test');
+
+    await expectLater(repo.getBibles(), throwsA(isA<StateError>()));
+    body = '{"data":[{"id":111,"abbreviation":"NIV","title":"NIV"}]}';
+    expect((await repo.getBibles()).single.abbreviation, 'NIV');
+    expect(calls, 2);
   });
 }

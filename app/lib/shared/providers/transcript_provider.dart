@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/features/player/domain/transcript.dart';
 
 /// HTTP client for transcript files; overridden in tests.
-final transcriptDioProvider = Provider<Dio>((ref) => Dio());
+final transcriptDioProvider = Provider<Dio>(
+  (ref) => Dio(BaseOptions(connectTimeout: const Duration(seconds: 10))),
+);
 
 /// Fetches one sermon's transcript on demand and splits it at its timestamp
 /// markers (see [Transcript.parse]) once, rather than on every rebuild.

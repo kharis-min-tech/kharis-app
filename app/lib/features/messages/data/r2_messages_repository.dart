@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show compute;
 
@@ -37,6 +39,11 @@ class R2MessagesRepository extends AbstractSermonRepository {
   /// ~1.5 MB file could otherwise hold page 1 (and the library) for minutes.
   final Duration mirrorDeadline;
 
+  /// How many sermons the mirror may trail the API's total by (records the
+  /// mapper drops, deletions between the two reads) before it counts as
+  /// truncated.
+  static const mirrorCountTolerance = 5;
+
   @override
   Future<SermonPage> fetchPage({String? url, String? search}) async {
     if (url != null || (search != null && search.isNotEmpty)) {
@@ -72,9 +79,20 @@ class R2MessagesRepository extends AbstractSermonRepository {
               : s.copyWith(transcriptUrl: transcripts[s.id]),
       ...mirror.where((s) => seen.add(s.id)),
     ];
-    // The whole archive is in hand, so there is no next page and the count
-    // is what was merged: the mirror plus every newer arrival on page 1.
-    return SermonPage(sermons: sermons, totalCount: sermons.length);
+    // A truncated mirror (short upstream list, partial upload) must not pose
+    // as the whole archive: it would be saved over the cached library. When
+    // the live API counts clearly more, use the paged walk instead.
+    if (head != null &&
+        sermons.length + mirrorCountTolerance < head.totalCount) {
+      return head;
+    }
+    // The whole archive is in hand, so there is no next page. The count never
+    // drops below the API's own total, so a small shortfall still reads as a
+    // gap for the notifier rather than a complete archive.
+    return SermonPage(
+      sermons: sermons,
+      totalCount: math.max(sermons.length, head?.totalCount ?? 0),
+    );
   }
 
   Future<List<Sermon>> _fetchMirror() async {
@@ -95,16 +113,17 @@ class R2MessagesRepository extends AbstractSermonRepository {
   }
 }
 
-/// Maps `messages.json` records. Top-level so [compute] can run it in a
-/// background isolate.
+/// Maps `messages.json` records, dropping malformed ones like
+/// [mapApiSermons]. Top-level so [compute] can run it in a background isolate.
 List<Sermon> mapR2Messages(List<dynamic> records) => [
-  for (final r in records) ?mapR2Message(r as Map<String, dynamic>),
+  for (final r in records) ?tryMapSermon(r, mapR2Message),
 ];
 
 /// Maps one `messages.json` record with the same rules as [mapApiSermon], so
 /// a sermon looks identical whichever source served it. Field names come
 /// from the Worker's schema (`backend/cloudflare-worker/src/index.js`), not
-/// the raw API shape. Only a record without an id is dropped.
+/// the raw API shape. A record without an id is dropped; a wrongly typed field
+/// throws, and [mapR2Messages] drops that record.
 Sermon? mapR2Message(Map<String, dynamic> m) {
   final id = '${m['id'] ?? ''}'.trim();
   if (id.isEmpty) return null;
