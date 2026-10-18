@@ -3,7 +3,6 @@ import {
   getFirestore,
   Timestamp,
   FieldValue,
-  FieldPath,
   Query,
 } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
@@ -14,18 +13,7 @@ import { branchTopic } from './topics';
 import { todayInLondon } from './london-time';
 import { NewsRecord, isPushDue, pickAnnouncements } from './announcements';
 import { EventRecord, IN_PROGRESS_LOOKBACK_MS, pickEvents } from './events-api';
-import {
-  DATE_KEY,
-  MONTH_KEY,
-  PLAN_LOOKBACK,
-  PlanEntry,
-  ReadingPlanDoc,
-  ResolvedReading,
-  dayDocReading,
-  formatReference,
-  planEntry,
-  resolveFromPlans,
-} from './reading-plans';
+import { fetchStudioReading, runDailyReadingPush } from './daily-reading';
 
 // Initialize Firebase Admin once at module load
 initializeApp();
@@ -311,128 +299,17 @@ export const getEvents = onRequest(
 const DAILY_READING_TOPIC = 'daily_reading';
 
 /**
- * Plans that had already started on or before [date], newest start first.
- * Single-field range + order, so no composite index is required.
- */
-async function loadPlans(
-  db: FirebaseFirestore.Firestore,
-  date: string,
-): Promise<PlanEntry[]> {
-  const snapshot = await db
-    .collection('readingPlans')
-    .where('startDate', '<=', date)
-    .orderBy('startDate', 'desc')
-    .limit(PLAN_LOOKBACK)
-    .get();
-
-  const entries: PlanEntry[] = [];
-  for (const doc of snapshot.docs) {
-    const entry = planEntry(doc.id, doc.data() as ReadingPlanDoc);
-    if (entry) entries.push(entry);
-  }
-  return entries;
-}
-
-/** The reading for a single date, hand-written day doc first. */
-async function resolveReading(
-  db: FirebaseFirestore.Firestore,
-  date: string,
-): Promise<ResolvedReading | null> {
-  const doc = await db.collection('dailyContent').doc(date).get();
-  const data = doc.exists ? doc.data() ?? {} : null;
-  if (data?.reading?.book) return dayDocReading(date, data);
-  return resolveFromPlans(await loadPlans(db, date), date);
-}
-
-/** Every resolvable reading in `YYYY-MM`, date ascending. */
-async function resolveMonth(
-  db: FirebaseFirestore.Firestore,
-  month: string,
-): Promise<ResolvedReading[]> {
-  const [year, monthIndex] = month.split('-').map((p) => parseInt(p, 10));
-  const dayCount = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
-  const lastDate = `${month}-${String(dayCount).padStart(2, '0')}`;
-
-  const [daySnapshot, plans] = await Promise.all([
-    db
-      .collection('dailyContent')
-      .where(FieldPath.documentId(), '>=', `${month}-01`)
-      .where(FieldPath.documentId(), '<=', lastDate)
-      .orderBy(FieldPath.documentId(), 'asc')
-      .get(),
-    loadPlans(db, lastDate),
-  ]);
-
-  const dayDocs = new Map(daySnapshot.docs.map((doc) => [doc.id, doc.data()]));
-  const readings: ResolvedReading[] = [];
-  for (let day = 1; day <= dayCount; day++) {
-    const date = `${month}-${String(day).padStart(2, '0')}`;
-    const data = dayDocs.get(date);
-    if (data?.reading?.book) {
-      readings.push(dayDocReading(date, data));
-      continue;
-    }
-    const resolved = resolveFromPlans(plans, date);
-    if (resolved) readings.push(resolved);
-  }
-  return readings;
-}
-
-/**
- * HTTP: GET /getDailyReading
- * Query params:
- *   - date: YYYY-MM-DD (default: today in Europe/London)
- *   - month: YYYY-MM (returns every resolvable reading in that month, date asc)
- *
- * Each reading carries `source` (`day` | `plan` | `plan-last-day`) and the
- * originating `planId`/`planTitle` so the Content Studio can show an admin
- * exactly why a date resolves the way it does.
- */
-export const getDailyReading = onRequest(
-  { memory: '256MiB', timeoutSeconds: 30, cors: true },
-  async (req, res) => {
-    if (req.method !== 'GET') {
-      res.status(405).json({ error: 'Method Not Allowed' });
-      return;
-    }
-    const db = getFirestore();
-    const { date, month } = req.query as Record<string, string>;
-
-    if (month && !MONTH_KEY.test(month)) {
-      res.status(400).json({ error: 'month must be YYYY-MM' });
-      return;
-    }
-    if (date && !DATE_KEY.test(date)) {
-      res.status(400).json({ error: 'date must be YYYY-MM-DD' });
-      return;
-    }
-
-    let readings: ResolvedReading[];
-    if (month) {
-      readings = await resolveMonth(db, month);
-    } else {
-      const resolved = await resolveReading(db, date || todayInLondon());
-      readings = resolved ? [resolved] : [];
-    }
-
-    res.set('Cache-Control', API_CACHE_CONTROL);
-    res.status(200).json({
-      readings,
-      count: readings.length,
-    });
-  }
-);
-
-/**
  * Daily reading notification. Fires once a day at 07:00 Europe/London and
- * pushes the resolved reading to the `daily_reading` topic — the same topic the
- * app's notification preference toggles, so opting out really opts out.
+ * pushes today's Content Studio reading (`daily-reading.ts`: the same
+ * `daily_entries` row the app shows) to the `daily_reading` topic, the topic
+ * the app's notification preference toggles. No Studio reading, no push.
  *
  * Idempotency: `dailyReadingPushes/{YYYY-MM-DD}` is CLAIMED in a transaction
- * before the send, so a re-run (scheduler retry, redeploy, manual trigger) can
- * never send twice for one date. A failed send records `pushError` on the claim
- * instead of releasing it: a missed day can be fixed by hand, a duplicate blast
- * to the whole church cannot be taken back.
+ * before the lookup, so a re-run (scheduler retry, redeploy, manual trigger)
+ * can never send twice for one date. A skipped day records `skipped`; a failed
+ * send records `pushError` on the claim instead of releasing it: a missed day
+ * can be fixed by hand, a duplicate blast to the whole church cannot be taken
+ * back.
  */
 export const pushDailyReading = onSchedule(
   {
@@ -446,55 +323,41 @@ export const pushDailyReading = onSchedule(
     const date = todayInLondon();
     const marker = db.collection('dailyReadingPushes').doc(date);
 
-    const claimed = await db.runTransaction(async (tx) => {
-      const existing = await tx.get(marker);
-      if (existing.exists) return false;
-      tx.set(marker, { date, claimedAt: FieldValue.serverTimestamp() });
-      return true;
+    await runDailyReadingPush(date, {
+      claim: () =>
+        db.runTransaction(async (tx) => {
+          const existing = await tx.get(marker);
+          if (existing.exists) return false;
+          tx.set(marker, { date, claimedAt: FieldValue.serverTimestamp() });
+          return true;
+        }),
+      lookup: () => fetchStudioReading(date),
+      send: ({ title, body, data }) =>
+        getMessaging().send({
+          topic: DAILY_READING_TOPIC,
+          notification: { title, body },
+          data,
+          android: { priority: 'high' },
+          apns: { payload: { aps: { sound: 'default' } } },
+        }),
+      recordSkipped: async (reason) => {
+        await marker.set({ skipped: reason }, { merge: true });
+      },
+      recordSent: async (pushMessageId, reference, workspace) => {
+        await marker.set(
+          {
+            pushedAt: FieldValue.serverTimestamp(),
+            pushMessageId,
+            reference,
+            workspace,
+          },
+          { merge: true },
+        );
+      },
+      recordError: async (e) => {
+        await marker.set({ pushError: String(e) }, { merge: true });
+      },
     });
-    if (!claimed) {
-      console.log(`[reading-push] ${date} already claimed — skipping`);
-      return;
-    }
-
-    const resolved = await resolveReading(db, date);
-    if (!resolved?.reading.book) {
-      await marker.set({ skipped: 'no reading resolved' }, { merge: true });
-      console.warn(`[reading-push] no reading resolved for ${date}`);
-      return;
-    }
-
-    const reference = formatReference(
-      resolved.reading.book,
-      resolved.reading.chapter,
-      resolved.reading.verse,
-    );
-    try {
-      const id = await getMessaging().send({
-        topic: DAILY_READING_TOPIC,
-        notification: { title: "Today's Bible reading", body: reference },
-        // `reading` is the type NotificationService._handleNotificationTap
-        // already routes to /reading — do not invent a new string here.
-        data: { type: 'reading', date, reference, source: resolved.source },
-        android: { priority: 'high' },
-        apns: { payload: { aps: { sound: 'default' } } },
-      });
-      await marker.set(
-        {
-          pushedAt: FieldValue.serverTimestamp(),
-          pushMessageId: id,
-          reference,
-          source: resolved.source,
-        },
-        { merge: true },
-      );
-      console.log(`[reading-push] ${date} -> ${reference} (${id})`);
-    } catch (e) {
-      console.error(`[reading-push] failed for ${date}:`, e);
-      await marker
-        .set({ pushError: String(e) }, { merge: true })
-        .catch(() => undefined);
-    }
   },
 );
 
