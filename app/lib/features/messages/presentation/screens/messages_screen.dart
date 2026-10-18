@@ -686,23 +686,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                   ),
                               ],
                             ),
-                            for (final year in archiveYears)
-                              _SortPill(
-                                label:
-                                    '$year (${archiveYearCounts[year] ?? 0})',
-                                active: selectedYear == year,
-                                onTap: () {
-                                  ref
-                                      .read(
-                                        selectedArchiveYearProvider.notifier,
-                                      )
-                                      .state = selectedYear == year
-                                      ? null
-                                      : year;
-                                  _scrollToList();
-                                },
-                              ),
-                          ],
+                          ),
                         ),
 
                       // ── 6. Sermon list ───────────────────────────────────────
