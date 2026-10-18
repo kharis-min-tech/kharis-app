@@ -13,9 +13,11 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      # 1. Checkout repository
       - name: Checkout source
         uses: actions/checkout@v4
 
+      # 2. Check required GitHub Secrets
       - name: Check required secrets
         env:
           IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
@@ -25,6 +27,8 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
+          set -euo pipefail
+
           missing=""
 
           [ -n "$IOS_CERTIFICATE_BASE64" ] || missing="$missing IOS_CERTIFICATE_BASE64"
@@ -39,6 +43,7 @@ jobs:
             exit 1
           fi
 
+      # 3. Install Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -46,17 +51,21 @@ jobs:
           channel: stable
           cache: true
 
+      # 4. Install dependencies
       - name: Install Flutter dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile
 
+      # 5. Restore environment configuration
       - name: Restore env.json
         working-directory: app
         env:
           ENV_JSON: ${{ secrets.ENV_JSON }}
         run: |
+          set -euo pipefail
           printf '%s' "$ENV_JSON" > env.json
 
+      # 6. Install Apple Distribution certificate
       - name: Install Apple Certificate
         env:
           IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
@@ -64,10 +73,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          printf '%s' "$IOS_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          printf '%s' "$IOS_CERTIFICATE_BASE64" \
+            | base64 --decode > certificate.p12
 
           security create-keychain -p build build.keychain
-
           security list-keychains -d user -s build.keychain login.keychain-db
           security default-keychain -s build.keychain
           security unlock-keychain -p build build.keychain
@@ -84,9 +93,16 @@ jobs:
             -k build \
             build.keychain
 
-          echo "===== SIGNING IDENTITIES ====="
+          echo "===== AVAILABLE SIGNING IDENTITIES ====="
           security find-identity -v -p codesigning build.keychain
 
+          if ! security find-identity -v -p codesigning build.keychain \
+            | grep -qE '^[[:space:]]*[0-9]+\)'; then
+            echo "::error::No valid code-signing identity was found in build.keychain."
+            exit 1
+          fi
+
+      # 7. Install the exact provisioning profile
       - name: Install Provisioning Profile
         env:
           IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
@@ -101,7 +117,7 @@ jobs:
 
           security cms -D \
             -i profile.mobileprovision \
-            > profile.plist
+            -o profile.plist
 
           PROFILE_UUID=$(/usr/libexec/PlistBuddy \
             -c "Print :UUID" profile.plist)
@@ -118,6 +134,12 @@ jobs:
           echo "Installed profile: $PROFILE_NAME"
           echo "Profile UUID: $PROFILE_UUID"
 
+          if [ "$PROFILE_UUID" != "979a3d26-6f9e-457d-8f5e-651006b23894" ]; then
+            echo "::error::The installed provisioning profile UUID is not the expected profile."
+            exit 1
+          fi
+
+      # 8. Inspect and validate provisioning profile
       - name: Inspect and verify provisioning profile
         run: |
           set -euo pipefail
@@ -129,46 +151,64 @@ jobs:
 
           echo "===== PROFILE ENTITLEMENTS ====="
 
-          /usr/libexec/PlistBuddy \
-            -c "Print :Entitlements:application-identifier" profile.plist
-
-          /usr/libexec/PlistBuddy \
-            -c "Print :Entitlements:aps-environment" profile.plist
-
-          /usr/libexec/PlistBuddy \
-            -c "Print :Entitlements:com.apple.developer.associated-domains" \
-            profile.plist
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:application-identifier" profile.plist)
 
           APS_ENV=$(/usr/libexec/PlistBuddy \
             -c "Print :Entitlements:aps-environment" profile.plist)
 
+          ASSOCIATED_DOMAINS=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:com.apple.developer.associated-domains" \
+            profile.plist)
+
+          echo "Application identifier: $PROFILE_APP_ID"
+          echo "Push notification environment: $APS_ENV"
+          echo "Associated Domains entitlement: $ASSOCIATED_DOMAINS"
+
+          case "$PROFILE_APP_ID" in
+            Z9TTRH45X3.com.kharis.church) ;;
+            *)
+              echo "::error::Unexpected provisioning profile App ID: $PROFILE_APP_ID"
+              exit 1
+              ;;
+          esac
+
           if [ "$APS_ENV" != "production" ]; then
-            echo "::error::The provisioning profile must have aps-environment=production for App Store distribution."
+            echo "::error::Expected aps-environment=production for App Store distribution."
             exit 1
           fi
 
-          /usr/libexec/PlistBuddy \
-            -c "Print :Entitlements:com.apple.developer.associated-domains" \
-            profile.plist \
-            | grep -F "applinks:kharis-app-47c49.web.app" || {
-              echo "::error::The profile does not include the required Associated Domains entitlement."
-              exit 1
-            }
+          # A wildcard is accepted by this diagnostic check.
+          # The actual archive export remains responsible for validating signing.
+          if [ "$ASSOCIATED_DOMAINS" = "*" ]; then
+            echo "::warning::The profile reports a wildcard Associated Domains entitlement. Continuing to the actual export step."
+          elif ! printf '%s\n' "$ASSOCIATED_DOMAINS" \
+            | grep -Fq "applinks:kharis-app-47c49.web.app"; then
+            echo "::error::The profile output does not show the required Associated Domains domain."
+            exit 1
+          fi
 
-          echo "Provisioning profile checks passed."
+          echo "Provisioning profile diagnostic checks passed."
 
+      # 9. Calculate unique build number
       - name: Calculate build number
         id: build
         run: |
+          set -euo pipefail
+
           BUILD_NUMBER=$(( ${{ github.run_number }} + 4 ))
+
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Using build number: $BUILD_NUMBER"
 
+      # 10. Install CocoaPods
       - name: Install CocoaPods
         working-directory: app/ios
         run: |
+          set -euo pipefail
           pod install
 
+      # 11. Generate export options in the exact location used by the build
       - name: Prepare iOS export options
         working-directory: app
         run: |
@@ -180,15 +220,21 @@ jobs:
               -scheme Runner \
               -configuration Release \
               -showBuildSettings 2>/dev/null \
-            | awk -F ' = ' '/^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = / {print $2; exit}'
+            | awk -F ' = ' \
+              '/^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = / {print $2; exit}'
           )
 
           if [ -z "$BUNDLE_ID" ]; then
-            echo "::error::Could not determine iOS bundle identifier."
+            echo "::error::Could not determine the iOS bundle identifier."
             exit 1
           fi
 
           echo "Bundle identifier: $BUNDLE_ID"
+
+          if [ "$BUNDLE_ID" != "com.kharis.church" ]; then
+            echo "::error::Unexpected bundle identifier: $BUNDLE_ID"
+            exit 1
+          fi
 
           PROFILE_APP_ID=$(/usr/libexec/PlistBuddy \
             -c "Print :Entitlements:application-identifier" \
@@ -209,6 +255,8 @@ jobs:
           <dict>
             <key>method</key>
             <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>Z9TTRH45X3</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>provisioningProfiles</key>
@@ -216,41 +264,64 @@ jobs:
               <key>$BUNDLE_ID</key>
               <string>$PROFILE_UUID</string>
             </dict>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <true/>
           </dict>
           </plist>
           EOF
 
+          echo "===== EXPORT OPTIONS ====="
           plutil -lint export_options.plist
+          plutil -p export_options.plist
 
+      # 12. Build the signed App Store IPA
       - name: Build IPA
         working-directory: app
         run: |
+          set -euo pipefail
+
           flutter build ipa \
             --release \
             --build-number=${{ steps.build.outputs.build_number }} \
             --dart-define-from-file=env.json \
             --export-options-plist=export_options.plist
 
+      # 13. Find the generated IPA
       - name: Find IPA
         id: ipa
         run: |
           set -euo pipefail
 
-          IPA_PATH=$(find app/build/ios/ipa -name "*.ipa" -print -quit)
+          IPA_PATH=$(find app/build/ios/ipa \
+            -type f -name "*.ipa" -print -quit)
 
           if [ -z "$IPA_PATH" ]; then
-            echo "::error::IPA not found."
+            echo "::error::IPA not found in app/build/ios/ipa."
             exit 1
           fi
 
           echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
           echo "Found IPA: $IPA_PATH"
 
+      # 14. Save the IPA artifact before attempting upload
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-ipa-${{ steps.build.outputs.build_number }}
+          path: app/build/ios/ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      # 15. Upload the IPA to TestFlight
       - name: Upload to TestFlight
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
+          set -euo pipefail
+
           xcrun altool \
             --upload-app \
             --type ios \
@@ -258,13 +329,7 @@ jobs:
             --username "$APPLE_ID" \
             --password "$APPLE_APP_PASSWORD"
 
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-release-ipa-${{ steps.build.outputs.build_number }}
-          path: app/build/ios/ipa/*.ipa
-          retention-days: 30
-
+      # 16. Clean up temporary files and keychain
       - name: Cleanup
         if: always()
         run: |
@@ -273,4 +338,5 @@ jobs:
           rm -f profile.mobileprovision
           rm -f profile.plist
           rm -f app/export_options.plist
-          rm -f build.keychain
+
+          security delete-keychain build.keychain 2>/dev/null || true

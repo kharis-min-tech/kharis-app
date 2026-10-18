@@ -5,11 +5,11 @@
 	<key>method</key>
 	<string>app-store</string>
 	<key>teamID</key>
-	<string>YOUR_TEAM_ID</string>
+	<string>Z9TTRH45X3</string>
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.kharis.church</key>
-		<string>YOUR_PROVISIONING_PROFILE_NAME</string>
+		<string>979a3d26-6f9e-457d-8f5e-651006b23894</string>
 	</dict>
 	<key>compileBitcode</key>
 	<false/>
