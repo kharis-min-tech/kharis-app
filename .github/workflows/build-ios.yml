@@ -15,6 +15,29 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Check required secrets
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          missing=""
+
+          [ -n "$IOS_CERTIFICATE_BASE64" ] || missing="$missing IOS_CERTIFICATE_BASE64"
+          [ -n "$IOS_CERTIFICATE_PASSWORD" ] || missing="$missing IOS_CERTIFICATE_PASSWORD"
+          [ -n "$IOS_PROVISIONING_PROFILE_BASE64" ] || missing="$missing IOS_PROVISIONING_PROFILE_BASE64"
+          [ -n "$ENV_JSON" ] || missing="$missing ENV_JSON"
+          [ -n "$APPLE_ID" ] || missing="$missing APPLE_ID"
+          [ -n "$APPLE_APP_PASSWORD" ] || missing="$missing APPLE_APP_PASSWORD"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secrets:$missing"
+            exit 1
+          fi
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -61,6 +84,7 @@ jobs:
             -k build \
             build.keychain
 
+          echo "===== SIGNING IDENTITIES ====="
           security find-identity -v -p codesigning
 
       - name: Install Provisioning Profile
@@ -74,7 +98,65 @@ jobs:
           cp profile.mobileprovision \
             ~/Library/MobileDevice/Provisioning\ Profiles/
 
+      - name: Verify Provisioning Profile
+        run: |
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles
+
       - name: Calculate build number
         id: build
         run: |
           BUILD_NUMBER=$(( ${{ github.run_number }} + 4 ))
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Using build number: $BUILD_NUMBER"
+
+      - name: Install CocoaPods
+        working-directory: app/ios
+        run: |
+          pod install
+
+      - name: Build IPA
+        working-directory: app
+        run: |
+          flutter build ipa \
+            --release \
+            --build-number=${{ steps.build.outputs.build_number }} \
+            --dart-define-from-file=env.json
+
+      - name: Find IPA
+        id: ipa
+        run: |
+          IPA_PATH=$(find app/build/ios/ipa -name "*.ipa" | head -n 1)
+
+          if [ -z "$IPA_PATH" ]; then
+            echo "IPA not found"
+            exit 1
+          fi
+
+          echo "ipa_path=$IPA_PATH" >> $GITHUB_OUTPUT
+          echo "Found IPA: $IPA_PATH"
+
+      - name: Upload to TestFlight
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun altool \
+            --upload-app \
+            --type ios \
+            --file "${{ steps.ipa.outputs.ipa_path }}" \
+            --username "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD"
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-ipa-${{ steps.build.outputs.build_number }}
+          path: app/build/ios/ipa/*.ipa
+          retention-days: 30
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f app/env.json
+          rm -f certificate.p12
+          rm -f profile.mobileprovision
