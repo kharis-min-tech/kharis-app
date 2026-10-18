@@ -272,9 +272,25 @@ jobs:
           </plist>
           EOF
 
-          echo "===== EXPORT OPTIONS ====="
-          plutil -lint export_options.plist
-          plutil -p export_options.plist
+          
+          echo "===== EXPORT OPTIONS FILE ====="
+          ls -l export_options.plist
+
+          echo "===== VALIDATING PLIST SYNTAX ====="
+          if ! plutil -lint export_options.plist; then
+            echo "::error::export_options.plist is invalid."
+            cat export_options.plist
+            exit 1
+          fi
+
+          echo "===== EXPORT OPTIONS CONTENTS ====="
+          if ! plutil -p export_options.plist; then
+            echo "::error::Could not print export_options.plist."
+            exit 1
+          fi
+
+          echo "Export options generated and validated successfully."
+
 
       # 12. Build the signed App Store IPA
       - name: Build IPA
