@@ -12,7 +12,12 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { EventDoc, NewsDoc } from './types';
 import { branchTopic } from './topics';
 import { todayInLondon } from './london-time';
-import { NewsRecord, isPushDue, pickAnnouncements } from './announcements';
+import {
+  NewsRecord,
+  isPushDue,
+  pickAnnouncements,
+  pushAnnouncementOnce,
+} from './announcements';
 import { EventRecord, IN_PROGRESS_LOOKBACK_MS, pickEvents } from './events-api';
 import {
   DATE_KEY,
@@ -33,7 +38,6 @@ initializeApp();
 // Re-export scheduled functions
 export { syncYouTube } from './sync-youtube';
 export { syncWebsiteEvents } from './sync-website-events';
-export { feedProxy } from './feed-proxy';
 export { sermonApiProxy } from './sermon-proxy';
 
 // Content Studio -> device pushes: Firestore triggers that fire on the write
@@ -45,8 +49,22 @@ export {
   pushServiceReminders,
   purgePushLog,
 } from './content-notifications';
+import { PUSH_LOG, claimPush } from './content-notifications';
+import { PUBLIC_MAX_INSTANCES, TtlCache } from './response-cache';
+import { isBirthdayCelebrant } from './birthdays';
 
 const ANNOUNCEMENT_PAGE_SIZE = 20;
+
+/**
+ * Per-instance cache of the public read endpoints' JSON bodies (see
+ * `response-cache.ts`). getBranches/getEvents keep a body as long as their
+ * Cache-Control max-age; getAnnouncements sends no Cache-Control, so a short
+ * TTL keeps a fresh notice (announced by push) visible almost at once.
+ */
+const responseCache = new TtlCache<object>(200);
+const ANNOUNCEMENT_CACHE_TTL_MS = 30_000;
+const API_CACHE_TTL_MS = 300_000;
+const EVENT_PAST_CACHE_TTL_MS = 60_000;
 
 /** The newest published `news` docs, optionally for one campus. */
 async function newestNews(
@@ -73,7 +91,7 @@ async function newestNews(
  * published (`publishedAt <= now`) and not expired. See `pickAnnouncements`.
  */
 export const getAnnouncements = onRequest(
-  { memory: '256MiB', timeoutSeconds: 30, cors: true },
+  { memory: '256MiB', timeoutSeconds: 30, cors: true, maxInstances: PUBLIC_MAX_INSTANCES },
   async (req, res) => {
     if (req.method !== 'GET') {
       res.status(405).json({ error: 'Method Not Allowed' });
@@ -85,27 +103,34 @@ export const getAnnouncements = onRequest(
         ANNOUNCEMENT_PAGE_SIZE,
       50
     );
-    const db = getFirestore();
-    const now = Timestamp.now();
-    // Over-fetch so the post-filter for expired items still fills the page.
-    const fetch = Math.min(limit * 2, 100);
-    const [branchDocs, anyDocs] = await Promise.all([
-      branch ? newestNews(db, now, fetch, branch) : Promise.resolve([]),
-      newestNews(db, now, fetch),
-    ]);
-    const announcements = pickAnnouncements(
-      branch,
-      branchDocs,
-      anyDocs,
-      limit,
-      now.toMillis(),
+    const payload = await responseCache.getOrLoad(
+      `announcements|${branch ?? ''}|${limit}`,
+      ANNOUNCEMENT_CACHE_TTL_MS,
+      async () => {
+        const db = getFirestore();
+        const now = Timestamp.now();
+        // Over-fetch so the post-filter for expired items still fills the page.
+        const fetch = Math.min(limit * 2, 100);
+        const [branchDocs, anyDocs] = await Promise.all([
+          branch ? newestNews(db, now, fetch, branch) : Promise.resolve([]),
+          newestNews(db, now, fetch),
+        ]);
+        const announcements = pickAnnouncements(
+          branch,
+          branchDocs,
+          anyDocs,
+          limit,
+          now.toMillis(),
+        );
+        return {
+          announcements,
+          count: announcements.length,
+          timestamp: now.toDate().toISOString(),
+        };
+      },
     );
 
-    res.status(200).json({
-      announcements,
-      count: announcements.length,
-      timestamp: now.toDate().toISOString(),
-    });
+    res.status(200).json(payload);
   }
 );
 
@@ -117,9 +142,10 @@ const PUSH_WINDOW_MS = 15 * 60 * 1000;
  * or `all` (all-campus) — topic names mirror the app's subscriptions
  * (`branch_<slug(branchName)>` / `all`), and the topic is derived from the very
  * same `branch` field getAnnouncements scopes on, so an announcement is pushed
- * to exactly the audience that can later read it back. Idempotent via the
- * `pushedAt` marker; only the last 15 minutes are considered, so it never
- * blasts the backlog.
+ * to exactly the audience that can later read it back. Idempotent via a
+ * `pushLog/news_<id>` claim taken before the send (see
+ * `pushAnnouncementOnce`); only the last 15 minutes are considered, so it
+ * never blasts the backlog.
  *
  * A Studio-scheduled notice (future `publishedAt`) is pushed when its time
  * arrives, not when it is saved: the query and `isPushDue` both require
@@ -165,31 +191,38 @@ export const pushPendingAnnouncements = onSchedule(
           ? `${data.body.slice(0, 137)}...`
           : data.body) || 'New announcement';
       const eventId = (data.eventId ?? '').toString().trim();
-      try {
-        const id = await getMessaging().send({
-          topic,
-          notification: { title, body },
-          data: {
-            type: 'announcement',
-            newsId: doc.id,
-            branch,
-            ...(eventId ? { eventId } : {}),
-          },
-          android: { priority: 'high' },
-          apns: { payload: { aps: { sound: 'default' } } },
-        });
-        await doc.ref.set(
-          { pushedAt: FieldValue.serverTimestamp(), pushTopic: topic, pushMessageId: id },
-          { merge: true },
-        );
-        pushed++;
-        console.log(`[push] ${doc.id} -> ${topic} (${id})`);
-      } catch (e) {
-        console.error(`[push] failed for ${doc.id} topic ${topic}:`, e);
-        await doc.ref
-          .set({ pushError: String(e) }, { merge: true })
-          .catch(() => undefined);
-      }
+      const claimKey = `news_${doc.id}`;
+      const outcome = await pushAnnouncementOnce({
+        claim: () => claimPush(claimKey),
+        send: () =>
+          getMessaging().send({
+            topic,
+            notification: { title, body },
+            data: {
+              type: 'announcement',
+              newsId: doc.id,
+              branch,
+              ...(eventId ? { eventId } : {}),
+            },
+            android: { priority: 'high' },
+            apns: { payload: { aps: { sound: 'default' } } },
+          }),
+        markPushed: async (id) => {
+          await doc.ref.set(
+            { pushedAt: FieldValue.serverTimestamp(), pushTopic: topic, pushMessageId: id },
+            { merge: true },
+          );
+          console.log(`[push] ${doc.id} -> ${topic} (${id})`);
+        },
+        release: async () => {
+          await db.collection(PUSH_LOG).doc(claimKey).delete();
+        },
+        recordError: async (e) => {
+          console.error(`[push] failed for ${doc.id} topic ${topic}:`, e);
+          await doc.ref.set({ pushError: String(e) }, { merge: true });
+        },
+      });
+      if (outcome === 'sent') pushed++;
     }
 
     console.log(
@@ -215,28 +248,26 @@ const PAST_EVENT_LIMIT = 15;
  * Returns all branches (venues) ordered by `order` asc, doc fields verbatim.
  */
 export const getBranches = onRequest(
-  { memory: '256MiB', timeoutSeconds: 30, cors: true },
+  { memory: '256MiB', timeoutSeconds: 30, cors: true, maxInstances: PUBLIC_MAX_INSTANCES },
   async (req, res) => {
     if (req.method !== 'GET') {
       res.status(405).json({ error: 'Method Not Allowed' });
       return;
     }
-    const db = getFirestore();
-    const snapshot = await db
-      .collection('branches')
-      .orderBy('order', 'asc')
-      .get();
-
-    const branches = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const payload = await responseCache.getOrLoad('branches', API_CACHE_TTL_MS, async () => {
+      const snapshot = await getFirestore()
+        .collection('branches')
+        .orderBy('order', 'asc')
+        .get();
+      const branches = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      return { branches, count: branches.length };
+    });
 
     res.set('Cache-Control', API_CACHE_CONTROL);
-    res.status(200).json({
-      branches,
-      count: branches.length,
-    });
+    res.status(200).json(payload);
   }
 );
 
@@ -258,7 +289,7 @@ const ALL_CAMPUS_EVENT_WINDOW = 200;
  * stream, so the list does not change when one source replaces the other.
  */
 export const getEvents = onRequest(
-  { memory: '256MiB', timeoutSeconds: 30, cors: true },
+  { memory: '256MiB', timeoutSeconds: 30, cors: true, maxInstances: PUBLIC_MAX_INSTANCES },
   async (req, res) => {
     if (req.method !== 'GET') {
       res.status(405).json({ error: 'Method Not Allowed' });
@@ -273,37 +304,43 @@ export const getEvents = onRequest(
     const past = when === 'past';
     const maxLimit = past ? PAST_EVENT_LIMIT : EVENT_PAGE_SIZE;
     const limit = Math.min(parseInt(limitParam, 10) || maxLimit, maxLimit);
-    const nowMs = Date.now();
-    // Over-fetch: running events sit in both windows and are dropped from one.
-    const fetch = Math.min(limit * 2, 100);
 
-    const window = async (size: number, campus?: string): Promise<EventRecord[]> => {
-      let query: Query = db.collection('events');
-      if (campus) query = query.where('branch', '==', campus);
-      query = past
-        ? query
-            .where('startTime', '<', Timestamp.fromMillis(nowMs))
-            .orderBy('startTime', 'desc')
-        : query
-            .where('startTime', '>=', Timestamp.fromMillis(nowMs - IN_PROGRESS_LOOKBACK_MS))
-            .orderBy('startTime', 'asc');
-      const snap = await query.limit(size).get();
-      return snap.docs.map((d) => ({ id: d.id, data: d.data() as EventDoc }));
+    const load = async () => {
+      const nowMs = Date.now();
+      // Over-fetch: running events sit in both windows and are dropped from one.
+      const fetch = Math.min(limit * 2, 100);
+
+      const window = async (size: number, campus?: string): Promise<EventRecord[]> => {
+        let query: Query = db.collection('events');
+        if (campus) query = query.where('branch', '==', campus);
+        query = past
+          ? query
+              .where('startTime', '<', Timestamp.fromMillis(nowMs))
+              .orderBy('startTime', 'desc')
+          : query
+              .where('startTime', '>=', Timestamp.fromMillis(nowMs - IN_PROGRESS_LOOKBACK_MS))
+              .orderBy('startTime', 'asc');
+        const snap = await query.limit(size).get();
+        return snap.docs.map((d) => ({ id: d.id, data: d.data() as EventDoc }));
+      };
+
+      // The all-campus half is read unfiltered and picked in memory: an
+      // equality filter on `branch == null` misses docs with no `branch` key.
+      const [branchDocs, anyDocs] = await Promise.all([
+        branch ? window(fetch, branch) : Promise.resolve([]),
+        window(branch ? ALL_CAMPUS_EVENT_WINDOW : fetch),
+      ]);
+      const events = pickEvents(branch, branchDocs, anyDocs, past, limit, nowMs);
+      return { events, count: events.length };
     };
-
-    // The all-campus half is read unfiltered and picked in memory: an
-    // equality filter on `branch == null` misses docs with no `branch` key.
-    const [branchDocs, anyDocs] = await Promise.all([
-      branch ? window(fetch, branch) : Promise.resolve([]),
-      window(branch ? ALL_CAMPUS_EVENT_WINDOW : fetch),
-    ]);
-    const events = pickEvents(branch, branchDocs, anyDocs, past, limit, nowMs);
+    const payload = await responseCache.getOrLoad(
+      `events|${past ? 'past' : 'upcoming'}|${branch ?? ''}|${limit}`,
+      past ? EVENT_PAST_CACHE_TTL_MS : API_CACHE_TTL_MS,
+      load,
+    );
 
     res.set('Cache-Control', past ? EVENT_PAST_CACHE_CONTROL : API_CACHE_CONTROL);
-    res.status(200).json({
-      events,
-      count: events.length,
-    });
+    res.status(200).json(payload);
   }
 );
 
@@ -389,7 +426,7 @@ async function resolveMonth(
  * exactly why a date resolves the way it does.
  */
 export const getDailyReading = onRequest(
-  { memory: '256MiB', timeoutSeconds: 30, cors: true },
+  { memory: '256MiB', timeoutSeconds: 30, cors: true, maxInstances: PUBLIC_MAX_INSTANCES },
   async (req, res) => {
     if (req.method !== 'GET') {
       res.status(405).json({ error: 'Method Not Allowed' });
@@ -505,11 +542,14 @@ export const pushDailyReading = onSchedule(
  * today's month-day get a direct push on their saved device token
  * (`users/{uid}.fcmToken`, written by the app at sign-in/refresh).
  *
- * The users collection is small (tens of docs); when it grows past ~2k,
- * add a `dobMMDD` field at write time and query on it instead of the
- * in-memory filter. A create()-guarded marker in `birthdayPushes/{date}`
- * keeps retried runs idempotent, mirroring the daily-reading worker.
- * Dead tokens are pruned so the next run stays clean.
+ * Members are found with an indexed equality query on `dobMMDD` (`MM-DD`),
+ * which the app writes with `dob` (the rules require the two to agree), so
+ * the read scales with the day's celebrants, not the user count. Profiles
+ * saved before `dobMMDD` existed are backfilled by the app on the member's
+ * next sign-in, or at once with `scripts/backfill-dob-mmdd.mjs`. A
+ * create()-guarded marker in `birthdayPushes/{date}` keeps retried runs
+ * idempotent, mirroring the daily-reading worker. Dead tokens are pruned so
+ * the next run stays clean.
  */
 export const pushBirthdays = onSchedule(
   { schedule: '0 8 * * *', timeZone: 'Europe/London', region: 'us-central1' },
@@ -528,16 +568,8 @@ export const pushBirthdays = onSchedule(
       return;
     }
 
-    const snap = await db.collection('users').limit(2000).get();
-    const celebrants = snap.docs.filter((d) => {
-      const dob = d.data().dob;
-      return (
-        typeof dob === 'string' &&
-        dob.slice(5) === monthDay &&
-        typeof d.data().fcmToken === 'string' &&
-        d.data().fcmToken.length > 0
-      );
-    });
+    const snap = await db.collection('users').where('dobMMDD', '==', monthDay).get();
+    const celebrants = snap.docs.filter((d) => isBirthdayCelebrant(d.data(), monthDay));
     if (celebrants.length === 0) {
       console.log(`[birthday] no celebrants for ${monthDay}`);
       return;

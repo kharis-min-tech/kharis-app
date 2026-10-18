@@ -67,21 +67,27 @@ The `syncYouTube` function needs a YouTube Data API v3 key.
 6. Click **Create Credentials → API key**
 7. Restrict the key to **YouTube Data API v3** (recommended)
 
-### Set it as a Cloud Functions parameter
+### Store it as a Cloud Functions secret (one time, before the first deploy)
+
+`syncYouTube` reads the key with `defineSecret('YOUTUBE_API_KEY')`, so it lives
+in Secret Manager rather than as a plain environment variable that anyone with
+project Viewer access can read. Set it once per project:
 
 ```bash
-# Using Firebase Functions params (v2 recommended approach)
-# Create a .env file in functions/ for local dev:
-echo "YOUTUBE_API_KEY=YOUR_KEY_HERE" > functions/.env
-
-# For production, set it in the Firebase Console or via CLI:
-firebase functions:secrets:set YOUTUBE_API_KEY
+firebase functions:secrets:set YOUTUBE_API_KEY --project kharis-app-47c49
 # Then enter your key when prompted
 ```
 
-> **Note:** The function uses `defineString('YOUTUBE_API_KEY')` which reads from
-> environment config. For local emulation, `functions/.env` is loaded automatically.
-> For production, use Firebase Secrets (recommended) or `functions/.env.<project>`.
+Deploys (local or the `Deploy Backend` workflow) only reference the secret and
+fail if it was never set. Do not also put `YOUTUBE_API_KEY` in
+`functions/.env`: the CLI rejects a name that is both a secret and a plain
+variable. Rotating the key is another `secrets:set` followed by a deploy.
+
+For local emulation, put the key in the gitignored `functions/.secret.local`:
+
+```bash
+echo "YOUTUBE_API_KEY=YOUR_KEY_HERE" > functions/.secret.local
+```
 
 ---
 

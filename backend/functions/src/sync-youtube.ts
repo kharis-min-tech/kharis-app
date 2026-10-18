@@ -1,6 +1,6 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
-import { defineString } from 'firebase-functions/params';
+import { defineSecret } from 'firebase-functions/params';
 import {
   SermonDoc,
   YouTubeSearchItem,
@@ -13,7 +13,9 @@ import { decodeHtmlEntities } from './html-text';
 // Direct channel ID — more reliable than handle/username lookup
 const CHANNEL_ID = 'UC4l8WmdF9ivMDQHHVOdYKqQ';
 const YT_API_BASE = 'https://www.googleapis.com/youtube/v3';
-const youtubeApiKey = defineString('YOUTUBE_API_KEY');
+// Secret Manager, not a plain env var (one-time setup:
+// `firebase functions:secrets:set YOUTUBE_API_KEY`, see backend/SETUP.md).
+const youtubeApiKey = defineSecret('YOUTUBE_API_KEY');
 
 /**
  * Converts ISO 8601 duration (e.g. "PT4M13S", "PT1H2M3S") to seconds.
@@ -70,6 +72,7 @@ export const syncYouTube = onSchedule(
     schedule: 'every 60 minutes',
     timeZone: 'America/New_York',
     memory: '256MiB',
+    secrets: [youtubeApiKey],
     timeoutSeconds: 120,
   },
   async () => {

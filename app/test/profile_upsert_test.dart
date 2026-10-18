@@ -111,6 +111,43 @@ void main() {
       expect(data['displayName'], 'Still Admin');
       expect(data['photoUrl'], 'https://example.com/a.png');
     });
+
+    test('writes dobMMDD alongside dob for the birthday push query',
+        () async {
+      final db = FakeFirebaseFirestore();
+      await repoFor(db).updateProfile(dob: DateTime(1990, 3, 7));
+
+      final data = (await db.collection('users').doc(uid).get()).data()!;
+      expect(data['dob'], '1990-03-07');
+      expect(data['dobMMDD'], '03-07');
+    });
+
+    test('backfills dobMMDD on a legacy profile that only has dob', () async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(uid).set({
+        'role': 'member',
+        'displayName': 'Old',
+        'dob': '1985-12-25',
+      });
+
+      await repoFor(db).updateProfile(displayName: 'Old Member');
+      await pumpEventQueue();
+
+      final data = (await db.collection('users').doc(uid).get()).data()!;
+      expect(data['dobMMDD'], '12-25');
+      expect(data['role'], 'member');
+    });
+
+    test('leaves a profile without a string dob untouched', () async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(uid).set({'role': 'member'});
+
+      await repoFor(db).updateProfile(displayName: 'No Dob');
+      await pumpEventQueue();
+
+      final data = (await db.collection('users').doc(uid).get()).data()!;
+      expect(data.containsKey('dobMMDD'), isFalse);
+    });
   });
 
   group('updateNotificationPrefs', () {

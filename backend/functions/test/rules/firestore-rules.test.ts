@@ -124,6 +124,118 @@ describe('users', () => {
     await assertFails(getDocs(collection(db(formerAdmin()), 'users')));
     await assertSucceeds(getDoc(doc(db(member()), 'users/member')));
   });
+
+  test('every profile write the app makes is accepted', async () => {
+    const fresh = env.authenticatedContext('fresh');
+    const d = db(fresh);
+    const ref = doc(d, 'users/fresh');
+    // FirebaseAuthRepository.register / _hydrate / _upsertProfile create.
+    await assertSucceeds(
+      setDoc(
+        ref,
+        {
+          email: 'a@b.co',
+          displayName: 'Member',
+          role: 'member',
+          branch: null,
+          photoUrl: null,
+          createdAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    );
+    // updateProfile.
+    await assertSucceeds(
+      setDoc(
+        ref,
+        {
+          displayName: 'New',
+          branch: 'North',
+          photoUrl: 'https://x/y.png',
+          phone: '+44 7000 000000',
+          dob: '1990-10-18',
+          dobMMDD: '10-18',
+        },
+        { merge: true },
+      ),
+    );
+    // updateNotificationPrefs, branch_provider (explicit null), FCM token.
+    await assertSucceeds(
+      setDoc(ref, { notificationPrefs: { announcements: true, events: false } }, { merge: true }),
+    );
+    await assertSucceeds(setDoc(ref, { branch: null }, { merge: true }));
+    await assertSucceeds(
+      setDoc(ref, { fcmToken: 'tok', fcmTokenUpdatedAt: serverTimestamp() }, { merge: true }),
+    );
+    // Re-hydrate merge of the full shape (role unchanged).
+    await assertSucceeds(
+      setDoc(
+        ref,
+        {
+          email: 'a@b.co',
+          displayName: 'New',
+          role: 'member',
+          branch: null,
+          photoUrl: null,
+          createdAt: serverTimestamp(),
+        },
+        { merge: true },
+      ),
+    );
+    // Anonymous guest create.
+    await assertSucceeds(
+      setDoc(doc(db(env.authenticatedContext('anon')), 'users/anon'), {
+        email: '',
+        displayName: 'Guest',
+        role: 'guest',
+        branch: null,
+        photoUrl: null,
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  test('profile keys are allowlisted and type-checked', async () => {
+    const d = db(member());
+    const ref = doc(d, 'users/member');
+    await assertFails(updateDoc(ref, { isAdmin: true }));
+    await assertFails(updateDoc(ref, { adminBranchIds: ['north'] }));
+    await assertFails(updateDoc(ref, { dob: '18/10/1990', dobMMDD: '10/19' }));
+    await assertFails(updateDoc(ref, { dob: 19901018 }));
+    await assertFails(updateDoc(ref, { fcmToken: 'x'.repeat(4097) }));
+    await assertFails(updateDoc(ref, { fcmToken: '' }));
+    await assertFails(updateDoc(ref, { fcmToken: 42 }));
+    await assertFails(updateDoc(ref, { displayName: 'x'.repeat(201) }));
+    await assertFails(updateDoc(ref, { notificationPrefs: 'all' }));
+    await assertFails(updateDoc(ref, { fcmTokenUpdatedAt: 'now' }));
+    await assertSucceeds(updateDoc(ref, { fcmToken: 'x'.repeat(4096) }));
+    // Creates are checked on every key.
+    const fresh = db(env.authenticatedContext('fresh'));
+    await assertFails(setDoc(doc(fresh, 'users/fresh'), { role: 'member', score: 1 }));
+    await assertFails(setDoc(doc(fresh, 'users/fresh'), { role: 'member', fcmToken: 7 }));
+  });
+
+  test('dobMMDD must agree with dob', async () => {
+    const ref = doc(db(member()), 'users/member');
+    await assertFails(updateDoc(ref, { dob: '1990-10-18', dobMMDD: '01-01' }));
+    await assertFails(updateDoc(ref, { dobMMDD: '10-18' })); // no dob to match
+    await assertSucceeds(updateDoc(ref, { dob: '1990-10-18', dobMMDD: '10-18' }));
+    await assertFails(updateDoc(ref, { dob: '1990-11-02' })); // stale dobMMDD
+    await assertSucceeds(updateDoc(ref, { dob: '1990-11-02', dobMMDD: '11-02' }));
+  });
+
+  test('a legacy profile backfills dobMMDD and stays editable', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/legacy'), {
+        role: 'member',
+        dob: '1985-03-07',
+        oldStudioField: 'kept',
+      });
+    });
+    const ref = doc(db(env.authenticatedContext('legacy')), 'users/legacy');
+    await assertSucceeds(setDoc(ref, { dobMMDD: '03-07' }, { merge: true }));
+    await assertSucceeds(updateDoc(ref, { displayName: 'Still editable' }));
+  });
 });
 
 describe('account deletion', () => {
@@ -238,21 +350,37 @@ describe('other collections', () => {
     }
   });
 
-  test('feedback is write-once: members create their own, nobody reads it back', async () => {
+  test('feedback is one doc per member per UTC day; nobody reads it back', async () => {
     const d = db(member());
-    const ref = doc(d, 'app_feedback/f1');
-    await assertSucceeds(
-      setDoc(ref, {
-        uid: 'member',
-        rating: 5,
-        comment: 'Great',
-        source: 'settings',
-        platform: 'ios',
-        createdAt: serverTimestamp(),
+    const now = new Date();
+    const day =
+      `${now.getUTCFullYear()}` +
+      `${String(now.getUTCMonth() + 1).padStart(2, '0')}` +
+      `${String(now.getUTCDate()).padStart(2, '0')}`;
+    const feedback = (rating: number) => ({
+      uid: 'member',
+      rating,
+      comment: 'Great',
+      source: 'settings',
+      platform: 'ios',
+      createdAt: serverTimestamp(),
+    });
+    const ref = doc(d, `app_feedback/member_${day}`);
+    await assertSucceeds(setDoc(ref, feedback(5)));
+    // A second submission the same day replaces the first.
+    await assertSucceeds(setDoc(ref, feedback(4)));
+    // Any other id is refused: auto ids, another day, another member's prefix.
+    await assertFails(setDoc(doc(d, 'app_feedback/f1'), feedback(5)));
+    await assertFails(setDoc(doc(d, 'app_feedback/member_19990101'), feedback(5)));
+    await assertFails(setDoc(doc(d, `app_feedback/other_${day}`), feedback(5)));
+    await assertFails(
+      setDoc(doc(db(env.authenticatedContext('other')), `app_feedback/member_${day}`), {
+        ...feedback(5),
+        uid: 'other',
       }),
     );
     for (const ctx of [member(), formerAdmin(), claimAdmin()]) {
-      await assertFails(getDoc(doc(db(ctx), 'app_feedback/f1')));
+      await assertFails(getDoc(doc(db(ctx), `app_feedback/member_${day}`)));
     }
   });
 

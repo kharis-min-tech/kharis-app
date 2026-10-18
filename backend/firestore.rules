@@ -31,13 +31,53 @@ service cloud.firestore {
     // `role` from a client (no self-promotion): a self-created profile starts
     // as a plain member role. A member may delete their own profile (in-app
     // account deletion).
+    //
+    // Keys are an allowlist of what the app writes (FirebaseAuthRepository
+    // register/_upsertProfile/_hydrate/updateProfile/updateNotificationPrefs,
+    // branch_provider, NotificationService._saveTokenToProfile), each
+    // type-checked. A create is checked in full; an update only on the keys
+    // it changes, so legacy profiles holding other keys (old Studio admin
+    // fields, a Timestamp `dob`) stay editable. `dobMMDD` is the month-day
+    // pushBirthdays queries on, and must match `dob`.
+    function validProfile(data, keys) {
+      return keys.hasOnly(['email', 'displayName', 'role', 'branch', 'photoUrl',
+                           'phone', 'dob', 'dobMMDD', 'notificationPrefs',
+                           'fcmToken', 'fcmTokenUpdatedAt', 'createdAt'])
+        && (!keys.hasAny(['email']) || (data.email is string && data.email.size() <= 320))
+        && (!keys.hasAny(['displayName'])
+            || (data.displayName is string && data.displayName.size() <= 200))
+        && (!keys.hasAny(['branch'])
+            || data.branch == null || (data.branch is string && data.branch.size() <= 100))
+        && (!keys.hasAny(['photoUrl'])
+            || data.photoUrl == null
+            || (data.photoUrl is string && data.photoUrl.size() <= 2048))
+        && (!keys.hasAny(['phone'])
+            || data.phone == null || (data.phone is string && data.phone.size() <= 40))
+        && (!keys.hasAny(['dob'])
+            || (data.dob is string && data.dob.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')))
+        && (!keys.hasAny(['dob', 'dobMMDD'])
+            || !('dobMMDD' in data)
+            || (data.dob is string && data.dob.size() == 10
+                && data.dobMMDD == data.dob[5:10]))
+        && (!keys.hasAny(['notificationPrefs'])
+            || (data.notificationPrefs is map && data.notificationPrefs.size() <= 20))
+        && (!keys.hasAny(['fcmToken'])
+            || (data.fcmToken is string && data.fcmToken.size() > 0
+                && data.fcmToken.size() <= 4096))
+        && (!keys.hasAny(['fcmTokenUpdatedAt']) || data.fcmTokenUpdatedAt is timestamp)
+        && (!keys.hasAny(['createdAt']) || data.createdAt is timestamp);
+    }
+
     match /users/{uid} {
       allow read: if isAuthenticated() && request.auth.uid == uid;
       allow create: if isAuthenticated() && request.auth.uid == uid
-                    && request.resource.data.role in ['member', 'guest', 'new_here'];
+                    && request.resource.data.role in ['member', 'guest', 'new_here']
+                    && validProfile(request.resource.data, request.resource.data.keys());
       allow update: if isAuthenticated() && request.auth.uid == uid
                     && !request.resource.data.diff(resource.data).affectedKeys()
-                          .hasAny(['role']);
+                          .hasAny(['role'])
+                    && validProfile(request.resource.data,
+                                    request.resource.data.diff(resource.data).affectedKeys());
       allow delete: if isAuthenticated() && request.auth.uid == uid;
 
       // notes — the member's private notebook. Owner-only: nobody else, not
@@ -121,11 +161,23 @@ service cloud.firestore {
     }
 
     // app_feedback — in-app rating (1-5) + optional comment from the feedback
-    // sheet. Any signed-in member (anonymous included) may create one doc
-    // attributed to themselves; no client reads or changes it afterwards. Keys
-    // are closed so a client cannot smuggle extra fields.
+    // sheet. Any signed-in member (anonymous included) may write feedback
+    // attributed to themselves; no client reads it back. Keys are closed so a
+    // client cannot smuggle extra fields.
+    //
+    // One doc per user per UTC day: the id must be `{uid}_{yyyymmdd}` for the
+    // day of the write (request.time), so a scripted account can add at most
+    // one doc a day. A second submission that day overwrites the first.
+    function feedbackDayId() {
+      let t = request.time;
+      return request.auth.uid + '_' + string(t.year())
+             + (t.month() < 10 ? '0' : '') + string(t.month())
+             + (t.day() < 10 ? '0' : '') + string(t.day());
+    }
+
     match /app_feedback/{feedbackId} {
-      allow create: if isAuthenticated()
+      allow create, update: if isAuthenticated()
+                    && feedbackId == feedbackDayId()
                     && request.resource.data.keys().hasOnly(
                          ['uid', 'rating', 'comment', 'source', 'platform', 'createdAt'])
                     && request.resource.data.uid == request.auth.uid

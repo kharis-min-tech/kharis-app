@@ -28,7 +28,7 @@ import { dueService, REMINDER_RUN_EVERY_MS } from './service-reminders';
  * collection makes a loop structurally impossible, and keying on the
  * CloudEvent id makes an at-least-once redelivery a no-op.
  */
-const PUSH_LOG = 'pushLog';
+export const PUSH_LOG = 'pushLog';
 
 /** Days a marker is kept — long enough to outlive every trigger retry. */
 const PUSH_LOG_TTL_DAYS = 30;
@@ -62,7 +62,7 @@ const londonTime = new Intl.DateTimeFormat('en-US', {
  * fails for any other reason is logged and also treated as "do not send" —
  * duplicating a push to the whole church is worse than dropping one.
  */
-async function claimPush(key: string): Promise<boolean> {
+export async function claimPush(key: string): Promise<boolean> {
   try {
     await getFirestore()
       .collection(PUSH_LOG)

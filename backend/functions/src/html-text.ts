@@ -5,8 +5,8 @@
  */
 export function decodeHtmlEntities(s: string): string {
   return s
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (entity, n) => fromCodePoint(entity, parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (entity, n) => fromCodePoint(entity, parseInt(n, 16)))
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&lt;/g, '<')
@@ -14,6 +14,17 @@ export function decodeHtmlEntities(s: string): string {
     .replace(/&nbsp;/g, ' ')
     // Last, so an escaped entity (`&amp;lt;`) decodes to its literal text.
     .replace(/&amp;/g, '&');
+}
+
+/**
+ * The character for a numeric entity, or the entity left as-is when the
+ * number is not a code point (`String.fromCodePoint` throws a RangeError
+ * above 0x10FFFF, which would abort a whole sync run).
+ */
+function fromCodePoint(entity: string, code: number): string {
+  return Number.isInteger(code) && code >= 0 && code <= 0x10ffff
+    ? String.fromCodePoint(code)
+    : entity;
 }
 
 /** Plain text of an HTML fragment: tags dropped, block breaks kept, decoded. */

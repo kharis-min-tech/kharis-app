@@ -14,8 +14,8 @@ What exists now:
   marker, dead-token pruning.
 
 Future niceties: grouped "celebrating this week" digest for branch admins;
-in-app confetti card on the member's own birthday; scale path is a `dobMMDD`
-field + indexed query once users > ~2k.
+in-app confetti card on the member's own birthday. (Scale path done:
+`pushBirthdays` queries an indexed `dobMMDD` field.)
 
 ## 2. Supabase ("superbizz") exploration
 

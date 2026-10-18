@@ -38,10 +38,9 @@ The base URL comes from `app/lib/core/constants/api_config.dart` (`ApiConfig`):
 https://us-central1-kharis-app-47c49.cloudfunctions.net
 ```
 
-One exception: `feedProxy` is deployed in `europe-west1` (`https://europe-west1-kharis-app-47c49.cloudfunctions.net/feedProxy`).
-
 Behaviour shared by the read endpoints (`getAnnouncements`, `getBranches`, `getEvents`, `getDailyReading`):
 
+- Load limits: these endpoints and `sermonApiProxy` need no auth, so each is capped at `maxInstances: 10`. The `Cache-Control` headers are not honoured by any CDN (nothing routes the functions through Firebase Hosting), so every warm instance also keeps an in-memory copy of each response for the same TTL as its `max-age` (`getAnnouncements`: 30 seconds; `getDailyReading` is not cached in memory). Code: `response-cache.ts`.
 - `GET` only. Any other method returns `405 {"error":"Method Not Allowed"}`.
 - No authentication.
 - CORS is open (`cors: true`), so the response echoes the request origin and carries `vary: Origin`.
@@ -257,21 +256,6 @@ A CORS proxy that lets web builds reach the public sermon API ([section 2](#2-pu
 - The response body has the same shape as [2.1](#21-get-sermons).
 
 Deployment status on 2026-10-05: `GET /sermonApiProxy/sermons/?page=2` returned Google's HTML `404 Page not found`, which means the function is not deployed yet. Until it is, web builds cannot reach the sermon API, and the Messages tab on web shows the bundled archive.
-
-### 1.6 GET /feedProxy
-
-A CORS-safe pass-through for the church's RSS/Atom feeds. Source: `feed-proxy.ts`.
-
-- Region: `europe-west1`. URL: `https://europe-west1-kharis-app-47c49.cloudfunctions.net/feedProxy`.
-- Query param `source`:
-  - `youtube` returns the channel Atom feed.
-  - Anything else, including no value, returns the SoundCloud RSS feed (`soundcloud:users:58625221`).
-- Response: upstream XML as-is. Live `?source=youtube` returned `content-type: text/xml; charset=utf-8`.
-- Caching: `Cache-Control: public, max-age=60, s-maxage=300`.
-- Errors: an upstream non-2xx status is passed through with the upstream body. A fetch failure returns `502` with the text `Upstream fetch failed: …`.
-- No method check.
-
-The current app does not call `feedProxy`: `VideoRepository` fetches the YouTube Atom feed directly. The function is kept for web use.
 
 ---
 
@@ -506,7 +490,7 @@ Two callers. Both use YouTube Data API v3 at `https://www.googleapis.com/youtube
 
 | Caller | Calls | Key | Quota per run |
 |---|---|---|---|
-| `syncYouTube` (scheduler, `sync-youtube.ts`) | `search?part=id,snippet&channelId=…&order=date&type=video&maxResults=50`, then `videos?part=contentDetails&id=…` | Functions param `YOUTUBE_API_KEY` (`defineString`) | 100 (search) + 1 (videos) = **101 units per hour**, about 2,424 per day |
+| `syncYouTube` (scheduler, `sync-youtube.ts`) | `search?part=id,snippet&channelId=…&order=date&type=video&maxResults=50`, then `videos?part=contentDetails&id=…` | Secret Manager secret `YOUTUBE_API_KEY` (`defineSecret`) | 100 (search) + 1 (videos) = **101 units per hour**, about 2,424 per day |
 | App `VideoRepository` (`video_repository.dart`) | `playlistItems?part=snippet,contentDetails&playlistId=UU4l8WmdF9ivMDQHHVOdYKqQ&maxResults=20`, then `videos?part=contentDetails` | build-time `YOUTUBE_API_KEY` from `env.json` | 2 units per load, per device |
 
 The quota figures use the standard costs: `search.list` is 100 units, and `playlistItems.list` and `videos.list` are 1 unit each. The default project quota is 10,000 units per day.
@@ -535,15 +519,15 @@ All functions run in `us-central1` (the default region) unless noted. Times are 
 
 | Function | Trigger | What it does | Audience / topic | Idempotency |
 |---|---|---|---|---|
-| `pushPendingAnnouncements` | every 1 minute | Pushes `news` docs that became live within the last 15 minutes and have not been pushed yet. A future `publishedAt` is pushed when it arrives. Body is capped at 140 chars. Data: `{type:'announcement', newsId, branch, eventId?}` | `branchTopic(news.branch)`: `branch_<slug>` or `all` | Writes `pushedAt`, `pushTopic` and `pushMessageId` onto the news doc, and `pushError` on failure. The 15-minute window stops it from sending the backlog. |
+| `pushPendingAnnouncements` | every 1 minute | Pushes `news` docs that became live within the last 15 minutes and have not been pushed yet. A future `publishedAt` is pushed when it arrives. Body is capped at 140 chars. Data: `{type:'announcement', newsId, branch, eventId?}` | `branchTopic(news.branch)`: `branch_<slug>` or `all` | Claims `pushLog/news_<newsId>` with `create()` before sending, so overlapping runs cannot both send; a failed send releases the claim (retried next minute) and writes `pushError`. After a good send it writes `pushedAt`, `pushTopic` and `pushMessageId` onto the news doc; if that write fails, the claim still prevents a resend. The 15-minute window stops it from sending the backlog. |
 | `pushDailyReading` | cron `0 7 * * *` (07:00) | Pushes "Today's Bible reading" with the resolved reference. Data: `{type:'reading', date, reference, source}` | topic `daily_reading` | Claims `dailyReadingPushes/{date}` in a transaction before sending. A failed send records `pushError` and is not retried. |
-| `pushBirthdays` | cron `0 8 * * *` (08:00) | Direct push to each user whose `dob` month-day is today and who has an `fcmToken`. Title: "Happy birthday!" followed by a party emoji. Data: `{type:'birthday'}`. Deletes tokens that FCM reports as unregistered. | device token `users/{uid}.fcmToken` | `birthdayPushes/{date}` created with `create()`; the run is skipped if it already exists. |
+| `pushBirthdays` | cron `0 8 * * *` (08:00) | Direct push to each user whose `dob` month-day is today and who has an `fcmToken`, found by the query `dobMMDD == 'MM-DD'` (the app writes `dobMMDD` with `dob` and backfills it on sign-in; `scripts/backfill-dob-mmdd.mjs` backfills all profiles at once). Title: "Happy birthday!" followed by a party emoji. Data: `{type:'birthday'}`. Deletes tokens that FCM reports as unregistered. | device token `users/{uid}.fcmToken` | `birthdayPushes/{date}` created with `create()`; the run is skipped if it already exists. |
 | `pushServiceReminders` | every 15 minutes | One hour before each Branch's service, parsed from `meetingDays` and `meetingTime`. Branches whose schedule is ambiguous (no weekday, or several times) get no reminder. Data: `{type:'service_reminder', branchId, branch, startTime, address}` | condition `'service_reminders' in topics && '<branch topic>' in topics` | `pushLog/service_<branchId>_<YYYY-MM-DD>` |
 | `onEventWritten` | Firestore `events/{eventId}` write | "New event: …" when an event is created, or "Event updated: …" when the title, time, location, address or branch changes. A Branch move also notifies the old Branch. Data: `{type:'event', eventId, branch, startTime, location}` | condition `'events' in topics && '<branch topic>' in topics` | `pushLog/<cloudEventId>_<topic>`. The claim is released if the send fails. |
 | `onBranchVenueWritten` | Firestore `branches/{branchId}` update | "<Branch>: service details updated" when `address`, `meetingDays` or `meetingTime` changes. Data: `{type:'venue', branchId, branch, address, schedule}` | `branch_<slug>` | `pushLog/<cloudEventId>_<topic>` |
 | `purgePushLog` | `every day 03:30` | Deletes `pushLog` markers older than 30 days, at most 10 batches of 500 per run. | none | n/a |
 | `syncYouTube` | every 60 minutes (America/New_York) | Upserts the newest 50 channel uploads into `sermons/yt_<videoId>` ([section 4](#4-youtube-data-api)). | none | Deterministic doc ids plus merge |
-| `syncWebsiteEvents` | every 60 minutes | Imports kharis.org events from EventON (this month plus 2 more) into `events/web_<wpId>[_<ri>][_<branchSlug>]`. Fields: title, start and end times, location, address, description, `source:'website'`, `sourceId`, `sourceUrl`, `syncedAt`. The Branch is mapped from the WordPress `event_type`. Upcoming imports that disappear from the site are deleted. | none (its creates are not pushed by `onEventWritten`) | Doc ids derived from the WordPress id. Unchanged events are not rewritten. Admin-owned fields (`branch`, `imageUrl`, `isFeatured`) are kept. `hidden: true` tombstones are never rewritten. |
+| `syncWebsiteEvents` | every 60 minutes | Imports kharis.org events from EventON (this month plus 2 more) into `events/web_<wpId>[_<ri>][_<branchSlug>]`. Fields: title, start and end times, location, address, description, `source:'website'`, `sourceId`, `sourceUrl`, `syncedAt`. The Branch is mapped from the WordPress `event_type`. Upcoming imports that disappear from the site are deleted, except `hidden: true` tombstones and every doc of a post skipped this run (post missing from the REST API, unknown campus or unresolved `event_type`), so a transient gap cannot wipe admin overrides or resurrect an admin-deleted event. | none (its creates are not pushed by `onEventWritten`) | Doc ids derived from the WordPress id. Unchanged events are not rewritten. Admin-owned fields (`branch`, `imageUrl`, `isFeatured`) are kept. `hidden: true` tombstones are never rewritten or deleted. |
 
 `onEventWritten` sends nothing in these cases:
 
@@ -569,7 +553,7 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 
 | Collection | Read | Create / update / delete |
 |---|---|---|
-| `users/{uid}` | owner | Create: owner only, with `role` in `member`/`guest`/`new_here`. Update: owner, who cannot change `role`. Delete: owner (in-app account deletion). |
+| `users/{uid}` | owner | Create: owner only, with `role` in `member`/`guest`/`new_here`. Update: owner, who cannot change `role`. Keys are an allowlist of what the app writes (see [6.8](#68-users)), type-checked: on create every key, on update the changed keys (so legacy keys on old profiles stay). `dob` must be `yyyy-mm-dd`, `dobMMDD` must equal `dob`'s `MM-DD`, `fcmToken` a 1..4096-char string. Delete: owner (in-app account deletion). |
 | `users/{uid}/notes/{id}` | owner only (not admins) | Owner. `body` must be 1..20000 chars; `updatedAt` must be a timestamp. |
 | `users/{uid}/playlists/{id}` | owner only | Owner. `name` 1..80 chars, `sermonIds` a list, `createdAt` and `updatedAt` timestamps. |
 | `branches/{id}` | public | nobody (Firebase console / Admin SDK only) |
@@ -579,7 +563,7 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 | `dailyContent/{YYYY-MM-DD}` | public | nobody (Firebase console) |
 | `readingPlans/{id}` | public | nobody (Firebase console). A plan needs `startDate` (`YYYY-MM-DD`), a non-empty `book` and `days` 1..400 to resolve. |
 | `config/{doc}` | public | nobody (Firebase console). `featured.mode` is `auto`, `pinned` or `off`. |
-| `app_feedback/{id}` | nobody | Create: any signed-in user. Keys are limited to `uid, rating, comment, source, platform, createdAt`. `uid` must be the caller, `rating` an int 1..5, `comment` ≤2000 chars, `source` `prompt` or `settings`, `platform` ≤20 chars, `createdAt == request.time`. |
+| `app_feedback/{uid}_{yyyymmdd}` | nobody | Create or overwrite: any signed-in user, one doc per user per UTC day (the id must be the caller's uid plus the UTC date of the write). Keys are limited to `uid, rating, comment, source, platform, createdAt`. `uid` must be the caller, `rating` an int 1..5, `comment` ≤2000 chars, `source` `prompt` or `settings`, `platform` ≤20 chars, `createdAt == request.time`. |
 | `rsvps/{uid}_{eventId}` | get: owner (by id prefix). list: queries constrained to `userId == auth.uid`. | Create: signed-in user, `userId == uid`, id `{uid}_{eventId}`. Update: never. Delete: owner. |
 | `pushLog`, `dailyReadingPushes` | nobody | Admin SDK only |
 | `birthdayPushes` | nobody (default deny) | Admin SDK only |
@@ -653,7 +637,7 @@ A removed `web_*` doc carries `{hidden: true, hiddenAt}` instead of being delete
 | `email`, `displayName`, `photoUrl`, `createdAt` | app at registration (`FirebaseAuthRepository`) |
 | `role` | Set at registration (`member`/`guest`/`new_here`; a requested `admin` is downgraded to `member`). No client can change it afterwards. |
 | `branch` | owner; the selected Branch name, or null for all Branches |
-| `phone`, `dob` (`yyyy-MM-dd`) | owner |
+| `phone`, `dob` (`yyyy-MM-dd`), `dobMMDD` (`MM-dd`, written with `dob`; backfilled on hydrate for older profiles; queried by `pushBirthdays`) | owner |
 | `notificationPrefs` | owner, `Map<String,bool>` |
 | `fcmToken`, `fcmTokenUpdatedAt` | app (`NotificationService.syncToken`) |
 
@@ -664,12 +648,12 @@ A removed `web_*` doc carries `{hidden: true, hiddenAt}` instead of being delete
 3. Firebase Auth `currentUser.delete()`. On `requires-recent-login` the app asks for the password and retries the whole sequence, which is idempotent.
 4. Clears the device's notes box and saved onboarding role and Branch, then returns to Welcome.
 
-`app_feedback` is create-only for members and is not removed.
+`app_feedback` is write-only for members (a same-day resubmission overwrites that day's doc) and is not removed.
 
 ### 6.9 rsvps, app_feedback, pushLog
 
 - `rsvps/{uid}_{eventId}`: `{userId, eventId, branch, eventStartTime, createdAt}`.
-- `app_feedback`: `{uid, rating, comment, source, platform, createdAt}`, where `platform` is `web`, `iOS`, `android` and so on.
+- `app_feedback/{uid}_{yyyymmdd}`: `{uid, rating, comment, source, platform, createdAt}`, where `platform` is `web`, `iOS`, `android` and so on.
 - `pushLog/{key}`: `{claimedAt, target, title, body, messageId, sentAt}`. Server only.
 
 ---
@@ -776,7 +760,6 @@ Every export of `backend/functions/src/index.ts`:
 | `getEvents` | HTTP | [1.3](#13-get-getevents) |
 | `getDailyReading` | HTTP | [1.4](#14-get-getdailyreading) |
 | `sermonApiProxy` | HTTP | [1.5](#15-get-sermonapiproxyresource) |
-| `feedProxy` | HTTP (europe-west1) | [1.6](#16-get-feedproxy) |
 | `pushPendingAnnouncements` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `pushDailyReading` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `pushBirthdays` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |

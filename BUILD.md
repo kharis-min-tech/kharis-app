@@ -132,16 +132,21 @@ Firestore rules and indexes live only in `backend/` (`backend/firestore.rules`,
 
 ## Step 2: Backend deploy
 
-### 2.1 Functions config: `backend/functions/.env`
+### 2.1 Functions secret: `YOUTUBE_API_KEY`
 
-`YOUTUBE_API_KEY` is a `defineString` param (`sync-youtube.ts`), read from the
-gitignored `backend/functions/.env` at deploy time:
+`YOUTUBE_API_KEY` is a Secret Manager secret (`defineSecret`, `sync-youtube.ts`).
+Set it once per project before the first deploy; deploys fail until it exists:
 
 ```bash
-echo "YOUTUBE_API_KEY=YOUR_KEY_HERE" > backend/functions/.env
+firebase functions:secrets:set YOUTUBE_API_KEY --project kharis-app-47c49
 ```
 
-The deploy workflow writes the same file from the `FUNCTIONS_ENV` secret.
+Do not put it in `backend/functions/.env` (the CLI rejects a name that is both
+a secret and a plain variable). No functions param needs `.env` any more, and
+the deploy workflow no longer writes one: the old `FUNCTIONS_ENV` repository
+secret can be deleted. The workflow deploys only from `main`, through the
+`production` environment, with the `firebase-tools` version pinned in
+`backend/functions/package.json`.
 
 ### 2.2 Build and deploy
 
@@ -369,9 +374,8 @@ Settings, Secrets and variables, Actions, **New repository secret**:
 | `ENV_JSON` | verbatim `app/env.json` | `ci.yml` (optional, falls back to `env.example.json`), `build-android.yml`, `build-ios.yml` |
 | `KEYSTORE_BASE64` | `base64 -i app/android/keystore/kharis-release.jks` | `build-android.yml` |
 | `KEY_PROPERTIES` | verbatim `app/android/key.properties` | `build-android.yml` |
-| `FIREBASE_SERVICE_ACCOUNT` | service-account JSON key (Firebase Admin + Cloud Functions Developer on `kharis-app-47c49`) | `deploy-backend.yml` |
-| `FIREBASE_TOKEN` | legacy `firebase login:ci` token, only if no service account | `deploy-backend.yml` |
-| `FUNCTIONS_ENV` | verbatim `backend/functions/.env` | `deploy-backend.yml` |
+| `FIREBASE_SERVICE_ACCOUNT` | service-account JSON key (Firebase Admin + Cloud Functions Developer + Secret Manager Admin on `kharis-app-47c49`) | `deploy-backend.yml` (`production` environment) |
+| `FIREBASE_TOKEN` | legacy `firebase login:ci` token, only if no service account | `deploy-backend.yml` (`production` environment) |
 
 ### Workflows
 
@@ -380,7 +384,7 @@ Settings, Secrets and variables, Actions, **New repository secret**:
 | CI | `ci.yml` | Push / PR to `main` | `flutter analyze`, `flutter test`, `./scripts/build-web.sh --build-only`; Storybook tests |
 | Android build | `build-android.yml` | Manual | Signed `android-release-aab` artifact |
 | iOS build | `build-ios.yml` | Manual (macOS runner) | Unsigned `ios-release-xcarchive` artifact |
-| Backend deploy | `deploy-backend.yml` | Manual | Node 24; deploys functions + Firestore rules/indexes to `kharis-app-47c49` |
+| Backend deploy | `deploy-backend.yml` | Manual, `main` only, `production` environment | Node 24; pinned `firebase-tools`; deploys functions + Firestore rules/indexes to `kharis-app-47c49` |
 
 Signed iOS builds and store uploads are still done locally
 (`deploy-testflight.sh`, `upload-play-internal.sh`).
@@ -483,7 +487,7 @@ kharis-app-47c49                     Firebase project (all services)
 app/.fvmrc                           Flutter version pin (3.44.1), read by CI
 app/pubspec.lock                     committed; CI uses --enforce-lockfile
 app/env.json                         build-time keys (NOT committed; CI: ENV_JSON)
-backend/functions/.env               Functions params (NOT committed; CI: FUNCTIONS_ENV)
+backend/functions/.secret.local      local emulator secrets (NOT committed; prod: Secret Manager)
 android/keystore/kharis-release.jks  upload keystore (NOT committed)
 android/key.properties               signing config (NOT committed)
 ios/Runner/Runner.entitlements       push (aps-environment)

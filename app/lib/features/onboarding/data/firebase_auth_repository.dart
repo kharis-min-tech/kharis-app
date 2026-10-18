@@ -191,12 +191,15 @@ class FirebaseAuthRepository implements AuthRepository {
     if (fbUser == null) {
       throw const InvalidCredentialsException('Not signed in');
     }
+    final dobKey = dob?.toIso8601String().substring(0, 10);
     final updates = <String, Object?>{
       'displayName': ?displayName,
       'branch': ?branch,
       'photoUrl': ?photoUrl,
       'phone': ?phone,
-      if (dob != null) 'dob': dob.toIso8601String().substring(0, 10),
+      // `dobMMDD` (the rules require it to match `dob`) is what the
+      // pushBirthdays function queries on.
+      if (dobKey != null) ...{'dob': dobKey, 'dobMMDD': dobKey.substring(5)},
     };
     if (updates.isNotEmpty) {
       await _upsertProfile(fbUser, updates);
@@ -259,6 +262,7 @@ class FirebaseAuthRepository implements AuthRepository {
       final snap = await ref.get();
       if (snap.exists) {
         final data = snap.data()!;
+        _backfillDobMMDD(ref, data);
         return User(
           id: fbUser.uid,
           email: (data['email'] as String?) ?? fbUser.email ?? '',
@@ -299,6 +303,29 @@ class FirebaseAuthRepository implements AuthRepository {
     } catch (_) {}
     return user;
   }
+
+  /// Profiles saved before `dobMMDD` existed carry only `dob`; add the
+  /// month-day so pushBirthdays (which queries on it) finds them. Fire and
+  /// forget: a slow or offline write must not hold up sign-in, and a failure
+  /// is simply retried on the next hydrate.
+  static void _backfillDobMMDD(
+    DocumentReference<Map<String, dynamic>> ref,
+    Map<String, dynamic> data,
+  ) {
+    final dob = data['dob'];
+    if (dob is! String || !_dobPattern.hasMatch(dob)) return;
+    final monthDay = dob.substring(5);
+    if (data['dobMMDD'] == monthDay) return;
+    unawaited(
+      ref.set({'dobMMDD': monthDay}, SetOptions(merge: true)).catchError((
+        Object e,
+      ) {
+        debugPrint('[auth] dobMMDD backfill skipped: $e');
+      }),
+    );
+  }
+
+  static final _dobPattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
   Object _mapError(fb.FirebaseAuthException e) {
     switch (e.code) {
