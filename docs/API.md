@@ -340,23 +340,23 @@ Jonathan's media engine. The source is in `backend/cloudflare-worker/`; `src/ind
 | | |
 |---|---|
 | Worker name | `kharis-import-worker` (`wrangler.toml`) |
-| Schedule | cron `0 6 * * 1,4`: Monday and Thursday, 06:00 UTC |
+| Schedule | crons `0 22 * * 0`, `0 6 * * 1,4`, `0 18 * * 1` (UTC): Sunday night, Monday morning and evening, Thursday morning |
 | R2 binding | `MESSAGES_BUCKET` → bucket `kharis-messages` |
-| Vars | `SCRAPE_CONCURRENCY` (default `6`) |
+| Vars | `SCRAPE_CONCURRENCY` (default `6`), `SCRAPE_BATCH_LIMIT` (pages scraped per cron run, default `150`; about `10` on the Free plan's 50-subrequest limit), `MANUAL_SCRAPE_LIMIT` (per manual run, default `25`) |
 | Secret | `MANUAL_TRIGGER_SECRET` |
-| Manual run | `GET https://kharis-import-worker.<subdomain>.workers.dev/run-import?secret=<secret>`. Returns `401 Unauthorized` without the secret, `404` on any other path, a JSON summary `{messagesCount, playlistsCount, scrapedThisRun, reusedFromCache, log[]}` on success, and `500 Import failed: …` on failure. |
+| Manual run | `GET https://kharis-import-worker.<subdomain>.workers.dev/run-import` with header `Authorization: Bearer <secret>` (compared in constant time; `?secret=` is no longer accepted). Scrapes at most `MANUAL_SCRAPE_LIMIT` pages so it finishes while you wait; call again until `remainingToScrape` is `0`. Returns `401` without the secret, `404` on any other path, a JSON summary `{messagesCount, playlistsCount, scrapedThisRun, failedThisRun, remainingToScrape, reusedFromCache, written[], skipped[], log[]}` on success, and `500 Import failed: …` on failure. |
 
 What one run does:
 
-1. Walks `series/`, `sermons/` and `playlists/` on the sermon API, following `next` until `null`. A failure on series or playlists is logged and skipped. A failure on sermons aborts the run.
+1. Walks `series/`, `sermons/` and `playlists/` on the sermon API, following `next` until `null` (stops with an error on a repeated `next`, a page without a `results` array, or more than 200 pages). Every fetch times out after 15 s. A failed series fetch keeps series names from the existing `messages.json`; a failed playlists fetch skips writing `playlists.json`; a failed sermons fetch aborts the run and writes nothing.
 2. Maps each sermon to the flat `messages.json` schema ([3.2](#32-messagesjson)). Scheme-less audio URLs become `https://…`.
 3. Computes `previous_id` and `next_id` within each series, ordered oldest first by `date_preached`. Sermons with no series form one group. Two sermons in the same series with the same date are logged as ambiguous.
-4. For each sermon not already in `_cache/detail-cache.json`, fetches `https://yetanothersermon.host/_/kc/sermons/<id>/` and scrapes:
+4. Scrapes `https://yetanothersermon.host/_/kc/sermons/<id>/` for at most `SCRAPE_BATCH_LIMIT` sermons, in this order: sermons not yet in `_cache/detail-cache.json`; cached sermons whose `transcripts/<id>.txt` object is missing from the bucket; sermons preached in the last 30 days that still have no transcript. Newest first within each group. It extracts:
    - the Tags block
    - the Related Messages ids
    - the transcript `.txt` link, whose transcript id differs from the sermon id
-   It then writes the transcript text, starting at the first `[m:ss]` timestamp, to `transcripts/<sermonId>.txt`.
-5. Writes `_cache/detail-cache.json`, `messages.json` and `playlists.json`. Both JSON catalogue files are written with `Cache-Control: public, max-age=300`.
+   It then writes the transcript text, starting at the first `[m:ss]` timestamp, to `transcripts/<sermonId>.txt`. A failed scrape (error page, network error, timeout, failed transcript download) is not cached and is retried on the next run. The cache is saved every 25 scrapes.
+5. Writes `_cache/detail-cache.json`, `messages.json` and `playlists.json`. Both JSON catalogue files are written with `Cache-Control: public, max-age=300`. A sermon whose transcript object is missing gets no `transcript_url`. A new `messages.json` that is empty or smaller than 90% of the existing one is not written; the run logs an error and keeps the old file.
 
 ### 3.2 messages.json
 
@@ -384,8 +384,6 @@ The file held 1,489 messages, matching the API count. Live record:
       "speaker": "David Antwi",
       "date_preached": "2026-09-27",
       "series": null,
-      "topics": [],
-      "keywords": [],
       "scripture_refs": ["1 Timothy 3:16"],
       "audio_url": "https://yetanothersermon.host/_/kc/media/mp3/99934.mp3",
       "image_url": "https://yash.b-cdn.net/media/images/Kharis_resized_H6Mr63b.jpeg?width=256",
@@ -411,7 +409,6 @@ Schema (from `mapSermon` in `src/index.js`):
 | `title`, `speaker` | string \| null | `speaker` is the first preacher |
 | `date_preached` | `YYYY-MM-DD` \| null | |
 | `series` | `{id: string, name: string\|null}` \| null | |
-| `topics`, `keywords` | string[] | Always empty today |
 | `scripture_refs` | string[] | The API's `passages` |
 | `audio_url` | string \| null | Absolute. It 302-redirects like the API URL does. |
 | `image_url` | string \| null | |
