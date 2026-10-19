@@ -52,26 +52,27 @@ void main() {
     child: const MaterialApp(home: MessagesScreen()),
   );
 
-  testWidgets('offline with nothing saved shows a banner whose Retry goes live', (
-    tester,
-  ) async {
-    final repo = FakePagedSermonRepository([live], failFirstLoad: true);
-    await tester.pumpWidget(app(repo));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'offline with nothing saved shows a banner whose Retry goes live',
+    (tester) async {
+      final repo = FakePagedSermonRepository([live], failFirstLoad: true);
+      await tester.pumpWidget(app(repo));
+      await tester.pumpAndSettle();
 
-    expect(find.text('You are offline'), findsOneWidget);
-    expect(
-      find.text('Messages will appear here once you are back online.'),
-      findsOneWidget,
-    );
+      expect(find.text('You are offline'), findsOneWidget);
+      expect(
+        find.text('Messages will appear here once you are back online.'),
+        findsOneWidget,
+      );
 
-    repo.failFirstLoad = false;
-    await tester.tap(find.text('Retry'));
-    await tester.pumpAndSettle();
+      repo.failFirstLoad = false;
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('You are offline'), findsNothing);
-    expect(find.text('Live message 3'), findsWidgets);
-  });
+      expect(find.text('You are offline'), findsNothing);
+      expect(find.text('Live message 3'), findsWidgets);
+    },
+  );
 
   testWidgets('pull to refresh refetches page 1', (tester) async {
     final repo = FakePagedSermonRepository([live]);
@@ -299,6 +300,56 @@ void main() {
       );
     });
   });
+
+  for (final reduceMotion in [false, true]) {
+    testWidgets('back to top appears well down the list and returns to the top '
+        '(reduced motion: $reduceMotion)', (tester) async {
+      final many = [
+        for (var i = 1; i <= 60; i++)
+          testSermon(
+            'm$i',
+            title: 'Message $i',
+            publishedAt: DateTime(2026, 1, 1).add(Duration(days: i)),
+          ),
+      ];
+      final repo = FakePagedSermonRepository([many]);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(disableAnimations: reduceMotion),
+          child: app(repo),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      bool shown() =>
+          tester
+              .widget<IgnorePointer>(
+                find
+                    .ancestor(
+                      of: find.byKey(const Key('messages-back-to-top')),
+                      matching: find.byType(IgnorePointer),
+                    )
+                    .first,
+              )
+              .ignoring ==
+          false;
+
+      expect(shown(), isFalse);
+      expect(find.bySemanticsLabel('Back to top'), findsNothing);
+
+      final scrollable = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      scrollable.position.jumpTo(2000);
+      await tester.pumpAndSettle();
+      expect(shown(), isTrue);
+
+      await tester.tap(find.byKey(const Key('messages-back-to-top')));
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, 0);
+      expect(shown(), isFalse);
+    });
+  }
 
   group('chip rows are never clipped', () {
     final archive = [

@@ -112,46 +112,87 @@ class EventRepository {
   final DateTime Function() _clock;
 
   static const _table = 'events';
-  static const _query = {'order': 'start_time.asc'};
 
   /// The Past view is a capped list, not a full history.
   static const int pastEventLimit = 15;
+
+  /// How far back an upcoming query reaches for one-off events by start: a
+  /// running event with no `end_time` (or one the device clock disagrees on)
+  /// still arrives. Longer events arrive through their `end_time`.
+  static const upcomingWindow = Duration(days: 1);
+
+  /// Rows the past query asks for. Branch, "Show on" and weekly filtering
+  /// happen on the device, so it fetches well over [pastEventLimit].
+  static const pastRowLimit = 200;
+
+  // Each query keeps its own saved copy (see [ContentApi]); the filters are
+  // relative to now, and the device re-applies them to saved rows.
+  static const _upcomingKey = 'events.upcoming';
+  static const _pastKey = 'events.past';
+
+  /// Weekly rows, and one-off rows that started within [upcomingWindow] or
+  /// have not ended, soonest first. Bounded on the server so a table past
+  /// PostgREST's row cap cannot crowd out upcoming events with old ones.
+  static Map<String, String> upcomingQuery(DateTime now) {
+    final from = now.subtract(upcomingWindow).toUtc().toIso8601String();
+    final to = now.toUtc().toIso8601String();
+    return {
+      'or': '(recurrence.eq.weekly,start_time.gte.$from,end_time.gte.$to)',
+      'order': 'start_time.asc,id.asc',
+    };
+  }
+
+  /// Rows that started before now, most recent first, capped at
+  /// [pastRowLimit].
+  static Map<String, String> pastQuery(DateTime now) => {
+    'start_time': 'lt.${now.toUtc().toIso8601String()}',
+    'order': 'start_time.desc,id.desc',
+    'limit': '$pastRowLimit',
+  };
 
   // ── Reads ──────────────────────────────────────────────────────────────────
 
   /// Upcoming events visible to [branch], soonest (next occurrence) first:
   /// the saved list first when there is one, then the Studio's current one.
   Stream<List<Event>> watchUpcomingEvents({String? branch}) => _api
-      .watch(_table, query: _query)
+      .watch(_table, query: upcomingQuery(_clock()), cacheKey: _upcomingKey)
       .map((rows) => upcoming(rows, branch: branch, now: _clock()));
 
   /// The [pastEventLimit] most recently finished one-off events visible to
   /// [branch], most recent first. Weekly events are left out.
   Stream<List<Event>> watchPastEvents({String? branch}) => _api
-      .watch(_table, query: _query)
+      .watch(_table, query: pastQuery(_clock()), cacheKey: _pastKey)
       .map((rows) => past(rows, branch: branch, now: _clock()));
 
   /// Resolves event ids; unknown ids are dropped.
   Future<List<Event>> getEventsByIds(List<String> ids) async {
     final unique = ids.toSet();
     if (unique.isEmpty) return const [];
-    try {
-      final rows = await _api.load(_table, query: _query);
-      final now = _clock();
-      return [for (final id in unique) ?resolve(rows, id, now: now)];
-    } catch (_) {
-      return const [];
-    }
+    final rows = await _knownRows(_clock());
+    final now = _clock();
+    return [for (final id in unique) ?resolve(rows, id, now: now)];
   }
 
   /// One event by its Studio id.
   Future<Event?> getEventById(String id) async {
-    try {
-      final rows = await _api.load(_table, query: _query);
-      return resolve(rows, id, now: _clock());
-    } catch (_) {
-      return null;
-    }
+    final now = _clock();
+    return resolve(await _knownRows(now), id, now: now);
+  }
+
+  /// The upcoming rows, then the recent past ones: every event the app lists.
+  /// A query that fails with no saved copy contributes nothing.
+  Future<List<Map<String, dynamic>>> _knownRows(DateTime now) async {
+    Future<List<Map<String, dynamic>>> read(
+      Map<String, String> query,
+      String key,
+    ) => _api
+        .load(_table, query: query, cacheKey: key)
+        .catchError((Object _) => const <Map<String, dynamic>>[]);
+    final results = await Future.wait([
+      read(upcomingQuery(now), _upcomingKey),
+      read(pastQuery(now), _pastKey),
+    ]);
+    return [...results[0], ...results[1]];
   }
 
   // ── Mapping (pure; tested directly) ────────────────────────────────────────

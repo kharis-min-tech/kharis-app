@@ -38,9 +38,9 @@ The base URL comes from `app/lib/core/constants/api_config.dart` (`ApiConfig`):
 https://us-central1-kharis-app-47c49.cloudfunctions.net
 ```
 
-Behaviour shared by the read endpoints (`getAnnouncements`, `getBranches`, `getEvents`, `getDailyReading`):
+Behaviour shared by the read endpoints (`getAnnouncements`, `getBranches`, `getEvents`):
 
-- Load limits: these endpoints and `sermonApiProxy` need no auth, so each is capped at `maxInstances: 10`. The `Cache-Control` headers are not honoured by any CDN (nothing routes the functions through Firebase Hosting), so every warm instance also keeps an in-memory copy of each response for the same TTL as its `max-age` (`getAnnouncements`: 30 seconds; `getDailyReading` is not cached in memory). Code: `response-cache.ts`.
+- Load limits: these endpoints and `sermonApiProxy` need no auth, so each is capped at `maxInstances: 10`. The `Cache-Control` headers are not honoured by any CDN (nothing routes the functions through Firebase Hosting), so every warm instance also keeps an in-memory copy of each response for the same TTL as its `max-age` (`getAnnouncements`: 30 seconds). Code: `response-cache.ts`.
 - `GET` only. Any other method returns `405 {"error":"Method Not Allowed"}`.
 - No authentication.
 - CORS is open (`cors: true`), so the response echoes the request origin and carries `vary: Origin`.
@@ -196,48 +196,7 @@ Response (`EventJson`), live, `?when=past&limit=1`:
 
 `EventJson` also has `address` (string or null). The deployed function predates that field, and live responses omit it until the next deploy.
 
-### 1.4 GET /getDailyReading
-
-Resolves the Bible reading for a date. Resolution order (`reading-plans.ts`):
-
-1. `dailyContent/{YYYY-MM-DD}`, a reading written by hand for that date. It always wins.
-2. The covering `readingPlans` doc. When several plans cover the date, the most recently started plan wins.
-3. If no plan covers the date, the plan that ended most recently is pinned to its last day.
-
-| Query param | Type | Default | Notes |
-|---|---|---|---|
-| `date` | `YYYY-MM-DD` | today in Europe/London | |
-| `month` | `YYYY-MM` | none | Returns every resolvable reading in that month, date ascending. Takes precedence over `date`. |
-
-- Caching: `Cache-Control: public, max-age=300`.
-- Errors: `400 {"error":"date must be YYYY-MM-DD"}` or `400 {"error":"month must be YYYY-MM"}` (live).
-
-Live response:
-
-```json
-{
-  "readings": [
-    {
-      "date": "2026-10-05",
-      "reading": { "book": "2 Corinthians", "chapter": 19, "verse": "1-end" },
-      "prayer": "Lord, speak to us through 2 Corinthians 19 today.",
-      "prayerReference": "2 Corinthians 19",
-      "source": "plan",
-      "planId": "MlCzng0YB8ZqbIvLzVK4",
-      "planTitle": "September - part 2"
-    }
-  ],
-  "count": 1
-}
-```
-
-Field notes:
-
-- `source` is one of `day`, `plan` or `plan-last-day`. `planId` and `planTitle` are `null` for `day`.
-- The current source also returns `planDay` and `planDays` (for example "Day 3 of 13"; both `null` for a `day` reading). The deployed build predates these fields.
-- The chapter shown in the live response is what production currently resolves for this plan.
-
-### 1.5 GET /sermonApiProxy/{resource}/
+### 1.4 GET /sermonApiProxy/{resource}/
 
 A CORS proxy that lets web builds reach the public sermon API ([section 2](#2-public-sermon-api-yetanothersermonhost)). Source: `sermon-proxy.ts`. Native builds call the upstream directly.
 
@@ -256,6 +215,7 @@ A CORS proxy that lets web builds reach the public sermon API ([section 2](#2-pu
 - The response body has the same shape as [2.1](#21-get-sermons).
 
 Deployment status on 2026-10-05: `GET /sermonApiProxy/sermons/?page=2` returned Google's HTML `404 Page not found`, which means the function is not deployed yet. Until it is, web builds cannot reach the sermon API, and the Messages tab on web shows the bundled archive.
+
 
 ---
 
@@ -365,23 +325,23 @@ Jonathan's media engine. The source is in `backend/cloudflare-worker/`; `src/ind
 | | |
 |---|---|
 | Worker name | `kharis-import-worker` (`wrangler.toml`) |
-| Schedule | cron `0 6 * * 1,4`: Monday and Thursday, 06:00 UTC |
+| Schedule | crons `0 22 * * 0`, `0 6 * * 1,4`, `0 18 * * 1` (UTC): Sunday night, Monday morning and evening, Thursday morning |
 | R2 binding | `MESSAGES_BUCKET` → bucket `kharis-messages` |
-| Vars | `SCRAPE_CONCURRENCY` (default `6`) |
+| Vars | `SCRAPE_CONCURRENCY` (default `6`), `SCRAPE_BATCH_LIMIT` (pages scraped per cron run, default `150`; about `10` on the Free plan's 50-subrequest limit), `MANUAL_SCRAPE_LIMIT` (per manual run, default `25`) |
 | Secret | `MANUAL_TRIGGER_SECRET` |
-| Manual run | `GET https://kharis-import-worker.<subdomain>.workers.dev/run-import?secret=<secret>`. Returns `401 Unauthorized` without the secret, `404` on any other path, a JSON summary `{messagesCount, playlistsCount, scrapedThisRun, reusedFromCache, log[]}` on success, and `500 Import failed: …` on failure. |
+| Manual run | `GET https://kharis-import-worker.<subdomain>.workers.dev/run-import` with header `Authorization: Bearer <secret>` (compared in constant time; `?secret=` is no longer accepted). Scrapes at most `MANUAL_SCRAPE_LIMIT` pages so it finishes while you wait; call again until `remainingToScrape` is `0`. Returns `401` without the secret, `404` on any other path, a JSON summary `{messagesCount, playlistsCount, scrapedThisRun, failedThisRun, remainingToScrape, reusedFromCache, written[], skipped[], log[]}` on success, and `500 Import failed: …` on failure. |
 
 What one run does:
 
-1. Walks `series/`, `sermons/` and `playlists/` on the sermon API, following `next` until `null`. A failure on series or playlists is logged and skipped. A failure on sermons aborts the run.
+1. Walks `series/`, `sermons/` and `playlists/` on the sermon API, following `next` until `null` (stops with an error on a repeated `next`, a page without a `results` array, or more than 200 pages). Every fetch times out after 15 s. A failed series fetch keeps series names from the existing `messages.json`; a failed playlists fetch skips writing `playlists.json`; a failed sermons fetch aborts the run and writes nothing.
 2. Maps each sermon to the flat `messages.json` schema ([3.2](#32-messagesjson)). Scheme-less audio URLs become `https://…`.
 3. Computes `previous_id` and `next_id` within each series, ordered oldest first by `date_preached`. Sermons with no series form one group. Two sermons in the same series with the same date are logged as ambiguous.
-4. For each sermon not already in `_cache/detail-cache.json`, fetches `https://yetanothersermon.host/_/kc/sermons/<id>/` and scrapes:
+4. Scrapes `https://yetanothersermon.host/_/kc/sermons/<id>/` for at most `SCRAPE_BATCH_LIMIT` sermons, in this order: sermons not yet in `_cache/detail-cache.json`; cached sermons whose `transcripts/<id>.txt` object is missing from the bucket; sermons preached in the last 30 days that still have no transcript. Newest first within each group. It extracts:
    - the Tags block
    - the Related Messages ids
    - the transcript `.txt` link, whose transcript id differs from the sermon id
-   It then writes the transcript text, starting at the first `[m:ss]` timestamp, to `transcripts/<sermonId>.txt`.
-5. Writes `_cache/detail-cache.json`, `messages.json` and `playlists.json`. Both JSON catalogue files are written with `Cache-Control: public, max-age=300`.
+   It then writes the transcript text, starting at the first `[m:ss]` timestamp, to `transcripts/<sermonId>.txt`. A failed scrape (error page, network error, timeout, failed transcript download) is not cached and is retried on the next run. The cache is saved every 25 scrapes.
+5. Writes `_cache/detail-cache.json`, `messages.json` and `playlists.json`. Both JSON catalogue files are written with `Cache-Control: public, max-age=300`. A sermon whose transcript object is missing gets no `transcript_url`. A new `messages.json` that is empty or smaller than 90% of the existing one is not written; the run logs an error and keeps the old file.
 
 ### 3.2 messages.json
 
@@ -409,8 +369,6 @@ The file held 1,489 messages, matching the API count. Live record:
       "speaker": "David Antwi",
       "date_preached": "2026-09-27",
       "series": null,
-      "topics": [],
-      "keywords": [],
       "scripture_refs": ["1 Timothy 3:16"],
       "audio_url": "https://yetanothersermon.host/_/kc/media/mp3/99934.mp3",
       "image_url": "https://yash.b-cdn.net/media/images/Kharis_resized_H6Mr63b.jpeg?width=256",
@@ -436,7 +394,6 @@ Schema (from `mapSermon` in `src/index.js`):
 | `title`, `speaker` | string \| null | `speaker` is the first preacher |
 | `date_preached` | `YYYY-MM-DD` \| null | |
 | `series` | `{id: string, name: string\|null}` \| null | |
-| `topics`, `keywords` | string[] | Always empty today |
 | `scripture_refs` | string[] | The API's `passages` |
 | `audio_url` | string \| null | Absolute. It 302-redirects like the API URL does. |
 | `image_url` | string \| null | |
@@ -520,7 +477,7 @@ All functions run in `us-central1` (the default region) unless noted. Times are 
 | Function | Trigger | What it does | Audience / topic | Idempotency |
 |---|---|---|---|---|
 | `pushPendingAnnouncements` | every 1 minute | Pushes `news` docs that became live within the last 15 minutes and have not been pushed yet. A future `publishedAt` is pushed when it arrives. Body is capped at 140 chars. Data: `{type:'announcement', newsId, branch, eventId?}` | `branchTopic(news.branch)`: `branch_<slug>` or `all` | Claims `pushLog/news_<newsId>` with `create()` before sending, so overlapping runs cannot both send; a failed send releases the claim (retried next minute) and writes `pushError`. After a good send it writes `pushedAt`, `pushTopic` and `pushMessageId` onto the news doc; if that write fails, the claim still prevents a resend. The 15-minute window stops it from sending the backlog. |
-| `pushDailyReading` | cron `0 7 * * *` (07:00) | Pushes "Today's Bible reading" with the resolved reference. Data: `{type:'reading', date, reference, source}` | topic `daily_reading` | Claims `dailyReadingPushes/{date}` in a transaction before sending. A failed send records `pushError` and is not retried. |
+| `pushDailyReading` | cron `0 7 * * *` (07:00) | Pushes "Today's Bible reading" with today's (Europe/London) Content Studio reading, the same row the app shows: Supabase `daily_entries`, `kind=reading`, workspace `app` before `general` (`daily-reading.ts`). Body: the row's `reference`, else its `title`. No row, a missing table (404) or a failed lookup sends nothing; there is no fallback. Data: `{type:'reading', date, reference}` | topic `daily_reading` | Claims `dailyReadingPushes/{date}` in a transaction before the lookup. A day with no reading records `skipped`; a failed send records `pushError`. Neither is retried. |
 | `pushBirthdays` | cron `0 8 * * *` (08:00) | Direct push to each user whose `dob` month-day is today and who has an `fcmToken`, found by the query `dobMMDD == 'MM-DD'` (the app writes `dobMMDD` with `dob` and backfills it on sign-in; `scripts/backfill-dob-mmdd.mjs` backfills all profiles at once). Title: "Happy birthday!" followed by a party emoji. Data: `{type:'birthday'}`. Deletes tokens that FCM reports as unregistered. | device token `users/{uid}.fcmToken` | `birthdayPushes/{date}` created with `create()`; the run is skipped if it already exists. |
 | `pushServiceReminders` | every 15 minutes | One hour before each Branch's service, parsed from `meetingDays` and `meetingTime`. Branches whose schedule is ambiguous (no weekday, or several times) get no reminder. Data: `{type:'service_reminder', branchId, branch, startTime, address}` | condition `'service_reminders' in topics && '<branch topic>' in topics` | `pushLog/service_<branchId>_<YYYY-MM-DD>` |
 | `onEventWritten` | Firestore `events/{eventId}` write | "New event: …" when an event is created, or "Event updated: …" when the title, time, location, address or branch changes. A Branch move also notifies the old Branch. Data: `{type:'event', eventId, branch, startTime, location}` | condition `'events' in topics && '<branch topic>' in topics` | `pushLog/<cloudEventId>_<topic>`. The claim is released if the send fails. |
@@ -560,8 +517,8 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 | `news/{id}` | public | nobody (`pushPendingAnnouncements` writes push fields through the Admin SDK) |
 | `events/{id}` | public | nobody (`web_*` docs are written by `syncWebsiteEvents`) |
 | `sermons/{id}` | public | nobody (`syncYouTube` writes `yt_*` docs) |
-| `dailyContent/{YYYY-MM-DD}` | public | nobody (Firebase console) |
-| `readingPlans/{id}` | public | nobody (Firebase console). A plan needs `startDate` (`YYYY-MM-DD`), a non-empty `book` and `days` 1..400 to resolve. |
+| `dailyContent/{YYYY-MM-DD}` | public | nobody (Firebase console). Legacy: no longer read by the app or the functions. |
+| `readingPlans/{id}` | public | nobody (Firebase console). Legacy: no longer read by the app or the functions. |
 | `config/{doc}` | public | nobody (Firebase console). `featured.mode` is `auto`, `pinned` or `off`. |
 | `app_feedback/{uid}_{yyyymmdd}` | nobody | Create or overwrite: any signed-in user, one doc per user per UTC day (the id must be the caller's uid plus the UTC date of the write). Keys are limited to `uid, rating, comment, source, platform, createdAt`. `uid` must be the caller, `rating` an int 1..5, `comment` ≤2000 chars, `source` `prompt` or `settings`, `platform` ≤20 chars, `createdAt == request.time`. |
 | `rsvps/{uid}_{eventId}` | get: owner (by id prefix). list: queries constrained to `userId == auth.uid`. | Create: signed-in user, `userId == uid`, id `{uid}_{eventId}`. Update: never. Delete: owner. |
@@ -614,7 +571,9 @@ A removed `web_*` doc carries `{hidden: true, hiddenAt}` instead of being delete
 | `config/giving` | `{url?, bankName?, accountName?, sortCode?, accountNumber?, swiftBic?, iban?, reference?, note?}` | not read by the app | none |
 | `config/home` | `{sections: [{id, enabled}]}` | not read by the app | none |
 
-### 6.6 readingPlans and dailyContent
+### 6.6 readingPlans and dailyContent (legacy)
+
+Neither collection is read any more: today's reading comes from the Content Studio `daily_entries` table, in the app and in `pushDailyReading`. The shapes below describe the documents still stored.
 
 `readingPlans/{id}`:
 
@@ -745,7 +704,7 @@ curl -sI -H 'Origin: https://kharis-app-47c49.web.app' \
 
 The last command should print `access-control-allow-origin: https://kharis-app-47c49.web.app`. Propagation can take up to 30 seconds. No app change is needed: once the header is present, `R2MessagesRepository` uses the mirror on web as well, and web shows transcripts.
 
-Related: deploy `sermonApiProxy` ([1.5](#15-get-sermonapiproxyresource)) so that web has a working API fallback.
+Related: deploy `sermonApiProxy` ([1.4](#14-get-sermonapiproxyresource)) so that web has a working API fallback.
 
 ---
 
@@ -758,8 +717,7 @@ Every export of `backend/functions/src/index.ts`:
 | `getAnnouncements` | HTTP | [1.1](#11-get-getannouncements) |
 | `getBranches` | HTTP | [1.2](#12-get-getbranches) |
 | `getEvents` | HTTP | [1.3](#13-get-getevents) |
-| `getDailyReading` | HTTP | [1.4](#14-get-getdailyreading) |
-| `sermonApiProxy` | HTTP | [1.5](#15-get-sermonapiproxyresource) |
+| `sermonApiProxy` | HTTP | [1.4](#14-get-sermonapiproxyresource) |
 | `pushPendingAnnouncements` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `pushDailyReading` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
 | `pushBirthdays` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |

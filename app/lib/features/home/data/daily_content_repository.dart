@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kharis_app/core/services/content_api.dart';
@@ -120,11 +122,33 @@ class DailyContentRepository {
     }
   }
 
-  /// The Studio answered, but rejected the query: the table or a column is
-  /// not there. Server errors and dropped connections are real failures.
+  /// The Studio answered that the table (404 `PGRST205`, or `42P01` from
+  /// older PostgREST) or a queried column (400 `42703`) is not there, so there
+  /// is nothing for today. Every other failure (rate limits, a rotated key,
+  /// a policy change, server errors, dropped connections) keeps the saved
+  /// copy on screen.
   static bool _isMissing(Object error) {
-    final status = error is DioException ? error.response?.statusCode : null;
-    return status != null && status >= 400 && status < 500;
+    if (error is! DioException) return false;
+    final response = error.response;
+    final code = _postgrestCode(response?.data);
+    return switch (response?.statusCode) {
+      404 => code == 'PGRST205' || code == '42P01',
+      400 => code == '42703',
+      _ => false,
+    };
+  }
+
+  /// The `code` of a PostgREST error body, decoded or still JSON text.
+  static String? _postgrestCode(Object? body) {
+    Object? decoded = body;
+    if (body is String) {
+      try {
+        decoded = jsonDecode(body);
+      } on FormatException {
+        return null;
+      }
+    }
+    return decoded is Map ? '${decoded['code'] ?? ''}' : null;
   }
 
   /// Today's [kind] entry with a title, the app workspace's first.

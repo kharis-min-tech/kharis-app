@@ -98,11 +98,19 @@ class NewsRepository {
 
   static const _table = 'news';
 
+  /// Newest first with a stable tie-break, bounded so the table can grow
+  /// past PostgREST's row cap without dropping the newest items. The device
+  /// still filters and re-sorts (see [liveFor]).
+  static const _query = {
+    'order': 'published_at.desc.nullslast,created_at.desc,id.desc',
+    'limit': '100',
+  };
+
   /// Live announcements visible to [branch] (that branch's plus those for
   /// all branches; every one when [branch] is null), newest first. Falls
   /// back to the copy saved on this device when the network fails.
   Future<List<NewsItem>> getAnnouncements({String? branch}) async {
-    final rows = await _api.load(_table);
+    final rows = await _api.load(_table, query: _query);
     return liveFor(rows, branch: branch);
   }
 

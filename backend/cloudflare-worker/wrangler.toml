@@ -2,9 +2,13 @@ name = "kharis-import-worker"
 main = "src/index.js"
 compatibility_date = "2026-08-11"
 
-# Monday and Thursday, 06:00 UTC. Cron day-of-week: 1 = Monday, 4 = Thursday.
+# All times UTC. Cron day-of-week: 0 = Sunday, 1 = Monday, 4 = Thursday.
+#   Sunday 22:00   picks up the Sunday sermon the evening it is published
+#   Monday 06:00   catches a late Sunday upload
+#   Monday 18:00   catches a Monday upload (and its transcript, if ready)
+#   Thursday 06:00 midweek sweep: transcripts and backfill batches
 [triggers]
-crons = ["0 6 * * 1,4"]
+crons = ["0 22 * * 0", "0 6 * * 1,4", "0 18 * * 1"]
 
 # Create this bucket first: `npx wrangler r2 bucket create kharis-messages`
 [[r2_buckets]]
@@ -13,3 +17,7 @@ bucket_name = "kharis-messages"
 
 [vars]
 SCRAPE_CONCURRENCY = "6"
+# Most sermon pages scraped per cron run (each is up to 2 fetches + 1 R2 write).
+SCRAPE_BATCH_LIMIT = "150"
+# Most sermon pages scraped per manual /run-import call.
+MANUAL_SCRAPE_LIMIT = "25"

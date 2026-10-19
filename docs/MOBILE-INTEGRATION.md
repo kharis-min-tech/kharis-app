@@ -34,8 +34,7 @@ Most providers live in `app/lib/shared/providers/sermon_provider.dart`. Other pr
 | Announcements | `NewsRepository` (`features/home/data/news_repository.dart`) | `newsRepositoryProvider`, `newsProvider` | Content Studio `news`, mapped defensively, filtered on the device to published, unexpired and the member's Branch | last good response saved in Hive; empty list when the table is empty |
 | Events | `EventRepository` (`features/calendar/data/event_repository.dart`) | `eventRepositoryProvider`, `upcomingEventsProvider`, `pastEventsProvider` | Content Studio `events`. `branch_name` null means every Branch. `recurrence = weekly` expands into one event per `recurrence_days` date (0 = Sunday) until `recurrence_until`, at most 8 weeks ahead; occurrence ids are `<id>~<yyyymmdd>` | last good response saved in Hive |
 | RSVPs | `RsvpRepository` (`rsvp_repository.dart`) | `rsvpRepositoryProvider` | Firestore `rsvps/{uid}_{eventId}` | none |
-| Daily reading | `DailyContentRepository` (`features/home/data/daily_content_repository.dart`) | `dailyContentRepositoryProvider` | `GET getDailyReading` | 1. `dailyContent/{date}`<br>2. `readingPlans` resolved on the device (same rules as the server)<br>3. built-in Psalm 23 |
-| Reading plans | `ReadingPlanRepository` (`reading_plan_repository.dart`) | `readingPlanRepositoryProvider` (`reading_plan_provider.dart`) | Firestore `readingPlans` | none |
+| Daily reading | `DailyContentRepository` (`features/home/data/daily_content_repository.dart`) | `dailyContentRepositoryProvider`, `dailyContentProvider` | Content Studio `daily_entries` for today (`kind` `reading` and `prayer`), the `app` workspace's before `general`; `daily_messages` for the Daily Message. A 4xx (table not created yet) reads as "nothing today". The 07:00 `pushDailyReading` push reads the same row. | last good response saved in Hive; no bundled reading, the card hides |
 | Bible text | `BibleRepository` (`features/home/data/bible_repository.dart`) | `bibleRepositoryProvider` | YouVersion `https://api.youversion.com/v1` (`/bibles`, `/bibles/{id}/passages/{usfm}`), header `x-yvp-app-key` | in-memory cache only |
 | Notifications (push) | `NotificationService` (`core/services/notification_service.dart`) | `notificationServiceProvider`, `notificationInitProvider`, `notificationTopicSyncProvider` (`shared/providers/notification_provider.dart`) | FCM topics ([API.md 7.1](API.md#71-fcm-topics)). Writes `users/{uid}.fcmToken`. A tap routes by `data.type` (`notificationTargetFor`). | none |
 | Auth and profile | `FirebaseAuthRepository` (`features/onboarding/data/firebase_auth_repository.dart`) | `firebaseAuthRepositoryProvider`, `authRepositoryProvider` (`auth_provider.dart`) | Firebase Auth (email or anonymous) and `users/{uid}` | none |
@@ -54,7 +53,7 @@ Content (branches, services, venues, events, announcements, featured videos, liv
 | Client | Connect | Receive | Retry |
 |---|---|---|---|
 | Content Studio reads (`ContentApi`: branches, services, venues, events, news, app_config) | 10 s | 20 s | None. A failed call serves the last good response saved in Hive (live status excepted). |
-| `DailyContentRepository` (`getDailyReading`) | 12 s | 15 s | None. A failed call goes to the Firestore fallback. |
+| `DailyContentRepository` (`ContentApi`) | 10 s | 20 s | None. A failed call keeps the saved copy on screen. |
 | `KharisApiSermonRepository` | 15 s | 20 s | Handled by the library notifier (below). |
 | `R2MessagesRepository` mirror | 10 s | 20 s per request | None. An overall `mirrorDeadline` of **25 s** applies, after which page 1 falls back to the sermon API. |
 | `BibleRepository` | Dio default | Dio default | One retry after 800 ms, only for connection errors (no response). |

@@ -172,50 +172,6 @@ paths:
                         endTime: '2026-08-29T19:00:00.000Z'
                     count: 1
         '405': { $ref: '#/components/responses/MethodNotAllowed' }
-  /getDailyReading:
-    get:
-      tags: [Functions]
-      operationId: getDailyReading
-      summary: Resolved daily Bible reading for a date or month
-      parameters:
-        - name: date
-          in: query
-          description: Defaults to today in Europe/London.
-          schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
-        - name: month
-          in: query
-          description: Every resolvable reading in the month, date ascending. Takes precedence over `date`.
-          schema: { type: string, pattern: '^\d{4}-\d{2}$' }
-      responses:
-        '200':
-          description: Readings
-          headers:
-            Cache-Control: { $ref: '#/components/headers/CacheFiveMinutes' }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/DailyReadingResponse' }
-              examples:
-                live:
-                  summary: Live, 2026-10-05
-                  value:
-                    readings:
-                      - date: '2026-10-05'
-                        reading: { book: 2 Corinthians, chapter: 19, verse: 1-end }
-                        prayer: Lord, speak to us through 2 Corinthians 19 today.
-                        prayerReference: 2 Corinthians 19
-                        source: plan
-                        planId: MlCzng0YB8ZqbIvLzVK4
-                        planTitle: September - part 2
-                    count: 1
-        '400':
-          description: Malformed `date` or `month`
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-              examples:
-                live:
-                  value: { error: date must be YYYY-MM-DD }
-        '405': { $ref: '#/components/responses/MethodNotAllowed' }
   /sermonApiProxy/{resource}/:
     get:
       tags: [Functions]
@@ -694,39 +650,6 @@ components:
         events:
           type: array
           items: { $ref: '#/components/schemas/Event' }
-        count: { type: integer }
-    ResolvedReading:
-      type: object
-      required: [date, reading, prayer, prayerReference, source, planId, planTitle]
-      properties:
-        date: { type: string, format: date }
-        reading:
-          type: object
-          required: [book, chapter, verse]
-          properties:
-            book: { type: string }
-            chapter: { type: integer }
-            verse:
-              type: string
-              description: Verse range, e.g. `1-end` or `4-9`.
-        prayer: { type: string }
-        prayerReference: { type: string }
-        source: { type: string, enum: [day, plan, plan-last-day] }
-        planId: { type: [string, 'null'] }
-        planTitle: { type: [string, 'null'] }
-        planDay:
-          type: [integer, 'null']
-          description: 1-based plan day (source only; not yet deployed).
-        planDays:
-          type: [integer, 'null']
-          description: Plan length in days (source only; not yet deployed).
-    DailyReadingResponse:
-      type: object
-      required: [readings, count]
-      properties:
-        readings:
-          type: array
-          items: { $ref: '#/components/schemas/ResolvedReading' }
         count: { type: integer }
     PageEnvelope:
       type: object

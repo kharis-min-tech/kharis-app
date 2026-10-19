@@ -131,6 +131,17 @@ void main() {
       expect(NewsRepository.liveFor(rows, branch: null), hasLength(3));
     });
 
+    test('asks for the newest first, bounded', () async {
+      final stub = SupabaseStub({'news': []});
+      await NewsRepository(api: stub.api()).getAnnouncements();
+      final query = stub.requests.single.uri.queryParameters;
+      expect(
+        query['order'],
+        'published_at.desc.nullslast,created_at.desc,id.desc',
+      );
+      expect(query['limit'], '100');
+    });
+
     test('an empty table is an empty list', () async {
       final repo = NewsRepository(api: SupabaseStub({'news': []}).api());
       expect(await repo.getAnnouncements(), isEmpty);
