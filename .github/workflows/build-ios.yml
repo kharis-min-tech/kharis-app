@@ -250,16 +250,9 @@ jobs:
       # 9. Generate a build number from the workflow run and attempt.
       - name: Calculate build number
         id: build
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-        shell: bash
         run: |
-          set -euo pipefail
-
-          BUILD_NUMBER=$(( RUN_NUMBER * 100 + RUN_ATTEMPT ))
-
-          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          BUILD_NUMBER=$(date +%s)
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "Using build number: $BUILD_NUMBER"
 
       # 10. Install iOS dependencies.
@@ -383,15 +376,6 @@ jobs:
 
           echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
           echo "Exported IPA signature and required entitlements validated."
-
-      # 14. Save the validated IPA artifact for seven days.
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ios-release-ipa-${{ steps.build.outputs.build_number }}
-          path: ${{ steps.ipa.outputs.ipa_path }}
-          if-no-files-found: error
-          retention-days: 7
 
       # 15. Upload the IPA to TestFlight.
       - name: Upload to TestFlight
