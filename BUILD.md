@@ -141,7 +141,7 @@ gitignored `backend/functions/.env` at deploy time:
 echo "YOUTUBE_API_KEY=YOUR_KEY_HERE" > backend/functions/.env
 ```
 
-The deploy workflow writes the same file from the `FUNCTIONS_ENV` secret.
+The deploy workflow writes the same file from the `FUNCTIONS_ENV` secret. It deploys only from `main`, through the `production` environment, with the `firebase-tools` version pinned in `backend/functions/package.json`.
 
 ### 2.2 Build and deploy
 
@@ -380,7 +380,7 @@ Settings, Secrets and variables, Actions, **New repository secret**:
 | CI | `ci.yml` | Push / PR to `main` | `flutter analyze`, `flutter test`, `./scripts/build-web.sh --build-only`; Storybook tests |
 | Android build | `build-android.yml` | Manual | Signed `android-release-aab` artifact |
 | iOS build | `build-ios.yml` | Manual (macOS runner) | Unsigned `ios-release-xcarchive` artifact |
-| Backend deploy | `deploy-backend.yml` | Manual | Node 24; deploys functions + Firestore rules/indexes to `kharis-app-47c49` |
+| Backend deploy | `deploy-backend.yml` | Manual, `main` only, `production` environment | Node 24; pinned `firebase-tools`; deploys functions + Firestore rules/indexes to `kharis-app-47c49` |
 
 Signed iOS builds and store uploads are still done locally
 (`deploy-testflight.sh`, `upload-play-internal.sh`).

@@ -1,6 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
+import { PUBLIC_MAX_INSTANCES, TtlCache } from './response-cache';
 
 /**
  * CORS proxy for the public sermon API (finding D1).
@@ -26,6 +27,14 @@ export const BROWSER_USER_AGENT =
   '(KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
 export const SERMON_PROXY_CACHE_CONTROL = 'public, max-age=300';
+/** In-memory TTL, matching [SERMON_PROXY_CACHE_CONTROL]. */
+export const SERMON_PROXY_CACHE_TTL_MS = 300_000;
+
+/** A good upstream page, as served. */
+export interface CachedSermonPage {
+  contentType: string;
+  body: string;
+}
 
 const REGION = 'us-central1';
 
@@ -59,11 +68,15 @@ export function proxyBase(host: string | undefined): string {
 
 type Fetch = typeof fetch;
 
-/** The request handler, with `fetch` injectable for tests. */
+/**
+ * The request handler, with `fetch` injectable for tests. Good pages are kept
+ * in [cache] (when given) for the Cache-Control TTL; errors never are.
+ */
 export async function handleSermonProxy(
   req: Pick<Request, 'method' | 'path' | 'url'> & { get(name: string): string | undefined },
   res: Response,
   fetchImpl: Fetch = fetch,
+  cache?: TtlCache<CachedSermonPage>,
 ): Promise<void> {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method Not Allowed' });
@@ -76,17 +89,29 @@ export async function handleSermonProxy(
     return;
   }
 
+  const base = proxyBase(req.get('host'));
+  const cacheKey = `${base} ${target}`;
+  const hit = cache?.get(cacheKey);
+  if (hit) {
+    res.set('Content-Type', hit.contentType);
+    res.set('Cache-Control', SERMON_PROXY_CACHE_CONTROL);
+    res.status(200).send(hit.body);
+    return;
+  }
+
   try {
     const upstream = await fetchImpl(target, {
       headers: { 'User-Agent': BROWSER_USER_AGENT, Accept: 'application/json' },
     });
-    const body = (await upstream.text())
-      .split(SERMON_API_UPSTREAM)
-      .join(proxyBase(req.get('host')));
-    res.set('Content-Type', upstream.headers.get('content-type') ?? 'application/json');
+    const body = (await upstream.text()).split(SERMON_API_UPSTREAM).join(base);
+    const contentType = upstream.headers.get('content-type') ?? 'application/json';
+    res.set('Content-Type', contentType);
     // Only a good page is shared through the CDN; an upstream error must not
     // be pinned for five minutes.
     res.set('Cache-Control', upstream.ok ? SERMON_PROXY_CACHE_CONTROL : 'no-store');
+    if (upstream.ok && upstream.status === 200) {
+      cache?.set(cacheKey, { contentType, body }, SERMON_PROXY_CACHE_TTL_MS);
+    }
     res.status(upstream.status).send(body);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -95,12 +120,15 @@ export async function handleSermonProxy(
   }
 }
 
+const sermonPageCache = new TtlCache<CachedSermonPage>(200);
+
 export const sermonApiProxy = onRequest(
   {
     cors: SERMON_PROXY_ORIGINS,
     region: REGION,
     memory: '256MiB',
     timeoutSeconds: 30,
+    maxInstances: PUBLIC_MAX_INSTANCES,
   },
-  (req, res) => handleSermonProxy(req, res),
+  (req, res) => handleSermonProxy(req, res, fetch, sermonPageCache),
 );

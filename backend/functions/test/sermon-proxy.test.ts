@@ -6,7 +6,9 @@ import {
   SERMON_API_UPSTREAM,
   SERMON_PROXY_CACHE_CONTROL,
   handleSermonProxy,
+  type CachedSermonPage,
 } from '../src/sermon-proxy';
+import { TtlCache } from '../src/response-cache';
 
 interface Captured {
   status?: number;
@@ -116,4 +118,31 @@ test('passes an upstream 404 through uncached; network failure is a 502', async 
   const broken = fakeRes();
   await handleSermonProxy(req('GET', '/sermons/', '/sermons/'), broken.res, failing);
   assert.equal(broken.out.status, 502);
+});
+
+test('a good page is served from the instance cache; errors are not cached', async () => {
+  let now = 0;
+  const cache = new TtlCache<CachedSermonPage>(10, () => now);
+  const { fetchImpl, calls } = mockFetch(200, '{"results":[]}');
+  for (let i = 0; i < 3; i++) {
+    const { res, out } = fakeRes();
+    await handleSermonProxy(req('GET', '/series/', '/series/'), res, fetchImpl, cache);
+    assert.equal(out.status, 200);
+    assert.equal(out.body, '{"results":[]}');
+    assert.equal(out.headers['Cache-Control'], SERMON_PROXY_CACHE_CONTROL);
+  }
+  assert.equal(calls.length, 1);
+  // A different query string is a different entry.
+  await handleSermonProxy(req('GET', '/series/', '/series/?page=2'), fakeRes().res, fetchImpl, cache);
+  assert.equal(calls.length, 2);
+  // Expired after the Cache-Control TTL.
+  now = 300_000;
+  await handleSermonProxy(req('GET', '/series/', '/series/'), fakeRes().res, fetchImpl, cache);
+  assert.equal(calls.length, 3);
+
+  const failing = mockFetch(500, 'oops');
+  for (let i = 0; i < 2; i++) {
+    await handleSermonProxy(req('GET', '/sermons/', '/sermons/'), fakeRes().res, failing.fetchImpl, cache);
+  }
+  assert.equal(failing.calls.length, 2);
 });

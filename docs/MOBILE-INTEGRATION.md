@@ -136,7 +136,8 @@ The Cloud Functions YouTube key is a Functions parameter (`YOUTUBE_API_KEY`, `de
 The existing read endpoints all follow the same pattern. Copy it:
 
 1. **Backend.** Add an `onRequest` handler in `backend/functions/src`, and export it from `index.ts`.
-   - Use `{ memory: '256MiB', timeoutSeconds: 30, cors: true }`.
+   - Use `{ memory: '256MiB', timeoutSeconds: 30, cors: true, maxInstances: PUBLIC_MAX_INSTANCES }`.
+   - Cache the response body per instance with `TtlCache` (`response-cache.ts`) for the same TTL as its `Cache-Control` max-age: nothing in front of the functions honours that header.
    - Return `405` for non-GET requests.
    - Set `Cache-Control: public, max-age=300` when the data can be shared.
    - Return `{ <items>: [...], count }` with ISO timestamps.

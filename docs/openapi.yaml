@@ -6,9 +6,8 @@ info:
   description: |
     Prose reference: docs/API.md. App integration guide: docs/MOBILE-INTEGRATION.md.
 
-    Four hosts are described here, each set as per-path `servers`:
+    Three hosts are described here, each set as per-path `servers`:
     - Cloud Functions, us-central1 (project kharis-app-47c49)
-    - Cloud Functions, europe-west1 (feedProxy only)
     - Public sermon API, yetanothersermon.host (third party; native clients must send a browser User-Agent; no CORS)
     - R2 public bucket written by the Cloudflare import Worker (static files; no CORS headers today)
 
@@ -209,37 +208,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-  /feedProxy:
-    servers:
-      - url: https://europe-west1-kharis-app-47c49.cloudfunctions.net
-        description: Cloud Functions, europe-west1
-    get:
-      tags: [Functions]
-      operationId: feedProxy
-      summary: CORS-safe SoundCloud RSS / YouTube Atom pass-through
-      description: Not called by the current app.
-      parameters:
-        - name: source
-          in: query
-          description: '`youtube` for the channel Atom feed; anything else (or absent) for SoundCloud RSS.'
-          schema: { type: string, enum: [youtube, soundcloud] }
-      responses:
-        '200':
-          description: Upstream XML
-          headers:
-            Cache-Control:
-              description: '`public, max-age=60, s-maxage=300`'
-              schema: { type: string }
-          content:
-            text/xml:
-              schema: { type: string }
-            application/rss+xml:
-              schema: { type: string }
-        '502':
-          description: Upstream fetch failed (plain text)
-          content:
-            text/plain:
-              schema: { type: string }
   /sermons/:
     servers:
       - url: https://yetanothersermon.host/_/kc/public-api/v1

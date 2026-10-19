@@ -316,6 +316,33 @@ export function eventCampuses(
   return { campuses, skip: null };
 }
 
+/**
+ * Whether the stale sweep may delete [doc]: an upcoming (within the import
+ * window) website import this run did not see. Never deleted:
+ * - a doc this run wrote or kept ([seen]);
+ * - any occurrence of a post this run skipped ([skippedWpIds]): its campuses
+ *   were unknown, so its doc ids could not be derived, and deleting it would
+ *   wipe the admin's branch/image/featured overrides until it reappears;
+ * - a `hidden: true` tombstone (an admin's delete): dropping it would bring
+ *   the event back if the site lists it again.
+ */
+export function isStaleWebEvent(
+  id: string,
+  data: DocumentData,
+  seen: ReadonlySet<string>,
+  skippedWpIds: ReadonlySet<number>,
+  nowMs: number,
+): boolean {
+  if (seen.has(id) || data.hidden === true) return false;
+  if (typeof data.sourceId === 'number' && skippedWpIds.has(data.sourceId)) return false;
+  const start = data.startTime;
+  if (!(start instanceof Timestamp) || start.toMillis() < nowMs) return false;
+  const today = londonClock(nowMs);
+  const startMonth = londonClock(start.toMillis());
+  const monthsOut = (startMonth.year - today.year) * 12 + (startMonth.month - today.month);
+  return monthsOut <= MONTHS_AHEAD;
+}
+
 export const syncWebsiteEvents = onSchedule(
   {
     schedule: 'every 60 minutes',
@@ -381,12 +408,14 @@ export const syncWebsiteEvents = onSchedule(
     let created = 0;
     let updated = 0;
     let skipped = 0;
+    const skippedWpIds = new Set<number>();
     for (const event of occurrences) {
       const post = postById[event.wpId];
       const { campuses, skip } = eventCampuses(post, termName, branchNames);
       if (skip !== null) {
         console.warn(`[web-events] skip ${event.wpId}: ${skip}`);
         skipped++;
+        skippedWpIds.add(event.wpId);
         continue;
       }
       const description = post?.content?.rendered ? htmlToText(post.content.rendered) || null : null;
@@ -423,12 +452,7 @@ export const syncWebsiteEvents = onSchedule(
       .get();
     let deleted = 0;
     for (const doc of stale.docs) {
-      const start = doc.data().startTime;
-      if (seen.has(doc.id) || !(start instanceof Timestamp) || start.toMillis() < nowMs) continue;
-      const startMonth = londonClock(start.toMillis());
-      const monthsOut =
-        (startMonth.year - today.year) * 12 + (startMonth.month - today.month);
-      if (monthsOut > MONTHS_AHEAD) continue;
+      if (!isStaleWebEvent(doc.id, doc.data(), seen, skippedWpIds, nowMs)) continue;
       await doc.ref.delete();
       deleted++;
     }

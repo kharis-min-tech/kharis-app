@@ -4,14 +4,30 @@ import 'package:flutter/foundation.dart';
 /// Where a piece of feedback was written.
 enum FeedbackSource { prompt, settings }
 
-/// Writes member feedback to the `app_feedback` collection (create-only,
+/// Writes member feedback to the `app_feedback` collection (write-only,
 /// admin-read; see backend/firestore.rules).
+///
+/// The rules allow one doc per member per UTC day, id `{uid}_{yyyymmdd}`, so
+/// a second submission the same day replaces the first.
 class AppFeedbackRepository {
-  AppFeedbackRepository(this._firestore, {required String? uid})
-    : _uid = (uid == null || uid.isEmpty) ? null : uid;
+  AppFeedbackRepository(
+    this._firestore, {
+    required String? uid,
+    DateTime Function()? clock,
+  }) : _uid = (uid == null || uid.isEmpty) ? null : uid,
+       _clock = clock ?? DateTime.now;
 
   final FirebaseFirestore _firestore;
   final String? _uid;
+  final DateTime Function() _clock;
+
+  /// The rules-enforced doc id for [uid]'s feedback on the UTC day of [at].
+  static String docIdFor(String uid, DateTime at) {
+    final utc = at.toUtc();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${uid}_${utc.year.toString().padLeft(4, '0')}'
+        '${two(utc.month)}${two(utc.day)}';
+  }
 
   static const maxCommentLength = 2000;
 
@@ -41,14 +57,17 @@ class AppFeedbackRepository {
         ? trimmed.substring(0, maxCommentLength)
         : trimmed;
 
-    final write = _firestore.collection('app_feedback').doc().set({
-      'uid': uid,
-      'rating': rating,
-      'comment': body,
-      'source': source.name,
-      'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    final write = _firestore
+        .collection('app_feedback')
+        .doc(docIdFor(uid, _clock()))
+        .set({
+          'uid': uid,
+          'rating': rating,
+          'comment': body,
+          'source': source.name,
+          'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
     await write.timeout(_ackTimeout, onTimeout: () {});
   }
 }
