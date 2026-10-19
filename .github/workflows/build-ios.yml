@@ -1,86 +1,432 @@
-name: Build iOS
 
-# Builds an unsigned release archive (smoke test that the iOS release build
-# compiles exactly like a local one). Signed IPAs for App Store Connect are
-# still produced locally with app/scripts/deploy-testflight.sh.
-#
-# Required repository secret (Settings -> Secrets and variables -> Actions):
-#
-#   ENV_JSON   Verbatim copy of app/env.json (YOUVERSION_API_KEY,
-#              YOUTUBE_API_KEY). Same secret build-android.yml and ci.yml use.
+name: Build and Upload iOS to TestFlight
 
-'on':
+on:
   workflow_dispatch:
-    inputs:
-      build_number:
-        description: Build number (optional override)
-        required: false
-        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-release
+  cancel-in-progress: false
 
 jobs:
   build-ios:
-    name: Build iOS archive (unsigned)
+    name: Build iOS Release IPA
     runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Check required secrets are present
+    # Release builds are allowed only from main.
+    if: github.ref == 'refs/heads/main'
+
+    env:
+      BUNDLE_ID: com.kharis.church
+      TEAM_ID: Z9TTRH45X3
+      EXPECTED_PROFILE_UUID: 979a3d26-6f9e-457d-8f5e-651006b23894
+      REQUIRED_ASSOCIATED_DOMAIN: applinks:kharis-app-47c49.web.app
+
+    steps:
+      # 1. Checkout source without persisting the GitHub token.
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      # 2. Verify required repository-level secrets.
+      - name: Check required secrets
         env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           ENV_JSON: ${{ secrets.ENV_JSON }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        shell: bash
         run: |
-          if [ -z "$ENV_JSON" ]; then
-            echo "::error::Missing repository secret ENV_JSON (see the header of .github/workflows/build-ios.yml)"
+          set -euo pipefail
+
+          missing=""
+
+          [[ -n "$IOS_CERTIFICATE_BASE64" ]] || missing="$missing IOS_CERTIFICATE_BASE64"
+          [[ -n "$IOS_CERTIFICATE_PASSWORD" ]] || missing="$missing IOS_CERTIFICATE_PASSWORD"
+          [[ -n "$IOS_PROVISIONING_PROFILE_BASE64" ]] || missing="$missing IOS_PROVISIONING_PROFILE_BASE64"
+          [[ -n "$ENV_JSON" ]] || missing="$missing ENV_JSON"
+          [[ -n "$APPLE_ID" ]] || missing="$missing APPLE_ID"
+          [[ -n "$APPLE_APP_PASSWORD" ]] || missing="$missing APPLE_APP_PASSWORD"
+
+          if [[ -n "$missing" ]]; then
+            echo "::error::Missing required repository secrets:$missing"
             exit 1
           fi
 
-      - name: Set up Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
+          echo "All required release secrets are configured."
 
-      # Same Flutter as local development: the single pin is app/.fvmrc.
-      - uses: subosito/flutter-action@v2
+      # 3. Install the Flutter version pinned by app/.fvmrc.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version-file: app/.fvmrc
           channel: stable
           cache: true
 
+      # 4. Resolve locked dependencies.
       - name: Install Flutter dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile
 
+      # 5. Restore environment configuration without printing it.
       - name: Restore env.json
         working-directory: app
         env:
           ENV_JSON: ${{ secrets.ENV_JSON }}
-        run: printf '%s' "$ENV_JSON" > env.json
-
-      # --no-codesign stops after the archive (no IPA is exported without
-      # signing), so the archive is the artifact.
-      - name: Build iOS archive
-        working-directory: app
-        # The input reaches the shell as data, never as script text.
-        env:
-          BUILD_NUMBER: ${{ github.event.inputs.build_number }}
+        shell: bash
         run: |
-          EXTRA=()
-          if [ -n "$BUILD_NUMBER" ]; then
-            if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-              echo "::error::build_number must be digits only"
-              exit 1
-            fi
-            EXTRA=(--build-number="$BUILD_NUMBER")
+          set -euo pipefail
+          umask 077
+
+          printf '%s' "$ENV_JSON" > env.json
+          test -s env.json
+
+      # 6. Install the Apple Distribution certificate.
+      - name: Install Apple Distribution certificate
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/kharis-build.keychain-db"
+          CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+          printf '%s' "$IOS_CERTIFICATE_BASE64" \
+            | base64 -D > "$CERTIFICATE_PATH"
+
+          security create-keychain \
+            -p "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security set-keychain-settings \
+            -lut 21600 "$KEYCHAIN_PATH"
+
+          security unlock-keychain \
+            -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security list-keychains \
+            -d user -s "$KEYCHAIN_PATH"
+
+          security default-keychain -s "$KEYCHAIN_PATH"
+
+          security import "$CERTIFICATE_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$IOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          rm -f "$CERTIFICATE_PATH"
+
+          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep -qE '^[[:space:]]*[0-9]+\)'; then
+            echo "::error::No valid code-signing identity was found."
+            exit 1
           fi
-          flutter build ipa --release --no-codesign --dart-define-from-file=env.json "${EXTRA[@]}"
 
-      - name: Upload archive artifact
-        uses: actions/upload-artifact@v4
+          echo "Apple Distribution signing identity installed."
+
+      # 7. Install and validate the expected provisioning profile.
+      - name: Install provisioning profile
+        env:
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_FILE="$RUNNER_TEMP/profile.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+
+          mkdir -p "$PROFILE_DIR"
+
+          printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" \
+            | base64 -D > "$PROFILE_FILE"
+
+          security cms -D \
+            -i "$PROFILE_FILE" \
+            -o "$PROFILE_PLIST"
+
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy \
+            -c "Print :UUID" "$PROFILE_PLIST")
+
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:application-identifier" "$PROFILE_PLIST")
+
+          PROFILE_EXPIRY=$(/usr/libexec/PlistBuddy \
+            -c "Print :ExpirationDate" "$PROFILE_PLIST")
+
+          if [[ "$PROFILE_UUID" != "$EXPECTED_PROFILE_UUID" ]]; then
+            echo "::error::Unexpected provisioning profile UUID."
+            exit 1
+          fi
+
+          if [[ "$PROFILE_APP_ID" != "$TEAM_ID.$BUNDLE_ID" ]]; then
+            echo "::error::Provisioning profile App ID does not match the app."
+            exit 1
+          fi
+
+          python3 - "$PROFILE_PLIST" <<'PY'
+          import datetime
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], "rb") as file:
+              profile = plistlib.load(file)
+
+          expiry = profile["ExpirationDate"]
+          if expiry.tzinfo is None:
+              expiry = expiry.replace(tzinfo=datetime.timezone.utc)
+
+          if expiry <= datetime.datetime.now(datetime.timezone.utc):
+              print("::error::Provisioning profile has expired.")
+              sys.exit(1)
+
+          print("Provisioning profile is not expired.")
+          PY
+
+          cp "$PROFILE_FILE" \
+            "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "PROFILE_PLIST=$PROFILE_PLIST" >> "$GITHUB_ENV"
+
+          echo "Provisioning profile UUID validated."
+          echo "Provisioning profile expiry: $PROFILE_EXPIRY"
+
+      # 8. Validate relevant profile entitlements.
+      - name: Validate provisioning profile entitlements
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:application-identifier" "$PROFILE_PLIST")
+
+          APS_ENV=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:aps-environment" "$PROFILE_PLIST")
+
+          if [[ "$PROFILE_APP_ID" != "$TEAM_ID.$BUNDLE_ID" ]]; then
+            echo "::error::Provisioning profile App ID mismatch."
+            exit 1
+          fi
+
+          if [[ "$APS_ENV" != "production" ]]; then
+            echo "::error::Expected production push notification entitlement."
+            exit 1
+          fi
+
+          PROFILE_DOMAINS=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:com.apple.developer.associated-domains" \
+            "$PROFILE_PLIST" 2>/dev/null || true)
+
+          if [[ "$PROFILE_DOMAINS" == "*" ]]; then
+            echo "::notice::Profile contains a wildcard Associated Domains entitlement; the exported app will be checked separately."
+          elif ! printf '%s\n' "$PROFILE_DOMAINS" \
+            | grep -Fq "$REQUIRED_ASSOCIATED_DOMAIN"; then
+            echo "::error::Profile does not contain the expected Associated Domains entitlement."
+            exit 1
+          fi
+
+          echo "Provisioning profile entitlement checks passed."
+
+      # 9. Generate a build number from the workflow run and attempt.
+      - name: Calculate build number
+        id: build
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BUILD_NUMBER=$(( RUN_NUMBER * 100 + RUN_ATTEMPT ))
+
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Using build number: $BUILD_NUMBER"
+
+      # 10. Install iOS dependencies.
+      - name: Install CocoaPods
+        working-directory: app/ios
+        run: pod install
+
+      # 11. Generate App Store export options.
+      - name: Prepare iOS export options
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s "$PROFILE_PLIST"
+          test -n "$PROFILE_UUID"
+
+          cat > export_options.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_UUID}</string>
+            </dict>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+          plutil -lint export_options.plist
+          echo "Export options validated."
+
+      # 12. Build the signed App Store IPA.
+      - name: Build IPA
+        working-directory: app
+        env:
+          BUILD_NUMBER: ${{ steps.build.outputs.build_number }}
+        run: |
+          set -euo pipefail
+
+          flutter build ipa \
+            --release \
+            --build-number="$BUILD_NUMBER" \
+            --dart-define-from-file=env.json \
+            --export-options-plist=export_options.plist
+
+      # 13. Verify the exported IPA and its signed entitlements.
+      - name: Validate exported IPA
+        id: ipa
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IPA_PATH="$(find "$GITHUB_WORKSPACE/app/build/ios/ipa" \
+            -type f -name '*.ipa' -print -quit)"
+
+          if [[ -z "$IPA_PATH" || ! -s "$IPA_PATH" ]]; then
+            echo "::error::A non-empty IPA was not found."
+            exit 1
+          fi
+
+          VALIDATION_DIR="$RUNNER_TEMP/ipa-validation"
+          rm -rf "$VALIDATION_DIR"
+          mkdir -p "$VALIDATION_DIR"
+
+          unzip -q "$IPA_PATH" -d "$VALIDATION_DIR"
+
+          APP_PATH="$VALIDATION_DIR/Payload/Runner.app"
+          ENTITLEMENTS_PATH="$VALIDATION_DIR/signed-entitlements.plist"
+
+          if [[ ! -d "$APP_PATH" ]]; then
+            echo "::error::Runner.app was not found in the IPA."
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+          codesign -d --entitlements :- "$APP_PATH" \
+            > "$ENTITLEMENTS_PATH" 2>/dev/null
+
+          test -s "$ENTITLEMENTS_PATH"
+          plutil -lint "$ENTITLEMENTS_PATH"
+
+          SIGNED_APP_ID=$(/usr/libexec/PlistBuddy \
+            -c "Print :application-identifier" "$ENTITLEMENTS_PATH")
+
+          if [[ "$SIGNED_APP_ID" != "$TEAM_ID.$BUNDLE_ID" ]]; then
+            echo "::error::Signed app identifier does not match the expected app."
+            exit 1
+          fi
+
+          SIGNED_APS_ENV=$(/usr/libexec/PlistBuddy \
+            -c "Print :aps-environment" "$ENTITLEMENTS_PATH")
+
+          if [[ "$SIGNED_APS_ENV" != "production" ]]; then
+            echo "::error::Signed app does not have production push notification entitlement."
+            exit 1
+          fi
+
+          SIGNED_DOMAINS=$(/usr/libexec/PlistBuddy \
+            -c "Print :com.apple.developer.associated-domains" \
+            "$ENTITLEMENTS_PATH" 2>/dev/null || true)
+
+          if ! printf '%s\n' "$SIGNED_DOMAINS" \
+            | grep -Fq "$REQUIRED_ASSOCIATED_DOMAIN"; then
+            echo "::error::Signed app is missing the required Associated Domains entitlement."
+            exit 1
+          fi
+
+          echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+          echo "Exported IPA signature and required entitlements validated."
+
+      # 14. Save the validated IPA artifact for seven days.
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ios-release-xcarchive
-          path: app/build/ios/archive/Runner.xcarchive
+          name: ios-release-ipa-${{ steps.build.outputs.build_number }}
+          path: ${{ steps.ipa.outputs.ipa_path }}
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
-      - name: Scrub env.json
+      # 15. Upload the IPA to TestFlight.
+      - name: Upload to TestFlight
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          IPA_PATH: ${{ steps.ipa.outputs.ipa_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          xcrun altool \
+            --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --username "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD"
+
+      # 16. Remove temporary secrets, profiles and keychain.
+      - name: Cleanup
         if: always()
-        run: rm -f app/env.json
+        shell: bash
+        run: |
+          set +e
+
+          rm -f app/env.json
+          rm -f app/export_options.plist
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/profile.mobileprovision"
+          rm -f "$RUNNER_TEMP/profile.plist"
+          rm -rf "$RUNNER_TEMP/ipa-validation"
+
+          if [[ -n "${KEYCHAIN_PATH:-}" ]]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null
+          fi
+
+          rm -f \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/${EXPECTED_PROFILE_UUID}.mobileprovision"
