@@ -1069,7 +1069,7 @@ bool sermonMatchesQuery(Sermon s, String query) {
 }
 
 /// How well [s] matches [query]; higher ranks first. Each word scores by
-/// the best field it hits (title, then series, then speaker, then
+/// the best field it hits (title, then series, then
 /// description), with whole words beating partial ones, so "faith" puts
 /// "Faith From First to Last" above a sermon that mentions faithfulness in
 /// its notes. The whole query appearing in the title earns a bonus.
@@ -1081,7 +1081,6 @@ double sermonSearchScore(Sermon s, String query) {
   final fields = [
     (title, 10.0),
     (_normaliseForSearch(s.series ?? ''), 5.0),
-    (_normaliseForSearch(s.speaker), 3.0),
     (_normaliseForSearch(s.description ?? ''), 1.0),
   ];
   var score = 0.0;
