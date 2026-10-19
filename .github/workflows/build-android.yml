@@ -78,7 +78,7 @@ jobs:
       - name: Calculate build number
         id: build
         run: |
-          BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
+          BUILD_NUMBER=$(date +%s)
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "Using build number: $BUILD_NUMBER"
       - name: Verify signing files
