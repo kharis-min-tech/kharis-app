@@ -104,7 +104,15 @@ Future<void> openMessagesReset(Journey j) async {
   j.c.read(selectedArchiveYearProvider.notifier).state = null;
   j.c.read(sermonSortProvider.notifier).state = SermonSort.newest;
   await pumpFor(t, const Duration(milliseconds: 500));
-  await t.drag(messagesScroll, const Offset(0, 8000), warnIfMissed: false);
+  // Jump rather than drag: with paging the list can be hundreds of rows
+  // long, further than any single fling.
+  final scrollable = find.descendant(
+    of: messagesScroll,
+    matching: find.byType(Scrollable),
+  );
+  if (scrollable.evaluate().isNotEmpty) {
+    t.state<ScrollableState>(scrollable.first).position.jumpTo(0);
+  }
   await pumpFor(t, const Duration(milliseconds: 800));
 }
 

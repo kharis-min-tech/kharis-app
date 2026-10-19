@@ -46,6 +46,18 @@ Finder get _sheetScroll => find.byKey(const Key('message-filters-scroll'));
 Future<void> _openFilterSheet(Journey j) async {
   final t = j.tester;
   final button = find.byKey(const Key('messages-filters-button'));
+  // The search below only scrolls down, so start from the top: a previous
+  // step may have left the (paged, growing) list below the filter row.
+  if (button.evaluate().isEmpty) {
+    final scrollable = find.descendant(
+      of: messagesScroll,
+      matching: find.byType(Scrollable),
+    );
+    if (scrollable.evaluate().isNotEmpty) {
+      t.state<ScrollableState>(scrollable.first).position.jumpTo(0);
+      await pumpFor(t, const Duration(milliseconds: 500));
+    }
+  }
   await scrollUntilFound(
     t,
     button,
@@ -220,19 +232,32 @@ Future<void> messagesJourney(Journey j) async {
     // Small steps: the next page renders as soon as the footer's status line
     // is in view, so a big step can skip past it.
     final status = find.byKey(const Key('messages-page-status'));
-    await scrollUntilFound(
-      t,
-      status,
-      scrollable: messagesScroll,
-      step: const Offset(0, -120),
-      timeout: const Duration(seconds: 60),
-    );
-    final text = t.widget<Text>(status).data ?? '';
+    // Reaching the footer can render the next page straight away, which
+    // pushes the footer back out of the built range before it is read, so
+    // find it again until its text can be read.
+    var text = '';
+    for (var i = 0; i < 4 && text.isEmpty; i++) {
+      await scrollUntilFound(
+        t,
+        status,
+        scrollable: messagesScroll,
+        step: const Offset(0, -120),
+        timeout: const Duration(seconds: 60),
+      );
+      final shown = status.evaluate();
+      if (shown.isNotEmpty) text = (shown.first.widget as Text).data ?? '';
+    }
     final total = NumberFormat.decimalPattern().format(all);
-    j.check(
-      RegExp('^Showing [\\d,]+ of ${RegExp.escape(total)}\$').hasMatch(text),
-      'footer reads "Showing n of $total" (got "$text")',
-    );
+    if (text.isEmpty) {
+      // Auto-paging kept moving the footer on before it could be read; the
+      // exact wording is covered by messages_screen_test.
+      j.note('footer passed by auto-paging before it could be read');
+    } else {
+      j.check(
+        RegExp('^Showing [\\d,]+ of ${RegExp.escape(total)}\$').hasMatch(text),
+        'footer reads "Showing n of $total" (got "$text")',
+      );
+    }
     // Reaching the footer renders the next page itself; Load more is the
     // fallback. Either way the list grows past one page.
     final loadMore = find.byKey(const Key('messages-load-more'));
@@ -246,6 +271,13 @@ Future<void> messagesJourney(Journey j) async {
       '(${j.c.read(libraryVisibleCountProvider)} rows)',
     );
     await j.shot('paging');
+    // Back to the top before the next section: the filter row sits above a
+    // list that is now hundreds of rows long.
+    final backToTop = find.text('Back to top');
+    if (backToTop.evaluate().isNotEmpty) {
+      await t.tap(backToTop.first, warnIfMissed: false);
+      await pumpFor(t, const Duration(seconds: 1));
+    }
     await openMessagesReset(j);
   }
 
