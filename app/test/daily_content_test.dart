@@ -40,11 +40,13 @@ Map<String, dynamic> _entry({
 };
 
 /// A Studio whose database does not have [missing] yet: PostgREST answers
-/// those tables with a 404 (`PGRST205`).
+/// those tables with a 404 (`PGRST205`). While [rejection] is set, every
+/// table answers with that status and body instead.
 class _Studio extends SupabaseStub {
   _Studio(super.tables, {this.missing = const {}});
 
   final Set<String> missing;
+  (int, String)? rejection;
 
   @override
   Future<ResponseBody> fetch(
@@ -52,6 +54,10 @@ class _Studio extends SupabaseStub {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) {
+    if (rejection case (final status, final body)) {
+      requests.add(options);
+      return Future.value(ResponseBody.fromString(body, status));
+    }
     if (missing.contains(options.uri.pathSegments.last)) {
       requests.add(options);
       return Future.value(
@@ -158,6 +164,55 @@ void main() {
         cache: cache,
       ).watchTodaysContent().toList();
       expect(emitted.map((c) => c?.reading?.title), ['God so loved']);
+    });
+  });
+
+  group('rejected queries', () {
+    Future<List<String?>> afterRejection(int status, String body) async {
+      final stub = _Studio({
+        'daily_entries': [_entry()],
+      });
+      final cache = FakeCacheService();
+      await _repo(stub, cache: cache).watchTodaysContent().last;
+      stub.rejection = (status, body);
+      final emitted = await _repo(
+        stub,
+        cache: cache,
+      ).watchTodaysContent().toList();
+      return [for (final c in emitted) c?.reading?.title];
+    }
+
+    test('a missing column (400 42703) is nothing for today', () async {
+      expect(await afterRejection(400, '{"code":"42703"}'), [
+        'God so loved',
+        null,
+      ]);
+    });
+
+    test('a missing table (404 PGRST205) is nothing for today', () async {
+      expect(await afterRejection(404, '{"code":"PGRST205"}'), [
+        'God so loved',
+        null,
+      ]);
+    });
+
+    test('rate limits, auth and policy errors keep the saved copy', () async {
+      for (final (status, body) in [
+        (429, '{"message":"rate limited"}'),
+        (401, '{"code":"PGRST301"}'),
+        (403, '{"code":"42501"}'),
+        (404, '<html>not found</html>'),
+        (400, '{"code":"PGRST100"}'),
+      ]) {
+        expect(await afterRejection(status, body), [
+          'God so loved',
+        ], reason: '$status $body');
+      }
+    });
+
+    test('a rejection with nothing saved is an error', () {
+      final stub = _Studio(const {})..rejection = (429, '{}');
+      expect(_repo(stub).watchTodaysContent().toList(), throwsA(anything));
     });
   });
 

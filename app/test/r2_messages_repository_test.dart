@@ -25,10 +25,13 @@ Sermon _apiSermon(String id) => Sermon(
 
 /// The live API: scripted page 1, plus a record of every call.
 class _FakeApi extends KharisApiSermonRepository {
-  _FakeApi({this.head = const [], this.fail = false});
+  _FakeApi({this.head = const [], this.fail = false, this.total = 3});
 
   final List<Sermon> head;
   final bool fail;
+
+  /// The archive size the API reports.
+  final int total;
   final calls = <(String?, String?)>[];
 
   @override
@@ -38,7 +41,7 @@ class _FakeApi extends KharisApiSermonRepository {
     return SermonPage(
       sermons: head,
       nextUrl: 'https://x.test/sermons/?page=2',
-      totalCount: 1489,
+      totalCount: total,
     );
   }
 }
@@ -67,6 +70,65 @@ class _FakeApi extends KharisApiSermonRepository {
 }
 
 void main() {
+  group('a mirror shorter than the API\'s count', () {
+    final mirror = [for (var i = 1; i <= 20; i++) _record('$i')];
+
+    test(
+      'is a failed mirror: page 1 is the API\'s, so the walk runs',
+      () async {
+        final (dio, _) = _bucket(messages: mirror);
+        final api = _FakeApi(head: [_apiSermon('21')], total: 1489);
+        final page = await R2MessagesRepository(dio: dio, api: api).fetchPage();
+
+        expect(page.sermons.map((s) => s.id), ['21']);
+        expect(page.nextUrl, 'https://x.test/sermons/?page=2');
+        expect(page.totalCount, 1489);
+      },
+    );
+
+    test('within the tolerance is kept, counted at the API\'s total', () async {
+      final (dio, _) = _bucket(messages: mirror);
+      final total = 21 + R2MessagesRepository.mirrorCountTolerance;
+      final api = _FakeApi(head: [_apiSermon('21')], total: total);
+      final page = await R2MessagesRepository(dio: dio, api: api).fetchPage();
+
+      expect(page.sermons, hasLength(21));
+      expect(page.hasMore, isFalse);
+      expect(page.totalCount, total, reason: 'never below the API\'s count');
+    });
+  });
+
+  test('a malformed record is dropped, not the whole mirror', () {
+    final sermons = mapR2Messages([
+      _record('1'),
+      {..._record('2'), 'title': 42},
+      'not a record',
+      {..._record('3'), 'series': 'not a map'},
+      _record('4'),
+    ]);
+    expect(sermons.map((s) => s.id), ['1', '4']);
+  });
+
+  test('a malformed API record is dropped, not the whole page', () {
+    Map<String, dynamic> api(Object? id, {Object? duration}) => {
+      'id': id,
+      'title': 'Sermon $id',
+      'audio_link': {'download_url': 'x.test/a.mp3', 'duration': duration},
+    };
+    final sermons = mapApiSermons([
+      api(1, duration: 60),
+      api(null),
+      api(3, duration: '60'),
+      {
+        ...api(4),
+        'preachers': ['not a map'],
+      },
+      api(5),
+    ]);
+    expect(sermons.map((s) => s.id), ['1', '5']);
+    expect(sermons.first.duration, const Duration(seconds: 60));
+  });
+
   test('page 1 is the whole mirror headed by newer API arrivals, '
       'with R2 transcripts carried onto API rows', () async {
     final (dio, _) = _bucket(
@@ -130,7 +192,7 @@ void main() {
         final (dio, _) = _bucket(messages: messages);
         final repo = R2MessagesRepository(
           dio: dio,
-          api: _FakeApi(head: [_apiSermon('21')]),
+          api: _FakeApi(head: [_apiSermon('21')], total: 1489),
         );
 
         final page = await repo.fetchPage();

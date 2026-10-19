@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/core/services/cache_service.dart';
 import 'package:kharis_app/features/messages/data/kharis_api_sermon_repository.dart';
+import 'package:kharis_app/features/messages/data/r2_messages_repository.dart';
+import 'package:kharis_app/features/messages/data/sermon_repository_base.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
@@ -151,15 +153,15 @@ void main() {
     _MemoryStore? store,
     List<Map<String, dynamic>>? records,
     Duration backoff = Duration.zero,
+    AbstractSermonRepository Function(KharisApiSermonRepository api)? wrap,
   }) {
     final adapter = _ArchiveAdapter(records ?? _archive());
     final dio = Dio(BaseOptions(baseUrl: 'https://x.test/api/'))
       ..httpClientAdapter = adapter;
+    final api = KharisApiSermonRepository(dio: dio);
     final container = ProviderContainer(
       overrides: [
-        sermonRepositoryProvider.overrideWithValue(
-          KharisApiSermonRepository(dio: dio),
-        ),
+        sermonRepositoryProvider.overrideWithValue(wrap?.call(api) ?? api),
         sermonArchiveCacheProvider.overrideWithValue(store),
         sermonArchiveBackoffProvider.overrideWithValue((_) => backoff),
         cmsSermonsProvider.overrideWith(
@@ -509,5 +511,53 @@ void main() {
       expect(ids(container), isNot(contains(removedId)));
       expect(adapter.requestedPages, hasLength(30));
     });
+  });
+
+  test('a truncated R2 mirror never replaces the cached archive', () async {
+    final records = _archive();
+    final store = _MemoryStore(
+      SermonArchiveSnapshot(
+        sermons: [for (final r in records) mapApiSermon(r)],
+        fetchedAt: DateTime.now().subtract(const Duration(days: 2)),
+      ),
+    );
+    // messages.json cut off after 100 records, while the API counts 1,489.
+    final bucket = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.resolve(
+            Response(
+              requestOptions: options,
+              data: {
+                'messages': [
+                  for (final r in records.take(100))
+                    {
+                      'id': '${r['id']}',
+                      'title': r['title'],
+                      'date_preached': r['date'],
+                    },
+                ],
+              },
+            ),
+          ),
+        ),
+      );
+    final before = DateTime.now();
+    final (container, adapter) = harness(
+      store: store,
+      records: records,
+      wrap: (api) => R2MessagesRepository(dio: bucket, api: api),
+    );
+    await settle(
+      container,
+      () =>
+          complete(container) &&
+          container.read(sermonLibraryProvider).fetchedAt!.isAfter(before),
+    );
+
+    final lib = container.read(sermonLibraryProvider);
+    expect(lib.sermons, hasLength(1489));
+    expect(store.snapshot!.sermons, hasLength(1489));
+    expect(adapter.requestedPages, hasLength(30), reason: 'the paged walk ran');
   });
 }

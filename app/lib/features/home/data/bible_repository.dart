@@ -59,6 +59,9 @@ class BibleRepository {
     );
     final data = (response.data?['data'] as List? ?? const [])
         .cast<Map<String, dynamic>>();
+    // An empty answer (an error-shaped 200) is a failure, not a fact to keep
+    // for the session: Retry must ask again.
+    if (data.isEmpty) throw StateError('No Bible versions returned');
     _biblesCache = [
       for (final b in data)
         BibleVersion(

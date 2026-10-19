@@ -72,13 +72,30 @@ class KharisApiSermonRepository extends AbstractSermonRepository {
 
 /// Maps one page of API sermon records. Top-level so [compute] can run it in
 /// a background isolate.
+///
+/// A malformed record (missing id, wrongly typed field) is dropped rather
+/// than failing the page, which would stall the whole archive walk.
 List<Sermon> mapApiSermons(List<dynamic> results) => [
-  for (final r in results) mapApiSermon(r as Map<String, dynamic>),
+  for (final r in results) ?tryMapSermon(r, mapApiSermon),
 ];
+
+/// Applies [map] to [record], or null when the record is not a JSON object or
+/// [map] throws on its shape.
+Sermon? tryMapSermon(
+  Object? record,
+  Sermon? Function(Map<String, dynamic>) map,
+) {
+  if (record is! Map<String, dynamic>) return null;
+  try {
+    return map(record);
+  } catch (_) {
+    return null;
+  }
+}
 
 /// Maps one API sermon record.
 ///
-/// Every record is kept, so the library matches the API's count year for
+/// Every well-formed record is kept, so the library matches the API's count year for
 /// year. Video-only records play in video mode; the four records with no
 /// recording at all still list (and the player explains there is nothing to
 /// play) rather than silently vanishing.
