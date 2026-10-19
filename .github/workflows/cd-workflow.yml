@@ -72,7 +72,7 @@ jobs:
 
       - name: Install Flutter dependencies
         working-directory: app
-        run: flutter pub get --enforce-lockfile
+        run: flutter pub get
 
       - name: Restore env.json
         working-directory: app
@@ -184,7 +184,7 @@ jobs:
       # 4. Resolve locked dependencies.
       - name: Install Flutter dependencies
         working-directory: app
-        run: flutter pub get --enforce-lockfile
+        run: flutter pub get
 
       # 5. Restore environment configuration without printing it.
       - name: Restore env.json
