@@ -23,6 +23,8 @@ class Sermon {
     this.source,
     this.isFeatured = false,
     this.transcriptUrl,
+    this.relatedIds = const [],
+    this.tags = const [],
   });
 
   /// Rebuilds a sermon from the on-disk archive cache.
@@ -46,6 +48,9 @@ class Sermon {
         : null,
     source: j['source'] as String?,
     isFeatured: j['isFeatured'] as bool? ?? false,
+    // Absent from caches written before these fields existed.
+    relatedIds: _stringList(j['relatedIds']),
+    tags: _stringList(j['tags']),
   );
 
   /// Serialises for the archive cache and player snapshots. `Duration` and
@@ -66,6 +71,8 @@ class Sermon {
     if (videoStart != null) 'videoStartSeconds': videoStart!.inSeconds,
     if (source != null) 'source': source,
     'isFeatured': isFeatured,
+    if (relatedIds.isNotEmpty) 'relatedIds': relatedIds,
+    if (tags.isNotEmpty) 'tags': tags,
   };
 
   /// Whether this sermon has a streamable audio recording.
@@ -131,6 +138,13 @@ class Sermon {
   /// Whether a transcript exists for this sermon.
   bool get hasTranscript => (transcriptUrl ?? '').trim().isNotEmpty;
 
+  /// Ids of the messages the Kharis sermon site lists as related to this
+  /// one, in the site's order. Ids only: resolve them against the library.
+  final List<String> relatedIds;
+
+  /// Free-form labels from the Kharis sermon site (e.g. `PDAK`).
+  final List<String> tags;
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   String get formattedDuration {
@@ -160,6 +174,8 @@ class Sermon {
     String? source,
     bool? isFeatured,
     String? transcriptUrl,
+    List<String>? relatedIds,
+    List<String>? tags,
   }) {
     return Sermon(
       id: id ?? this.id,
@@ -178,6 +194,8 @@ class Sermon {
       source: source ?? this.source,
       isFeatured: isFeatured ?? this.isFeatured,
       transcriptUrl: transcriptUrl ?? this.transcriptUrl,
+      relatedIds: relatedIds ?? this.relatedIds,
+      tags: tags ?? this.tags,
     );
   }
 
@@ -199,7 +217,9 @@ class Sermon {
         other.videoId == videoId &&
         other.videoStart == videoStart &&
         other.source == source &&
-        other.isFeatured == isFeatured;
+        other.isFeatured == isFeatured &&
+        listEquals(other.relatedIds, relatedIds) &&
+        listEquals(other.tags, tags);
   }
 
   @override
@@ -219,9 +239,18 @@ class Sermon {
     videoStart,
     source,
     isFeatured,
+    Object.hashAll(relatedIds),
+    Object.hashAll(tags),
   );
 
   @override
   String toString() =>
       'Sermon(id: $id, title: $title, speaker: $speaker, series: $series, category: $category)';
 }
+
+/// The non-empty strings of a JSON list; empty for anything else.
+List<String> _stringList(Object? value) => [
+  if (value is List)
+    for (final e in value)
+      if (e is String && e.trim().isNotEmpty) e.trim(),
+];

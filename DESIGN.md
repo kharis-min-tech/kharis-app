@@ -131,6 +131,13 @@ letterSpacing: 1.1)` in `kc.muted`.
 - **Campus picker**: always `pickActiveBranch` (the shared sheet in
   `app/lib/shared/widgets/branch_picker_sheet.dart`), which persists via
   `setActiveBranch`.
+- **Full player**: the top (status bar to the transport row) is one solid
+  surface in the artwork's own colour, read with `ColorScheme.fromImageProvider`
+  (`artwork_tint.dart`): the dark scheme's `primaryContainer` in dark mode, a
+  50% wash of the light scheme's over `kc.bg` in light mode. Text on it is
+  re-picked to pass WCAG AA; no artwork colour falls back to `kc.bg`. Below
+  it: actions, an **Up next** card (the queue's next message) and a **More
+  like this** rail of artwork-led cards, from the app's own library only.
 
 ## Motion
 

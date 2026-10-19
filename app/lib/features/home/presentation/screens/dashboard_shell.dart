@@ -35,15 +35,26 @@ class DashboardShell extends ConsumerStatefulWidget {
 const _givingTabIndex = 2;
 
 class _DashboardShellState extends ConsumerState<DashboardShell> {
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
+    // Back from the background: the bar is where the member left the app's
+    // navigation, never stranded off screen.
+    _lifecycle = AppLifecycleListener(onResume: () => _setBarVisible(true));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreMiniPlayer();
       _promptBranchOnce();
       // Rating/feedback prompts are scheduled by ReviewPromptListener (end
       // of a listen), never on launch.
     });
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
   }
 
   /// Accounts created before branch selection became part of onboarding (and
@@ -131,10 +142,28 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   //
   // The tab bar (and the mini player docked on it) slides away while the
   // member scrolls a tab's list down and returns on any scroll up, at the
-  // top of the list, and on a tab tap or route change. It never needs an
-  // edge swipe to come back: that is the system home gesture.
+  // top of the list, on a tab tap or route change, when a screen pushed over
+  // the shell (the full player, a detail screen) comes or goes, when
+  // playback starts, and when the app resumes. It never needs an edge swipe
+  // to come back: that is the system home gesture.
 
   bool _barVisible = true;
+
+  /// Whether the shell's own route was on top at the last check; null before
+  /// the first.
+  bool? _shellOnTop;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Rebuilds whenever a route is pushed over the shell on the root
+    // navigator, or popped off it. Either way the member comes back to a
+    // visible bar: reset while covered, so it is already in place as the
+    // screen above slides away.
+    final onTop = ModalRoute.isCurrentOf(context);
+    if (_shellOnTop != null && onTop != _shellOnTop) _barVisible = true;
+    _shellOnTop = onTop;
+  }
 
   @override
   void didUpdateWidget(DashboardShell oldWidget) {
@@ -179,6 +208,18 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   Widget build(BuildContext context) {
     final currentSermon = ref.watch(currentSermonProvider);
+    // A message starting (a new one, or playback resuming from anywhere)
+    // shows the mini player along with the bar it docks on.
+    ref
+      ..listen<Sermon?>(currentSermonProvider, (before, now) {
+        if (now != null && now.id != before?.id) _setBarVisible(true);
+      })
+      ..listen<bool>(
+        playerStateProvider.select((s) => s.valueOrNull?.playing ?? false),
+        (was, playing) {
+          if (playing && !(was ?? false)) _setBarVisible(true);
+        },
+      );
     final safeBottom = MediaQuery.of(context).padding.bottom;
     // Screen-reader navigation keeps the bar put: a bar that moves out from
     // under the focus is worse than one that takes some room.

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -17,10 +18,12 @@ import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart'
     show startAudioPlayback;
+import 'package:kharis_app/features/player/presentation/artwork_tint.dart';
 import 'package:kharis_app/features/player/presentation/widgets/like_button.dart';
 import 'package:kharis_app/features/player/presentation/widgets/media_mode_toggle.dart';
 import 'package:kharis_app/features/player/presentation/widgets/playback_error_banner.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_discovery.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
@@ -159,6 +162,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   /// parameter rather than a controller call.
   int _webStartSeconds = 0;
 
+  /// The artwork colour scheme the top of the player is tinted with. Kept
+  /// while the next message's colour is still being read, so a skip goes
+  /// straight from one tint to the next instead of flashing the page colour.
+  ColorScheme? _tintScheme;
+
+  final ScrollController _scroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -197,6 +207,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     // Audio deliberately keeps playing on close — the mini player takes over.
     if (_mode == MediaMode.video) _saveVideoPosition();
     _disposeVideoEngine();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -661,6 +672,96 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     await launchUrl(url, mode: LaunchMode.externalApplication);
   }
 
+  // ── Up next / More like this ───────────────────────────────────────────────
+
+  /// The message Next moves to: the video queue's in video mode, else the
+  /// audio engine's while it plays the message on screen. Null at the end
+  /// of the queue (the card hides; Next is disabled there too).
+  Sermon? _upNext() {
+    if (_mode == MediaMode.video) return _videoQueue.next;
+    final queue = ref.watch(playbackQueueProvider).valueOrNull;
+    if (queue == null || !_sameMessage(queue.current, _sermon)) return null;
+    return queue.next;
+  }
+
+  /// Same as the Next control: the audio engine skips (the screen follows
+  /// it), or video opens the next entry in place.
+  void _playUpNext(Sermon next) {
+    _scrollToTop();
+    if (_mode == MediaMode.video) {
+      _openInVideoMode(next);
+      return;
+    }
+    unawaited(_audio.skipToNext());
+  }
+
+  /// Plays [target] from the "More like this" [rail] in place. The rail
+  /// becomes the queue, so Next and Up next carry on through it.
+  void _openRelated(Sermon target, List<Sermon> rail) {
+    _scrollToTop();
+    _queueItems = rail;
+    if (_mode == MediaMode.video) {
+      _openInVideoMode(target);
+      return;
+    }
+    if (target.hasAudio) {
+      setState(() => _sermon = target);
+      unawaited(startAudioPlayback(ref, target, queue: rail));
+      return;
+    }
+    // A video-only message: video takes over in place, as in the toggle.
+    unawaited(_audio.stop());
+    setState(() {
+      _sermon = target;
+      _mode = MediaMode.video;
+    });
+    _startVideoEngine(startAt: _savedAudioPoint(target) + _offsetFor(target));
+  }
+
+  /// Brings the new message's artwork and controls back into view.
+  void _scrollToTop() {
+    if (!_scroll.hasClients || _scroll.offset == 0) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(0);
+    } else {
+      unawaited(
+        _scroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+    }
+  }
+
+  // ── Artwork tint ───────────────────────────────────────────────────────────
+
+  /// [base] with its palette re-pointed at the artwork's colour (see
+  /// [tintedPlayerColors]); [base] itself while there is no artwork or its
+  /// colour could not be read.
+  ThemeData _tintedTheme(ThemeData base) {
+    final url = _sermon.artworkUrl?.trim() ?? '';
+    if (url.isEmpty) {
+      _tintScheme = null;
+    } else {
+      final scheme = ref.watch(artworkSchemeProvider((url, base.brightness)));
+      if (!scheme.isLoading) _tintScheme = scheme.valueOrNull;
+    }
+    final tint = _tintScheme;
+    if (tint == null) return base;
+    return base.copyWith(
+      extensions: [
+        for (final e in base.extensions.values)
+          if (e is! KharisColors) e,
+        tintedPlayerColors(
+          base.extension<KharisColors>() ?? KharisColors.light,
+          tint,
+          base.brightness,
+        ),
+      ],
+    );
+  }
+
   // ── Layout ─────────────────────────────────────────────────────────────────
 
   @override
@@ -677,66 +778,143 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       ref.watch(sermonsProvider);
       _videoOffset = _offsetFor(_sermon);
     }
-    // Flat page colour: no ambient wash. _buildVideoSurface's corner mask
-    // paints this same colour, so the two must stay in step.
-    return Scaffold(
-      backgroundColor: context.kc.bg,
-      body: SafeArea(
-        child: Column(
+    final tinted = _tintedTheme(Theme.of(context));
+    // Reduced motion: the colour changes, it does not fade.
+    final tintDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
+    // The tint is one solid colour from the status bar down to the controls,
+    // painted as two flat blocks (the pinned header, the top of the scroll)
+    // that always share a colour. No gradient, no glow.
+    Widget tintedBlock(WidgetBuilder builder) => AnimatedTheme(
+      data: tinted,
+      duration: tintDuration,
+      curve: Curves.easeOut,
+      child: Builder(builder: builder),
+    );
+    final lightIcons =
+        (tinted.extension<KharisColors>() ?? context.kc).onBg
+            .computeLuminance() >
+        0.5;
+    final upNext = _upNext();
+    final related = ref.watch(relatedMessagesProvider(_sermon));
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: lightIcons
+            ? Brightness.light
+            : Brightness.dark,
+        statusBarBrightness: lightIcons ? Brightness.dark : Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: context.kc.bg,
+        body: Column(
           children: [
-            _buildHeader(),
-            // The video stays pinned outside the scrollable so a swipe on
-            // the picture never scrolls the page out from under playback
-            // (tester feedback); everything below it still scrolls.
-            if (isVideo)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
-                child: _buildVideoSurface(),
-              ),
-            Expanded(
-              // Clamping: the page only scrolls when it truly overflows (small
-              // screens) and never rubber-bands the artwork (tester feedback).
-              child: SingleChildScrollView(
-                key: const Key('player-scroll'),
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (!isVideo) ...[
-                      _buildArtwork(),
-                      const SizedBox(height: 24),
+            tintedBlock(
+              (context) => ColoredBox(
+                key: const Key('player-tint-header'),
+                color: context.kc.bg,
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    children: [
+                      _buildHeader(context),
+                      // The video stays pinned outside the scrollable so a
+                      // swipe on the picture never scrolls the page out from
+                      // under playback (tester feedback); everything below
+                      // it still scrolls.
+                      if (isVideo)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                          child: _buildVideoSurface(context),
+                        ),
                     ],
-                    _buildInfoRow(),
-                    const SizedBox(height: 18),
-                    MediaModeToggle(
-                      sermon: isVideo
-                          ? _sermon.copyWith(audioUrl: _audioTwin()?.audioUrl)
-                          : _sermon,
-                      activeMode: _mode,
-                      onSelect: (mode) => unawaited(_switchMode(mode)),
-                    ),
-                    const SizedBox(height: 22),
-                    if (isVideo)
-                      _buildVideoTransport()
-                    else
-                      _buildAudioTransport(),
-                    const SizedBox(height: 26),
-                    Container(
-                      padding: const EdgeInsets.only(top: 18),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(color: context.kc.divider),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: SafeArea(
+                top: false,
+                // Clamping: the page only scrolls when it truly overflows
+                // and never rubber-bands the artwork (tester feedback).
+                child: SingleChildScrollView(
+                  key: const Key('player-scroll'),
+                  controller: _scroll,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      tintedBlock(
+                        (context) => DecoratedBox(
+                          key: const Key('player-tint-body'),
+                          decoration: BoxDecoration(
+                            color: context.kc.bg,
+                            borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(AppRadius.xl),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 18, 24, 22),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (!isVideo) ...[
+                                  _buildArtwork(),
+                                  const SizedBox(height: 24),
+                                ],
+                                _buildInfoRow(context),
+                                const SizedBox(height: 16),
+                                MediaModeToggle(
+                                  sermon: isVideo
+                                      ? _sermon.copyWith(
+                                          audioUrl: _audioTwin()?.audioUrl,
+                                        )
+                                      : _sermon,
+                                  activeMode: _mode,
+                                  onSelect: (mode) =>
+                                      unawaited(_switchMode(mode)),
+                                ),
+                                const SizedBox(height: 22),
+                                if (isVideo)
+                                  _buildVideoTransport()
+                                else
+                                  _buildAudioTransport(),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      child: PlayerActions(
-                        sermon: _sermon,
-                        timeline: _videoNoteBinding(),
-                        asVideo: isVideo,
-                        positionOf: _sharePosition,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                        child: PlayerActions(
+                          sermon: _sermon,
+                          timeline: _videoNoteBinding(),
+                          asVideo: isVideo,
+                          positionOf: _sharePosition,
+                        ),
                       ),
-                    ),
-                  ],
+                      if (upNext != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+                          child: UpNextCard(
+                            sermon: upNext,
+                            onTap: () => _playUpNext(upNext),
+                          ),
+                        ),
+                      if (related.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 30),
+                          child: RelatedMessagesRail(
+                            sermons: related,
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            onOpen: (target) => _openRelated(target, related),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -746,7 +924,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     );
   }
 
-  Widget _buildVideoSurface() {
+  Widget _buildVideoSurface(BuildContext context) {
     final Widget player;
     if (kIsWeb) {
       // Keyed on the start position: a timestamp seek bumps
@@ -771,10 +949,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     // Clip.antiAliasWithSaveLayer rounds it - verified on device, the corners
     // stayed hard, which is what made the video read as "slapped on" beside
     // the rounded artwork (tester feedback).
-    //
     // So the rounding is painted ON TOP instead: four corner slivers in the
-    // page colour (the Scaffold's kc.bg), over the video. Flat, like
-    // _buildArtwork: no glow under the frame.
+    // colour behind the video (the tinted header's kc.bg), over the video.
+    // Flat, like _buildArtwork: no glow under the frame.
     final pageColor = context.kc.bg;
     return Stack(
       children: [
@@ -860,7 +1037,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     final series = (_sermon.series ?? _sermon.category ?? 'Now playing')
         .toUpperCase();
     return Padding(
@@ -872,6 +1049,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             label: 'Close player',
             excludeSemantics: true,
             child: _iconButton(
+              context,
               Icons.keyboard_arrow_down_rounded,
               28,
               () => Navigator.of(context).pop(),
@@ -900,7 +1078,12 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     );
   }
 
-  Widget _iconButton(IconData icon, double size, VoidCallback onTap) {
+  Widget _iconButton(
+    BuildContext context,
+    IconData icon,
+    double size,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -926,12 +1109,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     );
   }
 
-  Widget _buildInfoRow() {
-    final speaker = _sermon.speaker;
-    final extra = _sermon.category ?? _sermon.series;
-    final subtitle = (extra != null && extra.isNotEmpty && extra != speaker)
-        ? '$speaker · $extra'
-        : speaker;
+  Widget _buildInfoRow(BuildContext context) {
+    final speaker = _sermon.speaker.trim();
+    // The header already names the series, so the topic leads here.
+    final extra = (_sermon.category ?? _sermon.series ?? '').trim();
+    final hasExtra = extra.isNotEmpty && extra != speaker;
 
     // No extra inset: the title lines up with the mode toggle and seek bar
     // below it (it used to sit 24 px further in than everything else).
@@ -946,19 +1128,41 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
               Text(
                 _sermon.title,
                 style: AppTypography.display(
-                  size: 22,
-                  weight: FontWeight.w700,
-                  height: 1.08,
+                  size: 27,
+                  weight: FontWeight.w800,
+                  height: 1.04,
                   color: context.kc.onBg,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (subtitle.isNotEmpty) ...[
-                const SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  style: AppTypography.ui(size: 13.5, color: context.kc.muted),
+              if (speaker.isNotEmpty || hasExtra) ...[
+                const SizedBox(height: 4),
+                // One tight line: the speaker carries the weight, the
+                // series or topic trails it.
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      if (speaker.isNotEmpty)
+                        TextSpan(
+                          text: speaker,
+                          style: AppTypography.ui(
+                            size: 13.5,
+                            weight: FontWeight.w700,
+                            height: 1.2,
+                            color: context.kc.onBg,
+                          ),
+                        ),
+                      if (speaker.isNotEmpty && hasExtra)
+                        const TextSpan(text: ' · '),
+                      if (hasExtra) TextSpan(text: extra),
+                    ],
+                  ),
+                  style: AppTypography.ui(
+                    size: 13.5,
+                    height: 1.2,
+                    color: context.kc.muted,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

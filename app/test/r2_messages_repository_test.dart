@@ -244,4 +244,37 @@ void main() {
     expect(s.artworkUrl, 'https://cdn.test/a.jpeg?width=512');
     expect(mapR2Message({'title': 'no id'}), isNull);
   });
+
+  test(
+    'related message ids and tags are mapped and kept on API rows',
+    () async {
+      final s = mapR2Message({
+        ..._record('7'),
+        'related_message_ids': ['12', ' 9 ', 30, '', null, '7'],
+        'tags': ['PDAK', ' Kharis Church ', '', 3],
+      })!;
+      // Self and blank ids dropped; numbers tolerated.
+      expect(s.relatedIds, ['12', '9', '30']);
+      expect(s.tags, ['PDAK', 'Kharis Church']);
+      expect(mapR2Message(_record('8'))!.relatedIds, isEmpty);
+
+      final (dio, _) = _bucket(
+        messages: [
+          {
+            ..._record('20'),
+            'related_message_ids': ['19'],
+            'tags': ['PDAK'],
+          },
+          _record('19'),
+        ],
+      );
+      final repo = R2MessagesRepository(
+        dio: dio,
+        api: _FakeApi(head: [_apiSermon('20')]),
+      );
+      final page = await repo.fetchPage();
+      expect(page.sermons.first.relatedIds, ['19']);
+      expect(page.sermons.first.tags, ['PDAK']);
+    },
+  );
 }

@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio/just_audio.dart' show PlayerState, ProcessingState;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
+import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
@@ -16,14 +21,17 @@ import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
 
 /// The tab bar slides away while a tab's list scrolls down and comes back
-/// on a scroll up, at the top, and on a route change, unless a screen reader
-/// is navigating.
+/// on a scroll up, at the top, on a route change (including closing a screen
+/// pushed over the shell), on playback starting and on app resume, unless a
+/// screen reader is navigating.
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   late GoRouter router;
+  late FakeAudioPlayerService audio;
 
   Future<void> launch(WidgetTester tester) async {
+    audio = FakeAudioPlayerService();
     SharedPreferences.setMockInitialValues({
       'onboarding_completed': true,
       'onboarding_branch': 'London',
@@ -67,9 +75,7 @@ void main() {
       ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(sp),
-          audioPlayerServiceProvider.overrideWithValue(
-            FakeAudioPlayerService(),
-          ),
+          audioPlayerServiceProvider.overrideWithValue(audio),
           cacheServiceProvider.overrideWithValue(FakeCacheService()),
           currentUserProvider.overrideWith((ref) => Stream.value(null)),
           currentBranchProvider.overrideWith((ref) => Stream.value('London')),
@@ -120,6 +126,80 @@ void main() {
     await tester.pumpAndSettle();
     expect(barOffset(tester), Offset.zero);
     expect(find.text('page /messages'), findsOneWidget);
+  });
+
+  testWidgets('closing a screen pushed over the shell brings it back', (
+    tester,
+  ) async {
+    await launch(tester);
+    await scrollList(tester, -400);
+    expect(barOffset(tester), const Offset(0, 1));
+
+    // The full player: a plain route on the root navigator, which changes
+    // no go_router location.
+    final navigator = Navigator.of(
+      tester.element(find.byType(ListView)),
+      rootNavigator: true,
+    );
+    unawaited(
+      navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('full player')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    navigator.pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('full player'), findsNothing);
+    expect(barOffset(tester), Offset.zero);
+  });
+
+  testWidgets('playback starting shows the bar with the mini player', (
+    tester,
+  ) async {
+    await launch(tester);
+    await scrollList(tester, -400);
+    expect(barOffset(tester), const Offset(0, 1));
+
+    await audio.play(
+      const Sermon(id: 's1', title: 'Message 1', speaker: 'P', audioUrl: 'a'),
+    );
+    audio.playerStates.add(PlayerState(true, ProcessingState.ready));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MiniPlayer), findsOneWidget);
+    expect(barOffset(tester), Offset.zero);
+
+    // Paused and hidden again, then resumed (lock screen, headphones).
+    audio.playerStates.add(PlayerState(false, ProcessingState.ready));
+    await scrollList(tester, -400);
+    expect(barOffset(tester), const Offset(0, 1));
+    audio.playerStates.add(PlayerState(true, ProcessingState.ready));
+    await tester.pumpAndSettle();
+    expect(barOffset(tester), Offset.zero);
+  });
+
+  testWidgets('returning to the app brings it back', (tester) async {
+    await launch(tester);
+    await scrollList(tester, -400);
+    expect(barOffset(tester), const Offset(0, 1));
+
+    final binding = tester.binding;
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+
+    expect(barOffset(tester), Offset.zero);
   });
 
   testWidgets('stays put while a screen reader navigates', (tester) async {

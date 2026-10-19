@@ -151,8 +151,10 @@ Future<void> scrollUntilFound(
 }
 
 /// Taps the bottom-most match of [label]: the tab bar item, even when the
-/// same word appears in the page above it.
+/// same word appears in the page above it. The bar slides away while a list
+/// scrolls down, so a small scroll up brings it back first.
 Future<void> tapNav(WidgetTester tester, String label) async {
+  await _revealTabBar(tester);
   final matches = find.text(label);
   await pumpUntilFound(tester, matches, reason: 'tab "$label"');
   var best = 0;
@@ -166,6 +168,22 @@ Future<void> tapNav(WidgetTester tester, String label) async {
   }
   await tester.tap(matches.at(best), warnIfMissed: false);
   await pumpFor(tester, const Duration(milliseconds: 700));
+}
+
+/// Scrolls the visible page up a little when the shell's bottom bar has slid
+/// off screen, which is how a member brings it back.
+Future<void> _revealTabBar(WidgetTester tester) async {
+  final bar = find.byKey(const Key('dashboard-bottom-bar'));
+  if (bar.evaluate().isEmpty) return;
+  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+  for (var i = 0; i < 3; i++) {
+    if (tester.getRect(bar).top < screen.height - 8) return;
+    await tester.dragFrom(
+      Offset(screen.width / 2, screen.height * 0.5),
+      const Offset(0, 80),
+    );
+    await pumpFor(tester, const Duration(milliseconds: 500));
+  }
 }
 
 /// Taps the first match of [finder] after scrolling it into view.
