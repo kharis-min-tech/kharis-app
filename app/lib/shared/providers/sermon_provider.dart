@@ -655,7 +655,7 @@ final archiveYearsProvider = Provider<List<int>>((ref) {
   return years;
 });
 
-/// How many sermons sit in each year, for the year rail's counts.
+/// How many sermons sit in each year, for the filter sheet's year counts.
 final archiveYearCountsProvider = Provider<Map<int, int>>((ref) {
   final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
   final counts = <int, int>{};
@@ -733,11 +733,57 @@ final seriesListProvider = Provider<List<SermonSeries>>((ref) {
 /// Active series filter; null = every series.
 final selectedSeriesProvider = StateProvider<String?>((ref) => null);
 
-/// The library list: topic, series and year filtered, then sorted.
+/// One speaker in the library and how many messages they preached.
+typedef SermonSpeaker = ({String name, int count});
+
+/// Speakers named in the library, most messages first (ties A-Z). Sermons
+/// with no speaker are not represented.
+final speakerListProvider = Provider<List<SermonSpeaker>>((ref) {
+  final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+  final counts = <String, int>{};
+  for (final s in sermons) {
+    final name = s.speaker.trim();
+    if (name.isEmpty) continue;
+    counts[name] = (counts[name] ?? 0) + 1;
+  }
+  return [for (final e in counts.entries) (name: e.key, count: e.value)]
+    ..sort((a, b) {
+      final byCount = b.count.compareTo(a.count);
+      return byCount != 0 ? byCount : a.name.compareTo(b.name);
+    });
+});
+
+/// Active speaker filter; null = every speaker. Not persisted, like series.
+final selectedSpeakerProvider = StateProvider<String?>((ref) => null);
+
+/// Rows the Messages lists render per page.
+const kMessagesPageSize = 30;
+
+/// How many library rows the Messages list renders. Changing any filter or
+/// the sort rebuilds this provider, which starts again at one page.
+final libraryVisibleCountProvider = StateProvider<int>((ref) {
+  ref
+    ..watch(selectedCategoryProvider)
+    ..watch(selectedSeriesProvider)
+    ..watch(selectedSpeakerProvider)
+    ..watch(selectedArchiveYearProvider)
+    ..watch(sermonSortProvider);
+  return kMessagesPageSize;
+});
+
+/// How many search results the Messages list renders; a new query starts
+/// again at one page.
+final searchVisibleCountProvider = StateProvider<int>((ref) {
+  ref.watch(sermonSearchProvider.select((q) => q.trim()));
+  return kMessagesPageSize;
+});
+
+/// The library list: topic, series, speaker and year filtered, then sorted.
 final librarySermonsProvider = Provider<List<Sermon>>((ref) {
   final sermonsAsync = ref.watch(sermonsProvider);
   final category = ref.watch(selectedCategoryProvider);
   final series = ref.watch(selectedSeriesProvider);
+  final speaker = ref.watch(selectedSpeakerProvider);
   final year = ref.watch(selectedArchiveYearProvider);
   final sort = ref.watch(sermonSortProvider);
 
@@ -749,6 +795,7 @@ final librarySermonsProvider = Provider<List<Sermon>>((ref) {
     for (final s in sermons)
       if ((category == 'All' || sermonTopic(s) == category) &&
           (series == null || s.series == series) &&
+          (speaker == null || s.speaker.trim() == speaker) &&
           (year == null || s.publishedAt?.year == year))
         s,
   ];
@@ -1048,21 +1095,72 @@ final recentlyPlayedProvider = Provider<List<Sermon>>((ref) {
 /// Active search query for the Messages library. Empty string = no search.
 final sermonSearchProvider = StateProvider<String>((ref) => '');
 
-/// Lower-cased, quote-normalised, whitespace-collapsed form for matching.
-String _normaliseForSearch(String s) => s
-    .toLowerCase()
-    .replaceAll(RegExp('[\u2018\u2019]'), "'")
-    .replaceAll(RegExp(r'\s+'), ' ')
-    .trim();
+/// Accented Latin letters and the plain spelling search matches them by.
+const _foldGroups = {
+  'a': 'àáâãäåāăą',
+  'c': 'çćĉċč',
+  'd': 'ďđ',
+  'e': 'èéêëēĕėęě',
+  'g': 'ĝğġģ',
+  'h': 'ĥħ',
+  'i': 'ìíîïĩīĭįı',
+  'j': 'ĵ',
+  'k': 'ķ',
+  'l': 'ĺļľŀł',
+  'n': 'ñńņň',
+  'o': 'òóôõöøōŏő',
+  'r': 'ŕŗř',
+  's': 'śŝşšș',
+  't': 'ţťŧț',
+  'u': 'ùúûüũūŭůűų',
+  'w': 'ŵ',
+  'y': 'ýÿŷ',
+  'z': 'źżž',
+  'ae': 'æ',
+  'oe': 'œ',
+  'ss': 'ß',
+};
 
-/// The one search predicate: every word of [query] must appear in the
-/// sermon's title, speaker, series or description.
+final Map<int, String> _foldTable = {
+  for (final e in _foldGroups.entries)
+    for (final rune in e.value.runes) rune: e.key,
+};
+
+/// Combining accents left by decomposed (NFD) text.
+final _combiningMarks = RegExp('[\u0300-\u036f]');
+
+/// Lower-cased, accent-folded, quote-normalised, whitespace-collapsed form
+/// for matching: "Grâce" and "grace" compare equal.
+String normaliseForSearch(String s) {
+  final lower = s.toLowerCase().replaceAll(_combiningMarks, '');
+  final folded = StringBuffer();
+  for (final rune in lower.runes) {
+    final plain = rune < 0x80 ? null : _foldTable[rune];
+    if (plain != null) {
+      folded.write(plain);
+    } else {
+      folded.writeCharCode(rune);
+    }
+  }
+  return folded
+      .toString()
+      .replaceAll(RegExp('[\u2018\u2019]'), "'")
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+/// Each sermon's normalised search text, built once per sermon object.
+final _searchText = Expando<String>('sermonSearchText');
+
+/// The one search predicate: every word of [query] must appear somewhere
+/// (not only at a word start) in the sermon's title, speaker, series or
+/// description.
 bool sermonMatchesQuery(Sermon s, String query) {
-  final words = _normaliseForSearch(
+  final words = normaliseForSearch(
     query,
   ).split(' ').where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return false;
-  final haystack = _normaliseForSearch(
+  final haystack = _searchText[s] ??= normaliseForSearch(
     [s.title, s.speaker, s.series ?? '', s.description ?? ''].join(' \u0000 '),
   );
   return words.every(haystack.contains);

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +16,7 @@ import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_shee
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../widgets/sermon_list_item.dart';
+import '../widgets/message_filters_sheet.dart';
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -28,6 +31,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
   bool _showBackToTop = false;
+  bool _pageGrowing = false;
 
   static final _count = NumberFormat.decimalPattern();
 
@@ -35,6 +39,10 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   /// hides again near the top; the gap between the two stops it flickering.
   static const _backToTopShowAt = 1400.0;
   static const _backToTopHideAt = 700.0;
+
+  /// How far the "Showing n of total" footer's status line reaches above the
+  /// bottom pad: once it is in view, the next page of rows renders.
+  static const _footerStatusReach = 50.0;
 
   @override
   void initState() {
@@ -103,6 +111,34 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     startPlayback(context, ref, sermon, queue: results);
   }
 
+  /// Renders one more page of a list of [total] rows, at most once a frame:
+  /// one scroll fires many near-the-end notifications before the longer
+  /// list is laid out.
+  void _showMore(StateProvider<int> visible, int total) {
+    if (_pageGrowing) return;
+    final shown = ref.read(visible);
+    if (shown >= total) return;
+    _pageGrowing = true;
+    ref.read(visible.notifier).state = math.min(
+      shown + kMessagesPageSize,
+      total,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _pageGrowing = false);
+  }
+
+  Future<void> _openFilters() async {
+    final applied = await showMessageFiltersSheet(context);
+    if (applied && mounted) _scrollToList();
+  }
+
+  /// Clears every filter (topic included); the sort stays.
+  void _clearFilters() {
+    ref.read(selectedCategoryProvider.notifier).state = 'All';
+    ref.read(selectedSeriesProvider.notifier).state = null;
+    ref.read(selectedSpeakerProvider.notifier).state = null;
+    ref.read(selectedArchiveYearProvider.notifier).state = null;
+  }
+
   Widget _sermonRow(
     Sermon sermon,
     int index, {
@@ -155,17 +191,51 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final playerState = ref.watch(playerStateProvider).valueOrNull;
     final playing = playerState?.playing ?? false;
 
-    // Active sort and filters.
+    // Active sort and filters. Year, series and speaker live in the filter
+    // sheet; the topic comes from the cards above.
     final sort = ref.watch(sermonSortProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final isFiltered = selectedCategory != 'All';
-    final seriesList = ref.watch(seriesListProvider);
     final selectedSeries = ref.watch(selectedSeriesProvider);
-
-    // Archive year navigation.
-    final archiveYears = ref.watch(archiveYearsProvider);
-    final archiveYearCounts = ref.watch(archiveYearCountsProvider);
+    final selectedSpeaker = ref.watch(selectedSpeakerProvider);
     final selectedYear = ref.watch(selectedArchiveYearProvider);
+    final filterCount = activeSheetFilterCount(ref);
+    final sortLabel = switch (sort) {
+      SermonSort.newest => 'Newest first',
+      SermonSort.oldest => 'Oldest first',
+      _ => sort.label,
+    };
+    final filterChips = <Widget>[
+      if (isFiltered)
+        _FilterChip(
+          label: selectedCategory,
+          onClear: () =>
+              ref.read(selectedCategoryProvider.notifier).state = 'All',
+        ),
+      if (selectedSeries != null)
+        _FilterChip(
+          label: selectedSeries,
+          onClear: () => ref.read(selectedSeriesProvider.notifier).state = null,
+        ),
+      if (selectedSpeaker != null)
+        _FilterChip(
+          label: selectedSpeaker,
+          onClear: () =>
+              ref.read(selectedSpeakerProvider.notifier).state = null,
+        ),
+      if (selectedYear != null)
+        _FilterChip(
+          label: '$selectedYear',
+          onClear: () =>
+              ref.read(selectedArchiveYearProvider.notifier).state = null,
+        ),
+    ];
+
+    // Paging: the lists render page by page.
+    final libraryShown = math.min(
+      ref.watch(libraryVisibleCountProvider),
+      sermons.length,
+    );
 
     // Featured (or, with featured off, the latest) + recently played.
     final featured = ref.watch(featuredSermonsProvider);
@@ -188,6 +258,16 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
 
     final library = ref.watch(sermonLibraryProvider);
     final libraryNotifier = ref.read(sermonLibraryProvider.notifier);
+    final searchShown = math.min(
+      ref.watch(searchVisibleCountProvider),
+      searchResults.length,
+    );
+    // Room under the list for the docked bars, and for the Back to top pill
+    // above them, so the pill never covers the footer's Load more.
+    final bottomPad = math.max(
+      150.0,
+      MediaQuery.paddingOf(context).bottom + 72,
+    );
 
     return Scaffold(
       body: Stack(
@@ -195,11 +275,27 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           SafeArea(
             bottom: false,
             child: NotificationListener<ScrollNotification>(
-              // Near the bottom: pull the next archive page, or the next page of
-              // server search hits. Both self-guard against repeats.
+              // Near the bottom: render the next page of rows once the
+              // "Showing n of total" footer is in view; once every row is on
+              // screen, prefetch the next archive page or the next page of
+              // server search hits. All of these self-guard against repeats.
               onNotification: (n) {
                 if (n.metrics.axis != Axis.vertical) return false;
-                if (n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
+                final toEnd = n.metrics.maxScrollExtent - n.metrics.pixels;
+                final shown = isSearching ? searchShown : libraryShown;
+                final total = isSearching
+                    ? searchResults.length
+                    : sermons.length;
+                if (shown < total) {
+                  if (toEnd <= bottomPad + _footerStatusReach) {
+                    _showMore(
+                      isSearching
+                          ? searchVisibleCountProvider
+                          : libraryVisibleCountProvider,
+                      total,
+                    );
+                  }
+                } else if (toEnd <= 600) {
                   if (isSearching) {
                     ref.read(remoteSearchProvider.notifier).loadMore();
                   } else {
@@ -349,7 +445,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         )
                       else ...[
                         SliverList.builder(
-                          itemCount: searchResults.length,
+                          itemCount: searchShown,
                           itemBuilder: (context, index) {
                             final sermon = searchResults[index];
                             return _sermonRow(
@@ -362,11 +458,41 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                             );
                           },
                         ),
-                        if (remoteSearch.isLoadingMore)
+                        if (searchShown < searchResults.length)
+                          SliverToBoxAdapter(
+                            child: _PageFooter(
+                              status:
+                                  'Showing ${_count.format(searchShown)} of '
+                                  '${_count.format(searchResults.length)}',
+                              onLoadMore: () => _showMore(
+                                searchVisibleCountProvider,
+                                searchResults.length,
+                              ),
+                            ),
+                          )
+                        else if (remoteSearch.isLoadingMore)
                           const SliverToBoxAdapter(
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
                               child: Center(child: _SmallSpinner()),
+                            ),
+                          )
+                        else if (remoteSearch.hasMore)
+                          SliverToBoxAdapter(
+                            child: _PageFooter(
+                              onLoadMore: ref
+                                  .read(remoteSearchProvider.notifier)
+                                  .loadMore,
+                            ),
+                          )
+                        else
+                          SliverToBoxAdapter(
+                            child: _EndMarker(
+                              searchResults.length == 1
+                                  ? 'That\'s the only result'
+                                  : 'That\'s all '
+                                        '${_count.format(searchResults.length)} '
+                                        'results',
                             ),
                           ),
                       ],
@@ -527,169 +653,69 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           ),
                         ),
 
-                      // ── 4b. Series ───────────────────────────────────────────
-                      if (seriesList.isNotEmpty) ...[
-                        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                        SliverToBoxAdapter(child: _SectionTitle('Series')),
-                        SliverToBoxAdapter(
-                          child: _PillRow(
-                            children: [
-                              for (final series in seriesList)
-                                _SortPill(
-                                  label: '${series.name} (${series.count})',
-                                  active: selectedSeries == series.name,
-                                  onTap: () {
-                                    ref
-                                        .read(selectedSeriesProvider.notifier)
-                                        .state = selectedSeries == series.name
-                                        ? null
-                                        : series.name;
-                                    _scrollToList();
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      // ── 5. "All Messages" + sort pills ───────────────────────
+                      // ── 5. "All messages" + filters ──────────────────────────
                       const SliverToBoxAdapter(child: SizedBox(height: 28)),
                       SliverToBoxAdapter(
                         child: Padding(
                           key: _listHeaderKey,
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Text(
+                                [
+                                  if (selectedSeries != null)
+                                    selectedSeries
+                                  else if (isFiltered)
+                                    selectedCategory
+                                  else
+                                    'All messages',
+                                  if (selectedYear != null) '$selectedYear',
+                                ].join(' \u00b7 '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.bodyLg.copyWith(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  color: context.kc.onBg,
+                                  letterSpacing: -0.18,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      [
-                                        if (selectedSeries != null)
-                                          selectedSeries
-                                        else if (isFiltered)
-                                          selectedCategory
-                                        else
-                                          'All messages',
-                                        if (selectedYear != null)
-                                          '$selectedYear',
-                                      ].join(' \u00b7 '),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: AppTypography.bodyLg.copyWith(
-                                        fontSize: 19,
-                                        fontWeight: FontWeight.w800,
-                                        color: context.kc.onBg,
-                                        letterSpacing: -0.18,
-                                      ),
-                                    ),
+                                  _FiltersButton(
+                                    count: filterCount,
+                                    onTap: _openFilters,
                                   ),
-                                  const SizedBox(width: 12),
-                                  _SortPill(
-                                    label: 'Newest',
-                                    active: sort == SermonSort.newest,
-                                    onTap: () =>
-                                        ref
-                                            .read(sermonSortProvider.notifier)
-                                            .state = SermonSort
-                                            .newest,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _SortPill(
-                                    label: 'Oldest',
-                                    active: sort == SermonSort.oldest,
-                                    onTap: () =>
-                                        ref
-                                            .read(sermonSortProvider.notifier)
-                                            .state = SermonSort
-                                            .oldest,
+                                  const Spacer(),
+                                  _SortButton(
+                                    label: sortLabel,
+                                    onTap: _openFilters,
                                   ),
                                 ],
                               ),
-                              if (isFiltered || selectedSeries != null) ...[
-                                const SizedBox(height: 12),
+                              if (filterChips.isNotEmpty)
                                 Wrap(
                                   spacing: 8,
-                                  runSpacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    if (isFiltered)
-                                      _FilterChip(
-                                        label: selectedCategory,
-                                        count: sermons.length,
-                                        onClear: () =>
-                                            ref
-                                                    .read(
-                                                      selectedCategoryProvider
-                                                          .notifier,
-                                                    )
-                                                    .state =
-                                                'All',
-                                      ),
-                                    if (selectedSeries != null)
-                                      _FilterChip(
-                                        label: selectedSeries,
-                                        count: sermons.length,
-                                        onClear: () =>
-                                            ref
-                                                    .read(
-                                                      selectedSeriesProvider
-                                                          .notifier,
-                                                    )
-                                                    .state =
-                                                null,
+                                    ...filterChips,
+                                    if (filterChips.length > 1)
+                                      _HeaderLink(
+                                        label: 'Clear all',
+                                        color: context.kc.accentInk,
+                                        weight: FontWeight.w700,
+                                        onTap: _clearFilters,
                                       ),
                                   ],
                                 ),
-                              ],
                             ],
                           ),
                         ),
                       ),
 
-                      // ── 5b. Jump to year ─────────────────────────────────────
-                      if (archiveYears.length > 1)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _PillRow(
-                              children: [
-                                _SortPill(
-                                  label: 'All years',
-                                  active: selectedYear == null,
-                                  onTap: () =>
-                                      ref
-                                              .read(
-                                                selectedArchiveYearProvider
-                                                    .notifier,
-                                              )
-                                              .state =
-                                          null,
-                                ),
-                                for (final year in archiveYears)
-                                  _SortPill(
-                                    label:
-                                        '$year (${archiveYearCounts[year] ?? 0})',
-                                    active: selectedYear == year,
-                                    onTap: () {
-                                      ref
-                                          .read(
-                                            selectedArchiveYearProvider
-                                                .notifier,
-                                          )
-                                          .state = selectedYear == year
-                                          ? null
-                                          : year;
-                                      _scrollToList();
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                      // ── 6. Sermon list ───────────────────────────────────────
+                      // ── 6. Sermon list, one page at a time ───────────────────
                       if (sermons.isEmpty && !sermonsAsync.hasValue)
                         SliverList.builder(
                           itemCount: 6,
@@ -716,7 +742,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         )
                       else
                         SliverList.builder(
-                          itemCount: sermons.length,
+                          itemCount: libraryShown,
                           itemBuilder: (context, index) {
                             final sermon = sermons[index];
                             return _sermonRow(
@@ -734,18 +760,23 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           },
                         ),
 
-                      // ── 7. Archive footer ────────────────────────────────────
+                      // ── 7. Paging + archive footer ───────────────────────────
                       SliverToBoxAdapter(
                         child: _ArchiveFooter(
                           library: library,
-                          shown: sermons.length,
+                          shown: libraryShown,
+                          total: sermons.length,
+                          onLoadMore: () => _showMore(
+                            libraryVisibleCountProvider,
+                            sermons.length,
+                          ),
                           onRetry: libraryNotifier.retryHydration,
                         ),
                       ),
                     ],
 
                     // ── Bottom pad ─────────────────────────────────────────────
-                    const SliverPadding(padding: EdgeInsets.only(bottom: 150)),
+                    SliverPadding(padding: EdgeInsets.only(bottom: bottomPad)),
                   ],
                 ),
               ),
@@ -994,26 +1025,39 @@ class _OfflineBanner extends StatelessWidget {
 
 // ── Archive footer ─────────────────────────────────────────────────────────────
 
-/// Progress of the archive walk under the list: "Loading archive n/total"
-/// while older pages stream in (or a gap fill re-walks them), a retry when
-/// the walk gave up, the honest "n of total" with a retry when the library
-/// came up short, and a quiet end marker only once it holds every message
-/// the server lists.
+/// Under the library list: "Showing n of total" with Load more while rows
+/// are still paged out; then the archive walk's progress ("Loading archive
+/// n/total" while older pages stream in, or a gap fill re-walks them), a
+/// retry when the walk gave up, the honest "n of total" with a retry when
+/// the library came up short, and the end marker only once the list holds
+/// every message the server lists.
 class _ArchiveFooter extends StatelessWidget {
   const _ArchiveFooter({
     required this.library,
     required this.shown,
+    required this.total,
+    required this.onLoadMore,
     required this.onRetry,
   });
 
   final SermonLibrary library;
+
+  /// Rows on screen, and rows the filtered list holds.
   final int shown;
+  final int total;
+  final VoidCallback onLoadMore;
   final Future<void> Function() onRetry;
 
   static final _count = NumberFormat.decimalPattern();
 
   @override
   Widget build(BuildContext context) {
+    if (shown < total) {
+      return _PageFooter(
+        status: 'Showing ${_count.format(shown)} of ${_count.format(total)}',
+        onLoadMore: onLoadMore,
+      );
+    }
     final muted = AppTypography.bodySm.copyWith(color: context.kc.muted);
     final retry = TextButton(
       onPressed: onRetry,
@@ -1026,7 +1070,7 @@ class _ArchiveFooter extends StatelessWidget {
       ),
     );
     final held = _count.format(library.sermons.length);
-    final total = _count.format(library.totalCount);
+    final serverTotal = _count.format(library.totalCount);
     final walked = library.loaded && !library.hasMore;
     final short = walked && library.countMismatch;
     final Widget child;
@@ -1047,7 +1091,7 @@ class _ArchiveFooter extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             library.totalCount > 0
-                ? 'Loading archive $held/$total'
+                ? 'Loading archive $held/$serverTotal'
                 : 'Loading archive',
             style: muted,
           ),
@@ -1057,14 +1101,15 @@ class _ArchiveFooter extends StatelessWidget {
       child = Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('$held of $total messages \u2022', style: muted),
+          Text('$held of $serverTotal messages \u2022', style: muted),
           retry,
         ],
       );
-    } else if (walked && shown > 20) {
-      child = Text(
-        'You\'ve reached the beginning \u00b7 $held messages',
-        style: muted,
+    } else if (walked && total > 0) {
+      return _EndMarker(
+        total == 1
+            ? 'That\'s the only message'
+            : 'That\'s all ${_count.format(total)} messages',
       );
     } else {
       return const SizedBox.shrink();
@@ -1072,6 +1117,75 @@ class _ArchiveFooter extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       child: Center(child: child),
+    );
+  }
+}
+
+/// "Showing n of total" (when [status] is given) over a Load more button:
+/// the fallback for members who stop short of the automatic next page.
+class _PageFooter extends StatelessWidget {
+  const _PageFooter({this.status, required this.onLoadMore});
+
+  final String? status;
+  final VoidCallback onLoadMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+      child: Column(
+        children: [
+          if (status != null) ...[
+            Text(
+              status!,
+              key: const Key('messages-page-status'),
+              style: AppTypography.bodySm.copyWith(color: kc.muted),
+            ),
+            const SizedBox(height: 10),
+          ],
+          OutlinedButton(
+            key: const Key('messages-load-more'),
+            onPressed: onLoadMore,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: kc.onBg,
+              side: BorderSide(color: kc.outline),
+              shape: const StadiumBorder(),
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+            ),
+            child: Text(
+              'Load more',
+              style: AppTypography.labelMd.copyWith(
+                fontWeight: FontWeight.w700,
+                color: kc.onBg,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The quiet line under a list that holds everything there is.
+class _EndMarker extends StatelessWidget {
+  const _EndMarker(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      child: Center(
+        child: Text(
+          text,
+          key: const Key('messages-end'),
+          textAlign: TextAlign.center,
+          style: AppTypography.bodySm.copyWith(color: context.kc.muted),
+        ),
+      ),
     );
   }
 }
@@ -1674,17 +1788,12 @@ class _TopicCard extends StatelessWidget {
   }
 }
 
-// ── Active filter chip (tap to clear back to All) ─────────────────────────────
+// ── Active filter chip (tap to remove that filter) ────────────────────────────
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.count,
-    required this.onClear,
-  });
+  const _FilterChip({required this.label, required this.onClear});
 
   final String label;
-  final int count;
   final VoidCallback onClear;
 
   @override
@@ -1711,12 +1820,16 @@ class _FilterChip extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '$label · $count',
-                  style: AppTypography.labelMd.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: context.kc.accentInk,
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.labelMd.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: context.kc.accentInk,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -1762,46 +1875,97 @@ class _PillRow extends StatelessWidget {
   }
 }
 
-// ── Sort pill (gold active, muted surface inactive) ───────────────────────────
+// ── Filters button (opens the sheet; counts the active filters) ───────────────
 
-class _SortPill extends StatelessWidget {
-  const _SortPill({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+class _FiltersButton extends StatelessWidget {
+  const _FiltersButton({required this.count, required this.onTap});
 
-  final String label;
-  final bool active;
+  final int count;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // Selection is announced, not only coloured. 8 px of slack above and
-    // below lifts the 29 px pill to a 45 px target.
+    final kc = context.kc;
+    final active = count > 0;
+    final ink = active ? kc.accentInk : kc.onBg;
+    // 6 px of slack above and below lifts the 34 px pill to a 46 px target.
     return Semantics(
       button: true,
-      selected: active,
+      label: active ? 'Filters, $count active' : 'Filters',
+      excludeSemantics: true,
       child: GestureDetector(
+        key: const Key('messages-filters-button'),
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            padding: const EdgeInsets.fromLTRB(12, 7, 14, 7),
             decoration: BoxDecoration(
-              color: active ? context.kc.accent : context.kc.surfaceMuted,
+              color: active ? kc.accent.withValues(alpha: 0.14) : null,
               borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Text(
-              label,
-              style: AppTypography.labelMd.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: active ? context.kc.onAccent : context.kc.muted,
+              border: Border.all(
+                color: active ? kc.accent.withValues(alpha: 0.5) : kc.outline,
               ),
             ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.tune_rounded, size: 16, color: ink),
+                const SizedBox(width: 6),
+                Text(
+                  active ? 'Filters \u00b7 $count' : 'Filters',
+                  style: AppTypography.labelMd.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Current sort (opens the sheet) ────────────────────────────────────────────
+
+class _SortButton extends StatelessWidget {
+  const _SortButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = context.kc.muted;
+    return Semantics(
+      button: true,
+      label: 'Sort: $label',
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: const Key('messages-sort-button'),
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.swap_vert_rounded, size: 16, color: muted),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: AppTypography.labelMd.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: muted,
+                ),
+              ),
+            ],
           ),
         ),
       ),

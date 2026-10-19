@@ -100,6 +100,7 @@ Future<void> openMessagesReset(Journey j) async {
   await clearMessagesSearch(t);
   j.c.read(selectedCategoryProvider.notifier).state = 'All';
   j.c.read(selectedSeriesProvider.notifier).state = null;
+  j.c.read(selectedSpeakerProvider.notifier).state = null;
   j.c.read(selectedArchiveYearProvider.notifier).state = null;
   j.c.read(sermonSortProvider.notifier).state = SermonSort.newest;
   await pumpFor(t, const Duration(milliseconds: 500));
