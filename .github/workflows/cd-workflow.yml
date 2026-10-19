@@ -185,6 +185,17 @@ jobs:
       - name: Install Flutter dependencies
         working-directory: app
         run: flutter pub get
+      - name: Activate FlutterFire CLI
+        run: |
+          dart pub global activate flutterfire_cli
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
+      - name: Verify FlutterFire CLI
+        run: flutterfire --version
+
+      - name: Install Flutter dependencies
+        working-directory: app
+        run: flutter pub get
 
       # 5. Restore environment configuration without printing it.
       - name: Restore env.json
