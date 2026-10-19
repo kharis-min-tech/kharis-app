@@ -741,69 +741,96 @@ void main() {
         ),
     ];
 
-    testWidgets('renders 30 rows; Load more adds 30; the end marker closes '
-        'the list', (tester) async {
+    testWidgets('shows page 1 of 3; numbers, Next and Previous switch pages '
+        'and bring the list back into view', (tester) async {
       tallView(tester);
       await tester.pumpWidget(app(FakePagedSermonRepository([many])));
       await tester.pumpAndSettle();
       final c = containerOf(tester);
 
-      expect(c.read(libraryVisibleCountProvider), 30);
-      expect(find.text('Showing 30 of 75'), findsOneWidget);
-      expect(find.text('Paged message 46'), findsOneWidget);
+      expect(c.read(libraryPageProvider), 0);
+      expect(find.text('1–30 of 75 messages'), findsOneWidget);
+      expect(find.text('Paged message 75'), findsOneWidget);
       expect(find.text('Paged message 45'), findsNothing);
+      // Previous is disabled on the first page; the end marker only shows on
+      // the last one.
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('messages-page-prev')))
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('That\'s all 75 messages'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('messages-load-more')));
+      await tester.tap(find.byKey(const Key('messages-page-next')));
       await tester.pumpAndSettle();
-      expect(find.text('Showing 60 of 75'), findsOneWidget);
+      expect(c.read(libraryPageProvider), 1);
+      expect(find.text('31–60 of 75 messages'), findsOneWidget);
+      expect(find.text('Paged message 45'), findsOneWidget);
+      expect(find.text('Paged message 75'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('messages-load-more')));
+      await tester.tap(find.byKey(const Key('messages-page-3')));
       await tester.pumpAndSettle();
-      expect(c.read(libraryVisibleCountProvider), 75);
-      expect(find.byKey(const Key('messages-load-more')), findsNothing);
+      expect(find.text('61–75 of 75 messages'), findsOneWidget);
+      expect(find.text('Paged message 1'), findsOneWidget);
       expect(find.text('That\'s all 75 messages'), findsOneWidget);
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('messages-page-next')))
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.byKey(const Key('messages-page-prev')));
+      await tester.pumpAndSettle();
+      expect(find.text('31–60 of 75 messages'), findsOneWidget);
     });
 
-    testWidgets('a filter or sort change starts again at one page', (
-      tester,
-    ) async {
+    testWidgets('a filter or sort change goes back to page 1', (tester) async {
       tallView(tester);
       await tester.pumpWidget(app(FakePagedSermonRepository([many])));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('messages-load-more')));
+      await tester.tap(find.byKey(const Key('messages-page-next')));
       await tester.pumpAndSettle();
-      expect(find.text('Showing 60 of 75'), findsOneWidget);
+      expect(find.text('31–60 of 75 messages'), findsOneWidget);
 
       await openFilters(tester);
       await tapInSheet(tester, find.text('Oldest'));
       await apply(tester);
-      expect(find.text('Showing 30 of 75'), findsOneWidget);
+      expect(find.text('1–30 of 75 messages'), findsOneWidget);
       expect(find.text('Paged message 1'), findsOneWidget);
     });
 
-    testWidgets('scrolling near the end loads the next page, and back to '
-        'top still returns', (tester) async {
+    testWidgets('changing page from the bottom returns to the top of the '
+        'list; scrolling does not load more pages by itself', (tester) async {
       await tester.pumpWidget(app(FakePagedSermonRepository([many])));
       await tester.pumpAndSettle();
       final c = containerOf(tester);
-      expect(c.read(libraryVisibleCountProvider), 30);
-
+      final next = find.byKey(const Key('messages-page-next'));
       await tester.scrollUntilVisible(
-        find.byKey(const Key('messages-end')),
+        next,
         600,
         scrollable: find.byType(Scrollable).first,
         maxScrolls: 200,
       );
       await tester.pumpAndSettle();
-      expect(c.read(libraryVisibleCountProvider), 75);
-      expect(find.text('That\'s all 75 messages'), findsOneWidget);
+      expect(c.read(libraryPageProvider), 0);
 
-      await tester.tap(find.byKey(const Key('messages-back-to-top')));
+      await tester.tap(next);
       await tester.pumpAndSettle();
-      final scrollable = tester.state<ScrollableState>(
-        find.byType(Scrollable).first,
-      );
-      expect(scrollable.position.pixels, 0);
+      expect(c.read(libraryPageProvider), 1);
+      // The first row of the new page is on screen, not the bottom of it.
+      expect(find.text('Paged message 45'), findsOneWidget);
+      expect(find.byKey(const Key('messages-page-next')), findsNothing);
+    });
+
+    test('page numbers keep the ends and the neighbours, with gaps', () {
+      // Exposed through the screen's pager for the widget tests above; the
+      // rule itself is plain arithmetic.
+      expect(messagesPageCount(0), 1);
+      expect(messagesPageCount(30), 1);
+      expect(messagesPageCount(31), 2);
+      expect(messagesPageCount(1491), 50);
     });
   });
 
@@ -835,16 +862,17 @@ void main() {
       await tester.enterText(field, 'GRACE walk');
       await tester.pumpAndSettle();
       expect(find.text('45 results for "GRACE walk"'), findsOneWidget);
-      expect(find.text('Showing 30 of 45'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('messages-load-more')));
+      expect(find.text('1–30 of 45 results'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('messages-page-next')));
       await tester.pumpAndSettle();
+      expect(find.text('31–45 of 45 results'), findsOneWidget);
       expect(find.text('That\'s all 45 results'), findsOneWidget);
 
       // A new query starts again at one page; mid-word fragments match.
       await tester.enterText(field, 'alking part');
       await tester.pumpAndSettle();
       expect(find.text('45 results for "alking part"'), findsOneWidget);
-      expect(find.text('Showing 30 of 45'), findsOneWidget);
+      expect(find.text('1–30 of 45 results'), findsOneWidget);
 
       // Speaker words count too, and every word must match.
       await tester.enterText(field, 'owusu unrelated');
