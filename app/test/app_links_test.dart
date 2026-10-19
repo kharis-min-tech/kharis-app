@@ -772,7 +772,14 @@ void main() {
       final pbxproj = File(
         'ios/Runner.xcodeproj/project.pbxproj',
       ).readAsStringSync();
-      expect(pbxproj, contains('DEVELOPMENT_TEAM = Z9TTRH45X3;'));
+      // Either the plain setting or the device-only one CI signing uses
+      // (`"DEVELOPMENT_TEAM[sdk=iphoneos*]" = …`, PR #26).
+      expect(
+        pbxproj,
+        matches(
+          RegExp(r'"?DEVELOPMENT_TEAM(\[sdk=iphoneos\*\])?"? = Z9TTRH45X3;'),
+        ),
+      );
     });
 
     test('assetlinks.json: package and an upload-key SHA-256', () {
