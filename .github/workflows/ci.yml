@@ -20,8 +20,6 @@ jobs:
           channel: stable
           cache: true
 
-      # --enforce-lockfile: resolve exactly the committed app/pubspec.lock and
-      # fail if pubspec.yaml changed without the lockfile being updated.
       - name: Install Flutter dependencies
         working-directory: app
         run: flutter pub get
