@@ -82,8 +82,8 @@ service cloud.firestore {
     // pushes), `events` (website import by syncWebsiteEvents), `news`
     // (announcement pushes), `sermons` (syncYouTube mirrors; the app reads
     // hand-added and starred ones), `config` (`featured` mode for the Messages
-    // carousel), `dailyContent` and `readingPlans` (Today's reading, resolved
-    // by getDailyReading and by the app when the API is unreachable).
+    // carousel). `dailyContent` and `readingPlans` are legacy: today's reading
+    // now comes from the Content Studio, and nothing reads them any more.
     match /branches/{branchId} {
       allow read: if true;
     }
