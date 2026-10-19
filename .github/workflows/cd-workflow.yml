@@ -1,4 +1,4 @@
-name: Build Mobile Apps {UAT}
+name: Build UAT Mobile Apps
 
 on:
   workflow_dispatch:
