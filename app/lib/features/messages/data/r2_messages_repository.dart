@@ -65,18 +65,12 @@ class R2MessagesRepository extends AbstractSermonRepository {
     }
 
     final head = await apiHead;
-    final transcripts = <String, String>{
-      for (final s in mirror)
-        if (s.hasTranscript) s.id: s.transcriptUrl!,
-    };
+    final extras = {for (final s in mirror) s.id: s};
     final seen = <String>{};
     final sermons = [
-      // The API's newest arrivals lead, carrying any transcript R2 has.
+      // The API's newest arrivals lead, carrying what only R2 has.
       for (final s in head?.sermons ?? const <Sermon>[])
-        if (seen.add(s.id))
-          transcripts[s.id] == null
-              ? s
-              : s.copyWith(transcriptUrl: transcripts[s.id]),
+        if (seen.add(s.id)) _withMirrorExtras(s, extras[s.id]),
       ...mirror.where((s) => seen.add(s.id)),
     ];
     // A truncated mirror (short upstream list, partial upload) must not pose
@@ -111,6 +105,17 @@ class R2MessagesRepository extends AbstractSermonRepository {
     if (sermons.isEmpty) throw StateError('empty messages.json');
     return sermons;
   }
+}
+
+/// [api] with the fields only the mirror carries (transcript link, related
+/// messages, tags) filled in from its [mirror] record.
+Sermon _withMirrorExtras(Sermon api, Sermon? mirror) {
+  if (mirror == null) return api;
+  return api.copyWith(
+    transcriptUrl: api.transcriptUrl ?? mirror.transcriptUrl,
+    relatedIds: api.relatedIds.isEmpty ? mirror.relatedIds : null,
+    tags: api.tags.isEmpty ? mirror.tags : null,
+  );
 }
 
 /// Maps `messages.json` records, dropping malformed ones like
@@ -152,6 +157,16 @@ Sermon? mapR2Message(Map<String, dynamic> m) {
     videoStart: youTubeStart(videoLink),
     source: 'kharis-api',
     transcriptUrl: _absoluteTranscriptUrl(m['transcript_url'] as String?),
+    // Id strings scraped from the sermon site; numeric ids are tolerated.
+    relatedIds: [
+      for (final r in m['related_message_ids'] as List? ?? const [])
+        if (r is String || r is num)
+          if ('$r'.trim() case final rid when rid.isNotEmpty && rid != id) rid,
+    ],
+    tags: [
+      for (final t in m['tags'] as List? ?? const [])
+        if (t is String && t.trim().isNotEmpty) t.trim(),
+    ],
   );
 }
 

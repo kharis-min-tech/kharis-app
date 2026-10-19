@@ -25,6 +25,7 @@ import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
+import 'package:kharis_app/features/player/presentation/artwork_tint.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
@@ -123,10 +124,10 @@ void main() {
 
   setUp(() => audio = FakeAudioPlayerService());
 
-  List<Override> playerOverrides() => [
+  List<Override> playerOverrides({List<Sermon> library = const []}) => [
     audioPlayerServiceProvider.overrideWithValue(audio),
     cacheServiceProvider.overrideWithValue(FakeCacheService()),
-    sermonsProvider.overrideWith((ref) async => const <Sermon>[]),
+    sermonsProvider.overrideWith((ref) async => library),
     playlistsProvider.overrideWith((ref) => Stream.value(const <Playlist>[])),
     favoritesProvider.overrideWith((ref) => Stream.value(null)),
     notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
@@ -169,6 +170,46 @@ void main() {
         );
         await tester.pump();
 
+        expect(_gloss(tester, flatFills: true), isEmpty);
+      });
+
+      testWidgets('full player: artwork tint, Up next, More like this', (
+        tester,
+      ) async {
+        final sermon = Sermon(
+          id: 's1',
+          title: 'Message 1',
+          speaker: 'Pastor A',
+          audioUrl: 'https://cdn.example/s1.mp3',
+          artworkUrl: 'https://cdn.example/s1.jpg',
+        );
+        final queue = [sermon, _sermon(2), _sermon(3)];
+        await audio.play(sermon, queue: queue);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              ...playerOverrides(library: queue),
+              artworkSchemeSourceProvider.overrideWithValue(
+                (_, b) async => ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF2E7D32),
+                  brightness: b,
+                ),
+              ),
+            ],
+            child: MaterialApp(
+              theme: theme(),
+              home: MediaPlayerScreen(
+                sermon: sermon,
+                mode: MediaMode.audio,
+                queue: queue,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('player-up-next')), findsOneWidget);
+        expect(find.byKey(const Key('player-related')), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 

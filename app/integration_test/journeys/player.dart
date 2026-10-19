@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' show ProcessingState;
@@ -27,6 +28,11 @@ import '../support/live_data.dart';
 /// position, the notepad (stamp the time, save, reopen, seek back, restore),
 /// share text, minimise to the mini player (hidden on Giving), dismiss; the
 /// transcript sheet for a message the R2 catalogue says has one.
+/// The transport row's buttons only: the Up next card below it reuses the
+/// skip-next glyph.
+Finder _transport(Finder f) =>
+    find.descendant(of: find.byType(PlayerControls), matching: f).first;
+
 Future<void> playerJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'player');
@@ -80,7 +86,7 @@ Future<void> playerJourney(Journey j) async {
   final next = queue?.next;
   if (next != null) {
     await t.tap(
-      inPlayer(find.byIcon(Icons.skip_next_rounded)),
+      _transport(find.byIcon(Icons.skip_next_rounded)),
       warnIfMissed: false,
     );
     j.check(
@@ -97,7 +103,7 @@ Future<void> playerJourney(Journey j) async {
     // 3 s again, and the tap would only restart it a second time.
     for (var i = 0; i < 2 && audio.currentSermon?.id != first.id; i++) {
       await t.tap(
-        inPlayer(find.byIcon(Icons.skip_previous_rounded)),
+        _transport(find.byIcon(Icons.skip_previous_rounded)),
         warnIfMissed: false,
       );
       await pumpUntil(
@@ -118,7 +124,7 @@ Future<void> playerJourney(Journey j) async {
   var current = audio.currentSermon!;
   for (var i = 0; i < 8 && !current.hasVideo; i++) {
     await t.tap(
-      inPlayer(find.byIcon(Icons.skip_next_rounded)),
+      _transport(find.byIcon(Icons.skip_next_rounded)),
       warnIfMissed: false,
     );
     await pumpUntil(
