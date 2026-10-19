@@ -5,27 +5,26 @@ name: Deploy Backend
 # Runs only from main (a stale branch deploy would ship its rules and, with
 # --force, delete every function missing from it) and only through the
 # `production` GitHub environment: configure that environment's required
-# reviewers so each deploy needs approval, and store the secrets below as
-# environment secrets.
+# reviewers so each deploy needs approval. The secrets below can be
+# repository or production-environment secrets.
 #
 # Auth, in order of preference — set ONE of these secrets:
 #
 #   FIREBASE_SERVICE_ACCOUNT  (preferred) JSON key for a service account with
-#                             Firebase Admin + Cloud Functions Developer +
-#                             Secret Manager Admin on kharis-app-47c49 (the
-#                             deploy grants the runtime service account access
-#                             to YOUTUBE_API_KEY). Used via
-#                             GOOGLE_APPLICATION_CREDENTIALS.
+#                             Firebase Admin + Cloud Functions Developer on
+#                             kharis-app-47c49. Used via GOOGLE_APPLICATION_CREDENTIALS.
 #   FIREBASE_TOKEN            (legacy) output of `firebase login:ci`. Google has
 #                             deprecated these CI tokens; prefer the service
 #                             account above.
 #
 # Neither is set today, so this workflow has never completed a run.
 #
-# YOUTUBE_API_KEY (sync-youtube.ts) is a Secret Manager secret
-# (`defineSecret`), set once with `firebase functions:secrets:set
-# YOUTUBE_API_KEY` (backend/SETUP.md). The deploy only references it, so no
-# key passes through this workflow; it fails if the secret was never set.
+# Also required:
+#   FUNCTIONS_ENV             Verbatim copy of backend/functions/.env (the
+#                             gitignored file local deploys read). It supplies
+#                             the defineString params, today YOUTUBE_API_KEY
+#                             (sync-youtube.ts). A non-interactive deploy
+#                             fails when a param has no value.
 #
 # firebase-tools is the version pinned in backend/functions/package.json
 # (installed by `npm ci` from the lockfile) and run with `npx --no-install`,
@@ -50,9 +49,14 @@ jobs:
         env:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
         run: |
           if [ -z "$SA" ] && [ -z "$TOKEN" ]; then
             echo "::error::Set FIREBASE_SERVICE_ACCOUNT (preferred) or FIREBASE_TOKEN — see the header of .github/workflows/deploy-backend.yml"
+            exit 1
+          fi
+          if [ -z "$FUNCTIONS_ENV" ]; then
+            echo "::error::Set FUNCTIONS_ENV (copy of backend/functions/.env) — see the header of .github/workflows/deploy-backend.yml"
             exit 1
           fi
           if [ -z "$SA" ]; then
@@ -78,6 +82,12 @@ jobs:
       - name: Build functions
         working-directory: backend/functions
         run: npm run build --if-present
+
+      - name: Write functions .env
+        working-directory: backend/functions
+        env:
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
+        run: printf '%s\n' "$FUNCTIONS_ENV" > .env
 
       - name: Write service-account key
         if: env.HAS_SA == 'true'
@@ -110,4 +120,4 @@ jobs:
 
       - name: Scrub credentials
         if: always()
-        run: rm -f "$RUNNER_TEMP/gcp-key.json"
+        run: rm -f "$RUNNER_TEMP/gcp-key.json" backend/functions/.env
