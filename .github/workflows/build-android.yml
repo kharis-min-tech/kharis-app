@@ -78,7 +78,7 @@ jobs:
       - name: Calculate build number
         id: build
         run: |
-          BUILD_NUMBER=$(( ${{ github.run_number }}  ))
+          BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "Using build number: $BUILD_NUMBER"
       - name: Verify signing files
@@ -105,6 +105,17 @@ jobs:
           name: android-release-apk-${{ steps.build.outputs.build_number }}
           path: app/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+      
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Upload APK to Firebase App Distribution
+        run: |
+          firebase appdistribution:distribute \
+            app/build/app/outputs/flutter-apk/app-release.apk \
+            --app "${{ secrets.FIREBASE_APP_ID }}" \
+            --token "${{ secrets.FIREBASE_TOKEN }}" \
+            --groups "android-testers"
 
       - name: Scrub credentials
         if: always()
