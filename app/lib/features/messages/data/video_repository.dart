@@ -26,10 +26,6 @@ class VideoRepository {
   static const _atomFeedUrl =
       'https://www.youtube.com/feeds/videos.xml?channel_id=$kharisChannelId';
 
-  /// Shortest run-time (seconds) we treat as a real sermon. Anything below is
-  /// a Short or music clip and is excluded.
-  static const _minSermonSeconds = 120;
-
   /// Returns the newest YouTube uploads (Shorts excluded), freshest first.
   Future<List<Sermon>> getVideos() async {
     if (_apiKey.isNotEmpty) {
@@ -92,8 +88,11 @@ class VideoRepository {
     final out = <Sermon>[];
     var i = 0;
     for (final videoId in ordered) {
+      // Unknown length means it can't be shown to be a full sermon, so it is
+      // dropped too. If every lookup failed the list comes back empty and
+      // getVideos() falls through to the Atom feed.
       final secs = durations[videoId];
-      if (secs != null && secs < _minSermonSeconds) continue;
+      if (secs == null || secs < kMinMessageLength.inSeconds) continue;
       final snippet = snippets[videoId]!;
       final rawTitle = decodeHtmlEntities(snippet['title'] as String? ?? '');
       if (_isShort(rawTitle)) continue;
@@ -106,7 +105,7 @@ class VideoRepository {
           audioUrl: '',
           videoId: videoId,
           artworkUrl: _thumbnail(snippet, videoId),
-          duration: secs != null ? Duration(seconds: secs) : null,
+          duration: Duration(seconds: secs),
           publishedAt: DateTime.tryParse(
             snippet['publishedAt'] as String? ?? '',
           ),
@@ -144,7 +143,7 @@ class VideoRepository {
       }
       return out;
     } catch (_) {
-      // Without durations we keep everything and rely on the title heuristic.
+      // Without durations nothing passes the length check; see the caller.
       return const {};
     }
   }
@@ -216,8 +215,9 @@ class VideoRepository {
   }
 
   bool _hasClipMarker(String block) {
+    // The Atom feed has no durations, but links a Short as /shorts/<id>.
     final b = block.toLowerCase();
-    return b.contains('#shorts');
+    return b.contains('#shorts') || b.contains('/shorts/');
   }
 
   String _extract(String xml, String pattern) {

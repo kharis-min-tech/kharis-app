@@ -1,5 +1,9 @@
 import 'package:flutter/foundation.dart';
 
+/// Shortest run-time treated as a real message. Anything below is a Short
+/// or music clip.
+const Duration kMinMessageLength = Duration(minutes: 3);
+
 @immutable
 class Sermon {
   const Sermon({
@@ -75,6 +79,16 @@ class Sermon {
 
   /// Whether this sermon has a YouTube recording.
   bool get hasVideo => (videoId ?? '').trim().isNotEmpty;
+
+  /// Whether this is a YouTube Short or clip rather than a full message:
+  /// a video known to run under [kMinMessageLength], or tagged `#short`.
+  /// Messages never shows these.
+  bool get isShortClip {
+    if (!hasVideo) return false;
+    final d = duration;
+    if (d != null && d > Duration.zero && d < kMinMessageLength) return true;
+    return title.toLowerCase().contains('#short');
+  }
 
   /// YouTube video URL for opening in browser/player; null without a video.
   String? get youtubeUrl =>
