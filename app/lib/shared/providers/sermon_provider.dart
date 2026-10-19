@@ -756,26 +756,30 @@ final speakerListProvider = Provider<List<SermonSpeaker>>((ref) {
 /// Active speaker filter; null = every speaker. Not persisted, like series.
 final selectedSpeakerProvider = StateProvider<String?>((ref) => null);
 
-/// Rows the Messages lists render per page.
+/// Rows per page in the Messages lists.
 const kMessagesPageSize = 30;
 
-/// How many library rows the Messages list renders. Changing any filter or
-/// the sort rebuilds this provider, which starts again at one page.
-final libraryVisibleCountProvider = StateProvider<int>((ref) {
+/// Pages a list of [total] rows splits into; at least one.
+int messagesPageCount(int total) =>
+    total <= 0 ? 1 : (total + kMessagesPageSize - 1) ~/ kMessagesPageSize;
+
+/// The library page on screen, 0-based. Changing any filter or the sort
+/// rebuilds this provider, which goes back to the first page.
+final libraryPageProvider = StateProvider<int>((ref) {
   ref
     ..watch(selectedCategoryProvider)
     ..watch(selectedSeriesProvider)
     ..watch(selectedSpeakerProvider)
     ..watch(selectedArchiveYearProvider)
     ..watch(sermonSortProvider);
-  return kMessagesPageSize;
+  return 0;
 });
 
-/// How many search results the Messages list renders; a new query starts
-/// again at one page.
-final searchVisibleCountProvider = StateProvider<int>((ref) {
+/// The search-results page on screen, 0-based; a new query goes back to
+/// the first page.
+final searchPageProvider = StateProvider<int>((ref) {
   ref.watch(sermonSearchProvider.select((q) => q.trim()));
-  return kMessagesPageSize;
+  return 0;
 });
 
 /// The library list: topic, series, speaker and year filtered, then sorted.
