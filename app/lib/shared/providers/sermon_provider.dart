@@ -1049,7 +1049,7 @@ final recentlyPlayedProvider = Provider<List<Sermon>>((ref) {
 final sermonSearchProvider = StateProvider<String>((ref) => '');
 
 /// Lower-cased, quote-normalised, whitespace-collapsed form for matching.
-String _normaliseForSearch(String s) => s
+String normaliseForSearch(String s) => s
     .toLowerCase()
     .replaceAll(RegExp('[\u2018\u2019]'), "'")
     .replaceAll(RegExp(r'\s+'), ' ')
@@ -1058,11 +1058,11 @@ String _normaliseForSearch(String s) => s
 /// The one search predicate: every word of [query] must appear in the
 /// sermon's title, speaker, series or description.
 bool sermonMatchesQuery(Sermon s, String query) {
-  final words = _normaliseForSearch(
+  final words = normaliseForSearch(
     query,
   ).split(' ').where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return false;
-  final haystack = _normaliseForSearch(
+  final haystack = normaliseForSearch(
     [s.title, s.speaker, s.series ?? '', s.description ?? ''].join(' \u0000 '),
   );
   return words.every(haystack.contains);
@@ -1074,14 +1074,14 @@ bool sermonMatchesQuery(Sermon s, String query) {
 /// "Faith From First to Last" above a sermon that mentions faithfulness in
 /// its notes. The whole query appearing in the title earns a bonus.
 double sermonSearchScore(Sermon s, String query) {
-  final q = _normaliseForSearch(query);
+  final q = normaliseForSearch(query);
   final words = q.split(' ').where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return 0;
-  final title = _normaliseForSearch(s.title);
+  final title = normaliseForSearch(s.title);
   final fields = [
     (title, 10.0),
-    (_normaliseForSearch(s.series ?? ''), 5.0),
-    (_normaliseForSearch(s.description ?? ''), 1.0),
+    (normaliseForSearch(s.series ?? ''), 5.0),
+    (normaliseForSearch(s.description ?? ''), 1.0),
   ];
   var score = 0.0;
   for (final word in words) {
