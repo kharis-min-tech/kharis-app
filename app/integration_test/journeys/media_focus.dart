@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:kharis_app/features/home/presentation/screens/clip_player_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -11,9 +10,10 @@ import 'package:kharis_app/shared/providers/sound_focus_provider.dart';
 import '../support/actions.dart';
 import '../support/harness.dart';
 
-/// (m) One sound at a time on a real device: a message playing pauses when
-/// the Home clip opens full screen, and again when the Home video is
-/// unmuted; a message starting mutes the Home video.
+/// (m) One sound at a time on a real device, from the Home hero wall: a
+/// message playing as audio; a tap on the wall opens the latest message's
+/// video, which takes the sound, so the audio pauses. The wall itself never
+/// takes the sound (its videos are silent).
 Future<void> mediaFocusJourney(Journey j) async {
   final t = j.tester;
   await j.launch();
@@ -56,73 +56,25 @@ Future<void> mediaFocusJourney(Journey j) async {
   t.state<ScrollableState>(home).position.jumpTo(0);
   await pumpFor(t, const Duration(seconds: 2));
 
-  // The Home clip full screen takes the sound: the message pauses.
-  await t.tap(find.byKey(const Key('home-hero-pager')), warnIfMissed: false);
-  await pumpUntilFound(t, find.byType(ClipPlayerScreen));
+  j.check(
+    j.c.read(soundFocusProvider) == kAudioSoundOwner,
+    'the silent hero wall leaves the message the sound',
+  );
+  await j.shot('home-wall-message-playing');
+
+  // A tap on the wall plays the latest message's video: the audio pauses.
+  await t.tap(find.byKey(const Key('home-hero-wall')), warnIfMissed: false);
+  await pumpUntilFound(t, find.byType(MediaPlayerScreen));
   j.check(
     await pumpUntil(
       t,
       () => !audioPlaying(),
-      timeout: const Duration(seconds: 10),
+      timeout: const Duration(seconds: 30),
     ),
-    'opening the clip pauses the message',
+    'the hero\'s video takes the sound: the message pauses',
   );
-  await pumpFor(t, const Duration(seconds: 5));
-  await j.shot('clip-playing-message-paused');
-  await t.tap(find.byKey(const Key('clip-player-close')));
-  await pumpFor(t, const Duration(seconds: 2));
-
-  // Unmuting the Home video takes the sound: the message pauses again.
-  await audio.resume();
-  j.check(
-    await pumpUntil(t, audioPlaying, timeout: const Duration(seconds: 20)),
-    'the message resumes',
-  );
-  // The hero may have moved on to an event flyer (it advances while a clip
-  // is not playing): swipe back to a video slide, which has the mute chip.
-  final mute = find.byKey(const Key('home-hero-mute'));
-  for (var i = 0; i < 6 && mute.evaluate().isEmpty; i++) {
-    await t.drag(
-      find.byKey(const Key('home-hero-pager')),
-      const Offset(400, 0),
-      warnIfMissed: false,
-    );
-    await pumpFor(t, const Duration(seconds: 3));
-  }
-  if (await pumpUntil(
-    t,
-    () => mute.evaluate().isNotEmpty,
-    timeout: const Duration(seconds: 20),
-  )) {
-    await t.tap(mute);
-    await t.pump();
-    j.check(
-      await pumpUntil(
-        t,
-        () => !audioPlaying(),
-        timeout: const Duration(seconds: 10),
-      ),
-      'unmuting the Home video pauses the message',
-    );
-    j.check(
-      find.byIcon(Icons.volume_up_rounded).evaluate().isNotEmpty,
-      'the Home video is unmuted',
-    );
-    await j.shot('home-video-unmuted');
-
-    // The message starting again re-mutes the Home video.
-    await audio.resume();
-    j.check(
-      await pumpUntil(
-        t,
-        () => find.byIcon(Icons.volume_off_rounded).evaluate().isNotEmpty,
-        timeout: const Duration(seconds: 20),
-      ),
-      'the message starting mutes the Home video',
-    );
-    await j.shot('message-playing-video-muted');
-  } else {
-    j.check(false, 'the Home video shows its mute button (a clip is live)');
-  }
+  await pumpFor(t, const Duration(seconds: 4));
+  await j.shot('hero-video-playing');
+  await closePlayer(t);
   await audio.stop();
 }

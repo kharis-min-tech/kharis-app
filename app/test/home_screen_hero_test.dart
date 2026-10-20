@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
-import 'package:kharis_app/features/home/data/featured_video_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
@@ -21,30 +20,15 @@ import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
-/// Home with the hero on top: drags on it scroll the page, the logo and bell
-/// float over it, the status bar gets a backing once it has scrolled away,
-/// and empty blocks stay hidden. The YouTube surface is a plain box.
+/// Home with the hero wall on top: drags on it scroll the page or move the
+/// wall, the logo and bell float over it, the status bar gets a backing once
+/// it has scrolled away, and empty blocks stay hidden. Wall videos are plain
+/// boxes (tests have no video plugin).
 
 const _statusBar = 47.0;
 
-const _clip = FeaturedVideo(
-  workspace: 'app',
-  url: 'https://youtu.be/REhGafc8hdg',
-  videoId: 'REhGafc8hdg',
-  title: 'Year of Faith highlight',
-  thumbnailUrl: 'https://i.ytimg.com/vi/REhGafc8hdg/hqdefault.jpg',
-);
-
-final _flyerEvent = Event(
-  id: 'e-flyer',
-  title: 'Harvest Sunday',
-  startTime: DateTime.now().add(const Duration(days: 4)),
-  imageUrl: 'https://cdn.example.org/flyer.jpg',
-);
-
 Future<void> _pumpHome(
   WidgetTester tester, {
-  FeaturedVideo? video = _clip,
   List<Event> events = const [],
   List<NewsItem> news = const [],
 }) async {
@@ -80,10 +64,9 @@ Future<void> _pumpHome(
         dailyContentProvider.overrideWith((ref) => Stream.value(null)),
         dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
         continueListeningProvider.overrideWith((ref) => null),
-        featuredVideoProvider.overrideWith((ref) async => video),
         latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
-        heroVideoSurfaceProvider.overrideWithValue(
-          (videoId, muted, onPlaying) => const ColoredBox(color: Colors.black),
+        heroWallVideoProvider.overrideWithValue(
+          (asset, poster, playing) => const ColoredBox(color: Colors.black),
         ),
       ],
       child: const MaterialApp(home: HomeScreen()),
@@ -116,35 +99,23 @@ SystemUiOverlayStyle _statusStyle(WidgetTester tester) => tester
     )
     .value;
 
-/// A point on the hero's media, in its upper half.
-Offset _onHero(WidgetTester tester) {
-  final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
-  return Offset(media.center.dx, media.top + media.height * 0.3);
-}
+/// A point on the wall's top row.
+Offset _onHero(WidgetTester tester) =>
+    tester.getCenter(find.byKey(const Key('home-hero-row-0')));
+
+/// Where the wall's first card sits now.
+double _firstCardLeft(WidgetTester tester) =>
+    tester.getTopLeft(find.byKey(const Key('home-hero-card-0-0'))).dx;
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  testWidgets('a vertical drag on any hero slide scrolls Home; a horizontal '
-      'one changes slide', (tester) async {
-    final semantics = tester.ensureSemantics();
-    await _pumpHome(
-      tester,
-      events: [_flyerEvent],
-      news: [
-        NewsItem(
-          id: 'n1',
-          title: 'Welcome',
-          type: 'Announcement',
-          publishedAt: DateTime(2026),
-        ),
-      ],
-    );
-    expect(find.byKey(const Key('home-hero-video-surface')), findsOneWidget);
+  testWidgets('a vertical drag on the wall scrolls Home; a sideways one '
+      'moves the wall, not the page', (tester) async {
+    await _pumpHome(tester);
     expect(_homeScroll(tester).pixels, 0);
     expect(_homeScroll(tester).maxScrollExtent, greaterThan(150));
 
-    // On the video slide (a 120 px drag, less the touch slop).
     await tester.dragFrom(_onHero(tester), const Offset(0, -120));
     await tester.pump(const Duration(seconds: 1));
     expect(_homeScroll(tester).pixels, greaterThan(80));
@@ -152,34 +123,32 @@ void main() {
     _homeScroll(tester).jumpTo(0);
     await tester.pump();
 
-    // Sideways to the flyer.
-    await tester.dragFrom(_onHero(tester), const Offset(-300, 0));
-    await tester.pump(const Duration(seconds: 1));
-    expect(find.bySemanticsLabel('Harvest Sunday'), findsOneWidget);
+    final before = _firstCardLeft(tester);
+    await tester.dragFrom(_onHero(tester), const Offset(-150, 0));
+    await tester.pump();
     expect(_homeScroll(tester).pixels, 0);
-
-    // On the flyer slide.
-    await tester.dragFrom(_onHero(tester), const Offset(0, -120));
-    await tester.pump(const Duration(seconds: 1));
-    expect(_homeScroll(tester).pixels, greaterThan(80));
-    semantics.dispose();
+    // The row loops: measure the move within one set of cards.
+    final set =
+        tester.getTopLeft(find.byKey(const Key('home-hero-card-0-7'))).dx -
+        tester.getTopLeft(find.byKey(const Key('home-hero-card-0-0'))).dx;
+    var moved = (_firstCardLeft(tester) - before) % set;
+    if (moved > set / 2) moved -= set;
+    expect(moved, lessThan(-100), reason: 'dragged left with the finger');
   });
 
   testWidgets('logo and bell float over the top of the hero, below the '
-      'status bar; the mute chip sits in the hero\'s corner; the greeting '
-      'follows the hero', (tester) async {
+      'status bar and above the wall\'s first row; the greeting follows the '
+      'hero', (tester) async {
     await _pumpHome(tester);
 
-    final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
-    final mute = tester.getRect(find.byKey(const Key('home-hero-mute')));
-    expect(find.byKey(const Key('home-hero-mute')).hitTestable(), findsOne);
-    expect(media.contains(mute.center), isTrue);
-    expect(mute.center.dx, greaterThan(media.width - 60));
+    final media = tester.getRect(find.byKey(const Key('home-hero')));
+    final firstRow = tester.getRect(find.byKey(const Key('home-hero-row-0')));
     for (final key in const [Key('home-hero-logo'), Key('home-bell')]) {
       expect(find.byKey(key).hitTestable(), findsOneWidget, reason: '$key');
       final chip = tester.getRect(find.byKey(key));
       expect(chip.top, greaterThanOrEqualTo(_statusBar));
       expect(media.contains(chip.center), isTrue, reason: '$key on the hero');
+      expect(chip.bottom, lessThanOrEqualTo(firstRow.top), reason: '$key');
     }
     expect(
       tester.getCenter(find.byKey(const Key('home-hero-logo'))).dx,
@@ -273,16 +242,11 @@ void main() {
     expect(_statusStyle(tester).statusBarIconBrightness, Brightness.dark);
   });
 
-  testWidgets('no hero: the greeting header leads; no announcements: the '
-      'block is hidden, heading included', (tester) async {
-    await _pumpHome(tester, video: null);
-
-    expect(find.byKey(const Key('home-hero')), findsNothing);
-    expect(find.textContaining('Good '), findsOneWidget);
-    expect(find.byKey(const Key('home-branch-change')), findsOneWidget);
+  testWidgets('no announcements: the block is hidden, heading included', (
+    tester,
+  ) async {
+    await _pumpHome(tester);
     expect(find.byKey(const Key('home-announcements-see-all')), findsNothing);
     expect(find.textContaining('No announcements'), findsNothing);
-    // Nothing shows through under the clock without a hero either.
-    expect(find.byKey(const Key('home-status-bar-backing')), findsOneWidget);
   });
 }

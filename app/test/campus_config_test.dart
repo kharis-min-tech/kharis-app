@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
@@ -378,8 +379,11 @@ void main() {
             ),
             dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
             continueListeningProvider.overrideWith((ref) => null),
-            featuredVideoProvider.overrideWith((ref) async => null),
             latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
+            // The hero wall's videos as plain boxes: no video plugin here.
+            heroWallVideoProvider.overrideWithValue(
+              (asset, poster, playing) => const SizedBox.expand(),
+            ),
           ],
           child: const MaterialApp(home: HomeScreen()),
         ),

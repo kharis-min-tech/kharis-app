@@ -76,8 +76,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Pull-to-refresh reloads everything Home shows and holds the spinner
-  /// until it has all answered: today's reading and message, the featured
-  /// video, the campus announcements and events, and the branch settings
+  /// until it has all answered: today's reading and message, the campus
+  /// announcements and events, and the branch settings
   /// (branches with services and giving, and the live stream) behind the
   /// layout and the campus card.
   Future<void> _refresh() {
@@ -87,7 +87,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Future.wait<void>([
       settleRefresh(ref.refresh(dailyContentProvider.future)),
       settleRefresh(ref.refresh(dailyMessageProvider.future)),
-      settleRefresh(ref.refresh(featuredVideoProvider.future)),
       refreshCampusContent(ref),
       refreshCampusConfig(ref),
     ]);
@@ -96,13 +95,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final sections = ref.watch(effectiveHomeLayoutProvider).visible;
-    final slides = ref.watch(homeHeroSlidesProvider);
-    final hasHero = slides.isNotEmpty;
-    // Light status-bar icons over the hero's dark media; the theme's own
-    // once it has scrolled away (or when there is no hero).
+    // Light status-bar icons over the hero's dark wall; the theme's own
+    // once it has scrolled away.
     final lightIcons =
-        (hasHero && _heroUnderStatusBar) ||
-        Theme.of(context).brightness == Brightness.dark;
+        _heroUnderStatusBar || Theme.of(context).brightness == Brightness.dark;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -122,38 +118,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: CustomScrollView(
                 controller: _scroll,
                 slivers: [
-                  if (hasHero) ...[
-                    // Full-bleed from the very top, under the status bar.
-                    SliverToBoxAdapter(
-                      child: HomeHero(
-                        key: const Key('home-hero'),
-                        slides: slides,
-                        inView: _heroInView,
-                        scroll: _scroll,
-                        topBar: const _HeroTopBar(),
-                      ),
+                  // Full-bleed from the very top, under the status bar.
+                  SliverToBoxAdapter(
+                    child: HomeHero(
+                      key: const Key('home-hero'),
+                      inView: _heroInView,
+                      scroll: _scroll,
+                      topBar: const _HeroTopBar(),
                     ),
-                    // The greeting straight under the hero's faded bottom:
-                    // who and which Branch (tap to change), then the content.
-                    const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
-                        child: _Greeting(),
-                      ),
+                  ),
+                  // The greeting straight under the hero's faded bottom:
+                  // who and which Branch (tap to change), then the content.
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
+                      child: _Greeting(),
                     ),
-                  ] else
-                    // Greeting header
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          MediaQuery.of(context).padding.top + 8,
-                          20,
-                          18,
-                        ),
-                        child: const _HomeHeader(),
-                      ),
-                    ),
+                  ),
 
                   // The Studio's blocks in its order; the newest messages
                   // follow Today's reading (or lead when the Studio hides it).
@@ -175,7 +156,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             // Solid backing behind the status bar once the hero has left it,
             // so the list never shows through under the clock.
-            if (!(hasHero && _heroUnderStatusBar))
+            if (!_heroUnderStatusBar)
               Positioned(
                 key: const Key('home-status-bar-backing'),
                 top: 0,
@@ -381,31 +362,6 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
-
-/// The greeting header Home leads with when there is no hero: dove mark,
-/// greeting, bell.
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Brand dove mark
-        Image.asset(
-          AppAssets.dovePurple,
-          width: 34,
-          height: 34,
-          filterQuality: FilterQuality.medium,
-        ),
-        const SizedBox(width: 12),
-        const Expanded(child: _Greeting()),
-        const _BellButton(),
-      ],
-    );
-  }
-}
 
 /// The header floating over the hero: the dove mark and the bell, each in
 /// a round surface chip so they stay legible on any image without a scrim.

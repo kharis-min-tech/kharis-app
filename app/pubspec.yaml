@@ -76,6 +76,7 @@ dependencies:
   package_info_plus: ^10.2.1
   firebase_crashlytics: ^4.3.10
   firebase_performance: ^0.10.1+10
+  video_player: ^2.14.1
 
 dev_dependencies:
   flutter_test:
@@ -107,6 +108,7 @@ flutter:
     - assets/icon/
     - assets/design/
     - assets/google_fonts/
+    - assets/hero/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

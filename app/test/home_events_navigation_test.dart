@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/core/services/app_router.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
@@ -199,9 +200,11 @@ Future<void> _pump(
         dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
         // Nothing to resume: the card collapses (its engine is WP2's).
         continueListeningProvider.overrideWith((ref) => null),
-        // No hero: these tests drive the sections under it.
-        featuredVideoProvider.overrideWith((ref) async => null),
         latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
+        // The hero wall's videos as plain boxes: tests have no video plugin.
+        heroWallVideoProvider.overrideWithValue(
+          (asset, poster, playing) => const SizedBox.expand(),
+        ),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
