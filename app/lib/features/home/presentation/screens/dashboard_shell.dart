@@ -239,7 +239,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Slides (a paint transform: no relayout) within its own clip;
-            // the body shows through, and receives taps, where it was.
+            // the body shows through, and receives taps, where it was. The
+            // system gesture area is part of the bar and leaves with it, so
+            // nothing opaque is left covering the list (tester: "black box"
+            // over the last rows of More).
             ClipRect(
               child: AnimatedSlide(
                 key: const Key('dashboard-bottom-bar'),
@@ -266,7 +269,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           top: BorderSide(color: context.kc.divider, width: 1),
                         ),
                       ),
-                      padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
+                      padding: EdgeInsets.fromLTRB(6, 10, 6, 12 + safeBottom),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -317,13 +320,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                 ),
               ),
             ),
-            // The system gesture area stays padded on the bar's surface
-            // whether or not the bar is showing.
-            if (safeBottom > 0)
-              ColoredBox(
-                color: context.kc.surface,
-                child: SizedBox(height: safeBottom, width: double.infinity),
-              ),
           ],
         ),
       ),

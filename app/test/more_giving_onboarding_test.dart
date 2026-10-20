@@ -20,6 +20,7 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/branch_selection_screen.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/role_selection_screen.dart';
+import 'package:kharis_app/features/onboarding/presentation/widgets/role_card.dart';
 import 'package:kharis_app/features/settings/presentation/screens/edit_profile_screen.dart';
 import 'package:kharis_app/features/settings/presentation/screens/notifications_settings_screen.dart';
 import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
@@ -607,6 +608,25 @@ void main() {
       await tester.tap(find.text('Privacy policy'));
       await tester.pumpAndSettle();
       expect(_launched, ['https://kharis.org/privacy-policy/']);
+    });
+
+    testWidgets('role selection offers each way in once: first-timers and '
+        'visitors share New here (team review: duplicate option)', (
+      tester,
+    ) async {
+      final prefs = await _prefs();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const MaterialApp(home: RoleSelectionScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final titles = [
+        for (final card in tester.widgetList<RoleCard>(find.byType(RoleCard)))
+          card.title,
+      ];
+      expect(titles, ['Member', 'New here', 'Partner']);
     });
 
     testWidgets('Switch Branch from More keeps the onboarded role', (

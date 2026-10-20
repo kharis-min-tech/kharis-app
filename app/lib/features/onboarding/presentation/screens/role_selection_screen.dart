@@ -67,20 +67,15 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 onTap: () => _select('member'),
               ),
               const SizedBox(height: 12),
+              // One card for first-timers and visitors: the two meant the
+              // same thing to members (team review), and both settle in
+              // through the same New here path.
               RoleCard(
                 icon: Icons.waving_hand_outlined,
                 title: 'New here',
-                description: 'First time? Help me settle in',
+                description: 'Visiting or just exploring? Help me settle in',
                 accent: context.kc.accentInk,
                 onTap: () => _select('new_here'),
-              ),
-              const SizedBox(height: 12),
-              RoleCard(
-                icon: Icons.explore_outlined,
-                title: 'Visitor',
-                description: 'Just exploring for now',
-                accent: context.kc.onChip,
-                onTap: () => _select('visitor'),
               ),
               const SizedBox(height: 12),
               RoleCard(
