@@ -143,7 +143,11 @@ class BibleRepository {
     final response = await _withRetry(
       () => _dio.get<Map<String, dynamic>>(
         '$_base/bibles/$bibleId/passages/$usfmId',
-        queryParameters: {'format': 'html', 'include_headings': 'true'},
+        queryParameters: {
+          'format': 'html',
+          'include_headings': 'true',
+          'include_notes': 'true',
+        },
         options: _options,
       ),
     );
@@ -202,21 +206,49 @@ class BibleRepository {
       final body = m.group(2) ?? '';
       final segments = <PassageSegment>[];
 
+      // Footnotes come inline as nested spans; lift them out first so they
+      // neither leak into the verse text nor end its block early.
+      final (body: text, :notes) = _liftNotes(body);
       var cursor = 0;
       int? pendingVerse;
-      for (final v in _verseLabelRe.allMatches(body)) {
-        final before = body.substring(cursor, v.start);
-        final text = _clean(before);
-        if (text.isNotEmpty) {
-          segments.add(PassageSegment(verse: pendingVerse, text: text));
-          pendingVerse = null;
+      void add(String fragment) {
+        final noteIds = [
+          for (final n in _noteMarkRe.allMatches(fragment)) int.parse(n[1]!),
+        ];
+        final clean = _clean(fragment.replaceAll(_noteMarkRe, ''));
+        if (clean.isEmpty && noteIds.isEmpty && pendingVerse == null) return;
+        if (clean.isEmpty &&
+            noteIds.isNotEmpty &&
+            segments.isNotEmpty &&
+            pendingVerse == null) {
+          final last = segments.removeLast();
+          segments.add(last.withNotes([for (final i in noteIds) notes[i]]));
+          return;
+        }
+        segments.add(
+          PassageSegment(
+            verse: pendingVerse,
+            text: clean,
+            notes: [for (final i in noteIds) notes[i]],
+          ),
+        );
+        pendingVerse = null;
+      }
+
+      for (final v in _verseLabelRe.allMatches(text)) {
+        final before = text.substring(cursor, v.start);
+        if (_clean(before.replaceAll(_noteMarkRe, '')).isNotEmpty ||
+            _noteMarkRe.hasMatch(before)) {
+          add(before);
         }
         pendingVerse = int.tryParse(v.group(1) ?? '');
         cursor = v.end;
       }
-      final tailText = _clean(body.substring(cursor));
-      if (tailText.isNotEmpty || pendingVerse != null) {
-        segments.add(PassageSegment(verse: pendingVerse, text: tailText));
+      final tail = text.substring(cursor);
+      if (_clean(tail.replaceAll(_noteMarkRe, '')).isNotEmpty ||
+          _noteMarkRe.hasMatch(tail) ||
+          pendingVerse != null) {
+        add(tail);
       }
 
       if (segments.isEmpty) continue;
@@ -226,6 +258,50 @@ class BibleRepository {
     }
     return blocks;
   }
+
+  static final _noteMarkRe = RegExp('\u0001(\\d+)\u0002');
+  static final _noteOpenRe = RegExp(r'<span class="yv-n[^"]*">');
+  static final _spanRe = RegExp(r'<(/?)span\b[^>]*>');
+  static final _noteLabelRe = RegExp(r'<span class="fr">.*?</span>');
+
+  /// Replaces each footnote span with a marker and returns the notes' text
+  /// ("Or *in Christ Jesus, who do not walk…*"), its own "8:1" label dropped.
+  static ({String body, List<String> notes}) _liftNotes(String html) {
+    final notes = <String>[];
+    final out = StringBuffer();
+    var at = 0;
+    for (;;) {
+      final open = _noteOpenRe.firstMatch(html.substring(at));
+      if (open == null) break;
+      final start = at + open.start;
+      var depth = 0;
+      var end = html.length;
+      for (final t in _spanRe.allMatches(html, start)) {
+        depth += t[1] == '/' ? -1 : 1;
+        if (depth == 0) {
+          end = t.end;
+          break;
+        }
+      }
+      out.write(html.substring(at, start));
+      final note = _cleanStatic(
+        html.substring(start, end).replaceAll(_noteLabelRe, ''),
+      );
+      if (note.isNotEmpty) {
+        out.write('\u0001${notes.length}\u0002');
+        notes.add(note);
+      }
+      at = end;
+    }
+    out.write(html.substring(at));
+    return (body: out.toString(), notes: notes);
+  }
+
+  static String _cleanStatic(String fragment) => fragment
+      .replaceAll(_tagRe, '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 
   String _clean(String fragment) => fragment
       .replaceAll(_tagRe, '')
@@ -279,10 +355,16 @@ class PassageBlock {
 }
 
 class PassageSegment {
-  const PassageSegment({required this.text, this.verse});
+  const PassageSegment({required this.text, this.verse, this.notes = const []});
 
   final int? verse;
   final String text;
+
+  /// The translation's own footnotes at the end of this text, from the API.
+  final List<String> notes;
+
+  PassageSegment withNotes(List<String> more) =>
+      PassageSegment(text: text, verse: verse, notes: [...notes, ...more]);
 }
 
 /// A book as one Bible version has it.

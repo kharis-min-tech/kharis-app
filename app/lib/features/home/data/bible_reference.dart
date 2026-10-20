@@ -293,3 +293,30 @@ ReferenceLookup _resolve(
     ),
   );
 }
+
+/// Every passage a Studio reading names, in order: "Romans 8:1-11; Psalm 23"
+/// is two. Parts are split on `;`, line breaks and " and "; a part that is
+/// only numbers ("9:1-5") continues the previous part's book. Parts that do
+/// not parse are skipped.
+List<BibleLocation> parseReadingReferences(String text, BibleIndex index) {
+  final out = <BibleLocation>[];
+  String? lastBook;
+  for (final raw in text.split(
+    RegExp(r';|\n|\s+and\s+', caseSensitive: false),
+  )) {
+    var part = raw.trim();
+    if (part.isEmpty) continue;
+    if (RegExp(r'^\d+(\s*[:.]\s*\d+(\s*[-–]\s*\d+)?)?$').hasMatch(part) &&
+        lastBook != null) {
+      part = '$lastBook $part';
+    }
+    final found = parseBibleReference(part, index);
+    if (found is ReferenceFound) {
+      out.add(found.location);
+      lastBook = RegExp(
+        r'^(.*?)\s*\d+\s*([:.].*)?$',
+      ).firstMatch(part)?.group(1);
+    }
+  }
+  return out;
+}
