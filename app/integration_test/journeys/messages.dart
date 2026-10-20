@@ -46,6 +46,18 @@ Finder get _sheetScroll => find.byKey(const Key('message-filters-scroll'));
 Future<void> _openFilterSheet(Journey j) async {
   final t = j.tester;
   final button = find.byKey(const Key('messages-filters-button'));
+  // The search below only scrolls down, so start from the top: a previous
+  // step may have left a page of rows above the filter row's place.
+  if (button.evaluate().isEmpty) {
+    final scrollable = find.descendant(
+      of: messagesScroll,
+      matching: find.byType(Scrollable),
+    );
+    if (scrollable.evaluate().isNotEmpty) {
+      t.state<ScrollableState>(scrollable.first).position.jumpTo(0);
+      await pumpFor(t, const Duration(milliseconds: 500));
+    }
+  }
   await scrollUntilFound(
     t,
     button,
@@ -211,41 +223,42 @@ Future<void> messagesJourney(Journey j) async {
     await openMessagesReset(j);
   }
 
-  // ── Paging ───────────────────────────────────────────────────────────────
+  // ── Pages ────────────────────────────────────────────────────────────────
   if (all > kMessagesPageSize) {
+    final total = NumberFormat.decimalPattern().format(all);
+    final pages = messagesPageCount(all);
     j.check(
-      j.c.read(libraryVisibleCountProvider) == kMessagesPageSize,
-      'the list opens on one page of $kMessagesPageSize rows',
+      j.c.read(libraryPageProvider) == 0,
+      'the list opens on page 1 of $pages',
     );
-    // Small steps: the next page renders as soon as the footer's status line
-    // is in view, so a big step can skip past it.
     final status = find.byKey(const Key('messages-page-status'));
     await scrollUntilFound(
       t,
       status,
       scrollable: messagesScroll,
-      step: const Offset(0, -120),
       timeout: const Duration(seconds: 60),
     );
     final text = t.widget<Text>(status).data ?? '';
-    final total = NumberFormat.decimalPattern().format(all);
     j.check(
-      RegExp('^Showing [\\d,]+ of ${RegExp.escape(total)}\$').hasMatch(text),
-      'footer reads "Showing n of $total" (got "$text")',
+      text == '1–$kMessagesPageSize of $total messages',
+      'pager reads "1–$kMessagesPageSize of $total messages" (got "$text")',
     );
-    // Reaching the footer renders the next page itself; Load more is the
-    // fallback. Either way the list grows past one page.
-    final loadMore = find.byKey(const Key('messages-load-more'));
-    if (loadMore.evaluate().isNotEmpty) {
-      await t.tap(loadMore, warnIfMissed: false);
-    }
+    j.check(
+      find.byKey(Key('messages-page-$pages')).evaluate().isNotEmpty,
+      'the last page number ($pages) is offered',
+    );
+    await j.shot('pager');
+    final next = find.byKey(const Key('messages-page-next'));
+    await t.ensureVisible(next);
+    await pumpFor(t, const Duration(milliseconds: 300));
+    await t.tap(next, warnIfMissed: false);
     await pumpFor(t, const Duration(seconds: 1));
+    j.check(j.c.read(libraryPageProvider) == 1, 'Next opens page 2');
     j.check(
-      j.c.read(libraryVisibleCountProvider) > kMessagesPageSize,
-      'the list grows past one page near its end '
-      '(${j.c.read(libraryVisibleCountProvider)} rows)',
+      next.evaluate().isEmpty,
+      'the new page starts at its first row (the pager is out of view)',
     );
-    await j.shot('paging');
+    await j.shot('page-2');
     await openMessagesReset(j);
   }
 

@@ -31,7 +31,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
   bool _showBackToTop = false;
-  bool _pageGrowing = false;
 
   static final _count = NumberFormat.decimalPattern();
 
@@ -39,10 +38,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   /// hides again near the top; the gap between the two stops it flickering.
   static const _backToTopShowAt = 1400.0;
   static const _backToTopHideAt = 700.0;
-
-  /// How far the "Showing n of total" footer's status line reaches above the
-  /// bottom pad: once it is in view, the next page of rows renders.
-  static const _footerStatusReach = 50.0;
 
   @override
   void initState() {
@@ -97,6 +92,22 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     });
   }
 
+  /// Shows [page] of a paged list and brings its first row into view. The
+  /// list's heading is usually far above by now (and no longer built), so
+  /// jump to the top first, then down to the heading; search results have
+  /// no heading and simply start at the top.
+  void _goToPage(StateProvider<int> pageProvider, int page) {
+    ref.read(pageProvider.notifier).state = page;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollCtrl.hasClients) return;
+      _scrollCtrl.jumpTo(0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _listHeaderKey.currentContext;
+        if (ctx != null && mounted) Scrollable.ensureVisible(ctx);
+      });
+    });
+  }
+
   void _setQuery(String value) {
     _searchCtrl.value = TextEditingValue(
       text: value,
@@ -111,19 +122,21 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     startPlayback(context, ref, sermon, queue: results);
   }
 
-  /// Renders one more page of a list of [total] rows, at most once a frame:
-  /// one scroll fires many near-the-end notifications before the longer
-  /// list is laid out.
-  void _showMore(StateProvider<int> visible, int total) {
-    if (_pageGrowing) return;
-    final shown = ref.read(visible);
-    if (shown >= total) return;
-    _pageGrowing = true;
-    ref.read(visible.notifier).state = math.min(
-      shown + kMessagesPageSize,
-      total,
+  /// The range of a list of [total] rows that [page] shows, clamped to the
+  /// last page when the list has shrunk (a filter or a refreshed archive).
+  static ({int page, int pages, int start, int end}) _pageRange(
+    int page,
+    int total,
+  ) {
+    final pages = messagesPageCount(total);
+    final p = page.clamp(0, pages - 1);
+    final start = math.min(p * kMessagesPageSize, total);
+    return (
+      page: p,
+      pages: pages,
+      start: start,
+      end: math.min(start + kMessagesPageSize, total),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _pageGrowing = false);
   }
 
   Future<void> _openFilters() async {
@@ -231,9 +244,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         ),
     ];
 
-    // Paging: the lists render page by page.
-    final libraryShown = math.min(
-      ref.watch(libraryVisibleCountProvider),
+    // Paging: the lists show one numbered page of rows at a time.
+    final libraryPage = _pageRange(
+      ref.watch(libraryPageProvider),
       sermons.length,
     );
 
@@ -258,8 +271,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
 
     final library = ref.watch(sermonLibraryProvider);
     final libraryNotifier = ref.read(sermonLibraryProvider.notifier);
-    final searchShown = math.min(
-      ref.watch(searchVisibleCountProvider),
+    final searchPage = _pageRange(
+      ref.watch(searchPageProvider),
       searchResults.length,
     );
     // Room under the list for the docked bars, and for the Back to top pill
@@ -275,27 +288,14 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
           SafeArea(
             bottom: false,
             child: NotificationListener<ScrollNotification>(
-              // Near the bottom: render the next page of rows once the
-              // "Showing n of total" footer is in view; once every row is on
-              // screen, prefetch the next archive page or the next page of
-              // server search hits. All of these self-guard against repeats.
+              // On the last page, near the bottom: prefetch the next archive
+              // page or the next page of server search hits, so the page
+              // count grows as more arrive. Both self-guard against repeats.
               onNotification: (n) {
                 if (n.metrics.axis != Axis.vertical) return false;
                 final toEnd = n.metrics.maxScrollExtent - n.metrics.pixels;
-                final shown = isSearching ? searchShown : libraryShown;
-                final total = isSearching
-                    ? searchResults.length
-                    : sermons.length;
-                if (shown < total) {
-                  if (toEnd <= bottomPad + _footerStatusReach) {
-                    _showMore(
-                      isSearching
-                          ? searchVisibleCountProvider
-                          : libraryVisibleCountProvider,
-                      total,
-                    );
-                  }
-                } else if (toEnd <= 600) {
+                final range = isSearching ? searchPage : libraryPage;
+                if (range.page == range.pages - 1 && toEnd <= 600) {
                   if (isSearching) {
                     ref.read(remoteSearchProvider.notifier).loadMore();
                   } else {
@@ -445,8 +445,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         )
                       else ...[
                         SliverList.builder(
-                          itemCount: searchShown,
-                          itemBuilder: (context, index) {
+                          itemCount: searchPage.end - searchPage.start,
+                          itemBuilder: (context, i) {
+                            final index = searchPage.start + i;
                             final sermon = searchResults[index];
                             return _sermonRow(
                               sermon,
@@ -458,18 +459,20 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                             );
                           },
                         ),
-                        if (searchShown < searchResults.length)
+                        if (searchPage.pages > 1)
                           SliverToBoxAdapter(
-                            child: _PageFooter(
+                            child: _Pager(
+                              page: searchPage.page,
+                              pages: searchPage.pages,
                               status:
-                                  'Showing ${_count.format(searchShown)} of '
-                                  '${_count.format(searchResults.length)}',
-                              onLoadMore: () => _showMore(
-                                searchVisibleCountProvider,
-                                searchResults.length,
-                              ),
+                                  '${_count.format(searchPage.start + 1)}–'
+                                  '${_count.format(searchPage.end)} of '
+                                  '${_count.format(searchResults.length)} results',
+                              onPage: (p) => _goToPage(searchPageProvider, p),
                             ),
-                          )
+                          ),
+                        if (searchPage.page < searchPage.pages - 1)
+                          const SliverToBoxAdapter(child: SizedBox.shrink())
                         else if (remoteSearch.isLoadingMore)
                           const SliverToBoxAdapter(
                             child: Padding(
@@ -479,8 +482,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           )
                         else if (remoteSearch.hasMore)
                           SliverToBoxAdapter(
-                            child: _PageFooter(
-                              onLoadMore: ref
+                            child: _LoadMoreButton(
+                              label: 'Find more results',
+                              onPressed: ref
                                   .read(remoteSearchProvider.notifier)
                                   .loadMore,
                             ),
@@ -742,8 +746,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         )
                       else
                         SliverList.builder(
-                          itemCount: libraryShown,
-                          itemBuilder: (context, index) {
+                          itemCount: libraryPage.end - libraryPage.start,
+                          itemBuilder: (context, i) {
+                            final index = libraryPage.start + i;
                             final sermon = sermons[index];
                             return _sermonRow(
                               sermon,
@@ -760,19 +765,27 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           },
                         ),
 
-                      // ── 7. Paging + archive footer ───────────────────────────
-                      SliverToBoxAdapter(
-                        child: _ArchiveFooter(
-                          library: library,
-                          shown: libraryShown,
-                          total: sermons.length,
-                          onLoadMore: () => _showMore(
-                            libraryVisibleCountProvider,
-                            sermons.length,
+                      // ── 7. Pages + archive footer ────────────────────────────
+                      if (libraryPage.pages > 1)
+                        SliverToBoxAdapter(
+                          child: _Pager(
+                            page: libraryPage.page,
+                            pages: libraryPage.pages,
+                            status:
+                                '${_count.format(libraryPage.start + 1)}–'
+                                '${_count.format(libraryPage.end)} of '
+                                '${_count.format(sermons.length)} messages',
+                            onPage: (p) => _goToPage(libraryPageProvider, p),
                           ),
-                          onRetry: libraryNotifier.retryHydration,
                         ),
-                      ),
+                      if (libraryPage.page == libraryPage.pages - 1)
+                        SliverToBoxAdapter(
+                          child: _ArchiveFooter(
+                            library: library,
+                            total: sermons.length,
+                            onRetry: libraryNotifier.retryHydration,
+                          ),
+                        ),
                     ],
 
                     // ── Bottom pad ─────────────────────────────────────────────
@@ -1025,39 +1038,28 @@ class _OfflineBanner extends StatelessWidget {
 
 // ── Archive footer ─────────────────────────────────────────────────────────────
 
-/// Under the library list: "Showing n of total" with Load more while rows
-/// are still paged out; then the archive walk's progress ("Loading archive
-/// n/total" while older pages stream in, or a gap fill re-walks them), a
-/// retry when the walk gave up, the honest "n of total" with a retry when
-/// the library came up short, and the end marker only once the list holds
-/// every message the server lists.
+/// Under the last page of the library list: the archive walk's progress
+/// ("Loading archive n/total" while older pages stream in, or a gap fill
+/// re-walks them), a retry when the walk gave up, the honest "n of total"
+/// with a retry when the library came up short, and the end marker only
+/// once the list holds every message the server lists.
 class _ArchiveFooter extends StatelessWidget {
   const _ArchiveFooter({
     required this.library,
-    required this.shown,
     required this.total,
-    required this.onLoadMore,
     required this.onRetry,
   });
 
   final SermonLibrary library;
 
-  /// Rows on screen, and rows the filtered list holds.
-  final int shown;
+  /// Rows the filtered list holds.
   final int total;
-  final VoidCallback onLoadMore;
   final Future<void> Function() onRetry;
 
   static final _count = NumberFormat.decimalPattern();
 
   @override
   Widget build(BuildContext context) {
-    if (shown < total) {
-      return _PageFooter(
-        status: 'Showing ${_count.format(shown)} of ${_count.format(total)}',
-        onLoadMore: onLoadMore,
-      );
-    }
     final muted = AppTypography.bodySm.copyWith(color: context.kc.muted);
     final retry = TextButton(
       onPressed: onRetry,
@@ -1121,48 +1123,232 @@ class _ArchiveFooter extends StatelessWidget {
   }
 }
 
-/// "Showing n of total" (when [status] is given) over a Load more button:
-/// the fallback for members who stop short of the automatic next page.
-class _PageFooter extends StatelessWidget {
-  const _PageFooter({this.status, required this.onLoadMore});
+/// Numbered pages under a paged list: "31–60 of 1,491 messages", the page
+/// numbers (first, last and the ones around the current page, with gaps
+/// shown as "…"), and Previous / Next. Every target is at least 44 pt.
+class _Pager extends StatelessWidget {
+  const _Pager({
+    required this.page,
+    required this.pages,
+    required this.status,
+    required this.onPage,
+  });
 
-  final String? status;
-  final VoidCallback onLoadMore;
+  /// 0-based page on screen, and how many there are.
+  final int page;
+  final int pages;
+  final String status;
+  final ValueChanged<int> onPage;
+
+  /// Page numbers to show (0-based), with null for a gap.
+  @visibleForTesting
+  static List<int?> visiblePages(int page, int pages) {
+    final keep = <int>{0, pages - 1, page - 1, page, page + 1}
+      ..removeWhere((p) => p < 0 || p >= pages);
+    // Near either end, show a few more so the row doesn't shrink to three.
+    if (page <= 2) keep.addAll([0, 1, 2, 3].where((p) => p < pages));
+    if (page >= pages - 3) {
+      keep.addAll([pages - 4, pages - 3, pages - 2].where((p) => p >= 0));
+    }
+    final sorted = keep.toList()..sort();
+    final out = <int?>[];
+    for (final p in sorted) {
+      if (out.isNotEmpty && out.last != null && p - out.last! > 1) {
+        out.add(null);
+      }
+      out.add(p);
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    final hasPrev = page > 0;
+    final hasNext = page < pages - 1;
+    Widget step(
+      String label,
+      IconData icon,
+      bool enabled,
+      int to,
+      Key key, {
+      required bool iconFirst,
+    }) {
+      final text = Text(
+        label,
+        style: AppTypography.labelMd.copyWith(
+          fontWeight: FontWeight.w700,
+          color: enabled ? kc.onBg : kc.muted,
+        ),
+      );
+      final glyph = Icon(icon, size: 20, color: enabled ? kc.onBg : kc.muted);
+      return OutlinedButton(
+        key: key,
+        onPressed: enabled ? () => onPage(to) : null,
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: enabled ? kc.outline : kc.surfaceAlt),
+          shape: const StadiumBorder(),
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: iconFirst
+              ? [glyph, const SizedBox(width: 4), text]
+              : [text, const SizedBox(width: 4), glyph],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Column(
+        children: [
+          Text(
+            status,
+            key: const Key('messages-page-status'),
+            style: AppTypography.bodySm.copyWith(color: kc.muted),
+          ),
+          const SizedBox(height: 12),
+          Semantics(
+            container: true,
+            label: 'Page ${page + 1} of $pages',
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final p in visiblePages(page, pages))
+                  if (p == null)
+                    SizedBox(
+                      width: 28,
+                      height: 44,
+                      child: Center(
+                        child: Text(
+                          '…',
+                          style: AppTypography.labelMd.copyWith(
+                            color: kc.muted,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    _PageNumber(
+                      number: p + 1,
+                      current: p == page,
+                      onTap: () => onPage(p),
+                    ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              step(
+                'Previous',
+                Icons.chevron_left_rounded,
+                hasPrev,
+                page - 1,
+                const Key('messages-page-prev'),
+                iconFirst: true,
+              ),
+              step(
+                'Next',
+                Icons.chevron_right_rounded,
+                hasNext,
+                page + 1,
+                const Key('messages-page-next'),
+                iconFirst: false,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One page number in [_Pager]; the current page is filled.
+class _PageNumber extends StatelessWidget {
+  const _PageNumber({
+    required this.number,
+    required this.current,
+    required this.onTap,
+  });
+
+  final int number;
+  final bool current;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    return Semantics(
+      button: true,
+      selected: current,
+      label: current ? 'Page $number, current' : 'Page $number',
+      excludeSemantics: true,
+      child: Material(
+        key: Key('messages-page-$number'),
+        color: current ? kc.accent : kc.surfaceAlt,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: current ? null : onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                widthFactor: 1,
+                child: Text(
+                  '$number',
+                  style: AppTypography.labelMd.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: current ? kc.onAccent : kc.onBg,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A single quiet button under a list, e.g. "Find more results".
+class _LoadMoreButton extends StatelessWidget {
+  const _LoadMoreButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final kc = context.kc;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-      child: Column(
-        children: [
-          if (status != null) ...[
-            Text(
-              status!,
-              key: const Key('messages-page-status'),
-              style: AppTypography.bodySm.copyWith(color: kc.muted),
-            ),
-            const SizedBox(height: 10),
-          ],
-          OutlinedButton(
-            key: const Key('messages-load-more'),
-            onPressed: onLoadMore,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: kc.onBg,
-              side: BorderSide(color: kc.outline),
-              shape: const StadiumBorder(),
-              minimumSize: const Size(0, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-            ),
-            child: Text(
-              'Load more',
-              style: AppTypography.labelMd.copyWith(
-                fontWeight: FontWeight.w700,
-                color: kc.onBg,
-              ),
+      child: Center(
+        child: OutlinedButton(
+          key: const Key('messages-load-more'),
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: kc.onBg,
+            side: BorderSide(color: kc.outline),
+            shape: const StadiumBorder(),
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+          ),
+          child: Text(
+            label,
+            style: AppTypography.labelMd.copyWith(
+              fontWeight: FontWeight.w700,
+              color: kc.onBg,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
