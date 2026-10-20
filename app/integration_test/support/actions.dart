@@ -167,11 +167,13 @@ Future<void> tapMode(WidgetTester t, String label) => t.tap(
   warnIfMissed: false,
 );
 
-/// Notes / Playlist / Transcript / Share sit below the fold.
+/// Notes / Playlist / Transcript / Share sit below the fold. Centred
+/// before the tap: at the very top they would sit under the player's
+/// compact bar, which takes the touch.
 Future<void> tapPlayerAction(WidgetTester t, String label) async {
   final target = inPlayer(find.text(label));
   await pumpUntilFound(t, target, reason: 'player action "$label"');
-  await t.ensureVisible(target.first);
+  await Scrollable.ensureVisible(t.element(target.first), alignment: 0.5);
   await pumpFor(t, const Duration(milliseconds: 400));
   await t.tap(target.first, warnIfMissed: false);
 }

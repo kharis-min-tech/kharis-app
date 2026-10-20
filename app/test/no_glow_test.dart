@@ -234,9 +234,7 @@ void main() {
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
-      testWidgets('Messages screen with the featured carousel and topics', (
-        tester,
-      ) async {
+      testWidgets('Messages screen with the featured carousel', (tester) async {
         final live = [
           for (var i = 1; i <= 3; i++)
             testSermon(
@@ -260,9 +258,6 @@ void main() {
               cacheServiceProvider.overrideWithValue(FakeCacheService()),
               audioPlayerServiceProvider.overrideWithValue(audio),
               featuredSermonsProvider.overrideWith((ref) => live),
-              categoryLabelsProvider.overrideWith(
-                (ref) => const ['All', 'Prayer & Fasting'],
-              ),
               recentlyPlayedProvider.overrideWith(
                 (ref) => [testSermon('r1', title: 'Recent one')],
               ),
@@ -281,25 +276,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(_gloss(tester, flatFills: true), isEmpty);
 
-        // A selected topic card used to glow in the accent colour.
-        await tester.ensureVisible(find.text('Prayer & Fasting'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Prayer & Fasting'));
-        await tester.pumpAndSettle();
-        final accent = brightness == Brightness.dark
-            ? KharisColors.dark.accent
-            : KharisColors.light.accent;
-        expect(
-          find.byWidgetPredicate(
-            (w) =>
-                w is DecoratedBox &&
-                w.decoration is BoxDecoration &&
-                (w.decoration as BoxDecoration).border ==
-                    Border.all(color: accent, width: 2.5),
-          ),
-          findsOneWidget,
-          reason: 'the topic card is in its selected state',
-        );
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 

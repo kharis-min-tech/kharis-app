@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:just_audio/just_audio.dart' show PlayerState, ProcessingState;
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
@@ -288,7 +292,7 @@ void main() {
       });
     });
 
-    group('More like this', () {
+    group('You might also like', () {
       final current = _s('1', series: 'Grace', related: ['9']);
       final library = [
         current,
@@ -303,7 +307,7 @@ void main() {
 
         final rail = find.byKey(const Key('player-related'));
         expect(rail, findsOneWidget);
-        expect(find.text('More like this'), findsOneWidget);
+        expect(find.text('You might also like'), findsOneWidget);
         final first = find.descendant(
           of: rail,
           matching: find.text('Message 9'),
@@ -332,7 +336,118 @@ void main() {
         await open(tester, current, library: [current], queue: [current]);
 
         expect(find.byKey(const Key('player-related')), findsNothing);
-        expect(find.text('More like this'), findsNothing);
+        expect(find.text('You might also like'), findsNothing);
+      });
+    });
+
+    group('Explore', () {
+      testWidgets('a series tile closes the player and opens Messages '
+          'filtered to that series alone', (tester) async {
+        final current = _s('1', series: 'Grace');
+        await audio.play(current, queue: [current]);
+        final router = GoRouter(
+          initialLocation: '/home',
+          routes: [
+            GoRoute(path: '/home', builder: (_, _) => const Text('home')),
+            GoRoute(
+              path: '/messages',
+              builder: (_, _) => const Text('messages page'),
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              audioPlayerServiceProvider.overrideWithValue(audio),
+              cacheServiceProvider.overrideWithValue(FakeCacheService()),
+              sermonsProvider.overrideWith((ref) async => [current]),
+              playlistsProvider.overrideWith(
+                (ref) => Stream.value(const <Playlist>[]),
+              ),
+              favoritesProvider.overrideWith((ref) => Stream.value(null)),
+              notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
+              artworkSchemeSourceProvider.overrideWithValue(
+                (_, _) async => null,
+              ),
+            ],
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.text('home')),
+        );
+        // An earlier filter must not stack with the tile's.
+        container.read(selectedSpeakerProvider.notifier).state = 'Someone';
+        unawaited(
+          Navigator.of(tester.element(find.text('home'))).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  MediaPlayerScreen(sermon: current, queue: [current]),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final tile = find.byKey(const Key('player-explore-series'));
+        await tester.ensureVisible(tile);
+        await tester.pumpAndSettle();
+        expect(find.text('More from Grace'), findsOneWidget);
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(MediaPlayerScreen), findsNothing);
+        expect(find.text('messages page'), findsOneWidget);
+        expect(container.read(selectedSeriesProvider), 'Grace');
+        expect(container.read(selectedSpeakerProvider), isNull);
+      });
+    });
+
+    group('compact bar', () {
+      final current = _s('1', series: 'Grace', related: ['9']);
+      final library = [
+        current,
+        _s('2', speaker: 'Other', series: 'Grace'),
+        _s('9', speaker: 'Other'),
+      ];
+
+      bool barShown(WidgetTester tester) =>
+          tester
+              .widget<AnimatedOpacity>(
+                find.ancestor(
+                  of: find.byKey(const Key('player-compact-bar')),
+                  matching: find.byType(AnimatedOpacity),
+                ),
+              )
+              .opacity ==
+          1;
+
+      testWidgets('appears only once the transport has scrolled away, and '
+          'pauses from there', (tester) async {
+        await audio.play(current, queue: [current]);
+        await open(tester, current, library: library, queue: [current]);
+        await tester.pumpAndSettle();
+        expect(barShown(tester), isFalse, reason: 'transport on screen');
+
+        await tester.drag(
+          find.byKey(const Key('player-scroll')),
+          const Offset(0, -2000),
+        );
+        await tester.pumpAndSettle();
+        expect(barShown(tester), isTrue, reason: 'transport scrolled away');
+
+        // Playing: the bar offers Pause; paused: Play resumes.
+        audio.playerStates.add(PlayerState(true, ProcessingState.ready));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('player-compact-play')));
+        await tester.pump();
+        expect(audio.pauseCalls, 1);
+        audio.playerStates.add(PlayerState(false, ProcessingState.ready));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('player-compact-play')));
+        await tester.pump();
+        expect(audio.resumeCalls, 1);
       });
     });
 

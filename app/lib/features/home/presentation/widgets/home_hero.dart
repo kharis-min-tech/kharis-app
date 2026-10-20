@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -155,12 +156,18 @@ double homeHeroMediaHeight(Size screen) =>
 /// (logo and bell chips) occupies below the status bar.
 const double kHeroTopBarExtent = 58;
 
+/// How far the title card rises over the bottom of the media. Flyers stop
+/// this far (plus a gap) above the media's bottom edge so the card never
+/// covers their own text.
+const double kHeroCardOverlap = 52;
+
 // ── Hero ──────────────────────────────────────────────────────────────────────
 
 /// Full-bleed paged banner at the very top of Home, under the status bar:
 /// [slides] (see [homeHeroSlidesProvider]) with [topBar] floating over the
-/// top, then page dots below the media. No titles: each slide is media
-/// only, tapped to open, with its title as its screen-reader label.
+/// top, the current slide's title card ([_HeroCard]) rising over the
+/// media's bottom edge, then page dots. The media carries no words; slides
+/// and the card both open on tap.
 ///
 /// The clip plays (muted unless the member unmutes it) only while its slide
 /// is current, the hero is [inView], Home is the visible tab with nothing
@@ -283,50 +290,74 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
     final mediaHeight = homeHeroMediaHeight(MediaQuery.sizeOf(context));
     final canPlay = _canPlay(context);
 
+    final current = slides[_index.clamp(0, slides.length - 1)];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          height: mediaHeight,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: ColoredBox(
-                  color: _kBackdrop,
-                  child: NotificationListener<ScrollStartNotification>(
-                    onNotification: _onPagerScroll,
-                    child: PageView.builder(
-                      key: const Key('home-hero-pager'),
-                      controller: _pages,
-                      itemCount: slides.length,
-                      onPageChanged: (i) {
-                        setState(() {
-                          _index = i;
-                          _videoPlaying = false;
-                        });
-                        _scheduleAdvance();
-                      },
-                      itemBuilder: (context, i) => _SlideMedia(
-                        key: ValueKey('home-hero-slide-${slides[i].id}'),
-                        slide: slides[i],
-                        topInset: padding.top + kHeroTopBarExtent,
-                        active: canPlay && i == _index,
-                        onPlayingChanged: (playing) => _videoPlaying = playing,
-                        onOpen: () => _openSlide(context, ref, slides[i]),
-                      ),
+        Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: mediaHeight,
+              child: ColoredBox(
+                color: _kBackdrop,
+                child: NotificationListener<ScrollStartNotification>(
+                  onNotification: _onPagerScroll,
+                  child: PageView.builder(
+                    key: const Key('home-hero-pager'),
+                    controller: _pages,
+                    itemCount: slides.length,
+                    onPageChanged: (i) {
+                      setState(() {
+                        _index = i;
+                        _videoPlaying = false;
+                      });
+                      _scheduleAdvance();
+                    },
+                    itemBuilder: (context, i) => _SlideMedia(
+                      key: ValueKey('home-hero-slide-${slides[i].id}'),
+                      slide: slides[i],
+                      topInset: padding.top + kHeroTopBarExtent,
+                      bottomInset: kHeroCardOverlap + 12,
+                      active: canPlay && i == _index,
+                      onPlayingChanged: (playing) => _videoPlaying = playing,
+                      onOpen: () => _openSlide(context, ref, slides[i]),
                     ),
                   ),
                 ),
               ),
-              Positioned(
-                top: padding.top + 8,
-                left: 20,
-                right: 20,
-                child: widget.topBar,
+            ),
+            Positioned(
+              top: padding.top + 8,
+              left: 20,
+              right: 20,
+              child: widget.topBar,
+            ),
+            // The card sizes the stack: it starts [kHeroCardOverlap] above
+            // the media's bottom edge and hangs below it.
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                mediaHeight - kHeroCardOverlap,
+                20,
+                0,
               ),
-            ],
-          ),
+              child: AnimatedSwitcher(
+                duration: _reduceMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 220),
+                child: _HeroCard(
+                  key: ValueKey('home-hero-card-${current.id}'),
+                  slide: current,
+                  onOpen: () => _openSlide(context, ref, current),
+                ),
+              ),
+            ),
+          ],
         ),
         if (slides.length > 1)
           _HeroDots(
@@ -373,12 +404,16 @@ class _SlideMedia extends StatelessWidget {
     super.key,
     required this.slide,
     required this.topInset,
+    required this.bottomInset,
     required this.active,
     required this.onPlayingChanged,
     required this.onOpen,
   });
 
   final HeroSlide slide;
+
+  /// Room left below a flyer for the title card that rises over the media.
+  final double bottomInset;
 
   /// Room left above a flyer for the status bar and the floating header, so
   /// neither covers the flyer's own text.
@@ -400,18 +435,21 @@ class _SlideMedia extends StatelessWidget {
       EventHeroSlide(:final event) => _FlyerMedia(
         url: event.imageUrl!,
         topInset: topInset,
+        bottomInset: bottomInset,
       ),
       AnnouncementHeroSlide(:final item) => _FlyerMedia(
         url: usableMediaUrl(item.imageUrl)!,
         topInset: topInset,
+        bottomInset: bottomInset,
       ),
       LatestMessageHeroSlide(:final sermon) => _FlyerMedia(
         url: usableMediaUrl(sermon.artworkUrl)!,
         topInset: topInset,
+        bottomInset: bottomInset,
       ),
     };
-    // The title is what a screen reader says for the slide; nothing is
-    // written on or under the media.
+    // The title is what a screen reader says for the slide; the words show
+    // on the card below the media ([_HeroCard]), never on the media itself.
     return Semantics(
       container: true,
       button: true,
@@ -427,15 +465,20 @@ class _SlideMedia extends StatelessWidget {
 
 /// A flyer or artwork whole, letterboxed on the backdrop; never cropped.
 class _FlyerMedia extends StatelessWidget {
-  const _FlyerMedia({required this.url, required this.topInset});
+  const _FlyerMedia({
+    required this.url,
+    required this.topInset,
+    required this.bottomInset,
+  });
 
   final String url;
   final double topInset;
+  final double bottomInset;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(top: topInset),
+      padding: EdgeInsets.only(top: topInset, bottom: bottomInset),
       child: Image.network(
         url,
         fit: BoxFit.contain,
@@ -476,21 +519,40 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
   bool _playing = false;
   bool _muted = true;
 
+  /// Holds the thumbnail for [kHeroRevealDelay] after frames start moving,
+  /// past the pause glyph YouTube flashes as playback begins.
+  Timer? _reveal;
+
   @override
   void didUpdateWidget(_VideoMedia oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Going inactive disposes the surface: the next activation starts on the
     // thumbnail again, and silent.
     if (!widget.active) {
+      _reveal?.cancel();
       _playing = false;
       _muted = true;
     }
   }
 
+  @override
+  void dispose() {
+    _reveal?.cancel();
+    super.dispose();
+  }
+
   void _onPlaying(bool playing) {
     if (!mounted || !widget.active) return;
     widget.onPlayingChanged(playing);
-    if (playing != _playing) setState(() => _playing = playing);
+    _reveal?.cancel();
+    if (!playing) {
+      if (_playing) setState(() => _playing = false);
+      return;
+    }
+    if (_playing) return;
+    _reveal = Timer(kHeroRevealDelay, () {
+      if (mounted && widget.active) setState(() => _playing = true);
+    });
   }
 
   void _toggleMute() {
@@ -526,7 +588,8 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
         if (surface != null)
           Positioned(
             right: 17,
-            bottom: 13,
+            // Clear of the title card rising over the media's bottom edge.
+            bottom: kHeroCardOverlap + 12,
             child: _MuteButton(muted: _muted, onTap: _toggleMute),
           ),
       ],
@@ -580,6 +643,10 @@ class _MuteButton extends StatelessWidget {
 /// so YouTube's own edge chrome (the title bar across the top, the
 /// watermark and "More videos" corners) falls outside the clip.
 const double kHeroClipCropScale = 1.25;
+
+/// How long the thumbnail stays over a clip that has started playing, so
+/// the pause glyph YouTube flashes at the start is never seen.
+const Duration kHeroRevealDelay = Duration(seconds: 3);
 
 /// How long before its end the clip jumps back to the start.
 const Duration kHeroLoopLead = Duration(milliseconds: 1500);
@@ -772,6 +839,106 @@ try {
   @override
   Widget build(BuildContext context) {
     return WebViewWidget(controller: _controller.webViewController);
+  }
+}
+
+/// The current slide in words, on a card rising over the bottom of the
+/// media: what it is (small caps), its title (display serif), and a solid
+/// strip saying what a tap does or when it happens. Tapping opens the slide.
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({super.key, required this.slide, required this.onOpen});
+
+  final HeroSlide slide;
+  final VoidCallback onOpen;
+
+  /// (eyebrow, strip) for [slide].
+  static (String, String) _words(HeroSlide slide) => switch (slide) {
+    VideoHeroSlide() => ('FEATURED', 'WATCH NOW'),
+    EventHeroSlide(:final event) => (
+      event.isFeatured ? 'FEATURED EVENT' : 'UPCOMING EVENT',
+      (event.recurrenceLabel ??
+              DateFormat('EEE d MMM \u00b7 h:mm a').format(event.startTime))
+          .toUpperCase(),
+    ),
+    AnnouncementHeroSlide() => ('ANNOUNCEMENT', 'READ MORE'),
+    LatestMessageHeroSlide() => ('LATEST MESSAGE', 'LISTEN NOW'),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    final (eyebrow, strip) = _words(slide);
+    return Semantics(
+      button: true,
+      container: true,
+      child: Material(
+        key: const Key('home-hero-card'),
+        color: kc.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.cardBorder,
+          side: BorderSide(color: kc.outline),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onOpen,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+                child: Column(
+                  children: [
+                    Text(
+                      eyebrow,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.ui(
+                        size: 11,
+                        weight: FontWeight.w700,
+                        letterSpacing: 1.3,
+                      ).copyWith(color: kc.onBg, height: 1),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _slideTitle(slide),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.display(
+                        size: 25,
+                        weight: FontWeight.w600,
+                      ).copyWith(color: kc.onBg, height: 1.15),
+                    ),
+                  ],
+                ),
+              ),
+              ColoredBox(
+                color: AppColors.primaryDeep,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 11,
+                  ),
+                  child: Text(
+                    strip,
+                    key: const Key('home-hero-card-strip'),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.ui(
+                      size: 12,
+                      weight: FontWeight.w700,
+                      letterSpacing: 1.1,
+                    ).copyWith(color: Colors.white, height: 1.1),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

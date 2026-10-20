@@ -13,8 +13,8 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 /// with only a prayer shows the prayer alone.
 ///
 /// Loading shows a skeleton of the card. It never paints a made-up reading:
-/// when the Studio has nothing for today, or it cannot be reached, it renders
-/// nothing (not even [padding]); the reader explains a failed load.
+/// when the Studio has nothing for today, or it cannot be reached, it shows
+/// the way into the whole Bible instead ([_BibleCard]).
 class TodaysReadingCard extends ConsumerWidget {
   const TodaysReadingCard({super.key, this.padding = EdgeInsets.zero});
 
@@ -49,7 +49,9 @@ class TodaysReadingCard extends ConsumerWidget {
         ),
       );
     } else {
-      return const SizedBox.shrink();
+      // Nothing from the Studio today (or it cannot be reached): Home still
+      // leads into Scripture, through the whole Bible.
+      card = const _BibleCard();
     }
     return Padding(padding: padding, child: card);
   }
@@ -322,6 +324,57 @@ class _ReadingCard extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: open,
         child: card,
+      ),
+    );
+  }
+}
+
+/// The way into the whole Bible when the Studio has no reading for today,
+/// on the same brand card so Home always has Scripture in the same place.
+class _BibleCard extends StatelessWidget {
+  const _BibleCard();
+
+  @override
+  Widget build(BuildContext context) {
+    void open() => context.push('/bible');
+    return Semantics(
+      button: true,
+      label: 'Read the Bible',
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: const Key('reading-card-bible'),
+        behavior: HitTestBehavior.opaque,
+        onTap: open,
+        child: _CardShell(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _Eyebrow(text: 'THE BIBLE'),
+              const SizedBox(height: 14),
+              Text(
+                'Read the Bible',
+                style: AppTypography.display(
+                  size: 26,
+                  weight: FontWeight.w700,
+                ).copyWith(color: Colors.white, height: 1.15),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Every book and chapter, in the translation you choose.',
+                style: AppTypography.ui(size: 14).copyWith(
+                  color: Colors.white.withValues(alpha: .85),
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _Pill(
+                label: 'Open the Bible',
+                icon: Icons.arrow_forward_rounded,
+                onTap: open,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -287,13 +287,13 @@ void main() {
       expect(find.text('FEATURED'), findsNothing);
       expect(find.text('Featured upload'), findsNothing);
       expect(find.text('Latest messages'), findsOneWidget);
-      // Newest first, ahead of the topics and the full list.
+      // Newest first, ahead of the full list.
       final latest = tester.getTopLeft(find.text('Latest messages'));
       final newest = find.text('Live message 3').first;
       expect(tester.getTopLeft(newest).dy, greaterThan(latest.dy));
       expect(
         tester.getTopLeft(newest).dy,
-        lessThan(tester.getTopLeft(find.text('Browse by topic')).dy),
+        lessThan(tester.getTopLeft(find.text('All messages')).dy),
       );
     });
   });
@@ -447,55 +447,54 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  });
 
-    testWidgets('the topic cards take their full height at 2x text', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            sermonRepositoryProvider.overrideWithValue(
-              FakePagedSermonRepository([archive]),
+  testWidgets('a topic is chosen in the filter sheet: Apply narrows the '
+      'list, the header names it and the Filters button counts it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      app(
+        FakePagedSermonRepository([
+          [
+            testSermon(
+              't1',
+              title: 'Learning to pray',
+              publishedAt: DateTime(2026, 9, 3),
             ),
-            sermonArchiveAutoHydrateProvider.overrideWithValue(false),
-            cmsSermonsProvider.overrideWith(
-              (ref) => Stream.value(const <Sermon>[]),
-            ),
-            videosProvider.overrideWith((ref) async => const <Sermon>[]),
-            firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
-            cacheServiceProvider.overrideWithValue(FakeCacheService()),
-            audioPlayerServiceProvider.overrideWithValue(
-              FakeAudioPlayerService(),
+            testSermon(
+              't2',
+              title: 'Walking in love',
+              publishedAt: DateTime(2026, 9, 2),
             ),
           ],
-          child: MaterialApp(
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: const TextScaler.linear(2)),
-              child: child!,
-            ),
-            home: const MessagesScreen(),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('2 messages').first,
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      final count = find.text('2 messages').first;
-      final row = find
-          .ancestor(of: count, matching: find.byType(SingleChildScrollView))
-          .first;
-      expect(
-        tester.getRect(count).bottom,
-        lessThanOrEqualTo(tester.getRect(row).bottom + 0.5),
-      );
-      expect(tester.takeException(), isNull);
-    });
+        ]),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Browse by topic'), findsNothing);
+
+    final filters = find.byKey(const Key('messages-filters-button'));
+    await tester.scrollUntilVisible(
+      filters,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(filters);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Prayer & Fasting (1)'));
+    await tester.tap(find.byKey(const Key('message-filters-apply')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Filters \u00b7 1'), findsOneWidget);
+    expect(find.text('Walking in love'), findsNothing);
+    expect(find.text('Learning to pray'), findsWidgets);
+    // The header and the clearable chip both name the topic.
+    expect(find.text('Prayer & Fasting'), findsNWidgets(2));
   });
 
   ProviderContainer containerOf(WidgetTester tester) =>

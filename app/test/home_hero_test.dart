@@ -292,8 +292,9 @@ void main() {
       'news': <Map<String, dynamic>>[],
     };
 
-    testWidgets('media only: no caption text, the title as the slide\'s '
-        'screen-reader label, dots for more than one slide', (tester) async {
+    testWidgets('the card names the current slide (kind, title, what a tap '
+        'does); the media keeps the title as its label; dots for more than '
+        'one slide', (tester) async {
       final semantics = tester.ensureSemantics();
       await _pumpHero(tester, SupabaseStub(withVideo));
 
@@ -304,8 +305,13 @@ void main() {
         find.byKey(const Key('home-hero-video-thumbnail')),
         findsOneWidget,
       );
-      for (final text in ['App clip', 'Watch', 'Play', 'FEATURED VIDEO']) {
-        expect(find.text(text), findsNothing, reason: text);
+      final card = find.byKey(const Key('home-hero-card'));
+      for (final text in ['FEATURED', 'App clip', 'WATCH NOW']) {
+        expect(
+          find.descendant(of: card, matching: find.text(text)),
+          findsOneWidget,
+          reason: text,
+        );
       }
       expect(find.bySemanticsLabel('App clip'), findsOneWidget);
       expect(find.byKey(const Key('home-hero-dots')), findsOneWidget);
@@ -318,8 +324,11 @@ void main() {
       final thumbnail = find.byKey(const Key('home-hero-video-thumbnail'));
       expect(thumbnail, findsOneWidget);
 
+      // Playing: the thumbnail holds past YouTube's start glyph, then lifts.
       _reportPlaying!(true);
       await tester.pump();
+      expect(thumbnail, findsOneWidget);
+      await tester.pump(kHeroRevealDelay);
       expect(thumbnail, findsNothing);
 
       // Buffering, paused, cued, ended: YouTube would draw its own UI.
@@ -454,19 +463,23 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(_slide('Event b'), findsOneWidget);
       expect(_slide('Event a'), findsNothing);
-      expect(find.text('Event b'), findsNothing, reason: 'no caption');
+      // The card follows the slide.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Event b'), findsOneWidget);
+      expect(find.text('Event a'), findsNothing);
     });
 
-    testWidgets('the latest-message fallback: artwork only, no text, no '
-        'dots', (tester) async {
+    testWidgets('the latest-message fallback: its artwork, a card offering '
+        'to listen, no dots', (tester) async {
       await _pumpHero(
         tester,
         SupabaseStub({'featured_videos': [], 'events': [], 'news': []}),
       );
 
       expect(_slide('Walking by faith'), findsOneWidget);
-      expect(find.text('Walking by faith'), findsNothing);
-      expect(find.text('LATEST MESSAGE'), findsNothing);
+      expect(find.text('Walking by faith'), findsOneWidget);
+      expect(find.text('LATEST MESSAGE'), findsOneWidget);
+      expect(find.text('LISTEN NOW'), findsOneWidget);
       expect(find.byKey(const Key('home-hero-dots')), findsNothing);
     });
 

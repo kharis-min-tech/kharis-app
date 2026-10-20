@@ -8,6 +8,8 @@ import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import '../widgets/continue_listening_card.dart';
 import '../widgets/giving_shortcut_card.dart';
@@ -18,6 +20,7 @@ import '../widgets/campus_card.dart';
 import '../widgets/profile_completion_card.dart';
 import '../widgets/news_section.dart';
 import '../widgets/home_hero.dart';
+import '../widgets/latest_messages_row.dart';
 import '../widgets/upcoming_events_strip.dart';
 
 /// Space under a full-width Home block.
@@ -129,7 +132,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         topBar: const _HeroTopBar(),
                       ),
                     ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    // A quiet greeting under the hero: who and which Branch
+                    // (tap to change), then straight into the content.
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20, 22, 20, 22),
+                        child: _Greeting(),
+                      ),
+                    ),
                   ] else
                     // Greeting header
                     SliverToBoxAdapter(
@@ -144,11 +154,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
 
-                  for (final id in sections)
+                  // The Studio's blocks in its order; the newest messages
+                  // follow Today's reading (or lead when the Studio hides it).
+                  if (!sections.contains(HomeSectionId.reading))
+                    const SliverToBoxAdapter(child: _LatestMessagesBlock()),
+                  for (final id in sections) ...[
                     SliverToBoxAdapter(
                       key: ValueKey('home-section-${id.name}'),
                       child: _HomeSection(id),
                     ),
+                    if (id == HomeSectionId.reading)
+                      const SliverToBoxAdapter(child: _LatestMessagesBlock()),
+                  ],
 
                   // Bottom safe area: 150 clears mini player + tab bar
                   const SliverToBoxAdapter(child: SizedBox(height: 150)),
@@ -195,6 +212,34 @@ class _AnnouncementsBlock extends ConsumerWidget {
         const Padding(
           padding: EdgeInsets.only(left: 20, bottom: 28),
           child: AnnouncementsCarousel(),
+        ),
+      ],
+    );
+  }
+}
+
+/// The newest messages under their heading; collapses, heading included,
+/// until there are messages.
+class _LatestMessagesBlock extends ConsumerWidget {
+  const _LatestMessagesBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(latestSermonsProvider).isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          title: 'Latest messages',
+          actionKey: const Key('home-messages-see-all'),
+          // Messages is a tab: switch to it rather than stacking it.
+          onSeeAll: () => context.go('/messages'),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 28),
+          child: LatestMessagesRow(),
         ),
       ],
     );
@@ -266,32 +311,44 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final kc = context.kc;
+    // Small caps over a hairline, the way an editorial menu sets a section.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 8, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: AppTypography.display(
-                size: 19,
-                weight: FontWeight.w700,
-              ).copyWith(color: context.kc.onBg, height: 1),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: kc.outline)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title.toUpperCase(),
+                style: AppTypography.ui(
+                  size: 13,
+                  weight: FontWeight.w700,
+                  letterSpacing: 1.3,
+                ).copyWith(color: kc.onBg, height: 1),
+              ),
             ),
-          ),
-          TextButton(
-            key: actionKey,
-            onPressed: onSeeAll,
-            style: TextButton.styleFrom(foregroundColor: context.kc.muted),
-            child: Text(
-              'See all',
-              style: AppTypography.ui(
-                size: 12.5,
-                weight: FontWeight.w600,
-              ).copyWith(color: context.kc.muted, height: 1),
+            TextButton(
+              key: actionKey,
+              onPressed: onSeeAll,
+              style: TextButton.styleFrom(
+                foregroundColor: kc.accentInk,
+                padding: const EdgeInsets.only(left: 12),
+                minimumSize: const Size(48, 44),
+              ),
+              child: Text(
+                'See all',
+                style: AppTypography.ui(
+                  size: 12.5,
+                  weight: FontWeight.w600,
+                ).copyWith(color: kc.accentInk, height: 1),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -361,8 +418,8 @@ class _HeroTopBar extends StatelessWidget {
   }
 }
 
-/// Where the member belongs (small line) and the greeting (big line), with
-/// their name only when they have told us one.
+/// The greeting (big line), with the member's name only when they have told
+/// us one, then their Branch (small line) which opens the Branch picker.
 class _Greeting extends ConsumerWidget {
   const _Greeting();
 
@@ -384,36 +441,64 @@ class _Greeting extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
-    final branch = (user?.branch != null && user!.branch!.isNotEmpty)
-        ? user.branch!
-        : 'Kharis Church';
+    final branch =
+        ref.watch(currentBranchProvider).valueOrNull ??
+        ((user?.branch?.isNotEmpty ?? false) ? user!.branch : null);
     final firstName = _firstName(user?.displayName);
     final greeting = firstName == null
         ? _greeting()
         : '${_greeting()}, $firstName';
+    final kc = context.kc;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          branch,
-          style: AppTypography.ui(
-            size: 12.5,
-            weight: FontWeight.w500,
-          ).copyWith(color: context.kc.muted, height: 1.1),
+          greeting,
+          style: AppTypography.display(
+            size: 24,
+            weight: FontWeight.w700,
+          ).copyWith(color: kc.onBg, height: 1.15),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 2),
-        Text(
-          greeting,
-          style: AppTypography.display(
-            size: 22,
-            weight: FontWeight.w700,
-          ).copyWith(color: context.kc.onBg, height: 1.15),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        // The member's Branch; tap to change it.
+        Semantics(
+          button: true,
+          label: 'Branch: ${branch ?? 'none chosen'}. Change',
+          excludeSemantics: true,
+          child: InkWell(
+            key: const Key('home-branch-change'),
+            onTap: () => pickActiveBranch(context, ref),
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 36),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.location_on_rounded,
+                    size: 15,
+                    color: kc.accentInk,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      branch ?? 'Choose your branch',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.ui(
+                        size: 13.5,
+                        weight: FontWeight.w600,
+                      ).copyWith(color: kc.muted, height: 1.1),
+                    ),
+                  ),
+                  Icon(Icons.expand_more_rounded, size: 18, color: kc.muted),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );

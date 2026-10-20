@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -12,8 +13,15 @@ import 'package:kharis_app/shared/widgets/skeleton.dart';
 /// How many upcoming events Home previews; the Events tab has the rest.
 const int kHomeEventPreviewCount = 5;
 
-const double _kTileWidth = 264;
-const double _kTileHeight = 104;
+const double _kTileWidth = 236;
+
+/// A tile's height: the picture plus its text block, which grows with the
+/// member's text size.
+double _tileHeight(BuildContext context) =>
+    _kTileMedia + MediaQuery.textScalerOf(context).scale(100);
+
+/// Height of a tile's picture: the flyer, or the date when there is none.
+const double _kTileMedia = 136;
 
 /// "Today", "Tomorrow", else "Sat 11 Oct", then the start (and end, when
 /// set) time: `Tomorrow · 7:00 PM – 9:00 PM`. A weekly event shows its
@@ -60,15 +68,15 @@ class UpcomingEventsStrip extends ConsumerWidget {
       }
       return SizedBox(
         key: const Key('events-strip-skeleton'),
-        height: _kTileHeight,
+        height: _tileHeight(context),
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: 2,
           separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (_, _) => const Skeleton(
+          itemBuilder: (_, _) => Skeleton(
             width: _kTileWidth,
-            height: _kTileHeight,
+            height: _tileHeight(context),
             radius: AppRadius.card,
           ),
         ),
@@ -86,7 +94,7 @@ class UpcomingEventsStrip extends ConsumerWidget {
 
     final preview = events.take(kHomeEventPreviewCount).toList();
     return SizedBox(
-      height: _kTileHeight,
+      height: _tileHeight(context),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.only(right: 20),
@@ -120,86 +128,92 @@ class _EventTile extends StatelessWidget {
           onTap: () => openEventDetail(context, event),
           child: SizedBox(
             width: _kTileWidth,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  // Calendar leaf: weekday, day, month.
-                  Container(
-                    width: 54,
-                    height: double.infinity,
-                    decoration: BoxDecoration(
-                      color: kc.chipBg,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          DateFormat(
-                            'EEE',
-                          ).format(event.startTime).toUpperCase(),
-                          style: AppTypography.ui(
-                            size: 10,
-                            weight: FontWeight.w700,
-                            letterSpacing: 0.6,
-                          ).copyWith(color: kc.onChip, height: 1),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('d').format(event.startTime),
-                          style: AppTypography.display(
-                            size: 22,
-                            weight: FontWeight.w700,
-                          ).copyWith(color: kc.onChip, height: 1),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat(
-                            'MMM',
-                          ).format(event.startTime).toUpperCase(),
-                          style: AppTypography.ui(
-                            size: 10,
-                            weight: FontWeight.w700,
-                            letterSpacing: 0.6,
-                          ).copyWith(color: kc.onChip, height: 1),
-                        ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: _kTileMedia,
+                  child: _TileMedia(event: event),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.ui(
+                          size: 15,
+                          weight: FontWeight.w700,
+                        ).copyWith(color: kc.onBg, height: 1.25),
+                      ),
+                      const SizedBox(height: 6),
+                      _Line(
+                        icon: Icons.schedule_rounded,
+                        text: eventWhenLabel(event),
+                      ),
+                      if (place != null) ...[
+                        const SizedBox(height: 2),
+                        _Line(icon: Icons.place_outlined, text: place),
                       ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.ui(
-                            size: 14.5,
-                            weight: FontWeight.w700,
-                          ).copyWith(color: kc.onBg, height: 1.25),
-                        ),
-                        const SizedBox(height: 4),
-                        _Line(
-                          icon: Icons.schedule_rounded,
-                          text: eventWhenLabel(event),
-                        ),
-                        if (place != null) ...[
-                          const SizedBox(height: 2),
-                          _Line(icon: Icons.place_outlined, text: place),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The top of an event tile: the Studio's flyer filling it, else the date
+/// set large on the brand tint.
+class _TileMedia extends StatelessWidget {
+  const _TileMedia({required this.event});
+
+  final Event event;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    final date = Container(
+      color: kc.chipBg,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            DateFormat('EEEE').format(event.startTime).toUpperCase(),
+            style: AppTypography.ui(
+              size: 11,
+              weight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ).copyWith(color: kc.onChip, height: 1),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            DateFormat('d MMM').format(event.startTime),
+            style: AppTypography.display(
+              size: 40,
+              weight: FontWeight.w700,
+            ).copyWith(color: kc.onChip, height: 1),
+          ),
+        ],
+      ),
+    );
+    final url = event.imageUrl;
+    if (url == null) return date;
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      placeholder: (_, _) => ColoredBox(color: kc.chipBg),
+      errorWidget: (_, _, _) => date,
     );
   }
 }

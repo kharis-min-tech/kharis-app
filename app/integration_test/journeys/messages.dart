@@ -10,36 +10,6 @@ import '../support/actions.dart';
 import '../support/harness.dart';
 import '../support/live_data.dart';
 
-/// Scrolls the Messages page until a pill of [railPattern]'s rail is on
-/// screen, then drags that rail sideways until [label] is, and taps it.
-Future<void> _tapRailPill(Journey j, String label, RegExp railPattern) async {
-  final t = j.tester;
-  final anyPill = find.textContaining(railPattern);
-  await scrollUntilFound(
-    t,
-    anyPill,
-    scrollable: messagesScroll,
-    step: const Offset(0, -150),
-  );
-  final rail = railOf(anyPill, 'rail $railPattern');
-  final target = find.text(label);
-  final end = DateTime.now().add(const Duration(seconds: 40));
-  while (target.evaluate().isEmpty && DateTime.now().isBefore(end)) {
-    await t.drag(rail, const Offset(-250, 0), warnIfMissed: false);
-    await pumpFor(t, const Duration(milliseconds: 300));
-  }
-  await pumpUntilFound(
-    t,
-    target,
-    timeout: const Duration(seconds: 2),
-    reason: 'pill "$label"',
-  );
-  await t.ensureVisible(target.first);
-  await pumpFor(t, const Duration(milliseconds: 300));
-  await t.tap(target.first, warnIfMissed: false);
-  await pumpFor(t, const Duration(seconds: 2));
-}
-
 Finder get _sheetScroll => find.byKey(const Key('message-filters-scroll'));
 
 /// Opens the filter sheet from the control row under "All messages".
@@ -102,9 +72,8 @@ List<Sermon> _list(Journey j) => j.c.read(librarySermonsProvider);
 
 /// (d) Messages: the archive hydrates to the live API total; a search for a
 /// word from a live title hits it, nonsense shows the empty state; the list
-/// pages 30 at a time with "Showing n of total" and Load more; topic cards
-/// and the filter sheet's series and year each narrow the list to what they
-/// say; the sheet's Oldest / Newest order it; pull to refresh refetches.
+/// pages 30 at a time with numbered pages; the filter sheet's topic, series
+/// and year each narrow the list to what they say; the sheet's Oldest / Newest order it; pull to refresh refetches.
 Future<void> messagesJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'messages');
@@ -201,11 +170,10 @@ Future<void> messagesJourney(Journey j) async {
     j.check(false, 'the library has at least one topic with messages');
   } else {
     final topic = pick(r, topics);
-    await _tapRailPill(
-      j,
-      topic,
-      RegExp('^(${topics.map(RegExp.escape).join('|')})\$'),
-    );
+    // Topics live in the filter sheet (no topic cards on the page).
+    await _openFilterSheet(j);
+    await _tapInSheet(j, find.text('$topic (${counts[topic]})'));
+    await _applyFilters(j);
     final rows = _list(j);
     j.check(
       j.c.read(selectedCategoryProvider) == topic,
@@ -218,6 +186,10 @@ Future<void> messagesJourney(Journey j) async {
           rows.every((s) => sermonTopic(s) == topic),
       'topic "$topic" narrows $all to ${counts[topic]} of that topic '
       '(got ${rows.length})',
+    );
+    j.check(
+      find.text('Filters \u00b7 1').evaluate().isNotEmpty,
+      'Filters button counts the topic filter',
     );
     await j.shot('topic-$topic');
     await openMessagesReset(j);

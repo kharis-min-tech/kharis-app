@@ -260,8 +260,8 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('the reading card hides, padding included, with nothing '
-        'today or a failed load', (tester) async {
+    testWidgets('with nothing today, or a failed load, the reading card '
+        'offers the whole Bible instead of hiding', (tester) async {
       for (final content in [
         Stream<DailyContent?>.value(null),
         Stream<DailyContent?>.error(Exception('offline')),
@@ -271,7 +271,9 @@ void main() {
           const TodaysReadingCard(padding: EdgeInsets.all(20)),
           [dailyContentProvider.overrideWith((ref) => content)],
         );
-        expect(tester.getSize(find.byType(TodaysReadingCard)).height, 0);
+        expect(find.byKey(const Key('reading-card-bible')), findsOneWidget);
+        expect(find.text('Open the Bible'), findsOneWidget);
+        expect(find.text("TODAY'S READING"), findsNothing);
       }
     });
 
