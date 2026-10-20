@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -215,6 +216,47 @@ void main() {
     _homeScroll(tester).jumpTo(media / 2);
     await tester.pump();
     expect(wash(), closeTo(0.5, 0.05));
+  });
+
+  testWidgets('scrolling never lets the drifting hero cover the content '
+      'below it: the media stays inside its own box', (tester) async {
+    await _pumpHome(tester);
+    final media = homeHeroMediaHeight(const Size(400, 900));
+    _homeScroll(tester).jumpTo(media / 2);
+    await tester.pump();
+
+    // Just below the hero's box, where the slower-moving media would spill,
+    // at the left edge (no text there): the page shows, not the dark media.
+    final box = tester.getRect(find.byKey(const Key('home-hero')));
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find
+          .ancestor(
+            of: find.byKey(const Key('home-hero')),
+            matching: find.byType(RepaintBoundary),
+          )
+          .first,
+    );
+    final origin = boundary.localToGlobal(Offset.zero);
+    final at = Offset(4, box.bottom + 12) - origin;
+    final pixel = await tester.runAsync(() async {
+      final image = await boundary.toImage();
+      final bytes = await image.toByteData();
+      final i = (at.dy.round() * image.width + at.dx.round()) * 4;
+      return Color.fromARGB(
+        bytes!.getUint8(i + 3),
+        bytes.getUint8(i),
+        bytes.getUint8(i + 1),
+        bytes.getUint8(i + 2),
+      );
+    });
+    final page = Theme.of(
+      tester.element(find.byType(HomeScreen)),
+    ).scaffoldBackgroundColor;
+    expect(
+      pixel!.computeLuminance(),
+      closeTo(page.computeLuminance(), 0.05),
+      reason: 'the hero paints below its own box',
+    );
   });
 
   testWidgets('status bar: light icons and no backing over the hero; a '

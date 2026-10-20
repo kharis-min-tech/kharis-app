@@ -299,75 +299,79 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
     final bg = context.kc.bg;
 
     // Everything stays inside the hero's box: the clip is a native view that
-    // Flutter cannot paint over outside it, so nothing may overhang.
+    // Flutter cannot paint over outside it, so nothing may overhang. The
+    // scroll drift moves the media at paint time, which a Stack's own clip
+    // never sees, so the box clips explicitly: content below scrolls up
+    // cleanly instead of passing under the video.
     return SizedBox(
       height: mediaHeight,
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: mediaHeight,
-            child: _ScrollFade(
-              scroll: widget.scroll,
-              distance: mediaHeight,
-              background: bg,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ColoredBox(
-                    color: _kBackdrop,
-                    child: NotificationListener<ScrollStartNotification>(
-                      onNotification: _onPagerScroll,
-                      child: PageView.builder(
-                        key: const Key('home-hero-pager'),
-                        controller: _pages,
-                        itemCount: slides.length,
-                        onPageChanged: (i) {
-                          setState(() {
-                            _index = i;
-                            _videoPlaying = false;
-                          });
-                          _scheduleAdvance();
-                        },
-                        itemBuilder: (context, i) => _SlideMedia(
-                          key: ValueKey('home-hero-slide-${slides[i].id}'),
-                          slide: slides[i],
-                          topInset: padding.top + kHeroTopBarExtent,
-                          bottomInset: 0,
-                          active: canPlay && i == _index,
-                          onPlayingChanged: (playing) =>
-                              _videoPlaying = playing,
-                          onOpen: () => _openSlide(context, ref, slides[i]),
+      child: ClipRect(
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: mediaHeight,
+              child: _ScrollFade(
+                scroll: widget.scroll,
+                distance: mediaHeight,
+                background: bg,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(
+                      color: _kBackdrop,
+                      child: NotificationListener<ScrollStartNotification>(
+                        onNotification: _onPagerScroll,
+                        child: PageView.builder(
+                          key: const Key('home-hero-pager'),
+                          controller: _pages,
+                          itemCount: slides.length,
+                          onPageChanged: (i) {
+                            setState(() {
+                              _index = i;
+                              _videoPlaying = false;
+                            });
+                            _scheduleAdvance();
+                          },
+                          itemBuilder: (context, i) => _SlideMedia(
+                            key: ValueKey('home-hero-slide-${slides[i].id}'),
+                            slide: slides[i],
+                            topInset: padding.top + kHeroTopBarExtent,
+                            bottomInset: 0,
+                            active: canPlay && i == _index,
+                            onPlayingChanged: (playing) =>
+                                _videoPlaying = playing,
+                            onOpen: () => _openSlide(context, ref, slides[i]),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  // The dots fade with the video they belong to.
-                  if (slides.length > 1)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 14,
-                      child: _HeroDots(
-                        count: slides.length,
-                        index: _index,
-                        animate: !_reduceMotion,
+                    // The dots fade with the video they belong to.
+                    if (slides.length > 1)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 14,
+                        child: _HeroDots(
+                          count: slides.length,
+                          index: _index,
+                          animate: !_reduceMotion,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          Positioned(
-            top: padding.top + 8,
-            left: 20,
-            right: 20,
-            child: widget.topBar,
-          ),
-        ],
+            Positioned(
+              top: padding.top + 8,
+              left: 20,
+              right: 20,
+              child: widget.topBar,
+            ),
+          ],
+        ),
       ),
     );
   }
