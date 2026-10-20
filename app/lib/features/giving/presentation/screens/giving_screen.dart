@@ -40,7 +40,8 @@ class GivingScreen extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     final opened = await launchUrl(
       Uri.parse(kGivingUrl),
-      mode: LaunchMode.externalApplication,
+      // The giving page opens inside the app, never in another one.
+      mode: LaunchMode.inAppBrowserView,
     ).catchError((Object _) => false);
     if (opened) return;
     messenger

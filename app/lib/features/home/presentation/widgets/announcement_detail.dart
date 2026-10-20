@@ -236,7 +236,7 @@ class AnnouncementDetailSheet extends ConsumerWidget {
                     onPressed: () => unawaited(
                       launchUrl(
                         uri,
-                        mode: LaunchMode.externalApplication,
+                        mode: LaunchMode.inAppBrowserView,
                       ).catchError((Object _) => false),
                     ),
                     icon: const Icon(Icons.open_in_new_rounded, size: 18),

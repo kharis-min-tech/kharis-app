@@ -67,9 +67,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       MediaQuery.sizeOf(context),
       vertical: heroHasVertical(ref.read(homeHeroSlidesProvider)),
     );
+    // The hero has faded into the page once the content has risen over
+    // its visible part.
+    final visible = media - kHeroContentOverlap;
     final offset = _scroll.offset;
-    final under = offset < media - MediaQuery.paddingOf(context).top;
-    final inView = offset < media;
+    final under = offset < visible - MediaQuery.paddingOf(context).top;
+    final inView = offset < visible;
     if (under != _heroUnderStatusBar || inView != _heroInView) {
       setState(() {
         _heroUnderStatusBar = under;
@@ -132,14 +135,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         key: const Key('home-hero'),
                         slides: slides,
                         inView: _heroInView,
+                        scroll: _scroll,
                         topBar: const _HeroTopBar(),
                       ),
                     ),
-                    // A quiet greeting under the hero: who and which Branch
-                    // (tap to change), then straight into the content.
+                    // The greeting rises over the hero's faded bottom: who
+                    // and which Branch (tap to change), then the content.
                     const SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(20, 22, 20, 22),
+                        padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
                         child: _Greeting(),
                       ),
                     ),
@@ -206,6 +210,7 @@ class _AnnouncementsBlock extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SectionHeader(
+          eyebrow: 'News',
           title: 'Announcements',
           actionKey: const Key('home-announcements-see-all'),
           // The full announcements list, pushed so Back returns here.
@@ -235,6 +240,7 @@ class _LatestMessagesBlock extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SectionHeader(
+          eyebrow: 'Teachings',
           title: 'Latest messages',
           actionKey: const Key('home-messages-see-all'),
           // Messages is a tab: switch to it rather than stacking it.
@@ -276,6 +282,7 @@ class _HomeSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SectionHeader(
+            eyebrow: 'What\u2019s on',
             title: 'Upcoming events',
             actionKey: const Key('home-events-see-all'),
             // Events is a tab: switch to it rather than stacking it.
@@ -301,13 +308,18 @@ class _HomeSection extends StatelessWidget {
   }
 }
 
+/// A Home section's heading, set as on the Kharis website: a violet
+/// eyebrow ("TEACHINGS"), then the title with its last word in violet
+/// ("Latest messages"), and See all at the right.
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
+    required this.eyebrow,
     required this.title,
     required this.onSeeAll,
     this.actionKey,
   });
 
+  final String eyebrow;
   final String title;
   final VoidCallback onSeeAll;
   final Key? actionKey;
@@ -315,43 +327,60 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kc = context.kc;
-    // Small caps over a hairline, the way an editorial menu sets a section.
+    final brand = AppColors.brandInk(Theme.of(context).brightness);
+    final split = title.lastIndexOf(' ');
+    final lead = split < 0 ? '' : title.substring(0, split + 1);
+    final last = split < 0 ? title : title.substring(split + 1);
+    final heading = AppTypography.display(
+      size: 24,
+      weight: FontWeight.w800,
+    ).copyWith(color: kc.onBg, height: 1.1);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: kc.outline)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title.toUpperCase(),
-                style: AppTypography.ui(
-                  size: 13,
-                  weight: FontWeight.w700,
-                  letterSpacing: 1.3,
-                ).copyWith(color: kc.onBg, height: 1),
-              ),
+      padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  eyebrow.toUpperCase(),
+                  style: AppTypography.eyebrow(color: brand),
+                ),
+                const SizedBox(height: 8),
+                Text.rich(
+                  TextSpan(
+                    style: heading,
+                    children: [
+                      TextSpan(text: lead),
+                      TextSpan(
+                        text: last,
+                        style: TextStyle(color: brand),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              key: actionKey,
-              onPressed: onSeeAll,
-              style: TextButton.styleFrom(
-                foregroundColor: kc.accentInk,
-                padding: const EdgeInsets.only(left: 12),
-                minimumSize: const Size(48, 44),
-              ),
-              child: Text(
-                'See all',
-                style: AppTypography.ui(
-                  size: 12.5,
-                  weight: FontWeight.w600,
-                ).copyWith(color: kc.accentInk, height: 1),
-              ),
+          ),
+          TextButton(
+            key: actionKey,
+            onPressed: onSeeAll,
+            style: TextButton.styleFrom(
+              foregroundColor: kc.accentInk,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(48, 44),
             ),
-          ],
-        ),
+            child: Text(
+              'See all',
+              style: AppTypography.ui(
+                size: 13.5,
+                weight: FontWeight.w700,
+              ).copyWith(color: brand, height: 1),
+            ),
+          ),
+        ],
       ),
     );
   }

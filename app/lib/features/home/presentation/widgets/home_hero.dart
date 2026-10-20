@@ -1,10 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -21,6 +20,7 @@ import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'announcement_detail.dart';
+import '../screens/clip_player_screen.dart';
 
 // ── Slides ────────────────────────────────────────────────────────────────────
 
@@ -153,16 +153,17 @@ final heroVideoSurfaceProvider = Provider<HeroVideoSurfaceBuilder?>(
 /// cropped, and the status bar's light icons stay legible over it.
 const Color _kBackdrop = AppColors.surfaceDark;
 
-/// Height of the hero's media: about 58% of a phone's screen, clamped so a
-/// landscape phone keeps some list and a tablet is not all banner. With a
-/// vertical Short among the slides it grows to fit the Short whole at full
-/// width above the title card, up to 82% of the screen.
+/// Height of the hero's media: full width at the clip's own shape for a
+/// vertical Short (up to 78% of the screen), else 62% of the screen. Its
+/// lower part fades into the page and Home's content rises over it
+/// ([kHeroContentOverlap]), as on the Kharis website.
 double homeHeroMediaHeight(Size screen, {bool vertical = false}) => vertical
-    ? (screen.width * 16 / 9 + kHeroCardOverlap + 12).clamp(
-        260.0,
-        screen.height * 0.82,
-      )
-    : (screen.height * 0.58).clamp(260.0, 560.0);
+    ? math.min(screen.width * 16 / 9, screen.height * 0.78)
+    : (screen.height * 0.62).clamp(260.0, 600.0);
+
+/// How far Home's content rises over the faded bottom of the media, so the
+/// greeting and Today show without a long scroll.
+const double kHeroContentOverlap = 120;
 
 /// Whether any of [slides] is a vertical Short (the hero then grows).
 bool heroHasVertical(List<HeroSlide> slides) =>
@@ -172,18 +173,12 @@ bool heroHasVertical(List<HeroSlide> slides) =>
 /// (logo and bell chips) occupies below the status bar.
 const double kHeroTopBarExtent = 58;
 
-/// How far the title card rises over the bottom of the media. Flyers stop
-/// this far (plus a gap) above the media's bottom edge so the card never
-/// covers their own text.
-const double kHeroCardOverlap = 52;
-
 // ── Hero ──────────────────────────────────────────────────────────────────────
 
 /// Full-bleed paged banner at the very top of Home, under the status bar:
 /// [slides] (see [homeHeroSlidesProvider]) with [topBar] floating over the
-/// top, the current slide's title card ([_HeroCard]) rising over the
-/// media's bottom edge, then page dots. The media carries no words; slides
-/// and the card both open on tap.
+/// top, then page dots. The media carries no words: a slide opens on tap
+/// (a video in the app's own full-screen player).
 ///
 /// The clip plays (muted unless the member unmutes it) only while its slide
 /// is current, the hero is [inView], Home is the visible tab with nothing
@@ -197,10 +192,15 @@ class HomeHero extends ConsumerStatefulWidget {
     required this.slides,
     required this.topBar,
     this.inView = true,
+    this.scroll,
   });
 
   final List<HeroSlide> slides;
   final Widget topBar;
+
+  /// Home's scroll: the media drifts up slower than the page and fades into
+  /// it as the content rises (none in tests that host the hero alone).
+  final ScrollController? scroll;
 
   /// False once Home has scrolled the media out of view.
   final bool inView;
@@ -309,19 +309,25 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
     );
     final canPlay = _canPlay(context);
 
-    final current = slides[_index.clamp(0, slides.length - 1)];
+    final visible = mediaHeight - kHeroContentOverlap;
+    final bg = context.kc.bg;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: mediaHeight,
+    // The media is laid out at its full height but the hero only claims
+    // [visible] of it, so the content below rises over the faded bottom.
+    return SizedBox(
+      height: visible,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: mediaHeight,
+            child: _ScrollFade(
+              scroll: widget.scroll,
+              distance: visible,
+              background: bg,
               child: ColoredBox(
                 color: _kBackdrop,
                 child: NotificationListener<ScrollStartNotification>(
@@ -341,7 +347,7 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
                       key: ValueKey('home-hero-slide-${slides[i].id}'),
                       slide: slides[i],
                       topInset: padding.top + kHeroTopBarExtent,
-                      bottomInset: kHeroCardOverlap + 12,
+                      bottomInset: kHeroContentOverlap,
                       active: canPlay && i == _index,
                       onPlayingChanged: (playing) => _videoPlaying = playing,
                       onOpen: () => _openSlide(context, ref, slides[i]),
@@ -350,41 +356,96 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
                 ),
               ),
             ),
-            Positioned(
-              top: padding.top + 8,
-              left: 20,
-              right: 20,
-              child: widget.topBar,
-            ),
-            // The card sizes the stack: it starts [kHeroCardOverlap] above
-            // the media's bottom edge and hangs below it.
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                mediaHeight - kHeroCardOverlap,
-                20,
-                0,
-              ),
-              child: AnimatedSwitcher(
-                duration: _reduceMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 220),
-                child: _HeroCard(
-                  key: ValueKey('home-hero-card-${current.id}'),
-                  slide: current,
-                  onOpen: () => _openSlide(context, ref, current),
+          ),
+          // The media melts into the page where the content begins.
+          Positioned(
+            left: 0,
+            right: 0,
+            top: mediaHeight * 0.5,
+            height: mediaHeight * 0.5,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                key: const Key('home-hero-fade'),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [bg.withValues(alpha: 0), bg],
+                    stops: const [0, 0.78],
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-        if (slides.length > 1)
-          _HeroDots(
-            count: slides.length,
-            index: _index,
-            animate: !_reduceMotion,
           ),
-      ],
+          Positioned(
+            top: padding.top + 8,
+            left: 20,
+            right: 20,
+            child: widget.topBar,
+          ),
+          if (slides.length > 1)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: visible - 30,
+              child: _HeroDots(
+                count: slides.length,
+                index: _index,
+                animate: !_reduceMotion,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Moves [child] up at 40% of the page's speed and fades it into
+/// [background] over [distance] of scroll: the hero drifts away behind the
+/// content instead of scrolling off with it. A colour wash rather than
+/// [Opacity], which the clip's platform view does not honour everywhere.
+class _ScrollFade extends StatelessWidget {
+  const _ScrollFade({
+    required this.scroll,
+    required this.distance,
+    required this.background,
+    required this.child,
+  });
+
+  final ScrollController? scroll;
+  final double distance;
+  final Color background;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scroll = this.scroll;
+    if (scroll == null || MediaQuery.disableAnimationsOf(context)) {
+      return child;
+    }
+    return AnimatedBuilder(
+      animation: scroll,
+      child: child,
+      builder: (context, child) {
+        final offset = scroll.hasClients
+            ? scroll.offset.clamp(0.0, distance)
+            : 0.0;
+        final t = distance <= 0 ? 0.0 : offset / distance;
+        return Transform.translate(
+          offset: Offset(0, offset * 0.4),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              child!,
+              IgnorePointer(
+                child: ColoredBox(
+                  color: background.withValues(alpha: t * 0.85),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -394,12 +455,8 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
 void _openSlide(BuildContext context, WidgetRef ref, HeroSlide slide) {
   switch (slide) {
     case VideoHeroSlide(:final video):
-      unawaited(
-        launchUrl(
-          Uri.parse(video.url),
-          mode: LaunchMode.externalApplication,
-        ).catchError((Object _) => false),
-      );
+      // Played in the app, never handed to YouTube.
+      unawaited(openClipPlayer(context, video));
     case EventHeroSlide(:final event):
       openEventDetail(context, event);
     case AnnouncementHeroSlide(:final item):
@@ -470,7 +527,7 @@ class _SlideMedia extends StatelessWidget {
       ),
     };
     // The title is what a screen reader says for the slide; the words show
-    // on the card below the media ([_HeroCard]), never on the media itself.
+    // never on the media itself.
     return Semantics(
       container: true,
       button: true,
@@ -605,9 +662,12 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
         Padding(
           padding: EdgeInsets.only(
             top: widget.video.vertical ? 0 : widget.topInset,
-            bottom: widget.bottomInset,
+            bottom: widget.video.vertical ? 0 : widget.bottomInset,
           ),
-          child: Center(
+          child: Align(
+            alignment: widget.video.vertical
+                ? Alignment.topCenter
+                : Alignment.center,
             child: AspectRatio(
               key: const Key('home-hero-video-frame'),
               aspectRatio: ratio,
@@ -641,8 +701,7 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
         if (surface != null)
           Positioned(
             right: 17,
-            // Clear of the title card rising over the media's bottom edge.
-            bottom: kHeroCardOverlap + 12,
+            bottom: 16,
             child: _MuteButton(muted: _muted, onTap: _toggleMute),
           ),
       ],
@@ -857,109 +916,6 @@ try {
   @override
   Widget build(BuildContext context) {
     return WebViewWidget(controller: _controller.webViewController);
-  }
-}
-
-/// The current slide in words, on a card rising over the bottom of the
-/// media: what it is (small caps), its title (display serif), and a solid
-/// strip saying what a tap does or when it happens. Tapping opens the slide.
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({super.key, required this.slide, required this.onOpen});
-
-  final HeroSlide slide;
-  final VoidCallback onOpen;
-
-  /// (eyebrow, strip) for [slide].
-  static (String, String) _words(HeroSlide slide) => switch (slide) {
-    VideoHeroSlide(:final video) => (
-      video.vertical ? 'KHARIS SHORTS' : 'FEATURED',
-      'WATCH NOW',
-    ),
-    EventHeroSlide(:final event) => (
-      event.isFeatured ? 'FEATURED EVENT' : 'UPCOMING EVENT',
-      (event.recurrenceLabel ??
-              DateFormat('EEE d MMM \u00b7 h:mm a').format(event.startTime))
-          .toUpperCase(),
-    ),
-    AnnouncementHeroSlide() => ('ANNOUNCEMENT', 'READ MORE'),
-    LatestMessageHeroSlide() => ('LATEST MESSAGE', 'LISTEN NOW'),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    final (eyebrow, strip) = _words(slide);
-    return Semantics(
-      button: true,
-      container: true,
-      child: Material(
-        key: const Key('home-hero-card'),
-        color: kc.surface,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.cardBorder,
-          side: BorderSide(color: kc.outline),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onOpen,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-                child: Column(
-                  children: [
-                    Text(
-                      eyebrow,
-                      textAlign: TextAlign.center,
-                      style: AppTypography.ui(
-                        size: 11,
-                        weight: FontWeight.w700,
-                        letterSpacing: 1.3,
-                      ).copyWith(color: kc.onBg, height: 1),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _slideTitle(slide),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.display(
-                        size: 25,
-                        weight: FontWeight.w600,
-                      ).copyWith(color: kc.onBg, height: 1.15),
-                    ),
-                  ],
-                ),
-              ),
-              ColoredBox(
-                color: AppColors.primaryDeep,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 11,
-                  ),
-                  child: Text(
-                    strip,
-                    key: const Key('home-hero-card-strip'),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.ui(
-                      size: 12,
-                      weight: FontWeight.w700,
-                      letterSpacing: 1.1,
-                    ).copyWith(color: Colors.white, height: 1.1),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

@@ -12,22 +12,37 @@ abstract final class AppColors {
   // ── Brand ────────────────────────────────────────────────────────────────
 
   /// Purple — primary brand, icons, links, gradient start.
-  static const Color primary = Color(0xFF5D3FD3);
+  static const Color primary = Color(0xFF630ED4);
 
   /// Deep purple — gradient end, link hover / pressed.
-  static const Color primaryDeep = Color(0xFF451EBB);
+  static const Color primaryDeep = Color(0xFF4C08A8);
 
   /// Text/icon on purple surfaces.
   static const Color onPrimary = Color(0xFFFFFFFF);
 
+  /// The hard 2px edge under a violet button (as on the Kharis website).
+  static const Color primaryEdge = Color(0xFF3D0591);
+
+  /// The hard edge under a yellow button.
+  static const Color secondaryEdge = Color(0xFFC9A50F);
+
+  /// The edge under an outlined (white) button.
+  static const Color lilacEdge = Color(0xFFB9A6E6);
+
+  /// Violet for words that carry the brand (eyebrows, the highlighted word
+  /// in a heading): the website's violet on light, lilac on dark where the
+  /// violet would be too dim to read.
+  static Color brandInk(Brightness brightness) =>
+      brightness == Brightness.light ? primary : lilacEdge;
+
   /// Stronger purple container / pills.
-  static const Color primaryContainer = Color(0xFF451EBB);
+  static const Color primaryContainer = Color(0xFF4C08A8);
 
   /// Gold — PRIMARY CTAs, active chips, EQ bars, highlights, progress.
-  static const Color secondary = Color(0xFFF8B537);
+  static const Color secondary = Color(0xFFFFDE59);
 
   /// Alias for [secondary] under the design-handoff name.
-  static const Color gold = Color(0xFFF8B537);
+  static const Color gold = Color(0xFFFFDE59);
 
   /// Text/icon on gold (secondary) surfaces.
   static const Color onSecondary = Color(0xFF1A1205);

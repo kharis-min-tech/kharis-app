@@ -40,11 +40,7 @@ Future<void> main() async {
       // over fetching), so first launch renders the same offline as online.
       // Their SIL Open Font Licenses appear in the licences page.
       LicenseRegistry.addLicense(() async* {
-        for (final family in const [
-          'bricolagegrotesque',
-          'hankengrotesk',
-          'newsreader',
-        ]) {
+        for (final family in const ['plusjakartasans', 'newsreader']) {
           yield LicenseEntryWithLineBreaks(
             ['google_fonts'],
             await rootBundle.loadString('assets/google_fonts/OFL-$family.txt'),

@@ -15,3 +15,4 @@ export 'app_spacing.dart';
 export 'app_theme.dart';
 export 'kharis_colors.dart';
 export 'app_typography.dart';
+export 'edged_border.dart';

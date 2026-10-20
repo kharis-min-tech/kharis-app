@@ -35,8 +35,9 @@ final appVersionProvider = FutureProvider<String>((ref) async {
 });
 
 /// Opens [url] in the system browser.
-Future<void> _openExternal(String url) =>
-    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+/// Opens a web page inside the app (in-app browser), never in another app.
+Future<void> _openWebPage(String url) =>
+    launchUrl(Uri.parse(url), mode: LaunchMode.inAppBrowserView);
 
 /// Pushes a full-screen page above the tab shell.
 void _pushPage(BuildContext context, Widget page) {
@@ -187,14 +188,14 @@ class SettingsScreen extends ConsumerWidget {
                     icon: Icons.help_outline,
                     label: 'Help & support',
                     external: true,
-                    onTap: () => unawaited(_openExternal(kHelpUrl)),
+                    onTap: () => unawaited(_openWebPage(kHelpUrl)),
                   ),
                   _MoreMenuItem(
                     icon: Icons.privacy_tip_outlined,
                     label: 'Privacy policy',
                     external: true,
                     isLast: true,
-                    onTap: () => unawaited(_openExternal(kPrivacyPolicyUrl)),
+                    onTap: () => unawaited(_openWebPage(kPrivacyPolicyUrl)),
                   ),
                 ],
               ),

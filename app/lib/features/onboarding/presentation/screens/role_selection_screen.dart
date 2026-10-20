@@ -97,7 +97,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                   label: 'Privacy policy',
                   onTap: () => launchUrl(
                     Uri.parse(_kPrivacyPolicyUrl),
-                    mode: LaunchMode.externalApplication,
+                    mode: LaunchMode.inAppBrowserView,
                   ),
                 ),
               ),

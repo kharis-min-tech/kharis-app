@@ -6,7 +6,6 @@ import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart' show ProcessingState;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
@@ -230,7 +229,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       if (topic.isNotEmpty && topic != 'All')
         (
           id: 'topic',
-          label: '#$topic',
+          label: topic,
           onTap: () => _exploreMessages(
             (ref) => ref.read(selectedCategoryProvider.notifier).state = topic,
           ),
@@ -734,12 +733,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         : Duration.zero;
   }
 
-  Future<void> _openInYouTube() async {
-    final url = Uri.parse(
-      'https://www.youtube.com/watch?v=${_sermon.videoId}'
-      '${_videoPosition.inSeconds > 0 ? '&t=${_videoPosition.inSeconds}s' : ''}',
-    );
-    await launchUrl(url, mode: LaunchMode.externalApplication);
+  /// Starts the video again, in the app, from where it stopped.
+  void _retryVideo() {
+    final at = _videoPosition;
+    setState(() {
+      _disposeVideoEngine();
+      _startVideoEngine(startAt: at);
+    });
   }
 
   // ── Up next / More like this ───────────────────────────────────────────────
@@ -1175,7 +1175,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             onListen: _audioTwin() == null
                 ? null
                 : () => unawaited(_switchMode(MediaMode.audio)),
-            onOpenYouTube: () => unawaited(_openInYouTube()),
+            onRetry: _retryVideo,
           );
     final pins = _notePins();
     MediaPlayerScreen.debugLastVideoPins = pins;
@@ -1358,12 +1358,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 class _VideoErrorBanner extends StatelessWidget {
   const _VideoErrorBanner({
     required this.problem,
-    required this.onOpenYouTube,
+    required this.onRetry,
     this.onListen,
   });
 
   final _VideoProblem problem;
-  final VoidCallback onOpenYouTube;
+  /// Tries the video again in the app (it never leaves for YouTube).
+  final VoidCallback onRetry;
   final VoidCallback? onListen;
 
   String get _message => switch (problem) {
@@ -1426,9 +1427,9 @@ class _VideoErrorBanner extends StatelessWidget {
                   child: Text('Listen instead', style: labelStyle),
                 ),
               TextButton(
-                onPressed: onOpenYouTube,
+                onPressed: onRetry,
                 style: buttonStyle,
-                child: Text('Open in YouTube', style: labelStyle),
+                child: Text('Try again', style: labelStyle),
               ),
             ],
           ),

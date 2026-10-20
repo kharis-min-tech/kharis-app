@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
@@ -131,23 +130,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     router.canPop() ? router.pop() : router.go('/home');
   }
 
-  Future<void> _openInBibleApp(Uri uri) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    ).catchError((Object _) => false);
-    if (opened) return;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the Bible app. Please try again.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
   Future<void> _pickChapter(BibleLocation? current) async {
     final picked = await pickBibleChapter(context, current: current);
     if (picked != null && mounted) _go(picked);
@@ -178,9 +160,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final index =
         ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
         BibleIndex.bundled();
-    final today = _todayLocation(contentAsync.valueOrNull?.reading, index);
     final browsing = _browsing;
-    final current = browsing ?? today;
     final title = browsing != null ? 'Bible' : 'Today\u2019s reading';
 
     return Scaffold(
@@ -198,22 +178,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             tooltip: 'Go to a passage',
             icon: Icon(Icons.search_rounded, color: context.kc.onBg),
             onPressed: _search,
-          ),
-          // Hands the passage to YouVersion / bible.com for people who want
-          // their own Bible app (tester feedback).
-          IconButton(
-            tooltip: 'Open in Bible app',
-            icon: Icon(Icons.open_in_new_rounded, color: context.kc.onBg),
-            onPressed: current == null
-                ? null
-                : () => unawaited(
-                    _openInBibleApp(
-                      Uri.parse(
-                        'https://www.bible.com/bible/${version.id}/'
-                        '${current.passageId}',
-                      ),
-                    ),
-                  ),
           ),
         ],
         title: Text(

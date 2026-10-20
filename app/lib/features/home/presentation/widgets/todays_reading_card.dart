@@ -98,7 +98,8 @@ class _Eyebrow extends StatelessWidget {
   }
 }
 
-/// The card's gold action pill.
+/// The card's action, as the website's yellow button: square, with a hard
+/// darker edge underneath.
 class _Pill extends StatelessWidget {
   const _Pill({required this.label, required this.icon, required this.onTap});
 
@@ -118,10 +119,10 @@ class _Pill extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: const ShapeDecoration(
               color: AppColors.secondary,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
+              shape: EdgedBorder(edge: AppColors.secondaryEdge),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
