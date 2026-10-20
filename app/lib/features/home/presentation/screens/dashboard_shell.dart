@@ -31,6 +31,9 @@ class DashboardShell extends ConsumerStatefulWidget {
   ConsumerState<DashboardShell> createState() => _DashboardShellState();
 }
 
+/// How long a scroll rests before the hidden tab bar slides back.
+const Duration kBarReturnDelay = Duration(milliseconds: 600);
+
 /// Branch index of the Giving tab (see the tab row below and app_router.dart).
 const _givingTabIndex = 2;
 
@@ -54,6 +57,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _barReturn?.cancel();
     super.dispose();
   }
 
@@ -144,10 +148,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   // member scrolls a tab's list down and returns on any scroll up, at the
   // top of the list, on a tab tap or route change, when a screen pushed over
   // the shell (the full player, a detail screen) comes or goes, when
-  // playback starts, and when the app resumes. It never needs an edge swipe
+  // playback starts, when the app resumes, and shortly after a scroll comes
+  // to rest, so it is never missing while the member reads. It never needs an edge swipe
   // to come back: that is the system home gesture.
 
   bool _barVisible = true;
+
+  /// Brings the bar back once a scroll has rested for [kBarReturnDelay].
+  Timer? _barReturn;
 
   /// Whether the shell's own route was on top at the last check; null before
   /// the first.
@@ -189,6 +197,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     if (n is UserScrollNotification) {
       // Fires as a drag starts, before the offset moves: the direction
       // decides, even at the top.
+      _barReturn?.cancel();
       switch (n.direction) {
         case ScrollDirection.reverse:
           if (metrics.maxScrollExtent > metrics.minScrollExtent) {
@@ -197,7 +206,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case ScrollDirection.forward:
           _setBarVisible(true);
         case ScrollDirection.idle:
-          break;
+          _barReturn = Timer(kBarReturnDelay, () {
+            if (mounted) _setBarVisible(true);
+          });
       }
     } else if (metrics.pixels <= metrics.minScrollExtent ||
         (metrics.maxScrollExtent > metrics.minScrollExtent &&
