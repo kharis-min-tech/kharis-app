@@ -36,17 +36,25 @@ android {
         versionName = flutter.versionName
     }
 
-     signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as String
+    // Release signing needs android/key.properties (kept out of git). Without
+    // it, debug builds still work: a fresh clone, CI without secrets, a test
+    // worktree. Release builds with the file are signed as before.
+    val hasReleaseKeys = keystorePropertiesFile.exists()
+    signingConfigs {
+        if (hasReleaseKeys) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+                storePassword = keystoreProperties["storePassword"] as String
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (hasReleaseKeys) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }
