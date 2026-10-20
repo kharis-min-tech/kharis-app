@@ -192,6 +192,31 @@ void main() {
     expect(greeting.top, greaterThanOrEqualTo(media.bottom - 0.5));
   });
 
+  testWidgets('scrolling fades the video in step with it leaving: half '
+      'way it is still half visible, no dead band (tester report)', (
+    tester,
+  ) async {
+    await _pumpHome(tester);
+    final media = homeHeroMediaHeight(const Size(400, 900));
+    double wash() {
+      final boxes = tester
+          .widgetList<ColoredBox>(
+            find.descendant(
+              of: find.byKey(const Key('home-hero')),
+              matching: find.byType(ColoredBox),
+            ),
+          )
+          .map((b) => b.color.a)
+          .where((a) => a > 0 && a < 1)
+          .toList();
+      return boxes.isEmpty ? 0 : boxes.first;
+    }
+
+    _homeScroll(tester).jumpTo(media / 2);
+    await tester.pump();
+    expect(wash(), closeTo(0.5, 0.05));
+  });
+
   testWidgets('status bar: light icons and no backing over the hero; a '
       'solid backing and theme icons once scrolled past', (tester) async {
     await _pumpHome(tester);

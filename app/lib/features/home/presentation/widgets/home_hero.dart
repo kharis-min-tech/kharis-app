@@ -154,8 +154,8 @@ const Color _kBackdrop = AppColors.surfaceDark;
 
 /// Height of the hero: 62% of the screen (clamped for landscape phones and
 /// tablets), so the greeting and Today show on the first screen. The media
-/// fills the width at its own shape from the top; its lower part fades into
-/// the page, as on the Kharis website.
+/// fills the width at its own shape from the top, with a clean edge; it
+/// fades into the page only as the member scrolls ([_ScrollFade]).
 double homeHeroMediaHeight(Size screen) =>
     (screen.height * 0.62).clamp(260.0, 600.0);
 
@@ -314,52 +314,50 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
               scroll: widget.scroll,
               distance: mediaHeight,
               background: bg,
-              child: ColoredBox(
-                color: _kBackdrop,
-                child: NotificationListener<ScrollStartNotification>(
-                  onNotification: _onPagerScroll,
-                  child: PageView.builder(
-                    key: const Key('home-hero-pager'),
-                    controller: _pages,
-                    itemCount: slides.length,
-                    onPageChanged: (i) {
-                      setState(() {
-                        _index = i;
-                        _videoPlaying = false;
-                      });
-                      _scheduleAdvance();
-                    },
-                    itemBuilder: (context, i) => _SlideMedia(
-                      key: ValueKey('home-hero-slide-${slides[i].id}'),
-                      slide: slides[i],
-                      topInset: padding.top + kHeroTopBarExtent,
-                      bottomInset: 0,
-                      active: canPlay && i == _index,
-                      onPlayingChanged: (playing) => _videoPlaying = playing,
-                      onOpen: () => _openSlide(context, ref, slides[i]),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(
+                    color: _kBackdrop,
+                    child: NotificationListener<ScrollStartNotification>(
+                      onNotification: _onPagerScroll,
+                      child: PageView.builder(
+                        key: const Key('home-hero-pager'),
+                        controller: _pages,
+                        itemCount: slides.length,
+                        onPageChanged: (i) {
+                          setState(() {
+                            _index = i;
+                            _videoPlaying = false;
+                          });
+                          _scheduleAdvance();
+                        },
+                        itemBuilder: (context, i) => _SlideMedia(
+                          key: ValueKey('home-hero-slide-${slides[i].id}'),
+                          slide: slides[i],
+                          topInset: padding.top + kHeroTopBarExtent,
+                          bottomInset: 0,
+                          active: canPlay && i == _index,
+                          onPlayingChanged: (playing) =>
+                              _videoPlaying = playing,
+                          onOpen: () => _openSlide(context, ref, slides[i]),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
-          ),
-          // The media melts into the page where the content begins.
-          Positioned(
-            left: 0,
-            right: 0,
-            top: mediaHeight * 0.55,
-            height: mediaHeight * 0.45,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                key: const Key('home-hero-fade'),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [bg.withValues(alpha: 0), bg],
-                    stops: const [0, 0.78],
-                  ),
-                ),
+                  // The dots fade with the video they belong to.
+                  if (slides.length > 1)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 14,
+                      child: _HeroDots(
+                        count: slides.length,
+                        index: _index,
+                        animate: !_reduceMotion,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -369,17 +367,6 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
             right: 20,
             child: widget.topBar,
           ),
-          if (slides.length > 1)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 14,
-              child: _HeroDots(
-                count: slides.length,
-                index: _index,
-                animate: !_reduceMotion,
-              ),
-            ),
         ],
       ),
     );
@@ -416,11 +403,9 @@ class _ScrollFade extends StatelessWidget {
         final offset = scroll.hasClients
             ? scroll.offset.clamp(0.0, distance)
             : 0.0;
-        // Reaches the page colour by 60% of the way, so no dim band of
-        // video lingers behind the content.
-        final t = distance <= 0
-            ? 0.0
-            : (offset / (distance * 0.6)).clamp(0.0, 1.0);
+        // Fades in step with the hero leaving the screen, reaching the page
+        // colour only as it goes, so no dead band is left behind.
+        final t = distance <= 0 ? 0.0 : offset / distance;
         return Transform.translate(
           offset: Offset(0, offset * 0.4),
           child: Stack(
@@ -901,9 +886,14 @@ try {
   }
 }
 
-/// Lays out the hero's clip: a vertical Short at the full width from the
-/// top (taller than the hero; the hero clips it), a landscape clip fitted
-/// whole and centred.
+/// How far a vertical Short sits above the hero's top edge: the height of
+/// YouTube's own Shorts bar (wordmark, mute and menu icons), which is
+/// player chrome rather than Kharis content and is clipped away.
+const double kHeroShortChromeInset = 56;
+
+/// Lays out the hero's clip: a vertical Short at the full width, raised by
+/// [kHeroShortChromeInset] (taller than the hero; the hero clips it), a
+/// landscape clip fitted whole and centred.
 class _FrameLayout extends StatelessWidget {
   const _FrameLayout({
     required this.vertical,
@@ -936,7 +926,10 @@ class _FrameLayout extends StatelessWidget {
             maxWidth: box.maxWidth,
             minHeight: height,
             maxHeight: height,
-            child: frame,
+            child: Transform.translate(
+              offset: const Offset(0, -kHeroShortChromeInset),
+              child: frame,
+            ),
           ),
         );
       },

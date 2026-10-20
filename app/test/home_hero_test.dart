@@ -320,8 +320,10 @@ void main() {
       },
     );
 
-    testWidgets('a Short fills the hero\'s width from the top, upright, '
-        'and stays inside the hero', (tester) async {
+    testWidgets('a Short fills the hero\'s width, upright, with YouTube\'s '
+        'Shorts bar raised out of view, and stays inside the hero', (
+      tester,
+    ) async {
       await _pumpHero(tester, SupabaseStub(stub), shorts: [short]);
       final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
       final frame = tester.getRect(
@@ -329,7 +331,8 @@ void main() {
       );
       expect(frame.width / frame.height, closeTo(9 / 16, 0.01));
       expect(frame.width, closeTo(media.width, 0.5));
-      expect(frame.top, closeTo(media.top, 0.5));
+      // Raised so YouTube's own Shorts bar sits above the hero, clipped.
+      expect(frame.top, closeTo(media.top - kHeroShortChromeInset, 0.5));
       // The clip is a native view: the hero clips it so it can never paint
       // over the content below.
       final hero = tester.getRect(find.byKey(const Key('home-hero')));
