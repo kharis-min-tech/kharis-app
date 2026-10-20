@@ -152,10 +152,14 @@ Future<void> branchSwitchJourney(Journey j) async {
   // Events tab: branch chip -> All branches, a browse filter only.
   await tapNav(t, 'Events');
   await pumpUntilFound(t, find.byType(CalendarScreen));
-  final chip = find.descendant(
-    of: find.byType(CalendarScreen),
-    matching: find.text('YOUR BRANCH'),
-  );
+  // The branch chip at the top (a quiet week also shows the branch's
+  // timetable card further down).
+  final chip = find
+      .descendant(
+        of: find.byType(CalendarScreen),
+        matching: find.text('YOUR BRANCH'),
+      )
+      .first;
   await pumpUntilFound(t, chip);
   j.check(
     find
