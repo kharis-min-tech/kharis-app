@@ -82,20 +82,20 @@ class ReadingScreen extends ConsumerStatefulWidget {
   ConsumerState<ReadingScreen> createState() => _ReadingScreenState();
 }
 
-/// Where today's reading opens: its reference as a place in [index], or
-/// `null` when it has none or it does not parse.
-BibleLocation? _todayLocation(DailyEntry? reading, BibleIndex index) {
+/// The passages today's reading names, in order ("Romans 8:1-11; Psalm 23"
+/// is two); empty when it has none or none parse.
+List<BibleLocation> _todayLocations(DailyEntry? reading, BibleIndex index) {
   final reference = reading?.reference ?? '';
-  if (reference.isEmpty) return null;
-  return switch (parseBibleReference(reference, index)) {
-    ReferenceFound(:final location) => location,
-    ReferenceError() => null,
-  };
+  if (reference.isEmpty) return const [];
+  return parseReadingReferences(reference, index);
 }
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   /// The chapter being browsed; null while on today's reading.
   BibleLocation? _browsing;
+
+  /// Which of today's passages is open, when the reading names several.
+  int _todayPart = 0;
 
   /// Showing the book list as the reader's first screen, before any chapter
   /// was chosen ([ReadingScreen.browse]).
@@ -104,9 +104,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   BibleIndex _index(int bibleId) =>
       ref.read(bibleIndexProvider(bibleId)).valueOrNull ?? BibleIndex.bundled();
 
-  BibleLocation? get _today => _todayLocation(
-    ref.read(dailyContentProvider).valueOrNull?.reading,
-    _index(ref.read(selectedBibleProvider).id),
+  BibleLocation? _todayOf(List<BibleLocation> parts) =>
+      parts.isEmpty ? null : parts[_todayPart.clamp(0, parts.length - 1)];
+
+  BibleLocation? get _today => _todayOf(
+    _todayLocations(
+      ref.read(dailyContentProvider).valueOrNull?.reading,
+      _index(ref.read(selectedBibleProvider).id),
+    ),
   );
 
   void _go(BibleLocation to) {
@@ -160,6 +165,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final index =
         ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
         BibleIndex.bundled();
+    final todayParts = _todayLocations(
+      contentAsync.valueOrNull?.reading,
+      index,
+    );
+    final today = _todayOf(todayParts);
     final browsing = _browsing;
     final title = browsing != null ? 'Bible' : 'Today\u2019s reading';
 
@@ -222,7 +232,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                     onAction: () => _pickChapter(null),
                   );
                 }
-                final location = _todayLocation(reading, index);
+                final location = today;
                 if (location == null) {
                   // No reference to open (or one that does not parse): the
                   // Studio's own words, and the way into the Bible.
@@ -232,14 +242,27 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                     onBrowse: () => _pickChapter(null),
                   );
                 }
-                return _PassageView(
-                  key: const ValueKey('today'),
+                final passage = _PassageView(
+                  key: ValueKey('today-${location.passageId}'),
                   location: location,
                   isToday: true,
                   onNavigate: _go,
                   onPickChapter: () => _pickChapter(location.wholeChapter),
                   reading: reading,
                   prayer: content.prayer,
+                );
+                if (todayParts.length < 2) return passage;
+                // Several passages today: a row to switch between them,
+                // each opening its whole chapter with its verses marked.
+                return Column(
+                  children: [
+                    _TodayParts(
+                      labels: [for (final p in todayParts) index.label(p)],
+                      selected: _todayPart.clamp(0, todayParts.length - 1),
+                      onSelected: (i) => setState(() => _todayPart = i),
+                    ),
+                    Expanded(child: passage),
+                  ],
                 );
               },
             ),
@@ -987,6 +1010,7 @@ class _PassageBody extends StatelessWidget {
 
     // Text before a block's first verse label continues the previous verse.
     int? verse;
+    var noteCount = 0;
     final children = <Widget>[];
     for (final block in blocks) {
       if (block.isHeading) {
@@ -1042,9 +1066,24 @@ class _PassageBody extends StatelessWidget {
         }
         if (seg.text.isNotEmpty) {
           spans.add(
-            TextSpan(text: '${seg.text} ', style: lit(verse) ? litStyle : null),
+            TextSpan(
+              text: seg.notes.isEmpty ? '${seg.text} ' : seg.text,
+              style: lit(verse) ? litStyle : null,
+            ),
           );
         }
+        // The translation's own footnotes, from the Bible API: a small
+        // lettered marker that opens the note.
+        for (final note in seg.notes) {
+          final letter = _noteLetter(noteCount++);
+          spans.add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.top,
+              child: _NoteMarker(letter: letter, note: note),
+            ),
+          );
+        }
+        if (seg.notes.isNotEmpty) spans.add(const TextSpan(text: ' '));
       }
       final paragraph = Padding(
         padding: EdgeInsets.only(
@@ -1317,6 +1356,143 @@ class _ErrorView extends StatelessWidget {
                 child: Text(actionLabel, style: buttonStyle),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's passages when the reading names more than one: a row of
+/// references, the open one filled, each opening its whole chapter.
+class _TodayParts extends StatelessWidget {
+  const _TodayParts({
+    required this.labels,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        key: const Key('reading-parts'),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
+        itemCount: labels.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final on = i == selected;
+          return Semantics(
+            button: true,
+            selected: on,
+            child: Material(
+              key: Key('reading-part-$i'),
+              color: on ? kc.accent : kc.surfaceAlt,
+              shape: const StadiumBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => onSelected(i),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Center(
+                      widthFactor: 1,
+                      child: Text(
+                        labels[i],
+                        style: AppTypography.labelMd.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: on ? kc.onAccent : kc.onBg,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Footnote letters through a chapter: a…z, then aa, ab…
+String _noteLetter(int i) => i < 26
+    ? String.fromCharCode(97 + i)
+    : '${_noteLetter(i ~/ 26 - 1)}${_noteLetter(i % 26)}';
+
+/// A translation footnote in the text: a small letter that opens the note.
+class _NoteMarker extends StatelessWidget {
+  const _NoteMarker({required this.letter, required this.note});
+
+  final String letter;
+  final String note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Footnote $letter',
+      child: GestureDetector(
+        key: Key('bible-note-$letter'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          backgroundColor: context.kc.surface,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppRadius.card),
+            ),
+          ),
+          builder: (sheetContext) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'FOOTNOTE $letter'.toUpperCase(),
+                    style: AppTypography.ui(
+                      size: 11,
+                      weight: FontWeight.w700,
+                      letterSpacing: 11 * 0.09,
+                      color: sheetContext.kc.accentInk,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    note,
+                    key: const Key('bible-note-text'),
+                    style: AppTypography.serif(
+                      size: 17,
+                      height: 1.55,
+                      color: _scriptureInk(sheetContext),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Padding widens the tap target around the small letter.
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 6, 8),
+          child: Text(
+            letter,
+            style: AppTypography.ui(
+              size: 11,
+              weight: FontWeight.w700,
+              color: _verseAccent(context),
+            ),
+          ),
         ),
       ),
     );

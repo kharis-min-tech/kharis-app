@@ -114,6 +114,7 @@ class _FakeBibleRepository extends BibleRepository {
               PassageSegment(
                 verse: v,
                 text: 'Verse $v of $usfmId in $abbreviation.',
+                notes: v == 1 ? const ['Or in the beginning'] : const [],
               ),
           ],
         ),
@@ -517,7 +518,52 @@ void main() {
     });
   });
 
+  group('reading references', () {
+    final index = BibleIndex.bundled();
+
+    test('a reading can name several passages; bare numbers keep the book', () {
+      final parts = parseReadingReferences(
+        'Romans 8:1-11; 9:1-5 and Psalm 23\nJohn 3',
+        index,
+      );
+      expect(
+        [for (final p in parts) index.label(p)],
+        ['Romans 8:1-11', 'Romans 9:1-5', 'Psalms 23', 'John 3'],
+      );
+      expect(
+        parseReadingReferences('Not a reference; also not', index),
+        isEmpty,
+      );
+    });
+  });
+
   group('reader', () {
+    testWidgets('a translation footnote opens from its marker', (tester) async {
+      await _pumpReader(tester);
+      await tester.tap(find.byKey(const Key('bible-note-a')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bible-note-text')), findsOneWidget);
+      expect(find.text('Or in the beginning'), findsOneWidget);
+    });
+
+    testWidgets('a reading with several passages offers each, opening its '
+        'whole chapter', (tester) async {
+      final (repo, _) = await _pumpReader(
+        tester,
+        today: const DailyContent(
+          reading: DailyEntry(
+            title: 'Two passages',
+            reference: 'Romans 8:1-11; Psalm 23',
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('reading-parts')), findsOneWidget);
+      expect(repo.passageRequests.last, endsWith('/ROM.8'));
+      await tester.tap(find.byKey(const Key('reading-part-1')));
+      await tester.pumpAndSettle();
+      expect(repo.passageRequests.last, endsWith('/PSA.23'));
+    });
+
     testWidgets('opens on today\u2019s reading', (tester) async {
       final (repo, _) = await _pumpReader(tester);
 
@@ -743,7 +789,7 @@ void main() {
         today: const DailyContent(
           reading: DailyEntry(
             title: 'Faith at work',
-            reference: 'Hebrews 11 and James 2',
+            reference: 'The Sermon on the Mount',
           ),
         ),
       );

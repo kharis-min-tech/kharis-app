@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -245,5 +246,30 @@ void main() {
 
     await scrollList(tester, -400);
     expect(barOffset(tester), Offset.zero);
+  });
+
+  testWidgets('hidden, it leaves nothing over the list: the home-indicator '
+      'band shows and touches the rows beneath (tester: "black box" over '
+      'More)', (tester) async {
+    tester.view.padding = const FakeViewPadding(bottom: 34 * 3);
+    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = const Size(400 * 3, 800 * 3);
+    addTearDown(tester.view.reset);
+    await launch(tester);
+    await scrollList(tester, -400);
+    expect(barOffset(tester), const Offset(0, 1));
+
+    // A point inside the home-indicator band, at the screen's bottom edge.
+    final result = HitTestResult();
+    WidgetsBinding.instance.hitTestInView(
+      result,
+      const Offset(200, 800 - 12),
+      tester.view.viewId,
+    );
+    expect(
+      result.path.any((e) => e.target is RenderParagraph),
+      isTrue,
+      reason: 'the list row under the band receives the touch',
+    );
   });
 }
