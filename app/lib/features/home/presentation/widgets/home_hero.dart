@@ -14,9 +14,9 @@ import 'package:kharis_app/features/home/data/featured_video_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
-import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/sound_focus_provider.dart';
 
 import 'announcement_detail.dart';
 import '../screens/clip_player_screen.dart';
@@ -581,6 +581,16 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
   /// past the pause glyph YouTube flashes as playback begins.
   Timer? _reveal;
 
+  /// This clip's identity in [soundFocusProvider] while it has sound.
+  final Object _soundOwner = Object();
+  late final SoundFocus _focus;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus = ref.read(soundFocusProvider.notifier);
+  }
+
   @override
   void didUpdateWidget(_VideoMedia oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -590,12 +600,22 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
       _reveal?.cancel();
       _playing = false;
       _muted = true;
+      _releaseSound();
     }
+  }
+
+  /// Gives the sound back after the current frame: a provider may not
+  /// change while widgets are building or being torn down.
+  void _releaseSound() {
+    final focus = _focus;
+    final owner = _soundOwner;
+    scheduleMicrotask(() => focus.release(owner));
   }
 
   @override
   void dispose() {
     _reveal?.cancel();
+    _releaseSound();
     super.dispose();
   }
 
@@ -613,17 +633,25 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
     });
   }
 
+  /// Unmuting takes the app's one sound (anything else playing pauses);
+  /// muting gives it back. The silent preview never holds it.
   void _toggleMute() {
     if (_muted) {
-      // One sound at a time: a message playing in the app pauses first.
-      final audio = ref.read(audioPlayerServiceProvider);
-      if (audio.currentSermon != null) unawaited(audio.pause());
+      _focus.claim(_soundOwner);
+    } else {
+      _focus.release(_soundOwner);
     }
     setState(() => _muted = !_muted);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Something else took the sound (a message, a clip): back to silent.
+    ref.listen(soundFocusProvider, (_, owner) {
+      if (!_muted && owner != null && owner != _soundOwner) {
+        setState(() => _muted = true);
+      }
+    });
     final surface = widget.active ? ref.watch(heroVideoSurfaceProvider) : null;
     final ratio = widget.video.vertical ? 9 / 16 : 16 / 9;
     return Stack(

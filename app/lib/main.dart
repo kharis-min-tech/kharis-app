@@ -24,6 +24,7 @@ import 'shared/providers/cache_provider.dart';
 import 'shared/providers/sermon_provider.dart';
 import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
+import 'shared/providers/sound_focus_provider.dart';
 
 Future<void> main() async {
   // Catch all errors in release mode
@@ -139,6 +140,8 @@ class KharisApp extends ConsumerWidget {
     // never signs in) so per-user data — playlists, notes — has somewhere to
     // live even on the login-free onboarding path.
     ref.watch(anonymousSignInProvider);
+    // One sound at a time: message audio yields to any other player.
+    ref.watch(audioSoundFocusProvider);
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       builder: (BuildContext context, child) => MaterialApp.router(

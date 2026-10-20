@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart' show PlayerState, ProcessingState;
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/home/data/featured_video_repository.dart';
@@ -11,6 +12,7 @@ import 'package:kharis_app/shared/providers/content_api_provider.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/sound_focus_provider.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/supabase_stub.dart';
@@ -129,6 +131,8 @@ class _Host extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // As the app root does: message audio yields to any other sound.
+    ref.watch(audioSoundFocusProvider);
     final slides = ref.watch(homeHeroSlidesProvider);
     if (slides.isEmpty) return const Text('no hero');
     return SingleChildScrollView(
@@ -450,6 +454,20 @@ void main() {
       await tester.tap(find.byKey(const Key('home-hero-mute')));
       await tester.pump();
       expect(audio.pauseCalls, 1);
+    });
+
+    testWidgets('a message starting re-mutes the Home video', (tester) async {
+      final audio = FakeAudioPlayerService()..current = _latest;
+      await _pumpHero(tester, SupabaseStub(withVideo), audio: audio);
+
+      await tester.tap(find.byKey(const Key('home-hero-mute')));
+      await tester.pump();
+      expect(_clip(muted: false), findsOneWidget);
+
+      audio.playerStates.add(PlayerState(true, ProcessingState.ready));
+      await tester.pump();
+      await tester.pump();
+      expect(_clip(muted: true), findsOneWidget);
     });
 
     testWidgets('nothing playing in the app: unmuting pauses nothing', (

@@ -32,6 +32,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/sound_focus_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 export 'package:kharis_app/features/player/presentation/media_mode.dart';
@@ -170,6 +171,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   final ScrollController _scroll = ScrollController();
 
+  /// The message video's identity in [soundFocusProvider] while it plays.
+  final Object _videoSoundOwner = Object();
+  late final SoundFocus _soundFocus;
+
   /// The audio transport and the scroll viewport, to tell when the
   /// transport has scrolled out of view ([_compact]).
   final _transportKey = GlobalKey();
@@ -241,6 +246,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   void initState() {
     super.initState();
     _history = ref.read(playbackHistoryProvider);
+    _soundFocus = ref.read(soundFocusProvider.notifier);
     _audio = ref.read(audioPlayerServiceProvider);
     _sermon = widget.sermon;
     _scroll.addListener(_onPlayerScroll);
@@ -276,6 +282,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     // Audio deliberately keeps playing on close — the mini player takes over.
     if (_mode == MediaMode.video) _saveVideoPosition();
     _disposeVideoEngine();
+    final focus = _soundFocus;
+    final owner = _videoSoundOwner;
+    scheduleMicrotask(() => focus.release(owner));
     _scroll.dispose();
     super.dispose();
   }
@@ -448,6 +457,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   void _onVideoValue(YoutubePlayerValue value) {
     _syncWakelock(value);
+    // The video holds the app's one sound while it plays.
+    if (value.playerState == PlayerState.playing) {
+      _soundFocus.claim(_videoSoundOwner);
+    } else if (value.playerState == PlayerState.paused ||
+        value.playerState == PlayerState.ended) {
+      _soundFocus.release(_videoSoundOwner);
+    }
     if (value.hasError) {
       _videoWatchdog?.cancel();
       final problem = switch (value.error) {
@@ -840,6 +856,15 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       playbackQueueProvider,
       (_, next) => _followAudioQueue(next.valueOrNull),
     );
+    // Something else took the sound (a clip, the Home video unmuted, audio
+    // resumed from the lock screen): the message video pauses.
+    ref.listen(soundFocusProvider, (_, owner) {
+      if (owner != null &&
+          owner != _videoSoundOwner &&
+          _mode == MediaMode.video) {
+        unawaited(_youtubeController?.pauseVideo());
+      }
+    });
     final isVideo = _mode == MediaMode.video;
     if (isVideo && !_sermon.hasAudio) {
       // A video-only variant finds its audio twin, and the videoStart it
