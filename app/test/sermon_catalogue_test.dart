@@ -303,31 +303,6 @@ void main() {
         isTrue,
       );
     });
-
-    test('a message titled exactly as the search leads; the rest stay '
-        'newest first', () async {
-      final c = await library([
-        testSermon(
-          'new',
-          title: 'Keep Your Garments Pure',
-          series: 'Learn Christ',
-          publishedAt: DateTime(2026, 6),
-        ),
-        testSermon(
-          'mid',
-          title: 'Future-Proofing',
-          description: 'We learn christ together',
-          publishedAt: DateTime(2026, 3),
-        ),
-        testSermon('old', title: 'Learn Christ', publishedAt: DateTime(2019)),
-      ]);
-      c.read(sermonSearchProvider.notifier).state = '  learn   CHRIST ';
-      expect(c.read(searchResultsProvider).map((s) => s.id), [
-        'old',
-        'new',
-        'mid',
-      ]);
-    });
   });
 
   group('recent searches', () {

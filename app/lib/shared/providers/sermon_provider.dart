@@ -1279,9 +1279,7 @@ final remoteSearchProvider =
     );
 
 /// Search results: library matches for [sermonMatchesQuery] merged with the
-/// server's hits, newest first, except that a message whose title is exactly
-/// the query (ignoring case and spacing) leads: searching a title finds it.
-/// Empty when no query is active.
+/// server's hits, newest first. Empty when no query is active.
 final searchResultsProvider = Provider<List<Sermon>>((ref) {
   final query = ref.watch(sermonSearchProvider).trim();
   if (query.isEmpty) return const [];
@@ -1292,16 +1290,10 @@ final searchResultsProvider = Provider<List<Sermon>>((ref) {
   ];
   final remote = ref.watch(remoteSearchProvider).results;
   final seenIds = {for (final s in local) s.id};
-  String norm(String t) => t.toLowerCase().split(RegExp(r'\s+')).join(' ');
-  final wanted = norm(query);
-  bool exact(Sermon s) => norm(s.title.trim()) == wanted;
-  return [...local, ...remote.where((s) => seenIds.add(s.id))]..sort((a, b) {
-    final lead = (exact(a) ? 0 : 1) - (exact(b) ? 0 : 1);
-    if (lead != 0) return lead;
-    return (b.publishedAt ?? DateTime(0)).compareTo(
-      a.publishedAt ?? DateTime(0),
-    );
-  });
+  return [...local, ...remote.where((s) => seenIds.add(s.id))]..sort(
+    (a, b) =>
+        (b.publishedAt ?? DateTime(0)).compareTo(a.publishedAt ?? DateTime(0)),
+  );
 });
 
 /// Search is still producing results: the debounce or the server's first

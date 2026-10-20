@@ -56,8 +56,21 @@ Future<void> playlistsJourney(Journey j) async {
   j.check(await waitArchiveHydrated(j), 'archive loaded');
 
   // Three messages, distinct artwork where the library has it.
-  final pool = j.c.read(sermonLibraryProvider).sermons.take(300).toList()
-    ..shuffle(r);
+  // Only messages search finds under the same id: the archive and the
+  // search source can carry one message under different ids.
+  final searchable = {
+    for (final s in j.c.read(sermonsProvider).valueOrNull ?? const <Sermon>[])
+      s.id,
+  };
+  final pool =
+      j.c
+          .read(sermonLibraryProvider)
+          .sermons
+          .take(300)
+          .where((s) => searchable.contains(s.id))
+          .toList()
+        ..shuffle(r);
+  j.check(pool.length >= 3, 'at least 3 searchable messages (${pool.length})');
   final chosen = <Sermon>[];
   final arts = <String>{};
   for (final s in pool) {
