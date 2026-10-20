@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
+import 'package:kharis_app/features/home/presentation/screens/branch_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/upcoming_events_strip.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/branch_selection_screen.dart';
@@ -69,48 +70,52 @@ Future<void> branchSwitchJourney(Journey j) async {
   );
   await j.shot('more-after-switch');
 
-  // Home: Your branch card with the branch's Studio services.
+  // Home: the Next service card; its Full timetable opens the Branch page
+  // with every Studio service, the branch named once (in the app bar).
   await tapNav(t, 'Home');
-  final card = find.byKey(const Key('campus-card'));
-  await scrollUntilFound(t, card, scrollable: _homeScroll);
-  j.check(
-    find
-        .descendant(of: card, matching: find.text(to.name))
-        .evaluate()
-        .isNotEmpty,
-    'Your branch card names "${to.name}"',
-  );
+  final card = find.byKey(const Key('home-next-service'));
   if (to.services.isEmpty) {
     j.note('DATA: "${to.name}" has no active services in the Studio');
+    await pumpFor(t, const Duration(seconds: 2));
+    j.check(card.evaluate().isEmpty, 'no Next service card without services');
+  } else {
+    await scrollUntilFound(t, card, scrollable: _homeScroll);
+    await j.shot('home-next-service');
+    final timetable = find.descendant(
+      of: card,
+      matching: find.byKey(const Key('next-service-timetable')),
+    );
+    await ensureCentred(t, timetable);
+    await t.tap(timetable, warnIfMissed: false);
+    final page = find.byType(BranchScreen);
+    await pumpUntilFound(t, page);
+    await pumpFor(t, const Duration(milliseconds: 800));
     j.check(
       find
-          .descendant(
-            of: card,
-            matching: find.byWidgetPredicate(
-              (w) =>
-                  w.key is ValueKey<String> &&
-                  (w.key! as ValueKey<String>).value.startsWith(
-                    'campus-service-',
-                  ),
-            ),
-          )
-          .evaluate()
-          .isEmpty,
-      'no service rows for a branch without services',
+              .descendant(of: page, matching: find.text(to.name))
+              .evaluate()
+              .length ==
+          1,
+      'the Branch page names "${to.name}" once',
     );
+    final scroll = find
+        .descendant(of: page, matching: find.byType(Scrollable))
+        .first;
+    for (final s in to.services) {
+      final row = find.byKey(Key('campus-service-${s['id']}'));
+      await scrollUntilFound(t, row, scrollable: scroll);
+      final texts = paintedTexts(within: row);
+      final when = serviceWhen(s);
+      j.check(
+        texts.contains('${s['name']}'.trim()) &&
+            (when == null || texts.contains(when)),
+        'service "${s['name']}" shows "$when" (painted $texts)',
+      );
+    }
+    await j.shot('branch-timetable');
+    await tapBack(t);
+    await pumpUntilFound(t, find.byType(HomeScreen));
   }
-  for (final s in to.services) {
-    final row = find.byKey(Key('campus-service-${s['id']}'));
-    await scrollUntilFound(t, row, scrollable: _homeScroll);
-    final texts = paintedTexts(within: row);
-    final when = serviceWhen(s);
-    j.check(
-      texts.contains('${s['name']}'.trim()) &&
-          (when == null || texts.contains(when)),
-      'service "${s['name']}" shows "$when" (painted $texts)',
-    );
-  }
-  await j.shot('home-your-branch');
 
   // Announcements scoped to the branch.
   await _checkAnnouncements(j, news, to.name);
