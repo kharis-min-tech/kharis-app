@@ -110,7 +110,7 @@ shot() {
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 ALL=(onboarding branch_switch events messages player playlists bible giving
-  forms deep_links display account more_menu notifications)
+  forms deep_links display account more_menu notifications media_focus)
 [ ${#JOURNEYS[@]} -gt 0 ] && ALL=("${JOURNEYS[@]}")
 
 # One process per batch. A journey that trips a framework invariant (e.g. a

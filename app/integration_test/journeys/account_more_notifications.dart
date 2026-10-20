@@ -198,8 +198,8 @@ Future<void> accountJourney(Journey j) async {
 
 // ── (m) More menu ────────────────────────────────────────────────────────────
 
-/// (m) Every More row opens its destination and comes back; external rows
-/// hand their URL to the browser (external mode); the version is pubspec's.
+/// (m) Every More row opens its destination and comes back; web rows
+/// open their page in the in-app browser; the version is pubspec's.
 Future<void> moreMenuJourney(Journey j) async {
   final t = j.tester;
   await j.launch();
@@ -292,8 +292,8 @@ Future<void> moreMenuJourney(Journey j) async {
     j.check(
       launches.length == 1 &&
           launches.single.url == url &&
-          launches.single.external,
-      '"$label" hands $url to the external browser (got $launches)',
+          !launches.single.external,
+      '"$label" opens $url inside the app (got $launches)',
     );
     j.check(
       find.byType(SettingsScreen).evaluate().isNotEmpty,
