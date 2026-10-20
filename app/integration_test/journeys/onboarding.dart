@@ -18,7 +18,6 @@ import '../support/live_data.dart';
 const _roles = {
   'Member': 'member',
   'New here': 'new_here',
-  'Visitor': 'visitor',
   'Partner': 'partner',
 };
 
