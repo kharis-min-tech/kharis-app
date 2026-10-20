@@ -40,6 +40,7 @@ class _ClipPlayerScreenState extends ConsumerState<ClipPlayerScreen> {
         autoPlay: true,
         params: const YoutubePlayerParams(
           showFullscreenButton: false,
+          enableCaption: false,
           strictRelatedVideos: true,
           showVideoAnnotations: false,
           playsInline: true,
@@ -80,32 +81,38 @@ class _ClipPlayerScreenState extends ConsumerState<ClipPlayerScreen> {
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: Colors.black,
+        // The close bar sits above the clip, never over it: the clip is a
+        // native view that would cover anything drawn on top of it.
         body: SafeArea(
-          child: Stack(
+          child: Column(
             children: [
-              Center(
-                child: AspectRatio(
-                  key: const Key('clip-player-frame'),
-                  aspectRatio: vertical ? 9 / 16 : 16 / 9,
-                  child: YoutubePlayer(
-                    controller: _controller,
-                    aspectRatio: vertical ? 9 / 16 : 16 / 9,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                  child: IconButton(
+                    key: const Key('clip-player-close'),
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    color: Colors.white,
+                    iconSize: 28,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                    ),
+                    icon: const Icon(Icons.close_rounded),
                   ),
                 ),
               ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: IconButton(
-                  key: const Key('clip-player-close'),
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black.withValues(alpha: 0.55),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(44, 44),
+              Expanded(
+                child: Center(
+                  child: AspectRatio(
+                    key: const Key('clip-player-frame'),
+                    aspectRatio: vertical ? 9 / 16 : 16 / 9,
+                    child: YoutubePlayer(
+                      controller: _controller,
+                      aspectRatio: vertical ? 9 / 16 : 16 / 9,
+                    ),
                   ),
-                  icon: const Icon(Icons.close_rounded),
                 ),
               ),
             ],

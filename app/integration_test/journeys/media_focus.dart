@@ -78,7 +78,17 @@ Future<void> mediaFocusJourney(Journey j) async {
     await pumpUntil(t, audioPlaying, timeout: const Duration(seconds: 20)),
     'the message resumes',
   );
+  // The hero may have moved on to an event flyer (it advances while a clip
+  // is not playing): swipe back to a video slide, which has the mute chip.
   final mute = find.byKey(const Key('home-hero-mute'));
+  for (var i = 0; i < 6 && mute.evaluate().isEmpty; i++) {
+    await t.drag(
+      find.byKey(const Key('home-hero-pager')),
+      const Offset(400, 0),
+      warnIfMissed: false,
+    );
+    await pumpFor(t, const Duration(seconds: 3));
+  }
   if (await pumpUntil(
     t,
     () => mute.evaluate().isNotEmpty,
