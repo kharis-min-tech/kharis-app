@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -153,21 +152,12 @@ final heroVideoSurfaceProvider = Provider<HeroVideoSurfaceBuilder?>(
 /// cropped, and the status bar's light icons stay legible over it.
 const Color _kBackdrop = AppColors.surfaceDark;
 
-/// Height of the hero's media: full width at the clip's own shape for a
-/// vertical Short (up to 78% of the screen), else 62% of the screen. Its
-/// lower part fades into the page and Home's content rises over it
-/// ([kHeroContentOverlap]), as on the Kharis website.
-double homeHeroMediaHeight(Size screen, {bool vertical = false}) => vertical
-    ? math.min(screen.width * 16 / 9, screen.height * 0.78)
-    : (screen.height * 0.62).clamp(260.0, 600.0);
-
-/// How far Home's content rises over the faded bottom of the media, so the
-/// greeting and Today show without a long scroll.
-const double kHeroContentOverlap = 120;
-
-/// Whether any of [slides] is a vertical Short (the hero then grows).
-bool heroHasVertical(List<HeroSlide> slides) =>
-    slides.any((s) => s is VideoHeroSlide && s.video.vertical);
+/// Height of the hero: 62% of the screen (clamped for landscape phones and
+/// tablets), so the greeting and Today show on the first screen. The media
+/// fills the width at its own shape from the top; its lower part fades into
+/// the page, as on the Kharis website.
+double homeHeroMediaHeight(Size screen) =>
+    (screen.height * 0.62).clamp(260.0, 600.0);
 
 /// Height of the band at the top of the media that the floating header
 /// (logo and bell chips) occupies below the status bar.
@@ -303,21 +293,17 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
   Widget build(BuildContext context) {
     final slides = widget.slides;
     final padding = MediaQuery.paddingOf(context);
-    final mediaHeight = homeHeroMediaHeight(
-      MediaQuery.sizeOf(context),
-      vertical: heroHasVertical(slides),
-    );
+    final mediaHeight = homeHeroMediaHeight(MediaQuery.sizeOf(context));
     final canPlay = _canPlay(context);
 
-    final visible = mediaHeight - kHeroContentOverlap;
     final bg = context.kc.bg;
 
-    // The media is laid out at its full height but the hero only claims
-    // [visible] of it, so the content below rises over the faded bottom.
+    // Everything stays inside the hero's box: the clip is a native view that
+    // Flutter cannot paint over outside it, so nothing may overhang.
     return SizedBox(
-      height: visible,
+      height: mediaHeight,
       child: Stack(
-        clipBehavior: Clip.none,
+        clipBehavior: Clip.hardEdge,
         children: [
           Positioned(
             top: 0,
@@ -326,7 +312,7 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
             height: mediaHeight,
             child: _ScrollFade(
               scroll: widget.scroll,
-              distance: visible,
+              distance: mediaHeight,
               background: bg,
               child: ColoredBox(
                 color: _kBackdrop,
@@ -347,7 +333,7 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
                       key: ValueKey('home-hero-slide-${slides[i].id}'),
                       slide: slides[i],
                       topInset: padding.top + kHeroTopBarExtent,
-                      bottomInset: kHeroContentOverlap,
+                      bottomInset: 0,
                       active: canPlay && i == _index,
                       onPlayingChanged: (playing) => _videoPlaying = playing,
                       onOpen: () => _openSlide(context, ref, slides[i]),
@@ -361,8 +347,8 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
           Positioned(
             left: 0,
             right: 0,
-            top: mediaHeight * 0.5,
-            height: mediaHeight * 0.5,
+            top: mediaHeight * 0.55,
+            height: mediaHeight * 0.45,
             child: IgnorePointer(
               child: DecoratedBox(
                 key: const Key('home-hero-fade'),
@@ -387,7 +373,7 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
             Positioned(
               left: 0,
               right: 0,
-              top: visible - 30,
+              bottom: 14,
               child: _HeroDots(
                 count: slides.length,
                 index: _index,

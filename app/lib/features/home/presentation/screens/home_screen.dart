@@ -63,16 +63,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onScroll() {
-    final media = homeHeroMediaHeight(
-      MediaQuery.sizeOf(context),
-      vertical: heroHasVertical(ref.read(homeHeroSlidesProvider)),
-    );
-    // The hero has faded into the page once the content has risen over
-    // its visible part.
-    final visible = media - kHeroContentOverlap;
+    final media = homeHeroMediaHeight(MediaQuery.sizeOf(context));
     final offset = _scroll.offset;
-    final under = offset < visible - MediaQuery.paddingOf(context).top;
-    final inView = offset < visible;
+    final under = offset < media - MediaQuery.paddingOf(context).top;
+    final inView = offset < media;
     if (under != _heroUnderStatusBar || inView != _heroInView) {
       setState(() {
         _heroUnderStatusBar = under;
@@ -139,11 +133,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         topBar: const _HeroTopBar(),
                       ),
                     ),
-                    // The greeting rises over the hero's faded bottom: who
-                    // and which Branch (tap to change), then the content.
+                    // The greeting straight under the hero's faded bottom:
+                    // who and which Branch (tap to change), then the content.
                     const SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
                         child: _Greeting(),
                       ),
                     ),
