@@ -26,14 +26,23 @@ Future<Finder> _findRow(Journey j, Sermon s) async {
   await t.tap(field, warnIfMissed: false);
   await t.enterText(field, s.title);
   final row = find.byKey(ValueKey(s.id));
+  // Results are newest first and the list builds lazily: once they have
+  // settled, close the keyboard and scroll the row into being.
   await pumpUntilFound(
     t,
-    row,
+    find.textContaining(RegExp(r'results? for "')),
     timeout: const Duration(seconds: 30),
-    reason: 'row for "${s.title}"',
+    reason: 'results for "${s.title}"',
   );
+  await pumpFor(t, const Duration(seconds: 1));
   FocusManager.instance.primaryFocus?.unfocus();
   await pumpFor(t, const Duration(milliseconds: 600));
+  await scrollUntilFound(
+    t,
+    row,
+    scrollable: messagesScroll,
+    timeout: const Duration(seconds: 30),
+  );
   await ensureCentred(t, row);
   return row;
 }
@@ -56,21 +65,8 @@ Future<void> playlistsJourney(Journey j) async {
   j.check(await waitArchiveHydrated(j), 'archive loaded');
 
   // Three messages, distinct artwork where the library has it.
-  // Only messages search finds under the same id: the archive and the
-  // search source can carry one message under different ids.
-  final searchable = {
-    for (final s in j.c.read(sermonsProvider).valueOrNull ?? const <Sermon>[])
-      s.id,
-  };
-  final pool =
-      j.c
-          .read(sermonLibraryProvider)
-          .sermons
-          .take(300)
-          .where((s) => searchable.contains(s.id))
-          .toList()
-        ..shuffle(r);
-  j.check(pool.length >= 3, 'at least 3 searchable messages (${pool.length})');
+  final pool = j.c.read(sermonLibraryProvider).sermons.take(300).toList()
+    ..shuffle(r);
   final chosen = <Sermon>[];
   final arts = <String>{};
   for (final s in pool) {
