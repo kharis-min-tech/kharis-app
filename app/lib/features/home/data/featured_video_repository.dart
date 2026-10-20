@@ -13,6 +13,7 @@ class FeaturedVideo {
     required this.title,
     required this.thumbnailUrl,
     this.updatedAt,
+    this.vertical = false,
   });
 
   /// The Studio site the clip is for: `app`, `general`, `kharis` or `kp2`.
@@ -30,6 +31,10 @@ class FeaturedVideo {
   final String thumbnailUrl;
 
   final DateTime? updatedAt;
+
+  /// A 9:16 clip (a YouTube Short): the hero sizes its player to match so
+  /// the picture fills it without bars.
+  final bool vertical;
 
   @override
   String toString() => 'FeaturedVideo($workspace, $videoId, $title)';

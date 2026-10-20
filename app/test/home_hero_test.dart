@@ -70,8 +70,10 @@ List<Override> _overrides(
   SupabaseStub stub, {
   String? branch = 'London',
   List<Sermon> latest = const [_latest],
+  List<FeaturedVideo> shorts = const [],
 }) => [
   contentApiProvider.overrideWithValue(stub.api()),
+  heroShortsProvider.overrideWith((ref) async => shorts),
   currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
   latestSermonsProvider.overrideWith((ref) => latest),
   heroVideoSurfaceProvider.overrideWithValue((videoId, muted, onPlaying) {
@@ -90,9 +92,10 @@ Future<List<HeroSlide>> _slides(
   SupabaseStub stub, {
   String? branch = 'London',
   List<Sermon> latest = const [_latest],
+  List<FeaturedVideo> shorts = const [],
 }) async {
   final container = ProviderContainer(
-    overrides: _overrides(stub, branch: branch, latest: latest),
+    overrides: _overrides(stub, branch: branch, latest: latest, shorts: shorts),
   );
   addTearDown(container.dispose);
   final sub = container.listen(homeHeroSlidesProvider, (_, _) {});
@@ -103,6 +106,7 @@ Future<List<HeroSlide>> _slides(
   }
   await Future.wait<Object?>([
     container.read(featuredVideoProvider.future).catchError((_) => null),
+    container.read(heroShortsProvider.future),
     container.read(upcomingEventsProvider(branch).future),
     container.read(newsProvider(branch).future),
   ]);
@@ -282,6 +286,44 @@ void main() {
         latest: const [],
       );
       expect(slides, isEmpty);
+    });
+  });
+
+  group('Shorts', () {
+    const short = FeaturedVideo(
+      workspace: 'youtube',
+      url: 'https://www.youtube.com/shorts/s1',
+      videoId: 's1',
+      title: 'Have you prayed?',
+      thumbnailUrl: 'https://i.ytimg.com/vi/s1/hqdefault.jpg',
+      vertical: true,
+    );
+    final stub = {
+      'featured_videos': [_video('app', 'App clip')],
+      'events': <Map<String, dynamic>>[],
+      'news': <Map<String, dynamic>>[],
+    };
+
+    test(
+      'the channel\'s Shorts lead the hero in place of the Studio clip',
+      () async {
+        final slides = await _slides(
+          SupabaseStub(stub),
+          shorts: [short, short],
+        );
+        expect(slides, hasLength(2));
+        expect(
+          slides.every((s) => s is VideoHeroSlide && s.video.vertical),
+          isTrue,
+        );
+      },
+    );
+
+    test('no Shorts: the Studio clip is the video slide', () async {
+      final slides = await _slides(SupabaseStub(stub));
+      expect(slides.whereType<VideoHeroSlide>().map((s) => s.video.title), [
+        'App clip',
+      ]);
     });
   });
 

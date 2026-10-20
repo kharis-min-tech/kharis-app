@@ -74,7 +74,9 @@ const int kHeroAnnouncementLimit = 3;
 const Duration kHeroAdvanceInterval = Duration(seconds: 6);
 
 /// The hero's slides, in order:
-/// 1. the Studio's featured clip ([featuredVideoProvider]);
+/// 1. the channel's best Shorts ([heroShortsProvider]: the Senior Pastor's
+///    sayings and longer previews), else the Studio's featured clip
+///    ([featuredVideoProvider]);
 /// 2. up to [kHeroEventLimit] upcoming events with a flyer, from the same
 ///    app-visible, Branch-scoped feed as the events strip, featured first and
 ///    then soonest;
@@ -86,10 +88,11 @@ const Duration kHeroAdvanceInterval = Duration(seconds: 6);
 /// a partial set never flashes first) and when there is nothing to show:
 /// Home then hides the hero.
 final homeHeroSlidesProvider = Provider<List<HeroSlide>>((ref) {
+  final shorts = ref.watch(heroShortsProvider);
   final video = ref.watch(featuredVideoProvider);
   final events = ref.watch(campusUpcomingEventsProvider);
   final news = ref.watch(campusNewsProvider);
-  final feeds = <AsyncValue<Object?>>[video, events, news];
+  final feeds = <AsyncValue<Object?>>[shorts, video, events, news];
   if (feeds.any((f) => !f.hasValue && !f.hasError)) return const [];
 
   final flyers = [...?events.valueOrNull?.where((e) => e.imageUrl != null)]
@@ -101,7 +104,10 @@ final homeHeroSlidesProvider = Provider<List<HeroSlide>>((ref) {
   final shownEventIds = {for (final e in shownEvents) e.id};
 
   final slides = <HeroSlide>[
-    if (video.valueOrNull case final clip?) VideoHeroSlide(clip),
+    if (shorts.valueOrNull case final clips? when clips.isNotEmpty)
+      for (final clip in clips) VideoHeroSlide(clip)
+    else if (video.valueOrNull case final clip?)
+      VideoHeroSlide(clip),
     for (final event in shownEvents) EventHeroSlide(event),
     ...(news.valueOrNull ?? const <NewsItem>[])
         .where(
@@ -574,6 +580,7 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
           IgnorePointer(
             child: _CoverBox(
               key: const Key('home-hero-video-surface'),
+              ratio: widget.video.vertical ? 9 / 16 : 16 / 9,
               child: surface(widget.video.videoId, _muted, _onPlaying),
             ),
           ),
@@ -655,15 +662,17 @@ const Duration kHeroLoopLead = Duration(milliseconds: 1500);
 /// scaling its layout, so the platform view renders at its real size, then
 /// enlarges it by [kHeroClipCropScale] to crop the player's edges.
 class _CoverBox extends StatelessWidget {
-  const _CoverBox({super.key, required this.child});
+  const _CoverBox({super.key, required this.child, this.ratio = 16 / 9});
 
   final Widget child;
+
+  /// The player's shape: 16:9, or 9:16 for a Short.
+  final double ratio;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, box) {
-        const ratio = 16 / 9;
         final wide = box.maxWidth / box.maxHeight > ratio;
         final width = wide ? box.maxWidth : box.maxHeight * ratio;
         final height = wide ? box.maxWidth / ratio : box.maxHeight;
@@ -853,7 +862,10 @@ class _HeroCard extends StatelessWidget {
 
   /// (eyebrow, strip) for [slide].
   static (String, String) _words(HeroSlide slide) => switch (slide) {
-    VideoHeroSlide() => ('FEATURED', 'WATCH NOW'),
+    VideoHeroSlide(:final video) => (
+      video.vertical ? 'KHARIS SHORTS' : 'FEATURED',
+      'WATCH NOW',
+    ),
     EventHeroSlide(:final event) => (
       event.isFeatured ? 'FEATURED EVENT' : 'UPCOMING EVENT',
       (event.recurrenceLabel ??
