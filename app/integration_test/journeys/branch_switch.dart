@@ -237,8 +237,11 @@ Future<void> branchSwitchJourney(Journey j) async {
     '(got ${j.c.read(homeBranchProvider).valueOrNull})',
   );
   await _checkAnnouncements(j, news, to.name);
+  // The greeting's branch control sits under the hero: from the top.
   final change = find.byKey(const Key('home-branch-change')).first;
-  await scrollUntilFound(t, change, scrollable: _homeScroll);
+  await t.drag(_homeScroll, const Offset(0, 20000), warnIfMissed: false);
+  await pumpFor(t, const Duration(milliseconds: 800));
+  await ensureCentred(t, change);
   await t.tap(change, warnIfMissed: false);
   final useLocation = find.byKey(const ValueKey('branch-use-location'));
   await pumpUntilFound(t, useLocation, reason: 'member branch picker');
