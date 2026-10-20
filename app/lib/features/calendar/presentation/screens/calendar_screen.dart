@@ -115,7 +115,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           emptyActionLabel: 'See past events',
           onEmptyAction: () => setState(() => _tab = _EventTab.past),
           // A quiet week still says when the branch meets.
-          emptyFooter: const CampusCard(padding: EdgeInsets.only(top: 24)),
+          emptyFooter: const CampusCard(
+            padding: EdgeInsets.only(top: 24),
+            showHeader: false,
+          ),
         );
       case _EventTab.past:
         return _eventsSliver(

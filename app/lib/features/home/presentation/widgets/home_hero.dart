@@ -183,6 +183,9 @@ class _HomeHeroState extends ConsumerState<HomeHero>
   /// Ticks once per frame while the wall moves; the rows listen.
   final ValueNotifier<int> _frame = ValueNotifier(0);
 
+  /// One player per wall video while the wall exists.
+  final HeroVideoPool<VideoPlayerController> _videos = _videoPlayerPool();
+
   @override
   void initState() {
     super.initState();
@@ -199,6 +202,7 @@ class _HomeHeroState extends ConsumerState<HomeHero>
     _ticker.dispose();
     _lifecycle.dispose();
     _frame.dispose();
+    _videos.dispose();
     super.dispose();
   }
 
@@ -252,70 +256,73 @@ class _HomeHeroState extends ConsumerState<HomeHero>
     // Everything stays inside the hero's box: the scroll drift moves the
     // wall at paint time, which a Stack's own clip never sees, so the box
     // clips explicitly and content below scrolls up cleanly.
-    return SizedBox(
-      height: mediaHeight,
-      child: ClipRect(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: _ScrollFade(
-                scroll: widget.scroll,
-                distance: mediaHeight,
-                background: context.kc.bg,
-                child: Semantics(
-                  button: message != null,
-                  label: message == null
-                      ? 'Kharis Church'
-                      : 'Play the latest message, ${message.title}',
-                  excludeSemantics: true,
-                  child: GestureDetector(
-                    key: const Key('home-hero-wall'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: message == null ? null : _play,
-                    onHorizontalDragUpdate: _reduceMotion ? null : _onDrag,
-                    child: ColoredBox(
-                      color: kHeroWallBackground,
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          top: padding.top + kHeroTopBarExtent,
-                          bottom: kHeroWallGap,
-                        ),
-                        child: Column(
-                          children: [
-                            for (final (r, items) in const [
-                              kHeroWallTop,
-                              kHeroWallBottom,
-                            ].indexed) ...[
-                              if (r > 0) const SizedBox(height: kHeroWallGap),
-                              Expanded(
-                                child: _WallRow(
-                                  key: Key('home-hero-row-$r'),
-                                  row: r,
-                                  items: items,
-                                  // Row two sits half a card along.
-                                  phase: r * 0.5,
-                                  drift: () => _drift[r],
-                                  drag: () => _drag,
-                                  frame: _frame,
-                                  playing: move,
+    return _VideoPoolScope(
+      pool: _videos,
+      child: SizedBox(
+        height: mediaHeight,
+        child: ClipRect(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: _ScrollFade(
+                  scroll: widget.scroll,
+                  distance: mediaHeight,
+                  background: context.kc.bg,
+                  child: Semantics(
+                    button: message != null,
+                    label: message == null
+                        ? 'Kharis Church'
+                        : 'Play the latest message, ${message.title}',
+                    excludeSemantics: true,
+                    child: GestureDetector(
+                      key: const Key('home-hero-wall'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: message == null ? null : _play,
+                      onHorizontalDragUpdate: _reduceMotion ? null : _onDrag,
+                      child: ColoredBox(
+                        color: kHeroWallBackground,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            top: padding.top + kHeroTopBarExtent,
+                            bottom: kHeroWallGap,
+                          ),
+                          child: Column(
+                            children: [
+                              for (final (r, items) in const [
+                                kHeroWallTop,
+                                kHeroWallBottom,
+                              ].indexed) ...[
+                                if (r > 0) const SizedBox(height: kHeroWallGap),
+                                Expanded(
+                                  child: _WallRow(
+                                    key: Key('home-hero-row-$r'),
+                                    row: r,
+                                    items: items,
+                                    // Row two sits half a card along.
+                                    phase: r * 0.5,
+                                    drift: () => _drift[r],
+                                    drag: () => _drag,
+                                    frame: _frame,
+                                    playing: move,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              top: padding.top + 8,
-              left: 20,
-              right: 20,
-              child: widget.topBar,
-            ),
-          ],
+              Positioned(
+                top: padding.top + 8,
+                left: 20,
+                right: 20,
+                child: widget.topBar,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -523,12 +530,102 @@ class _WallCard extends StatelessWidget {
   }
 }
 
-// ── A wall video ─────────────────────────────────────────────────────────────
+// ── Wall videos ──────────────────────────────────────────────────────────────
 
-/// [asset] filling its card, silent and looping while [playing], over its
-/// [poster]. The player exists only while it plays, so off-screen cards
-/// hold no decoder; it never takes the app's sound and mixes with a
-/// message playing.
+/// One player per wall video, shared by every card showing it (each row
+/// holds its media twice to loop). A player is made the first time one of
+/// its cards is on screen, plays while any is, pauses when none is, and is
+/// released only with the wall: cards drifting on and off never make a
+/// second one. Generic over the player so its rules are testable.
+class HeroVideoPool<T extends Object> {
+  HeroVideoPool({
+    required this.create,
+    required this.play,
+    required this.pause,
+    required this.release,
+  });
+
+  final T Function(String asset) create;
+  final void Function(T player) play;
+  final void Function(T player) pause;
+  final void Function(T player) release;
+
+  final Map<String, T> _players = {};
+  final Map<String, Set<Object>> _wanted = {};
+  final Map<String, bool> _playing = {};
+
+  /// Players made so far, by asset.
+  Map<String, T> get players => Map.unmodifiable(_players);
+
+  /// [card] wants [asset] playing ([on]) or no longer does.
+  void want(Object card, String asset, {required bool on}) {
+    final wanting = _wanted.putIfAbsent(asset, () => <Object>{});
+    if (on) {
+      wanting.add(card);
+    } else {
+      wanting.remove(card);
+    }
+    var player = _players[asset];
+    if (player == null) {
+      // Made only once a card actually needs it.
+      if (wanting.isEmpty) return;
+      player = _players[asset] = create(asset);
+    }
+    final should = wanting.isNotEmpty;
+    if (_playing[asset] == should) return;
+    _playing[asset] = should;
+    should ? play(player) : pause(player);
+  }
+
+  /// Releases every player.
+  void dispose() {
+    _players.values.forEach(release);
+    _players.clear();
+    _wanted.clear();
+    _playing.clear();
+  }
+}
+
+/// The wall's pool of real players: silent, looping, mixing with any
+/// message playing, never taking the app's sound.
+HeroVideoPool<VideoPlayerController> _videoPlayerPool() {
+  final ready = <VideoPlayerController, Future<void>>{};
+  return HeroVideoPool<VideoPlayerController>(
+    create: (asset) {
+      final c = VideoPlayerController.asset(
+        asset,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      ready[c] = c.initialize().then((_) async {
+        await c.setVolume(0);
+        await c.setLooping(true);
+      });
+      return c;
+    },
+    play: (c) => unawaited(ready[c]?.then((_) => c.play())),
+    pause: (c) => unawaited(ready[c]?.then((_) => c.pause())),
+    release: (c) {
+      ready.remove(c);
+      unawaited(c.dispose());
+    },
+  );
+}
+
+/// Gives the wall's cards their shared players.
+class _VideoPoolScope extends InheritedWidget {
+  const _VideoPoolScope({required this.pool, required super.child});
+
+  final HeroVideoPool<VideoPlayerController> pool;
+
+  static HeroVideoPool<VideoPlayerController>? of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_VideoPoolScope>()?.pool;
+
+  @override
+  bool updateShouldNotify(_VideoPoolScope old) => pool != old.pool;
+}
+
+/// A wall video card: its [poster], with the shared player over it once
+/// that has a frame up. [playing] says whether this card is on screen.
 class _WallVideo extends StatefulWidget {
   const _WallVideo({
     required this.asset,
@@ -545,64 +642,52 @@ class _WallVideo extends StatefulWidget {
 }
 
 class _WallVideoState extends State<_WallVideo> {
-  VideoPlayerController? _controller;
+  HeroVideoPool<VideoPlayerController>? _pool;
+  VideoPlayerController? _player;
   bool _showing = false;
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.playing) _start();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _pool = _VideoPoolScope.of(context);
+    _sync();
   }
 
   @override
   void didUpdateWidget(_WallVideo old) {
     super.didUpdateWidget(old);
-    if (widget.playing && _controller == null) _start();
-    if (!widget.playing && _controller != null) _stop();
+    if (old.playing != widget.playing) _sync();
   }
 
   @override
   void dispose() {
-    _stop();
+    _pool?.want(this, widget.asset, on: false);
+    _player?.removeListener(_onValue);
     super.dispose();
   }
 
-  void _start() {
-    final c = VideoPlayerController.asset(
-      widget.asset,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-    _controller = c;
-    c.addListener(_onValue);
-    unawaited(
-      c.initialize().then((_) async {
-        if (_controller != c) return;
-        await c.setVolume(0);
-        await c.setLooping(true);
-        await c.play();
-      }),
-    );
+  void _sync() {
+    final pool = _pool;
+    if (pool == null) return;
+    pool.want(this, widget.asset, on: widget.playing);
+    final player = pool.players[widget.asset];
+    if (player != _player) {
+      _player?.removeListener(_onValue);
+      _player = player?..addListener(_onValue);
+      _onValue();
+    }
   }
 
   void _onValue() {
-    final v = _controller?.value;
-    // The poster stays until the first frame is up.
+    final v = _player?.value;
+    // The poster stays until the shared player has a frame up.
     final showing = v != null && v.isInitialized && v.position > Duration.zero;
     if (showing != _showing && mounted) setState(() => _showing = showing);
   }
 
-  void _stop() {
-    final c = _controller;
-    _controller = null;
-    if (c == null) return;
-    c.removeListener(_onValue);
-    unawaited(c.dispose());
-    _showing = false;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final c = _controller;
+    final c = _player;
     return Stack(
       fit: StackFit.expand,
       children: [

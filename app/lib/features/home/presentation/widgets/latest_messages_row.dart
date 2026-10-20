@@ -106,8 +106,7 @@ class _Artwork extends StatelessWidget {
 }
 
 /// The message the member left part-way: its artwork, a thin progress bar,
-/// the title and the time left. One tap picks it up where they left off,
-/// exactly as [ContinueListeningCard] does.
+/// the title and the time left. One tap picks it up where they left off.
 class _ContinueTile extends ConsumerWidget {
   const _ContinueTile({required this.unfinished});
 
@@ -135,7 +134,7 @@ class _ContinueTile extends ConsumerWidget {
         ? (position.inMilliseconds / total).clamp(0.0, 1.0)
         : null;
     final caption = total > 0
-        ? ContinueListeningCard.remainingLabel(duration! - position)
+        ? remainingLabel(duration! - position)
         : 'Paused at ${_clock(position)}';
 
     return Semantics(

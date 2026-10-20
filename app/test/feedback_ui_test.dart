@@ -145,6 +145,44 @@ void main() {
       expect(find.byKey(const Key('campus-card')), findsOneWidget);
       expect(find.byKey(const Key('campus-service-sun')), findsOneWidget);
     });
+
+    testWidgets('a quiet week names the branch in the chip only', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        campus: const Branch(
+          id: 'london',
+          name: 'London',
+          subtitle: '',
+          gradientStart: Colors.black,
+          gradientEnd: Colors.black,
+          services: [
+            CampusService(
+              id: 'sun',
+              name: 'Sunday Service',
+              day: 'Sunday',
+              startTime: '10:00',
+            ),
+          ],
+        ),
+      );
+      expect(find.byKey(const Key('campus-card')), findsOneWidget);
+      expect(find.text('YOUR BRANCH'), findsOneWidget);
+      // The chip names the branch; the card carries no heading of its own.
+      expect(find.text('London'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('campus-card')),
+          matching: find.text('London'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.text('Check back soon for events at London.'),
+        findsOneWidget,
+      );
+    });
   });
 
   // ── Playlist artwork ───────────────────────────────────────────────────────

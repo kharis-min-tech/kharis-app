@@ -209,6 +209,46 @@ void main() {
     );
   });
 
+  test('one player per video however often its cards come and go; it '
+      'plays while any card is on screen and pauses when none is', () {
+    final log = <String>[];
+    final pool = HeroVideoPool<String>(
+      create: (asset) {
+        log.add('create $asset');
+        return 'player:$asset';
+      },
+      play: (p) => log.add('play $p'),
+      pause: (p) => log.add('pause $p'),
+      release: (p) => log.add('release $p'),
+    );
+    final first = Object();
+    final copy = Object(); // the row's second copy of the same card
+
+    pool.want(first, 'a.mp4', on: false);
+    expect(log, isEmpty, reason: 'nothing made before a card needs it');
+
+    pool.want(first, 'a.mp4', on: true);
+    pool.want(copy, 'a.mp4', on: true);
+    // The drifting wall reports the same state every frame.
+    for (var i = 0; i < 5; i++) {
+      pool.want(first, 'a.mp4', on: true);
+    }
+    pool.want(first, 'a.mp4', on: false); // first card drifts off
+    expect(log, ['create a.mp4', 'play player:a.mp4'], reason: 'copy on');
+
+    pool.want(copy, 'a.mp4', on: false); // last card off screen
+    pool.want(first, 'a.mp4', on: true); // back round again
+    expect(log, [
+      'create a.mp4',
+      'play player:a.mp4',
+      'pause player:a.mp4',
+      'play player:a.mp4',
+    ]);
+
+    pool.dispose();
+    expect(log.last, 'release player:a.mp4');
+  });
+
   testWidgets('a tap plays the newest message that has a video, as video', (
     tester,
   ) async {
