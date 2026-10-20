@@ -32,6 +32,7 @@ import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
@@ -41,6 +42,7 @@ import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 
 import 'support/fake_cache_service.dart';
+import 'support/fake_location_service.dart';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -506,11 +508,38 @@ void main() {
       expect(find.text('Manchester Picnic'), findsNothing);
     });
 
-    test('a member on All campuses sees every campus', () async {
+    test('the Events tab "All branches" filter browses every campus, '
+        'leaving Home and the member\u2019s branch alone', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final container = ProviderContainer(
+        overrides: [
+          currentBranchProvider.overrideWith((ref) => Stream.value('London')),
+          upcomingEventsProvider.overrideWith(
+            (ref, b) => Stream.value([_prayerNight, _manchesterPicnic]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final tab = container.listen(eventsUpcomingProvider, (_, _) {});
+      final home = container.listen(campusUpcomingEventsProvider, (_, _) {});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(tab.read().value!.map((e) => e.id), ['e-prayer']);
+
+      container.read(eventsShowAllBranchesProvider.notifier).state = true;
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(tab.read().value!.map((e) => e.id), ['e-prayer', 'e-picnic']);
+      expect(home.read().value!.map((e) => e.id), ['e-prayer']);
+      expect(container.read(currentBranchProvider).value, 'London');
+    });
+
+    test('with no branch chosen, Home shows London and the Events tab every '
+        'campus', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final container = ProviderContainer(
         overrides: [
           currentBranchProvider.overrideWith((ref) => Stream.value(null)),
+          locationServiceProvider.overrideWithValue(FakeLocationService()),
           newsProvider.overrideWith(
             (ref, b) async => [
               _news('n-lon', 'London notice', branch: 'London'),
@@ -524,11 +553,11 @@ void main() {
       );
       addTearDown(container.dispose);
       final news = container.listen(campusNewsProvider, (_, _) {});
-      final events = container.listen(campusUpcomingEventsProvider, (_, _) {});
+      final tab = container.listen(eventsUpcomingProvider, (_, _) {});
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(news.read().value!.map((n) => n.id), ['n-lon', 'n-man']);
-      expect(events.read().value!.map((e) => e.id), ['e-prayer', 'e-picnic']);
+      expect(news.read().value!.map((n) => n.id), ['n-lon']);
+      expect(tab.read().value!.map((e) => e.id), ['e-prayer', 'e-picnic']);
     });
 
     test(

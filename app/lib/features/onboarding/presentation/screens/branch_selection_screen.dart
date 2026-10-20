@@ -7,6 +7,7 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
 /// Branch selection (design-handoff v3) — light screen. Search across cities,
 /// then tap a branch to set it as home and enter the app.
@@ -96,6 +97,14 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
                     _BranchesStatus(
                       failed: branchesAsync.hasError || branchesAsync.hasValue,
                       onRetry: () => ref.invalidate(branchesProvider),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: UseMyLocationTile(
+                        contentPadding: EdgeInsets.zero,
+                        onNearest: (b) => _confirm(context, ref, b),
+                      ),
                     ),
                   ..._section(
                     context,

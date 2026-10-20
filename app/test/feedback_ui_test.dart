@@ -74,9 +74,7 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
             currentUserProvider.overrideWith((ref) => Stream.value(null)),
-            campusUpcomingEventsProvider.overrideWithValue(
-              AsyncValue.data(events),
-            ),
+            eventsUpcomingProvider.overrideWithValue(AsyncValue.data(events)),
             myRsvpsProvider.overrideWith((ref) => Stream.value(const <Rsvp>[])),
             currentCampusProvider.overrideWithValue(campus),
           ],

@@ -6,9 +6,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_cache_service.dart';
+import 'support/fake_location_service.dart';
 import 'support/supabase_stub.dart';
 
 /// The homepage announcements pipeline with only the network stubbed:
@@ -35,6 +37,7 @@ Widget _homeHarness(SupabaseStub stub, {String? branch}) {
     overrides: [
       newsRepositoryProvider.overrideWithValue(NewsRepository(api: stub.api())),
       currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
+      locationServiceProvider.overrideWithValue(FakeLocationService()),
     ],
     child: const MaterialApp(home: Scaffold(body: LatestAnnouncementCard())),
   );

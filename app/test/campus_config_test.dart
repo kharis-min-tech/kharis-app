@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
@@ -100,7 +101,7 @@ void main() {
       expect(c.read(effectiveHomeLayoutProvider), HomeLayout.fallback);
     });
 
-    test('All branches uses the built-in layout', () async {
+    test('no branch chosen uses the built-in layout', () async {
       final c = await _resolve(
         campus: null,
         branches: [_branch('London', home: _campusLayout)],
@@ -357,8 +358,15 @@ void main() {
                 ),
               ],
             ),
+            // One one-off event, so the events block has something to show.
             upcomingEventsProvider.overrideWith(
-              (ref, b) => Stream.value(const []),
+              (ref, b) => Stream.value([
+                Event(
+                  id: 'praise',
+                  title: 'Praise Night',
+                  startTime: DateTime.now().add(const Duration(days: 9)),
+                ),
+              ]),
             ),
             liveStatusProvider.overrideWith(
               (ref) => Stream.value(LiveStatus.notLive),

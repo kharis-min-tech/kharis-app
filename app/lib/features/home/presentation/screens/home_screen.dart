@@ -241,6 +241,34 @@ class _LatestMessagesBlock extends ConsumerWidget {
   }
 }
 
+/// Upcoming events: the heading and strip, or nothing when Home's branch
+/// has no events beyond its weekly services.
+class _EventsBlock extends ConsumerWidget {
+  const _EventsBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final events = ref.watch(homeUpcomingEventsProvider).valueOrNull;
+    if (events != null && events.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          eyebrow: 'What\u2019s on',
+          title: 'Upcoming events',
+          actionKey: const Key('home-events-see-all'),
+          // Events is a tab: switch to it rather than stacking it.
+          onSeeAll: () => context.go('/calendar'),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(left: 20, bottom: 28),
+          child: UpcomingEventsStrip(),
+        ),
+      ],
+    );
+  }
+}
+
 /// One Home block by its Studio id.
 class _HomeSection extends StatelessWidget {
   const _HomeSection(this.id);
@@ -254,8 +282,6 @@ class _HomeSection extends StatelessWidget {
       // phone are set.
       HomeSectionId.profileCompletion => const ProfileCompletionCard(),
       HomeSectionId.live => const LiveNowCard(padding: _blockPadding),
-      // Today's reading, then the Daily Message; each collapses when the
-      // Studio has nothing for today.
       // The Bible as one row, then the Daily Message when the Studio has
       // one for today.
       HomeSectionId.reading => const Column(
@@ -266,22 +292,8 @@ class _HomeSection extends StatelessWidget {
         ],
       ),
       HomeSectionId.announcements => const _AnnouncementsBlock(),
-      HomeSectionId.events => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SectionHeader(
-            eyebrow: 'What\u2019s on',
-            title: 'Upcoming events',
-            actionKey: const Key('home-events-see-all'),
-            // Events is a tab: switch to it rather than stacking it.
-            onSeeAll: () => context.go('/calendar'),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 20, bottom: 28),
-            child: UpcomingEventsStrip(),
-          ),
-        ],
-      ),
+      // Hidden, heading included, when nothing is coming up.
+      HomeSectionId.events => const _EventsBlock(),
       // The branch's next service (flyer, times, venue, contact); the full
       // timetable is one tap away on the Branch page.
       HomeSectionId.campus => const NextServiceCard(

@@ -63,9 +63,17 @@ Future<void> eventsJourney(Journey j) async {
     'past ${past.map((e) => '$e').toList()}',
   );
 
-  await j.launch(branch: ''); // All branches: every Studio event applies.
+  await j.launch();
   await tapNav(t, 'Events');
   await pumpUntilFound(t, find.byType(CalendarScreen));
+  // Browse All branches (the Events tab filter): every Studio event applies.
+  final chip = _inCalendar(find.text('YOUR BRANCH'));
+  await pumpUntilFound(t, chip);
+  await t.tap(chip, warnIfMissed: false);
+  final all = find.byKey(const ValueKey('branch-choice-all'));
+  await pumpUntilFound(t, all, reason: 'branch picker sheet');
+  await t.tap(all, warnIfMissed: false);
+  await pumpUntilFound(t, _inCalendar(find.text('All branches')));
   await pumpUntil(
     t,
     () =>

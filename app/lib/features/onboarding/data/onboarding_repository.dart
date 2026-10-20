@@ -17,20 +17,13 @@ class OnboardingRepository {
 
   String? get selectedRole => _prefs.getString(_roleKey);
 
+  /// The chosen branch; `''` (a legacy "All branches" pick) or absent means
+  /// none is chosen.
   String? get selectedBranch => _prefs.getString(_branchKey);
 
-  /// Whether the member has ever explicitly chosen a campus.
-  ///
-  /// Distinct from [selectedBranch] being non-null: "All campuses" is a real
-  /// choice stored as an empty string, which reads back as `null`. Without
-  /// this, an unsynced "All campuses" pick would be indistinguishable from
-  /// never having chosen, and the stale profile branch would win.
-  bool get hasBranchChoice => _prefs.containsKey(_branchKey);
-
-  /// Persists the campus on its own, outside the onboarding flow.
-  /// `null` means all campuses and is stored as an empty string.
-  Future<void> setSelectedBranch(String? branch) =>
-      _prefs.setString(_branchKey, branch ?? '');
+  /// Persists the branch on its own, outside the onboarding flow.
+  Future<void> setSelectedBranch(String branch) =>
+      _prefs.setString(_branchKey, branch);
 
   /// True when [selectedBranch] has not yet been written to the signed-in
   /// user's Firestore profile.

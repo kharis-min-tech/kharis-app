@@ -30,12 +30,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The member's campus is persisted state, never screen state: this screen
-    // reads it from [currentBranchProvider] and writes it back through
-    // [setActiveBranch]. A local override field here would be a second source
-    // of truth that dies with the screen — which is exactly how the chip used
-    // to appear to "revert" on relaunch.
-    final branch = ref.watch(currentBranchProvider).valueOrNull;
+    // The member's branch is persisted state, read from
+    // [currentBranchProvider] and written through [setActiveBranch]. The
+    // only screen-level choice is the session "All branches" browse filter
+    // ([eventsShowAllBranchesProvider]), which never becomes their branch.
+    final branch = ref.watch(eventsBranchProvider).valueOrNull;
     final branchLabel = branch ?? kAllCampusesLabel;
 
     return Scaffold(
@@ -55,9 +54,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     children: [
                       _Header(
                         branchLabel: branchLabel,
-                        // The shared campus picker: one sheet, one write
-                        // path (setActiveBranch), wherever campus changes.
-                        onTapBranch: () => pickActiveBranch(context, ref),
+                        isMemberBranch: branch != null,
+                        onTapBranch: _pickBranch,
                       ),
                       const SizedBox(height: 16),
                       _SegmentedTabs(
@@ -77,13 +75,29 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
+  /// The shared branch sheet plus the "All branches" browse row. A branch
+  /// becomes the member's branch everywhere (and ends browsing); "All
+  /// branches" only widens this list for the session.
+  Future<void> _pickBranch() async {
+    final showAll = ref.read(eventsShowAllBranchesProvider);
+    final choice = await showBranchPicker(
+      context,
+      current: showAll ? null : ref.read(currentBranchProvider).valueOrNull,
+      allowAll: true,
+    );
+    if (choice == null || !mounted) return;
+    final name = choice.name;
+    ref.read(eventsShowAllBranchesProvider.notifier).state = name == null;
+    if (name != null) await applyBranchChoice(context, ref, name);
+  }
+
   /// Reloads the visible tab and holds the spinner until it has answered.
   Future<void> _refresh() {
     switch (_tab) {
       case _EventTab.upcoming:
-        return refreshCampusContent(ref);
+        return refreshEventsContent(ref);
       case _EventTab.past:
-        return refreshCampusContent(ref, pastEvents: true);
+        return refreshEventsContent(ref, pastEvents: true);
       case _EventTab.rsvps:
         return settleRefresh(ref.refresh(myRsvpEventsProvider.future));
     }
@@ -93,7 +107,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     switch (_tab) {
       case _EventTab.upcoming:
         return _eventsSliver(
-          ref.watch(campusUpcomingEventsProvider),
+          ref.watch(eventsUpcomingProvider),
           emptyIcon: Icons.event_busy_outlined,
           emptyTitle: 'No upcoming events',
           emptySubtitle: 'Check back soon for events at $branchLabel.',
@@ -105,7 +119,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         );
       case _EventTab.past:
         return _eventsSliver(
-          ref.watch(campusPastEventsProvider),
+          ref.watch(eventsPastProvider),
           emptyIcon: Icons.history_rounded,
           emptyTitle: 'No past events',
           emptySubtitle:
@@ -446,12 +460,17 @@ class _GroupHeader extends StatelessWidget {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 /// Screen title plus the branch chip. The chip is captioned "YOUR BRANCH"
-/// because tapping it changes the member's branch everywhere; it is not a
-/// throwaway filter over this list.
+/// while it shows the member's branch: choosing a branch there changes it
+/// everywhere. "All branches" is a browse filter, captioned "SHOWING".
 class _Header extends StatelessWidget {
-  const _Header({required this.branchLabel, required this.onTapBranch});
+  const _Header({
+    required this.branchLabel,
+    required this.isMemberBranch,
+    required this.onTapBranch,
+  });
 
   final String branchLabel;
+  final bool isMemberBranch;
   final VoidCallback onTapBranch;
 
   @override
@@ -472,7 +491,9 @@ class _Header extends StatelessWidget {
         Flexible(
           child: Semantics(
             button: true,
-            label: 'Your branch: $branchLabel. Change branch',
+            label: isMemberBranch
+                ? 'Your branch: $branchLabel. Change branch'
+                : 'Showing $branchLabel. Change branch',
             excludeSemantics: true,
             child: GestureDetector(
               onTap: onTapBranch,
@@ -494,7 +515,7 @@ class _Header extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'YOUR BRANCH',
+                        isMemberBranch ? 'YOUR BRANCH' : 'SHOWING',
                         style: AppTypography.ui(
                           size: 9,
                           weight: FontWeight.w700,

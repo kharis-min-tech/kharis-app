@@ -130,12 +130,13 @@ String? serviceTimesLabel(List<CampusService> services) {
 /// Opens the branch page with the full timetable.
 void _openBranch(BuildContext context) => context.push('/branch');
 
-/// Home's "Next service" card: the soonest day the member's branch meets,
-/// its times, where (with directions) and how to reach the branch.
+/// Home's "Next service" card: the soonest day Home's branch
+/// ([homeCampusProvider]) meets, its times, where (with directions) and how
+/// to reach the branch.
 ///
 /// Shows the flyer of the branch's weekly service event for that day when
 /// the Studio published one. Tapping the card, or "Full timetable", opens
-/// the branch page. Renders nothing for All branches or a branch with no
+/// the branch page. Renders nothing while the branch is unknown or has no
 /// dated services.
 class NextServiceCard extends ConsumerWidget {
   const NextServiceCard({super.key, this.padding = EdgeInsets.zero});
@@ -146,7 +147,7 @@ class NextServiceCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final branch = ref.watch(currentCampusProvider);
+    final branch = ref.watch(homeCampusProvider);
     if (branch == null) return const SizedBox.shrink();
     final now = ref.watch(nextServiceClockProvider)();
     final next = nextServiceDay(branch.services, now);

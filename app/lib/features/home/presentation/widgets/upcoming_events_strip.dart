@@ -7,7 +7,6 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
-import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
@@ -49,20 +48,32 @@ String eventWhenLabel(Event event, {DateTime? now}) {
   return '$dayLabel \u00b7 $range';
 }
 
+/// The events Home's strip lists: Home's branch plus all-branch events,
+/// less the branch's weekly services (the Next service card shows those).
+/// Empty means Home shows no events section at all.
+final homeUpcomingEventsProvider = Provider<AsyncValue<List<Event>>>((ref) {
+  final branch = ref.watch(homeCampusProvider);
+  return ref
+      .watch(campusUpcomingEventsProvider)
+      .whenData(
+        (events) => [
+          for (final e in events)
+            if (branch == null || !isBranchServiceEvent(e, branch)) e,
+        ],
+      );
+});
+
 /// Home's "Upcoming events" strip: the next few events Content Studio has
-/// published for the member's campus plus all-campus events, each showing
-/// when and where (venue) and opening the event detail on tap. With a branch
-/// picked, its weekly services are left to the Next service card.
+/// published for Home's branch ([homeBranchProvider]) plus all-campus
+/// events, each showing when and where (venue) and opening the event detail
+/// on tap. The branch's weekly services are left to the Next service card.
 class UpcomingEventsStrip extends ConsumerWidget {
   const UpcomingEventsStrip({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(campusUpcomingEventsProvider);
-    final branch = ref.watch(currentCampusProvider);
-    final events = async.valueOrNull?.where(
-      (e) => branch == null || !isBranchServiceEvent(e, branch),
-    );
+    final async = ref.watch(homeUpcomingEventsProvider);
+    final events = async.valueOrNull;
 
     if (events == null) {
       if (async.hasError) {
@@ -89,14 +100,8 @@ class UpcomingEventsStrip extends ConsumerWidget {
       );
     }
 
-    if (events.isEmpty) {
-      final campus = ref.watch(currentBranchProvider).valueOrNull;
-      return _StripMessage(
-        text: campus == null
-            ? 'No upcoming events yet.'
-            : 'No upcoming events at $campus yet.',
-      );
-    }
+    // Nothing coming up: Home leaves the whole section out.
+    if (events.isEmpty) return const SizedBox.shrink();
 
     final preview = events.take(kHomeEventPreviewCount).toList();
     if (preview.length == 1) {

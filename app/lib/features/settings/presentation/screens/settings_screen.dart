@@ -126,7 +126,7 @@ class SettingsScreen extends ConsumerWidget {
                   _MoreMenuItem(
                     icon: Icons.sync_alt,
                     label: 'Switch branch',
-                    value: branch ?? kAllCampusesLabel,
+                    value: branch ?? kChooseBranchLabel,
                     onTap: () => context.push('/branch-selection'),
                   ),
                   _MoreMenuItem(

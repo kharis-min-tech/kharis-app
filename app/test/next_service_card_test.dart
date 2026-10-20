@@ -14,8 +14,11 @@ import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
+import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+
+import 'support/fake_location_service.dart';
 
 // 18 Oct 2026 is a Sunday.
 DateTime _sunday(int hour, [int minute = 0]) =>
@@ -229,6 +232,7 @@ void main() {
               (ref) => Stream.value(branch?.name),
             ),
             branchesProvider.overrideWith((ref) => Stream.value([?branch])),
+            locationServiceProvider.overrideWithValue(FakeLocationService()),
             campusUpcomingEventsProvider.overrideWithValue(
               AsyncValue.data(events),
             ),
@@ -358,7 +362,12 @@ void main() {
         find.byKey(const ValueKey('branch-choice-London')),
         findsOneWidget,
       );
-      expect(find.byKey(const ValueKey('branch-choice-all')), findsOneWidget);
+      expect(find.byKey(const ValueKey('branch-use-location')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('branch-choice-all')),
+        findsNothing,
+        reason: '"All branches" is not a member\u2019s branch',
+      );
     });
 
     testWidgets('tapping the card opens the branch page', (tester) async {
@@ -370,7 +379,7 @@ void main() {
     });
 
     testWidgets(
-      'renders nothing for All branches or a branch with no services',
+      'renders nothing while Home\u2019s branch is unknown or has no services',
       (tester) async {
         await pump(tester);
         expect(find.byKey(const Key('home-next-service')), findsNothing);
@@ -389,7 +398,7 @@ void main() {
             currentBranchProvider.overrideWith(
               (ref) => Stream.value(branch?.name),
             ),
-            currentCampusProvider.overrideWithValue(branch),
+            homeCampusProvider.overrideWithValue(branch),
             campusUpcomingEventsProvider.overrideWithValue(
               AsyncValue.data([_serviceEvent, _prayerNight]),
             ),
@@ -408,10 +417,13 @@ void main() {
       expect(find.text('Prayer Night'), findsOneWidget);
     });
 
-    testWidgets('All branches keeps the weekly service', (tester) async {
-      await pump(tester);
-      expect(find.text('Sunday Service'), findsOneWidget);
-      expect(find.text('Prayer Night'), findsOneWidget);
-    });
+    testWidgets(
+      'while Home\u2019s branch is unknown, the weekly service stays',
+      (tester) async {
+        await pump(tester);
+        expect(find.text('Sunday Service'), findsOneWidget);
+        expect(find.text('Prayer Night'), findsOneWidget);
+      },
+    );
   });
 }

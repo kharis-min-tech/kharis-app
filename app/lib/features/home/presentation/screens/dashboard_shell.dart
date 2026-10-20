@@ -11,10 +11,9 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
-import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
 /// Bottom-nav shell wrapping all 5 dashboard tabs.
 ///
@@ -36,6 +35,11 @@ const Duration kBarReturnDelay = Duration(milliseconds: 600);
 
 /// Branch index of the Giving tab (see the tab row below and app_router.dart).
 const _givingTabIndex = 2;
+
+/// Whether this launch has already offered the branch picker. Lives in the
+/// app's [ProviderScope], so it resets on the next launch and not when the
+/// shell is rebuilt (sign-in, deep links).
+final branchPromptShownProvider = StateProvider<bool>((ref) => false);
 
 class _DashboardShellState extends ConsumerState<DashboardShell> {
   late final AppLifecycleListener _lifecycle;
@@ -61,24 +65,30 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     super.dispose();
   }
 
-  /// Accounts created before branch selection became part of onboarding (and
-  /// guests from older builds) have no saved branch, so events default to the
-  /// all-campus mush the testers flagged. Ask exactly once.
-  Future<void> _promptBranchOnce() async {
-    // A member who just chose a campus in onboarding (or chose "All
-    // campuses") has already answered. Checked synchronously from local
-    // prefs: the branch stream can still be empty a second later on a slow
-    // device, which used to ask again right after onboarding.
-    if (ref.read(onboardingRepositoryProvider).hasBranchChoice) return;
-    // Let the branch stream emit before deciding.
-    await Future<void>.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    final branch = ref.read(currentBranchProvider).valueOrNull;
-    if (branch != null && branch.isNotEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('branch_prompt_shown') ?? false) return;
-    await prefs.setBool('branch_prompt_shown', true);
-    if (mounted) context.push('/branch-selection');
+  /// While the member has not chosen a branch, offer the picker once per
+  /// launch. Dismissable: Home meanwhile shows [homeBranchProvider]'s
+  /// branch, and the chip keeps saying "Choose your branch".
+  void _promptBranchOnce() {
+    if (ref.read(branchPromptShownProvider)) return;
+    // Decide once the branch has resolved, so a member whose profile has yet
+    // to answer is not asked by mistake. Closed with the shell if it never
+    // does.
+    ProviderSubscription<AsyncValue<String?>>? sub;
+    var resolved = false;
+    sub = ref.listenManual<AsyncValue<String?>>(currentBranchProvider, (
+      _,
+      next,
+    ) {
+      if (resolved || (!next.hasValue && !next.hasError)) return;
+      resolved = true;
+      // Null while this fires immediately; closed just below instead.
+      sub?.close();
+      if (!mounted || next.valueOrNull != null) return;
+      if (ref.read(branchPromptShownProvider)) return;
+      ref.read(branchPromptShownProvider.notifier).state = true;
+      unawaited(pickActiveBranch(context, ref));
+    }, fireImmediately: true);
+    if (resolved) sub.close();
   }
 
   /// How long the restore waits for the catalogue to place the last-played

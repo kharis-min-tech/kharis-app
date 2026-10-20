@@ -56,6 +56,7 @@ class CampusCard extends ConsumerWidget {
     super.key,
     this.padding = EdgeInsets.zero,
     this.showHeader = true,
+    this.homeScope = false,
   });
 
   /// Outer padding, applied only when the card renders, so Home's spacing
@@ -67,9 +68,15 @@ class CampusCard extends ConsumerWidget {
   /// Branch page's AppBar).
   final bool showHeader;
 
+  /// Show Home's branch ([homeCampusProvider]) rather than the member's
+  /// chosen one, as the Branch page opened from Home does.
+  final bool homeScope;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final branch = ref.watch(currentCampusProvider);
+    final branch = ref.watch(
+      homeScope ? homeCampusProvider : currentCampusProvider,
+    );
     if (branch == null) return const SizedBox.shrink();
 
     final services = branch.services;

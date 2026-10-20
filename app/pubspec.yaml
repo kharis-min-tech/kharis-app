@@ -77,6 +77,8 @@ dependencies:
   firebase_crashlytics: ^4.3.10
   firebase_performance: ^0.10.1+10
   video_player: ^2.14.1
+  # "Use my location" in the branch picker: one approximate fix, on request.
+  geolocator: ^14.0.1
 
 dev_dependencies:
   flutter_test:

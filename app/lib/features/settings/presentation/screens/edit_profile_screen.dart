@@ -144,7 +144,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const SizedBox(height: 20),
             _label('Home branch'),
             _CampusRow(
-              label: branch ?? kAllCampusesLabel,
+              label: branch ?? kChooseBranchLabel,
               onTap: () => pickActiveBranch(context, ref),
             ),
             const SizedBox(height: 20),

@@ -24,7 +24,9 @@ Finder get _homeScroll => verticalScrollableIn(find.byType(HomeScreen));
 
 /// (b) Switch to a different branch (picked at random, seeded by the date)
 /// from More > Switch branch; Home, announcements, events and service times
-/// follow that branch's Studio data; then switch to All branches.
+/// follow that branch's Studio data. The Events tab then browses All
+/// branches, which leaves the member's branch (and Home) alone, and the
+/// member's own picker offers "Use my location", never "All branches".
 Future<void> branchSwitchJourney(Journey j) async {
   final t = j.tester;
   final branches = await studioBranches();
@@ -147,7 +149,7 @@ Future<void> branchSwitchJourney(Journey j) async {
       .toList();
   await _checkHomeEvents(j, expected, hidden, to.name);
 
-  // Events tab: branch chip -> All branches.
+  // Events tab: branch chip -> All branches, a browse filter only.
   await tapNav(t, 'Events');
   await pumpUntilFound(t, find.byType(CalendarScreen));
   final chip = find.descendant(
@@ -173,33 +175,30 @@ Future<void> branchSwitchJourney(Journey j) async {
   j.check(
     await pumpUntil(
       t,
-      () =>
-          j.c.read(currentBranchProvider).hasValue &&
-          j.c.read(currentBranchProvider).valueOrNull == null,
+      () => find
+          .descendant(
+            of: find.byType(CalendarScreen),
+            matching: find.text('All branches'),
+          )
+          .evaluate()
+          .isNotEmpty,
       timeout: const Duration(seconds: 15),
     ),
-    'All branches clears the active branch',
-  );
-  await pumpFor(t, const Duration(seconds: 2));
-  j.check(
-    find
-        .descendant(
-          of: find.byType(CalendarScreen),
-          matching: find.text('All branches'),
-        )
-        .evaluate()
-        .isNotEmpty,
     'Events chip shows "All branches"',
+  );
+  j.check(
+    j.c.read(currentBranchProvider).valueOrNull == to.name,
+    'browsing All branches keeps the member\'s branch "${to.name}" '
+    '(got ${j.c.read(currentBranchProvider).valueOrNull})',
   );
   final allUpcoming = events.where((e) => !e.isPast(now)).toList();
   await pumpUntil(
     t,
-    () => j.c.read(campusUpcomingEventsProvider).hasValue,
+    () => j.c.read(eventsUpcomingProvider).hasValue,
     timeout: const Duration(seconds: 30),
   );
   final shownIds = {
-    for (final e
-        in j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
+    for (final e in j.c.read(eventsUpcomingProvider).valueOrNull ?? const [])
       e.id,
   };
   j.check(
@@ -224,19 +223,32 @@ Future<void> branchSwitchJourney(Journey j) async {
   }
   await j.shot('events-all-branches');
 
+  // Home still follows the member's branch, and their own picker offers
+  // "Use my location" and the branches, never "All branches".
   await tapNav(t, 'Home');
   await pumpFor(t, const Duration(seconds: 1));
   j.check(
-    find.byKey(const Key('campus-card')).evaluate().isEmpty,
-    'Home hides the Your branch card for All branches',
+    j.c.read(homeBranchProvider).valueOrNull == to.name,
+    'Home still shows "${to.name}" '
+    '(got ${j.c.read(homeBranchProvider).valueOrNull})',
   );
-  await _checkAnnouncements(j, news, null);
+  await _checkAnnouncements(j, news, to.name);
+  final change = find.byKey(const Key('home-branch-change')).first;
+  await scrollUntilFound(t, change, scrollable: _homeScroll);
+  await t.tap(change, warnIfMissed: false);
+  final useLocation = find.byKey(const ValueKey('branch-use-location'));
+  await pumpUntilFound(t, useLocation, reason: 'member branch picker');
+  j.check(all.evaluate().isEmpty, 'the member picker has no "All branches"');
+  await j.shot('member-branch-sheet');
+  await t.tapAt(const Offset(20, 80));
+  await pumpFor(t, const Duration(seconds: 1));
+  j.check(useLocation.evaluate().isEmpty, 'the branch picker dismisses');
 }
 
 Future<void> _checkAnnouncements(
   Journey j,
   List<Map<String, dynamic>> news,
-  String? branch,
+  String branch,
 ) async {
   final t = j.tester;
   final card = find.byKey(const Key('home-announcement-latest'));
@@ -246,8 +258,7 @@ Future<void> _checkAnnouncements(
     final exp = DateTime.tryParse(
       '${n['expires_at'] ?? n['expiry_date'] ?? ''}',
     );
-    return (branch == null || b.isEmpty || b == branch) &&
-        (exp == null || exp.isAfter(now));
+    return (b.isEmpty || b == branch) && (exp == null || exp.isAfter(now));
   }).toList();
   // Sections sit above the branch card: start from the top.
   await t.drag(_homeScroll, const Offset(0, 20000), warnIfMissed: false);
@@ -255,7 +266,7 @@ Future<void> _checkAnnouncements(
   if (visible.isEmpty) {
     // Nothing published: Home hides the whole block, heading included.
     final heading = find.byKey(const Key('home-announcements-see-all'));
-    j.note('DATA: no live announcements for ${branch ?? 'All branches'}');
+    j.note('DATA: no live announcements for $branch');
     await pumpUntil(
       t,
       () => heading.evaluate().isEmpty,
@@ -277,7 +288,7 @@ Future<void> _checkAnnouncements(
     final visibleIds = {for (final n in visible) '${n['id']}'};
     j.check(
       feed.every((n) => visibleIds.contains(n.id)),
-      'announcement feed holds only ${branch ?? 'All branches'} notices',
+      'announcement feed holds only $branch notices',
     );
     j.check(feed.isNotEmpty, 'announcement feed answered with notices');
     if (feed.isNotEmpty) {
@@ -287,12 +298,11 @@ Future<void> _checkAnnouncements(
             .descendant(of: card, matching: find.text(newest.title))
             .evaluate()
             .isNotEmpty,
-        'newest announcement "${newest.title}" shown for '
-        '${branch ?? 'All branches'}',
+        'newest announcement "${newest.title}" shown for $branch',
       );
     }
   }
-  await j.shot('home-announcements-${branch ?? 'all'}');
+  await j.shot('home-announcements-$branch');
 }
 
 Future<void> _checkHomeEvents(

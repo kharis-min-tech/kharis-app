@@ -27,6 +27,13 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 const _statusBar = 47.0;
 
+/// A one-off event, so Home has an events block below the fold.
+Event _praiseNight() => Event(
+  id: 'praise',
+  title: 'Praise Night',
+  startTime: DateTime.now().add(const Duration(days: 9)),
+);
+
 Future<void> _pumpHome(
   WidgetTester tester, {
   List<Event> events = const [],
@@ -112,7 +119,7 @@ void main() {
 
   testWidgets('a vertical drag on the wall scrolls Home; a sideways one '
       'moves the wall, not the page', (tester) async {
-    await _pumpHome(tester);
+    await _pumpHome(tester, events: [_praiseNight()]);
     expect(_homeScroll(tester).pixels, 0);
     expect(_homeScroll(tester).maxScrollExtent, greaterThan(150));
 
@@ -242,11 +249,22 @@ void main() {
     expect(_statusStyle(tester).statusBarIconBrightness, Brightness.dark);
   });
 
-  testWidgets('no announcements: the block is hidden, heading included', (
-    tester,
-  ) async {
+  testWidgets('no announcements and no one-off events: both blocks are '
+      'hidden, headings included', (tester) async {
     await _pumpHome(tester);
     expect(find.byKey(const Key('home-announcements-see-all')), findsNothing);
     expect(find.textContaining('No announcements'), findsNothing);
+    expect(find.byKey(const Key('home-events-see-all')), findsNothing);
+    expect(find.textContaining('No upcoming events'), findsNothing);
+  });
+
+  testWidgets('a one-off event coming up: the events block shows', (
+    tester,
+  ) async {
+    await _pumpHome(tester, events: [_praiseNight()]);
+    _homeScroll(tester).jumpTo(_homeScroll(tester).maxScrollExtent);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byKey(const Key('home-events-see-all')), findsOneWidget);
+    expect(find.text('Praise Night'), findsOneWidget);
   });
 }
