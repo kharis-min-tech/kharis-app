@@ -75,6 +75,18 @@ class CampusCard extends ConsumerWidget {
         : null;
     final legacyAddress = venues.isEmpty ? branch.address?.trim() : null;
     final hasLegacyAddress = legacyAddress != null && legacyAddress.isNotEmpty;
+    // Services that name no listed venue lead, outside any venue block.
+    final unplaced = [
+      for (final s in services)
+        if (!venues.any((v) => v.id == s.venueId)) s,
+    ];
+    // With several venues, a note every one of them carries is said once.
+    final shared = venues.length < 2
+        ? const <String>[]
+        : [
+            for (final n in venueNotes(venues.first))
+              if (venues.every((v) => venueNotes(v).contains(n))) n,
+          ];
     final contact = branch.contact;
 
     if (services.isEmpty &&
@@ -141,26 +153,35 @@ class CampusCard extends ConsumerWidget {
                 weight: FontWeight.w700,
               ).copyWith(color: kc.onBg, height: 1.1),
             ),
-            if (services.isNotEmpty) ...[
+            // One block per venue: its name, the services that meet there,
+            // its address and its own notes. Notes every venue shares show
+            // once at the end rather than under each.
+            if (unplaced.isNotEmpty) ...[
               const SizedBox(height: 14),
-              for (final (i, s) in services.indexed) ...[
-                if (i > 0) const SizedBox(height: 12),
-                _ServiceRow(
-                  service: s,
-                  // Name the venue on a service only when the campus meets
-                  // in more than one place; otherwise the venue block says it.
-                  venue: venues.length > 1 ? branch.venueById(s.venueId) : null,
-                ),
-              ],
+              _ServiceList(services: unplaced),
             ] else if (legacySchedule != null) ...[
               const SizedBox(height: 12),
               _IconLine(icon: Icons.schedule_rounded, text: legacySchedule),
             ],
-            if (venues.isNotEmpty) ...[
+            for (final v in venues) ...[
               const SizedBox(height: 14),
               Divider(height: 1, thickness: 1, color: kc.divider),
-              for (final v in venues) _VenueRow(venue: v),
-            ] else if (hasLegacyAddress) ...[
+              _VenueBlock(
+                venue: v,
+                services: [
+                  for (final s in services)
+                    if (s.venueId == v.id) s,
+                ],
+                notes: [
+                  for (final n in venueNotes(v))
+                    if (!shared.contains(n)) n,
+                ],
+              ),
+            ],
+            if (shared.isNotEmpty) ...[
+              for (final n in shared) ...[const SizedBox(height: 4), _Note(n)],
+            ],
+            if (venues.isEmpty && hasLegacyAddress) ...[
               const SizedBox(height: 2),
               _AddressLink(
                 key: const Key('campus-directions'),
@@ -222,17 +243,42 @@ Future<void> _launch(Uri uri) async {
   }
 }
 
+/// A venue's directions, parking and transport notes, blanks dropped.
+List<String> venueNotes(CampusVenue venue) => [
+  for (final n in [
+    venue.directionsText,
+    venue.parkingInfo,
+    venue.publicTransportInfo,
+  ])
+    if (n?.trim() case final t? when t.isNotEmpty) t,
+];
+
+class _ServiceList extends StatelessWidget {
+  const _ServiceList({required this.services});
+
+  final List<CampusService> services;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (final (i, s) in services.indexed) ...[
+        if (i > 0) const SizedBox(height: 12),
+        _ServiceRow(service: s),
+      ],
+    ],
+  );
+}
+
 class _ServiceRow extends StatelessWidget {
-  const _ServiceRow({required this.service, this.venue});
+  const _ServiceRow({required this.service});
 
   final CampusService service;
-  final CampusVenue? venue;
 
   @override
   Widget build(BuildContext context) {
     final kc = context.kc;
     final when = campusServiceWhen(service);
-    final venueName = venue?.name;
     return Row(
       key: Key('campus-service-${service.id}'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,15 +314,6 @@ class _ServiceRow extends StatelessWidget {
                   ).copyWith(color: kc.muted, height: 1.3),
                 ),
               ],
-              if (venueName != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  venueName,
-                  style: AppTypography.ui(
-                    size: 13,
-                  ).copyWith(color: kc.muted, height: 1.3),
-                ),
-              ],
             ],
           ),
         ),
@@ -285,10 +322,18 @@ class _ServiceRow extends StatelessWidget {
   }
 }
 
-class _VenueRow extends StatelessWidget {
-  const _VenueRow({required this.venue});
+/// One place the branch meets: its name, the services held there, then its
+/// address (tap for directions) and [notes].
+class _VenueBlock extends StatelessWidget {
+  const _VenueBlock({
+    required this.venue,
+    required this.services,
+    required this.notes,
+  });
 
   final CampusVenue venue;
+  final List<CampusService> services;
+  final List<String> notes;
 
   /// What the maps app searches for: the address, else the pin, else the
   /// venue name.
@@ -306,17 +351,13 @@ class _VenueRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final kc = context.kc;
     final query = _query;
-    final notes = [
-      ?venue.directionsText,
-      ?venue.parkingInfo,
-      ?venue.publicTransportInfo,
-    ];
     return Padding(
+      key: Key('campus-venue-${venue.id}'),
       padding: const EdgeInsets.only(top: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (venue.name case final name?)
+          if (venue.name case final name?) ...[
             Text(
               name,
               style: AppTypography.ui(
@@ -324,26 +365,37 @@ class _VenueRow extends StatelessWidget {
                 weight: FontWeight.w700,
               ).copyWith(color: kc.onBg, height: 1.25),
             ),
-          if (query != null) ...[
+            if (services.isNotEmpty) const SizedBox(height: 10),
+          ],
+          if (services.isNotEmpty) ...[
+            _ServiceList(services: services),
+            const SizedBox(height: 8),
+          ],
+          if (query != null)
             _AddressLink(
               key: Key('campus-directions-${venue.id}'),
               text: venue.address.isNotEmpty ? venue.address : 'Get directions',
               onTap: () => _openDirections(context, query),
             ),
-          ],
-          for (final n in notes) ...[
-            const SizedBox(height: 4),
-            Text(
-              n,
-              style: AppTypography.ui(
-                size: 12.5,
-              ).copyWith(color: kc.muted, height: 1.35),
-            ),
-          ],
+          for (final n in notes) ...[const SizedBox(height: 4), _Note(n)],
         ],
       ),
     );
   }
+}
+
+class _Note extends StatelessWidget {
+  const _Note(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: AppTypography.ui(
+      size: 12.5,
+    ).copyWith(color: context.kc.muted, height: 1.35),
+  );
 }
 
 /// An address that opens directions; tinted so the affordance is visible.
