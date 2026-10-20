@@ -352,8 +352,8 @@ void main() {
     };
 
     testWidgets('no words on the media: the title is the slide\'s '
-        'screen-reader label; it fades into the page; dots for more than '
-        'one slide', (tester) async {
+        'screen-reader label; no gradient over it; dots for more than one '
+        'slide', (tester) async {
       final semantics = tester.ensureSemantics();
       await _pumpHero(tester, SupabaseStub(withVideo));
 
@@ -366,7 +366,20 @@ void main() {
       );
       expect(find.text('App clip'), findsNothing);
       expect(find.bySemanticsLabel('App clip'), findsOneWidget);
-      expect(find.byKey(const Key('home-hero-fade')), findsOneWidget);
+      // A clean edge: the video fades only on scroll, never through a
+      // gradient laid over it.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('home-hero')),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                w.decoration is BoxDecoration &&
+                (w.decoration as BoxDecoration).gradient != null,
+          ),
+        ),
+        findsNothing,
+      );
       expect(find.byKey(const Key('home-hero-dots')), findsOneWidget);
       semantics.dispose();
     });
