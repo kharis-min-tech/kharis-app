@@ -687,7 +687,25 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
                     key: const Key('home-hero-video-thumbnail'),
                     fit: BoxFit.cover,
                     gaplessPlayback: true,
-                    errorBuilder: (_, _, _) => const SizedBox.expand(),
+                    // Most Shorts have no upright `oardefault` frame: the
+                    // 4:3 `hqdefault` holds the clip pillarboxed, and
+                    // covering the 9:16 frame with it keeps exactly the clip.
+                    errorBuilder: (_, _, _) {
+                      final fallback = heroThumbnailFallback(
+                        widget.video.videoId,
+                        widget.video.thumbnailUrl,
+                      );
+                      return fallback == null
+                          ? const SizedBox.expand()
+                          : Image.network(
+                              fallback,
+                              key: const Key('home-hero-video-thumbnail-hq'),
+                              fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox.expand(),
+                            );
+                    },
                   ),
               ],
             ),
@@ -752,6 +770,14 @@ const Duration kHeroRevealDelay = Duration(seconds: 3);
 
 /// How long before its end the clip jumps back to the start.
 const Duration kHeroLoopLead = Duration(milliseconds: 1500);
+
+/// The frame to show when [failed] (a clip's thumbnail) did not load:
+/// YouTube's `hqdefault`, which every video has. Null when that already
+/// failed, so the hero never retries the same image.
+String? heroThumbnailFallback(String videoId, String failed) {
+  final hq = 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
+  return failed == hq ? null : hq;
+}
 
 /// The muted, looping, control-less YouTube preview behind the hero's video
 /// slide. One instance at most: the hero only builds it for the current,

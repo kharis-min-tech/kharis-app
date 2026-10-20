@@ -309,6 +309,37 @@ void main() {
       'news': <Map<String, dynamic>>[],
     };
 
+    testWidgets('a Short with no upright thumbnail falls back to YouTube\'s '
+        'hqdefault frame, never a black box', (tester) async {
+      const upright = FeaturedVideo(
+        workspace: 'youtube',
+        url: 'https://www.youtube.com/shorts/s2',
+        videoId: 's2',
+        title: 'Pray first',
+        thumbnailUrl: 'https://i.ytimg.com/vi/s2/oardefault.jpg',
+        vertical: true,
+      );
+      await _pumpHero(
+        tester,
+        SupabaseStub(stub),
+        reduceMotion: true,
+        shorts: const [upright],
+      );
+      // Network images fail in tests, as `oardefault` does for most Shorts.
+      await tester.pump();
+      final hq = find.byKey(const Key('home-hero-video-thumbnail-hq'));
+      expect(hq, findsOneWidget);
+      expect(
+        (tester.widget<Image>(hq).image as NetworkImage).url,
+        'https://i.ytimg.com/vi/s2/hqdefault.jpg',
+      );
+    });
+
+    test('the fallback is never the image that just failed', () {
+      const hq = 'https://i.ytimg.com/vi/s3/hqdefault.jpg';
+      expect(heroThumbnailFallback('s3', hq), isNull);
+    });
+
     test(
       'the channel\'s Shorts lead the hero in place of the Studio clip',
       () async {
