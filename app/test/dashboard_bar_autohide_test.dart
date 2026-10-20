@@ -117,6 +117,19 @@ void main() {
     expect(barOffset(tester), Offset.zero, reason: 'at the top');
   });
 
+  testWidgets(
+    'reaching the end of the page brings it back (Android: no bounce)',
+    (tester) async {
+      await launch(tester);
+      await scrollList(tester, -400);
+      expect(barOffset(tester), const Offset(0, 1), reason: 'mid page');
+
+      await scrollList(tester, -20000);
+      expect(barOffset(tester), Offset.zero, reason: 'at the end');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   testWidgets('a route change brings it back', (tester) async {
     await launch(tester);
     await scrollList(tester, -400);

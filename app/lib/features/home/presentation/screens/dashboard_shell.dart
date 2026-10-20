@@ -199,7 +199,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case ScrollDirection.idle:
           break;
       }
-    } else if (metrics.pixels <= metrics.minScrollExtent) {
+    } else if (metrics.pixels <= metrics.minScrollExtent ||
+        (metrics.maxScrollExtent > metrics.minScrollExtent &&
+            metrics.pixels >= metrics.maxScrollExtent)) {
+      // Top or end of the page: nothing more to read in this direction, so
+      // the tabs come back. iOS's bounce at the end did this by accident;
+      // Android's clamping scroll has no bounce and left the bar hidden.
       _setBarVisible(true);
     }
     return false;
