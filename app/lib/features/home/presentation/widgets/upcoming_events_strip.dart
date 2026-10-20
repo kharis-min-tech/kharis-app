@@ -17,8 +17,8 @@ const double _kTileWidth = 236;
 
 /// A tile's height: the picture plus its text block, which grows with the
 /// member's text size.
-double _tileHeight(BuildContext context) =>
-    _kTileMedia + MediaQuery.textScalerOf(context).scale(100);
+double _tileHeight(BuildContext context, {double media = _kTileMedia}) =>
+    media + MediaQuery.textScalerOf(context).scale(100);
 
 /// Height of a tile's picture: the flyer, or the date when there is none.
 const double _kTileMedia = 136;
@@ -93,6 +93,26 @@ class UpcomingEventsStrip extends ConsumerWidget {
     }
 
     final preview = events.take(kHomeEventPreviewCount).toList();
+    if (preview.length == 1) {
+      // One event spans the row, its flyer at 2:1, rather than a lone tile
+      // beside empty space.
+      return Padding(
+        padding: const EdgeInsets.only(right: 20),
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final media = box.maxWidth / 2;
+            return SizedBox(
+              height: _tileHeight(context, media: media),
+              child: _EventTile(
+                event: preview.single,
+                width: box.maxWidth,
+                mediaHeight: media,
+              ),
+            );
+          },
+        ),
+      );
+    }
     return SizedBox(
       height: _tileHeight(context),
       child: ListView.separated(
@@ -107,9 +127,15 @@ class UpcomingEventsStrip extends ConsumerWidget {
 }
 
 class _EventTile extends StatelessWidget {
-  const _EventTile({required this.event});
+  const _EventTile({
+    required this.event,
+    this.width = _kTileWidth,
+    this.mediaHeight = _kTileMedia,
+  });
 
   final Event event;
+  final double width;
+  final double mediaHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -127,12 +153,12 @@ class _EventTile extends StatelessWidget {
         child: InkWell(
           onTap: () => openEventDetail(context, event),
           child: SizedBox(
-            width: _kTileWidth,
+            width: width,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height: _kTileMedia,
+                  height: mediaHeight,
                   child: _TileMedia(event: event),
                 ),
                 Padding(

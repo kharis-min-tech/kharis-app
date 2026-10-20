@@ -416,7 +416,11 @@ class _ScrollFade extends StatelessWidget {
         final offset = scroll.hasClients
             ? scroll.offset.clamp(0.0, distance)
             : 0.0;
-        final t = distance <= 0 ? 0.0 : offset / distance;
+        // Reaches the page colour by 60% of the way, so no dim band of
+        // video lingers behind the content.
+        final t = distance <= 0
+            ? 0.0
+            : (offset / (distance * 0.6)).clamp(0.0, 1.0);
         return Transform.translate(
           offset: Offset(0, offset * 0.4),
           child: Stack(
@@ -424,9 +428,7 @@ class _ScrollFade extends StatelessWidget {
             children: [
               child!,
               IgnorePointer(
-                child: ColoredBox(
-                  color: background.withValues(alpha: t * 0.85),
-                ),
+                child: ColoredBox(color: background.withValues(alpha: t)),
               ),
             ],
           ),

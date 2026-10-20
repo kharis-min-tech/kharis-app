@@ -361,7 +361,7 @@ class _BibleCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Every book and chapter, in the translation you choose.',
+                'Every book and chapter, in your translation.',
                 style: AppTypography.ui(size: 14).copyWith(
                   color: Colors.white.withValues(alpha: .85),
                   height: 1.45,
