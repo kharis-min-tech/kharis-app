@@ -315,6 +315,18 @@ Future<void> _checkHomeEvents(
   final strip = find.byType(UpcomingEventsStrip);
   await t.drag(_homeScroll, const Offset(0, 20000), warnIfMissed: false);
   await pumpFor(t, const Duration(milliseconds: 600));
+  if (expected.isEmpty) {
+    // Nothing beyond the branch's weekly services: Home leaves the whole
+    // block out, heading included.
+    j.note('DATA: no one-off upcoming Studio events visible to $branch');
+    await pumpFor(t, const Duration(seconds: 3));
+    j.check(
+      find.byKey(const Key('home-events-see-all')).evaluate().isEmpty &&
+          strip.evaluate().isEmpty,
+      'no events block on Home for $branch',
+    );
+    return;
+  }
   await scrollUntilFound(t, strip, scrollable: _homeScroll);
   await pumpUntil(
     t,
@@ -323,34 +335,26 @@ Future<void> _checkHomeEvents(
   );
   await pumpFor(t, const Duration(seconds: 1));
   final texts = paintedTexts(within: strip);
-  if (expected.isEmpty) {
-    j.note('DATA: no upcoming Studio events visible to $branch');
-    j.check(
-      texts.contains('No upcoming events at $branch yet.'),
-      'events strip empty state for $branch (painted $texts)',
-    );
-  } else {
-    final shown = {
-      for (final e
-          in j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
-        e.id,
-    };
-    for (final e in expected) {
-      j.check(shown.contains(e.id), 'event "${e.title}" listed for $branch');
-    }
-    j.check(
-      texts.any((s) => s.contains(expected.first.title)) ||
-          // The strip is horizontal; later cards may be off screen.
-          find
-              .descendant(
-                of: strip,
-                matching: find.text(expected.first.title, skipOffstage: false),
-              )
-              .evaluate()
-              .isNotEmpty,
-      'strip shows "${expected.first.title}"',
-    );
+  final shown = {
+    for (final e
+        in j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const [])
+      e.id,
+  };
+  for (final e in expected) {
+    j.check(shown.contains(e.id), 'event "${e.title}" listed for $branch');
   }
+  j.check(
+    texts.any((s) => s.contains(expected.first.title)) ||
+        // The strip is horizontal; later cards may be off screen.
+        find
+            .descendant(
+              of: strip,
+              matching: find.text(expected.first.title, skipOffstage: false),
+            )
+            .evaluate()
+            .isNotEmpty,
+    'strip shows "${expected.first.title}"',
+  );
   for (final e in hidden) {
     j.check(
       !(j.c.read(campusUpcomingEventsProvider).valueOrNull ?? const []).any(

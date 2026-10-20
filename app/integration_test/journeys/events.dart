@@ -22,6 +22,12 @@ Finder _cardFor(String id) => _inCalendar(
 );
 
 Future<void> _tab(WidgetTester t, String label) async {
+  // The tab chips scroll with the list: bring them back first.
+  final list = _inCalendar(find.byType(Scrollable));
+  if (list.evaluate().isNotEmpty) {
+    t.state<ScrollableState>(list.first).position.jumpTo(0);
+    await t.pump();
+  }
   await t.tap(_inCalendar(find.text(label)).first, warnIfMissed: false);
   await pumpFor(t, const Duration(seconds: 2));
 }
