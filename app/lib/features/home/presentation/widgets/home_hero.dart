@@ -154,9 +154,19 @@ final heroVideoSurfaceProvider = Provider<HeroVideoSurfaceBuilder?>(
 const Color _kBackdrop = AppColors.surfaceDark;
 
 /// Height of the hero's media: about 58% of a phone's screen, clamped so a
-/// landscape phone keeps some list and a tablet is not all banner.
-double homeHeroMediaHeight(Size screen) =>
-    (screen.height * 0.58).clamp(260.0, 560.0);
+/// landscape phone keeps some list and a tablet is not all banner. With a
+/// vertical Short among the slides it grows to fit the Short whole at full
+/// width above the title card, up to 82% of the screen.
+double homeHeroMediaHeight(Size screen, {bool vertical = false}) => vertical
+    ? (screen.width * 16 / 9 + kHeroCardOverlap + 12).clamp(
+        260.0,
+        screen.height * 0.82,
+      )
+    : (screen.height * 0.58).clamp(260.0, 560.0);
+
+/// Whether any of [slides] is a vertical Short (the hero then grows).
+bool heroHasVertical(List<HeroSlide> slides) =>
+    slides.any((s) => s is VideoHeroSlide && s.video.vertical);
 
 /// Height of the band at the top of the media that the floating header
 /// (logo and bell chips) occupies below the status bar.
@@ -293,7 +303,10 @@ class _HomeHeroState extends ConsumerState<HomeHero> {
   Widget build(BuildContext context) {
     final slides = widget.slides;
     final padding = MediaQuery.paddingOf(context);
-    final mediaHeight = homeHeroMediaHeight(MediaQuery.sizeOf(context));
+    final mediaHeight = homeHeroMediaHeight(
+      MediaQuery.sizeOf(context),
+      vertical: heroHasVertical(slides),
+    );
     final canPlay = _canPlay(context);
 
     final current = slides[_index.clamp(0, slides.length - 1)];
@@ -437,6 +450,8 @@ class _SlideMedia extends StatelessWidget {
         title: title,
         active: active,
         onPlayingChanged: onPlayingChanged,
+        topInset: topInset,
+        bottomInset: bottomInset,
       ),
       EventHeroSlide(:final event) => _FlyerMedia(
         url: event.imageUrl!,
@@ -510,9 +525,16 @@ class _VideoMedia extends ConsumerStatefulWidget {
     required this.title,
     required this.active,
     required this.onPlayingChanged,
+    required this.topInset,
+    required this.bottomInset,
   });
 
   final FeaturedVideo video;
+
+  /// Room kept clear for the floating header (landscape clips) and the
+  /// title card, as for flyers.
+  final double topInset;
+  final double bottomInset;
   final String title;
   final bool active;
   final ValueChanged<bool> onPlayingChanged;
@@ -573,25 +595,49 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
   @override
   Widget build(BuildContext context) {
     final surface = widget.active ? ref.watch(heroVideoSurfaceProvider) : null;
+    final ratio = widget.video.vertical ? 9 / 16 : 16 / 9;
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (surface != null)
-          IgnorePointer(
-            child: _CoverBox(
-              key: const Key('home-hero-video-surface'),
-              ratio: widget.video.vertical ? 9 / 16 : 16 / 9,
-              child: surface(widget.video.videoId, _muted, _onPlaying),
+        // The clip whole, at its own shape, centred in the room left between
+        // the floating header (landscape) and the title card: fitted, never
+        // cropped or enlarged.
+        Padding(
+          padding: EdgeInsets.only(
+            top: widget.video.vertical ? 0 : widget.topInset,
+            bottom: widget.bottomInset,
+          ),
+          child: Center(
+            child: AspectRatio(
+              key: const Key('home-hero-video-frame'),
+              aspectRatio: ratio,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (surface != null)
+                    IgnorePointer(
+                      child: KeyedSubtree(
+                        key: const Key('home-hero-video-surface'),
+                        child: surface(
+                          widget.video.videoId,
+                          _muted,
+                          _onPlaying,
+                        ),
+                      ),
+                    ),
+                  if (surface == null || !_playing)
+                    Image.network(
+                      widget.video.thumbnailUrl,
+                      key: const Key('home-hero-video-thumbnail'),
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, _, _) => const SizedBox.expand(),
+                    ),
+                ],
+              ),
             ),
           ),
-        if (surface == null || !_playing)
-          Image.network(
-            widget.video.thumbnailUrl,
-            key: const Key('home-hero-video-thumbnail'),
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            errorBuilder: (_, _, _) => const SizedBox.expand(),
-          ),
+        ),
         if (surface != null)
           Positioned(
             right: 17,
@@ -646,49 +692,12 @@ class _MuteButton extends StatelessWidget {
   }
 }
 
-/// How far the clip is enlarged past covering the hero, around its centre,
-/// so YouTube's own edge chrome (the title bar across the top, the
-/// watermark and "More videos" corners) falls outside the clip.
-const double kHeroClipCropScale = 1.25;
-
 /// How long the thumbnail stays over a clip that has started playing, so
 /// the pause glyph YouTube flashes at the start is never seen.
 const Duration kHeroRevealDelay = Duration(seconds: 3);
 
 /// How long before its end the clip jumps back to the start.
 const Duration kHeroLoopLead = Duration(milliseconds: 1500);
-
-/// Sizes a 16:9 child to cover the box (centred, overflow clipped) without
-/// scaling its layout, so the platform view renders at its real size, then
-/// enlarges it by [kHeroClipCropScale] to crop the player's edges.
-class _CoverBox extends StatelessWidget {
-  const _CoverBox({super.key, required this.child, this.ratio = 16 / 9});
-
-  final Widget child;
-
-  /// The player's shape: 16:9, or 9:16 for a Short.
-  final double ratio;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        final wide = box.maxWidth / box.maxHeight > ratio;
-        final width = wide ? box.maxWidth : box.maxHeight * ratio;
-        final height = wide ? box.maxWidth / ratio : box.maxHeight;
-        return ClipRect(
-          child: OverflowBox(
-            minWidth: width,
-            maxWidth: width,
-            minHeight: height,
-            maxHeight: height,
-            child: Transform.scale(scale: kHeroClipCropScale, child: child),
-          ),
-        );
-      },
-    );
-  }
-}
 
 /// The muted, looping, control-less YouTube preview behind the hero's video
 /// slide. One instance at most: the hero only builds it for the current,

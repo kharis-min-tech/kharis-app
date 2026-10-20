@@ -266,9 +266,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           top: BorderSide(color: context.kc.divider, width: 1),
                         ),
                       ),
-                      padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
+                      padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _TabItem(
                             icon: Icons.home_outlined,
@@ -331,7 +330,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 }
 
-/// Single tab item: icon 24 + label 10.5px w600.
+/// Single tab item: icon 24 on a pill when active + label 11.5px.
 /// Active color: `context.kc.accentInk` (gold).
 /// Inactive color: `context.kc.muted`.
 class _TabItem extends StatelessWidget {
@@ -356,31 +355,56 @@ class _TabItem extends StatelessWidget {
     final isActive = index == currentIndex;
     final color = isActive ? context.kc.accentInk : context.kc.muted;
 
-    return GestureDetector(
-      onTap: () => onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: Semantics(
-        label: label,
-        selected: isActive,
-        button: true,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(isActive ? activeIcon : icon, size: 24, color: color),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: AppTypography.labelMd.copyWith(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                  letterSpacing: 0,
-                  height: 1.2,
+    final reduce = MediaQuery.disableAnimationsOf(context);
+
+    // An equal share of the bar each, so labels never crowd; the active tab
+    // sits on a soft pill (flat fill, no glow).
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: Semantics(
+          label: label,
+          selected: isActive,
+          button: true,
+          excludeSemantics: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: reduce
+                      ? Duration.zero
+                      : const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  width: 58,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isActive ? context.kc.chipBg : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    size: 24,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 5),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelMd.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                    color: color,
+                    letterSpacing: 0.1,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

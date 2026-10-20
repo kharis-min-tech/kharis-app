@@ -63,7 +63,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onScroll() {
-    final media = homeHeroMediaHeight(MediaQuery.sizeOf(context));
+    final media = homeHeroMediaHeight(
+      MediaQuery.sizeOf(context),
+      vertical: heroHasVertical(ref.read(homeHeroSlidesProvider)),
+    );
     final offset = _scroll.offset;
     final under = offset < media - MediaQuery.paddingOf(context).top;
     final inView = offset < media;

@@ -147,6 +147,7 @@ Future<void> _pumpHero(
   bool reduceMotion = false,
   List<Sermon> latest = const [_latest],
   FakeAudioPlayerService? audio,
+  List<FeaturedVideo> shorts = const [],
 }) async {
   tester.view.physicalSize = const Size(400, 900);
   tester.view.devicePixelRatio = 1;
@@ -154,7 +155,7 @@ Future<void> _pumpHero(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        ..._overrides(stub, latest: latest),
+        ..._overrides(stub, latest: latest, shorts: shorts),
         audioPlayerServiceProvider.overrideWithValue(
           audio ?? FakeAudioPlayerService(),
         ),
@@ -319,6 +320,26 @@ void main() {
       },
     );
 
+    testWidgets('a Short is shown whole: the hero grows to fit it at 9:16, '
+        'nothing cropped, and it ends above the title card', (tester) async {
+      await _pumpHero(tester, SupabaseStub(stub), shorts: [short]);
+      final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
+      final frame = tester.getRect(
+        find.byKey(const Key('home-hero-video-frame')),
+      );
+      final card = tester.getRect(find.byKey(const Key('home-hero-card')));
+      expect(frame.width / frame.height, closeTo(9 / 16, 0.01));
+      expect(frame.left, greaterThanOrEqualTo(media.left - 0.5));
+      expect(frame.right, lessThanOrEqualTo(media.right + 0.5));
+      expect(frame.top, greaterThanOrEqualTo(media.top - 0.5));
+      expect(frame.bottom, lessThanOrEqualTo(card.top + 0.5));
+      // Taller than the landscape hero, so the Short is not a postage stamp.
+      expect(
+        media.height,
+        greaterThan(homeHeroMediaHeight(const Size(400, 900))),
+      );
+    });
+
     test('no Shorts: the Studio clip is the video slide', () async {
       final slides = await _slides(SupabaseStub(stub));
       expect(slides.whereType<VideoHeroSlide>().map((s) => s.video.title), [
@@ -361,7 +382,8 @@ void main() {
     });
 
     testWidgets('the thumbnail covers the clip whenever it is not playing; '
-        'the clip is enlarged to crop the player\'s edges', (tester) async {
+        'a landscape clip is shown whole: 16:9, below the header and above '
+        'the card', (tester) async {
       await _pumpHero(tester, SupabaseStub(withVideo));
       final thumbnail = find.byKey(const Key('home-hero-video-thumbnail'));
       expect(thumbnail, findsOneWidget);
@@ -378,16 +400,16 @@ void main() {
       await tester.pump();
       expect(thumbnail, findsOneWidget);
 
-      final scale = tester.widget<Transform>(
-        find
-            .ancestor(of: _clip(muted: true), matching: find.byType(Transform))
-            .first,
+      final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
+      final frame = tester.getRect(
+        find.byKey(const Key('home-hero-video-frame')),
       );
-      expect(
-        scale.transform.getMaxScaleOnAxis(),
-        closeTo(kHeroClipCropScale, 1e-9),
-      );
-      expect(kHeroClipCropScale, greaterThan(1));
+      final card = tester.getRect(find.byKey(const Key('home-hero-card')));
+      expect(frame.width / frame.height, closeTo(16 / 9, 0.01));
+      expect(frame.left, greaterThanOrEqualTo(media.left));
+      expect(frame.right, lessThanOrEqualTo(media.right));
+      expect(frame.top, greaterThanOrEqualTo(media.top + kHeroTopBarExtent));
+      expect(frame.bottom, lessThanOrEqualTo(card.top));
     });
 
     testWidgets('the clip starts muted; the corner chip unmutes and mutes '
