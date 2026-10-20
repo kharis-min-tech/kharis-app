@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
+import 'package:kharis_app/shared/widgets/reveal_on_scroll.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
@@ -14,11 +18,8 @@ import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import '../widgets/continue_listening_card.dart';
 import '../widgets/giving_shortcut_card.dart';
 import '../widgets/live_now_card.dart';
-import '../widgets/todays_reading_card.dart';
 import '../widgets/daily_message_card.dart';
-import '../widgets/campus_card.dart';
 import '../widgets/profile_completion_card.dart';
-import '../widgets/news_section.dart';
 import '../widgets/home_hero.dart';
 import '../widgets/latest_messages_row.dart';
 import '../widgets/upcoming_events_strip.dart';
@@ -115,43 +116,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               backgroundColor: context.kc.surface,
               edgeOffset: MediaQuery.of(context).padding.top,
               onRefresh: _refresh,
-              child: CustomScrollView(
-                controller: _scroll,
-                slivers: [
-                  // Full-bleed from the very top, under the status bar.
-                  SliverToBoxAdapter(
-                    child: HomeHero(
-                      key: const Key('home-hero'),
-                      inView: _heroInView,
-                      scroll: _scroll,
-                      topBar: const _HeroTopBar(),
-                    ),
-                  ),
-                  // The greeting straight under the hero's faded bottom:
-                  // who and which Branch (tap to change), then the content.
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
-                      child: _Greeting(),
-                    ),
-                  ),
-
-                  // The Studio's blocks in its order; the newest messages
-                  // follow Today's reading (or lead when the Studio hides it).
-                  if (!sections.contains(HomeSectionId.reading))
-                    const SliverToBoxAdapter(child: _LatestMessagesBlock()),
-                  for (final id in sections) ...[
+              // Sections below the first screen rise into view once each.
+              child: RevealScope(
+                scroll: _scroll,
+                child: CustomScrollView(
+                  controller: _scroll,
+                  slivers: [
+                    // Full-bleed from the very top, under the status bar.
                     SliverToBoxAdapter(
-                      key: ValueKey('home-section-${id.name}'),
-                      child: _HomeSection(id),
+                      child: HomeHero(
+                        key: const Key('home-hero'),
+                        inView: _heroInView,
+                        scroll: _scroll,
+                        topBar: const _HeroTopBar(),
+                      ),
                     ),
-                    if (id == HomeSectionId.reading)
-                      const SliverToBoxAdapter(child: _LatestMessagesBlock()),
-                  ],
+                    // The greeting straight under the hero's faded bottom:
+                    // who and which Branch (tap to change), then the content.
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
+                        child: _Greeting(),
+                      ),
+                    ),
 
-                  // Bottom safe area: 150 clears mini player + tab bar
-                  const SliverToBoxAdapter(child: SizedBox(height: 150)),
-                ],
+                    // The Studio's blocks in its order; the newest messages
+                    // follow Today's reading (or lead when the Studio hides it).
+                    if (!sections.contains(HomeSectionId.reading))
+                      const SliverToBoxAdapter(
+                        child: RevealOnScroll(child: _LatestMessagesBlock()),
+                      ),
+                    for (final id in sections) ...[
+                      SliverToBoxAdapter(
+                        key: ValueKey('home-section-${id.name}'),
+                        child: RevealOnScroll(child: _HomeSection(id)),
+                      ),
+                      if (id == HomeSectionId.reading)
+                        const SliverToBoxAdapter(
+                          child: RevealOnScroll(child: _LatestMessagesBlock()),
+                        ),
+                    ],
+
+                    // Bottom safe area: 150 clears mini player + tab bar
+                    const SliverToBoxAdapter(child: SizedBox(height: 150)),
+                  ],
+                ),
               ),
             ),
             // Solid backing behind the status bar once the hero has left it,
@@ -179,8 +188,9 @@ class _AnnouncementsBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The heading only with something under it: the latest announcement.
     final items = ref.watch(campusNewsProvider).valueOrNull;
-    if (items != null && items.isEmpty) return const SizedBox.shrink();
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -191,10 +201,9 @@ class _AnnouncementsBlock extends ConsumerWidget {
           // The full announcements list, pushed so Back returns here.
           onSeeAll: () => context.push('/announcements'),
         ),
-        // Edge-to-edge carousel with a left pad.
-        const Padding(
-          padding: EdgeInsets.only(left: 20, bottom: 28),
-          child: AnnouncementsCarousel(),
+        // The newest one; See all lists the rest.
+        const LatestAnnouncementCard(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
         ),
       ],
     );
@@ -208,7 +217,9 @@ class _LatestMessagesBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(latestSermonsProvider).isEmpty) {
+    // The row leads with the message in progress, so it shows with either.
+    if (ref.watch(latestSermonsProvider).isEmpty &&
+        ref.watch(continueListeningProvider) == null) {
       return const SizedBox.shrink();
     }
     return Column(
@@ -245,10 +256,12 @@ class _HomeSection extends StatelessWidget {
       HomeSectionId.live => const LiveNowCard(padding: _blockPadding),
       // Today's reading, then the Daily Message; each collapses when the
       // Studio has nothing for today.
+      // The Bible as one row, then the Daily Message when the Studio has
+      // one for today.
       HomeSectionId.reading => const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TodaysReadingCard(padding: _blockPadding),
+          HomeBibleRow(padding: _blockPadding),
           DailyMessageCard(padding: _blockPadding),
         ],
       ),
@@ -269,12 +282,13 @@ class _HomeSection extends StatelessWidget {
           ),
         ],
       ),
-      HomeSectionId.campus => const CampusCard(
+      // The branch's next service (flyer, times, venue, contact); the full
+      // timetable is one tap away on the Branch page.
+      HomeSectionId.campus => const NextServiceCard(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
       ),
-      HomeSectionId.continueListening => const ContinueListeningCard(
-        padding: _blockPadding,
-      ),
+      // Leads the Latest messages row instead (no second copy here).
+      HomeSectionId.continueListening => const SizedBox.shrink(),
       HomeSectionId.giving => const Padding(
         padding: _blockPadding,
         child: GivingShortcutCard(),

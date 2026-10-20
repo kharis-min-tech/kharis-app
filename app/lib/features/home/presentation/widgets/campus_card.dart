@@ -52,11 +52,20 @@ Uri? instagramUri(String raw) {
 /// Renders nothing when no campus is selected (all-campus view) or the
 /// campus has nothing to show, rather than an empty card.
 class CampusCard extends ConsumerWidget {
-  const CampusCard({super.key, this.padding = EdgeInsets.zero});
+  const CampusCard({
+    super.key,
+    this.padding = EdgeInsets.zero,
+    this.showHeader = true,
+  });
 
   /// Outer padding, applied only when the card renders, so Home's spacing
   /// collapses with it.
   final EdgeInsetsGeometry padding;
+
+  /// Whether the card leads with "YOUR BRANCH", the branch name and its
+  /// Change link. Off where the screen already names the branch (the
+  /// Branch page's AppBar).
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -98,12 +107,21 @@ class CampusCard extends ConsumerWidget {
     }
 
     final kc = context.kc;
+    // Without the header, the first venue block's own top padding stands in
+    // for the card's, and no divider sits above it.
+    final venuesLead =
+        !showHeader && unplaced.isEmpty && legacySchedule == null;
     return Padding(
       padding: padding,
       child: Container(
         key: const Key('campus-card'),
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        padding: EdgeInsets.fromLTRB(
+          18,
+          venuesLead && venues.isNotEmpty ? 4 : 16,
+          18,
+          18,
+        ),
         decoration: BoxDecoration(
           color: kc.surface,
           borderRadius: AppRadius.cardBorder,
@@ -112,60 +130,64 @@ class CampusCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Text(
-                  'YOUR BRANCH',
-                  style: AppTypography.ui(
-                    size: 11,
-                    weight: FontWeight.w700,
-                    letterSpacing: 1.1,
-                  ).copyWith(color: kc.muted, height: 1),
-                ),
-                const Spacer(),
-                Semantics(
-                  label: 'Change branch',
-                  button: true,
-                  excludeSemantics: true,
-                  child: TextButton(
-                    onPressed: () => pickActiveBranch(context, ref),
-                    style: TextButton.styleFrom(
-                      foregroundColor: kc.onChip,
-                      minimumSize: const Size(48, 44),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      'Change',
-                      style: AppTypography.ui(
-                        size: 12.5,
-                        weight: FontWeight.w600,
-                      ).copyWith(color: kc.onChip, height: 1),
+            if (showHeader) ...[
+              Row(
+                children: [
+                  Text(
+                    'YOUR BRANCH',
+                    style: AppTypography.ui(
+                      size: 11,
+                      weight: FontWeight.w700,
+                      letterSpacing: 1.1,
+                    ).copyWith(color: kc.muted, height: 1),
+                  ),
+                  const Spacer(),
+                  Semantics(
+                    label: 'Change branch',
+                    button: true,
+                    excludeSemantics: true,
+                    child: TextButton(
+                      onPressed: () => pickActiveBranch(context, ref),
+                      style: TextButton.styleFrom(
+                        foregroundColor: kc.onChip,
+                        minimumSize: const Size(48, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Change',
+                        style: AppTypography.ui(
+                          size: 12.5,
+                          weight: FontWeight.w600,
+                        ).copyWith(color: kc.onChip, height: 1),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            Text(
-              branch.name,
-              style: AppTypography.display(
-                size: 22,
-                weight: FontWeight.w700,
-              ).copyWith(color: kc.onBg, height: 1.1),
-            ),
+                ],
+              ),
+              Text(
+                branch.name,
+                style: AppTypography.display(
+                  size: 22,
+                  weight: FontWeight.w700,
+                ).copyWith(color: kc.onBg, height: 1.1),
+              ),
+            ],
             // One block per venue: its name, the services that meet there,
             // its address and its own notes. Notes every venue shares show
             // once at the end rather than under each.
             if (unplaced.isNotEmpty) ...[
-              const SizedBox(height: 14),
+              if (showHeader) const SizedBox(height: 14),
               _ServiceList(services: unplaced),
             ] else if (legacySchedule != null) ...[
-              const SizedBox(height: 12),
+              if (showHeader) const SizedBox(height: 12),
               _IconLine(icon: Icons.schedule_rounded, text: legacySchedule),
             ],
-            for (final v in venues) ...[
-              const SizedBox(height: 14),
-              Divider(height: 1, thickness: 1, color: kc.divider),
+            for (final (i, v) in venues.indexed) ...[
+              if (!venuesLead || i > 0) ...[
+                const SizedBox(height: 14),
+                Divider(height: 1, thickness: 1, color: kc.divider),
+              ],
               _VenueBlock(
                 venue: v,
                 services: [
@@ -191,43 +213,60 @@ class CampusCard extends ConsumerWidget {
             ],
             if (!contact.isEmpty) ...[
               const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (contact.phone case final phone?)
-                    _ContactChip(
-                      key: const Key('campus-call'),
-                      icon: Icons.call_outlined,
-                      label: 'Call',
-                      semanticsLabel: 'Call $phone',
-                      onTap: () => _launch(Uri(scheme: 'tel', path: phone)),
-                    ),
-                  if (contact.email case final email?)
-                    _ContactChip(
-                      key: const Key('campus-email'),
-                      icon: Icons.mail_outline_rounded,
-                      label: 'Email',
-                      semanticsLabel: 'Email $email',
-                      onTap: () => _launch(Uri(scheme: 'mailto', path: email)),
-                    ),
-                  if (contact.instagram case final ig?)
-                    if (instagramUri(ig) case final uri?)
-                      _ContactChip(
-                        key: const Key('campus-instagram'),
-                        icon: Icons.photo_camera_outlined,
-                        label: 'Instagram',
-                        semanticsLabel: 'Instagram $ig',
-                        onTap: () => _launch(uri),
-                      ),
-                ],
-              ),
+              CampusContactActions(contact: contact),
             ],
           ],
         ),
       ),
     );
   }
+}
+
+/// How to reach a branch as compact buttons: Call, Email and Instagram,
+/// each only when the Studio set it. Button keys are `$keyPrefix-call`,
+/// `$keyPrefix-email` and `$keyPrefix-instagram`.
+class CampusContactActions extends StatelessWidget {
+  const CampusContactActions({
+    super.key,
+    required this.contact,
+    this.keyPrefix = 'campus',
+  });
+
+  final CampusContact contact;
+  final String keyPrefix;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      if (contact.phone case final phone?)
+        _ContactChip(
+          key: Key('$keyPrefix-call'),
+          icon: Icons.call_outlined,
+          label: 'Call',
+          semanticsLabel: 'Call $phone',
+          onTap: () => _launch(Uri(scheme: 'tel', path: phone)),
+        ),
+      if (contact.email case final email?)
+        _ContactChip(
+          key: Key('$keyPrefix-email'),
+          icon: Icons.mail_outline_rounded,
+          label: 'Email',
+          semanticsLabel: 'Email $email',
+          onTap: () => _launch(Uri(scheme: 'mailto', path: email)),
+        ),
+      if (contact.instagram case final ig?)
+        if (instagramUri(ig) case final uri?)
+          _ContactChip(
+            key: Key('$keyPrefix-instagram'),
+            icon: Icons.photo_camera_outlined,
+            label: 'Instagram',
+            semanticsLabel: 'Instagram $ig',
+            onTap: () => _launch(uri),
+          ),
+    ],
+  );
 }
 
 /// Opens [query] in the platform's maps app. A failure to launch is not
@@ -335,22 +374,9 @@ class _VenueBlock extends StatelessWidget {
   final List<CampusService> services;
   final List<String> notes;
 
-  /// What the maps app searches for: the address, else the pin, else the
-  /// venue name.
-  String? get _query {
-    if (venue.address.isNotEmpty) {
-      return [?venue.name, venue.address].join(', ');
-    }
-    if (venue.latitude case final lat?) {
-      if (venue.longitude case final lng?) return '$lat,$lng';
-    }
-    return venue.name;
-  }
-
   @override
   Widget build(BuildContext context) {
     final kc = context.kc;
-    final query = _query;
     return Padding(
       key: Key('campus-venue-${venue.id}'),
       padding: const EdgeInsets.only(top: 12),
@@ -371,15 +397,44 @@ class _VenueBlock extends StatelessWidget {
             _ServiceList(services: services),
             const SizedBox(height: 8),
           ],
-          if (query != null)
-            _AddressLink(
+          if (venueDirectionsQuery(venue) != null)
+            VenueDirectionsLink(
               key: Key('campus-directions-${venue.id}'),
-              text: venue.address.isNotEmpty ? venue.address : 'Get directions',
-              onTap: () => _openDirections(context, query),
+              venue: venue,
             ),
           for (final n in notes) ...[const SizedBox(height: 4), _Note(n)],
         ],
       ),
+    );
+  }
+}
+
+/// What the maps app searches for to reach [venue]: its address, else its
+/// pin, else its name; null when the Studio set none of them.
+String? venueDirectionsQuery(CampusVenue venue) {
+  if (venue.address.isNotEmpty) {
+    return [?venue.name, venue.address].join(', ');
+  }
+  if (venue.latitude case final lat?) {
+    if (venue.longitude case final lng?) return '$lat,$lng';
+  }
+  return venue.name;
+}
+
+/// [venue]'s address (or "Get directions"), opening the maps app on tap.
+/// Renders nothing when [venueDirectionsQuery] has nothing to search for.
+class VenueDirectionsLink extends StatelessWidget {
+  const VenueDirectionsLink({super.key, required this.venue});
+
+  final CampusVenue venue;
+
+  @override
+  Widget build(BuildContext context) {
+    final query = venueDirectionsQuery(venue);
+    if (query == null) return const SizedBox.shrink();
+    return _AddressLink(
+      text: venue.address.isNotEmpty ? venue.address : 'Get directions',
+      onTap: () => _openDirections(context, query),
     );
   }
 }

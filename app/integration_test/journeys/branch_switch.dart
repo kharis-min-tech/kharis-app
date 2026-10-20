@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
-import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
 import 'package:kharis_app/features/home/presentation/widgets/upcoming_events_strip.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/branch_selection_screen.dart';
 import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
@@ -216,7 +215,7 @@ Future<void> _checkAnnouncements(
   String? branch,
 ) async {
   final t = j.tester;
-  final carousel = find.byType(AnnouncementsCarousel);
+  final card = find.byKey(const Key('home-announcement-latest'));
   final now = DateTime.now();
   final visible = news.where((n) {
     final b = '${n['branch_name'] ?? n['branch'] ?? ''}'.trim();
@@ -239,24 +238,35 @@ Future<void> _checkAnnouncements(
       timeout: const Duration(seconds: 30),
     );
     j.check(
-      heading.evaluate().isEmpty && carousel.evaluate().isEmpty,
+      heading.evaluate().isEmpty && card.evaluate().isEmpty,
       'Announcements block hidden with nothing to show',
     );
   } else {
-    await scrollUntilFound(t, carousel, scrollable: _homeScroll);
+    // The card stays hidden until the feed answers.
     await pumpUntil(
       t,
-      () => find.byKey(const Key('announcements-skeleton')).evaluate().isEmpty,
+      () => j.c.read(campusNewsProvider).hasValue,
       timeout: const Duration(seconds: 30),
     );
-    final title = '${visible.first['title']}'.trim();
+    await scrollUntilFound(t, card, scrollable: _homeScroll);
+    final feed = j.c.read(campusNewsProvider).valueOrNull ?? const [];
+    final visibleIds = {for (final n in visible) '${n['id']}'};
     j.check(
-      find
-          .descendant(of: carousel, matching: find.text(title))
-          .evaluate()
-          .isNotEmpty,
-      'announcement "$title" shown for ${branch ?? 'All branches'}',
+      feed.every((n) => visibleIds.contains(n.id)),
+      'announcement feed holds only ${branch ?? 'All branches'} notices',
     );
+    j.check(feed.isNotEmpty, 'announcement feed answered with notices');
+    if (feed.isNotEmpty) {
+      final newest = feed.first;
+      j.check(
+        find
+            .descendant(of: card, matching: find.text(newest.title))
+            .evaluate()
+            .isNotEmpty,
+        'newest announcement "${newest.title}" shown for '
+        '${branch ?? 'All branches'}',
+      );
+    }
   }
   await j.shot('home-announcements-${branch ?? 'all'}');
 }

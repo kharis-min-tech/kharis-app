@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:kharis_app/shared/widgets/reduce_motion_scope.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -154,9 +155,13 @@ class KharisApp extends ConsumerWidget {
         routerConfig: ref.watch(appRouterProvider),
         // On web, a shared link opened in the browser gets the "Open in the
         // Kharis app" bar above every route.
-        builder: (context, child) => clampTextScaling(
-          context,
-          OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+        // iOS Reduce Motion reaches every reduced-motion check, as Android's
+        // Remove animations already does.
+        builder: (context, child) => ReduceMotionScope(
+          child: clampTextScaling(
+            context,
+            OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
     );

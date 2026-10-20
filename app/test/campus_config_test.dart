@@ -420,7 +420,7 @@ void main() {
       );
       expect(find.byKey(const Key('home-announcements-see-all')), findsNothing);
       expect(find.text('Give'), findsOneWidget);
-      expect(find.text('Read now'), findsOneWidget);
+      expect(find.byKey(const Key('home-bible-row')), findsOneWidget);
       final ys = [
         for (final id in [
           HomeSectionId.giving,
@@ -436,7 +436,7 @@ void main() {
       tester,
     ) async {
       await pumpHome(tester, null);
-      expect(find.text('Read now'), findsOneWidget);
+      expect(find.byKey(const Key('home-bible-row')), findsOneWidget);
       expect(
         find.byKey(const Key('home-announcements-see-all')),
         findsOneWidget,

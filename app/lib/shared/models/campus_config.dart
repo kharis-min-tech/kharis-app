@@ -212,14 +212,17 @@ class HomeLayout {
 
   final List<HomeSection> sections;
 
-  /// Built-in order when Studio has set nothing.
+  /// Built-in order when Studio has set nothing: the next service first,
+  /// then the Bible (with the latest messages after it), one-off events and
+  /// the latest announcement. Continue listening leads the messages row, so
+  /// its own block shows nothing on Home.
   static const fallback = HomeLayout([
     HomeSection(HomeSectionId.profileCompletion),
     HomeSection(HomeSectionId.live),
-    HomeSection(HomeSectionId.reading),
-    HomeSection(HomeSectionId.announcements),
-    HomeSection(HomeSectionId.events),
     HomeSection(HomeSectionId.campus),
+    HomeSection(HomeSectionId.reading),
+    HomeSection(HomeSectionId.events),
+    HomeSection(HomeSectionId.announcements),
     HomeSection(HomeSectionId.continueListening),
     HomeSection(HomeSectionId.giving, enabled: false),
   ]);

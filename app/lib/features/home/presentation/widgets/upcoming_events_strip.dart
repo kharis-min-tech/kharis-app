@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
 
@@ -49,14 +51,18 @@ String eventWhenLabel(Event event, {DateTime? now}) {
 
 /// Home's "Upcoming events" strip: the next few events Content Studio has
 /// published for the member's campus plus all-campus events, each showing
-/// when and where (venue) and opening the event detail on tap.
+/// when and where (venue) and opening the event detail on tap. With a branch
+/// picked, its weekly services are left to the Next service card.
 class UpcomingEventsStrip extends ConsumerWidget {
   const UpcomingEventsStrip({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(campusUpcomingEventsProvider);
-    final events = async.valueOrNull;
+    final branch = ref.watch(currentCampusProvider);
+    final events = async.valueOrNull?.where(
+      (e) => branch == null || !isBranchServiceEvent(e, branch),
+    );
 
     if (events == null) {
       if (async.hasError) {
