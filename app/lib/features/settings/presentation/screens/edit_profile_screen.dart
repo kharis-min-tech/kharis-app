@@ -211,9 +211,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   disabledBackgroundColor: context.kc.accent.withValues(
                     alpha: 0.5,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.pillBorder,
-                  ),
                 ),
                 child: _saving
                     ? SizedBox(
@@ -378,9 +375,6 @@ class _SignInPrompt extends StatelessWidget {
                   backgroundColor: kc.accent,
                   foregroundColor: kc.onAccent,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.pillBorder,
-                  ),
                 ),
                 child: Text(
                   'Sign in',

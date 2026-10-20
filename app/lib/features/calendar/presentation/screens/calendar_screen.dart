@@ -265,9 +265,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   horizontal: 28,
                   vertical: 12,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.pillBorder,
-                ),
               ),
               onPressed: () => context.push('/login'),
               child: Text(

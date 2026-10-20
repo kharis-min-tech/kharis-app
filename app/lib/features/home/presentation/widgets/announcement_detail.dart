@@ -199,9 +199,6 @@ class AnnouncementDetailSheet extends ConsumerWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: context.kc.onBg,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.button),
-                      ),
                     ),
                     onPressed: () {
                       final router = GoRouter.of(context);
@@ -229,9 +226,6 @@ class AnnouncementDetailSheet extends ConsumerWidget {
                       backgroundColor: context.kc.accent,
                       foregroundColor: context.kc.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.button),
-                      ),
                     ),
                     onPressed: () => unawaited(
                       launchUrl(

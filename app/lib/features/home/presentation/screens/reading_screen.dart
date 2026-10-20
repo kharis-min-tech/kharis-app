@@ -867,9 +867,6 @@ class _ReferenceSearchSheetState extends ConsumerState<_ReferenceSearchSheet> {
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.buttonBorder,
-                    ),
                   ),
                   child: Text(
                     'Go',

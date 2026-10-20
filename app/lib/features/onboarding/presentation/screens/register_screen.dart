@@ -204,9 +204,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         alpha: 0.4,
                       ),
                       foregroundColor: context.kc.onAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.buttonBorder,
-                      ),
                       elevation: 0,
                       shadowColor: Colors.transparent,
                     ),

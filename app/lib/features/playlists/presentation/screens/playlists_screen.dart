@@ -228,9 +228,6 @@ class _EmptyState extends StatelessWidget {
                     horizontal: 22,
                     vertical: 14,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.button),
-                  ),
                 ),
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: Text(

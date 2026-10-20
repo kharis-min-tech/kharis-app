@@ -136,9 +136,6 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
                   backgroundColor: context.kc.accent,
                   foregroundColor: context.kc.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.buttonBorder,
-                  ),
                   elevation: 0,
                 ),
                 onPressed: () => Navigator.of(context).pop(),
@@ -294,9 +291,6 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
                       backgroundColor: context.kc.accent,
                       foregroundColor: context.kc.onAccent,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.buttonBorder,
-                      ),
                       elevation: 0,
                     ),
                     onPressed: _state == _FormState.sending ? null : _submit,

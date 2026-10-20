@@ -442,7 +442,6 @@ class _ContactChip extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: kc.onBg,
           side: BorderSide(color: kc.outline),
-          shape: RoundedRectangleBorder(borderRadius: AppRadius.pillBorder),
           minimumSize: const Size(0, 38),
           padding: const EdgeInsets.symmetric(horizontal: 14),
         ),

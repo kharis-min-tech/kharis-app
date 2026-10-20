@@ -85,9 +85,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.button),
-              ),
             ),
             child: Text(
               'Delete',
@@ -305,9 +302,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
                           alpha: 0.4,
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.button),
-                        ),
                       ),
                       icon: const Icon(Icons.play_arrow_rounded, size: 22),
                       label: Text(

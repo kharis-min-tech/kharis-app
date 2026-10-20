@@ -151,9 +151,6 @@ class _NotificationPermissionCardState
               style: FilledButton.styleFrom(
                 backgroundColor: kc.accent,
                 foregroundColor: kc.onAccent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                ),
               ),
               onPressed: _busy ? null : _turnOn,
               child: Text(

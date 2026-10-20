@@ -115,9 +115,6 @@ class _PlaylistNameDialogState extends State<_PlaylistNameDialog> {
           style: FilledButton.styleFrom(
             backgroundColor: context.kc.accent,
             foregroundColor: context.kc.onAccent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.button),
-            ),
           ),
           child: Text(
             widget.confirmLabel,
