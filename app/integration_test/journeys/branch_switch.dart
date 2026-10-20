@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
+import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
+import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/presentation/screens/branch_screen.dart';
@@ -119,9 +123,24 @@ Future<void> branchSwitchJourney(Journey j) async {
 
   // Announcements scoped to the branch.
   await _checkAnnouncements(j, news, to.name);
-  // Upcoming events scoped to the branch.
+  // Upcoming events scoped to the branch, less its weekly service: that is
+  // the Next service card, not repeated in the strip.
+  final campus = j.c.read(currentCampusProvider);
+  final serviceIds = {
+    if (campus != null)
+      for (final e
+          in j.c.read(upcomingEventsProvider(to.name)).valueOrNull ??
+              const <Event>[])
+        if (isBranchServiceEvent(e, campus)) e.id,
+  };
+  j.note('weekly service events shown as Next service: $serviceIds');
   final expected = events
-      .where((e) => !e.isPast(now) && e.visibleTo(to.name))
+      .where(
+        (e) =>
+            !e.isPast(now) &&
+            e.visibleTo(to.name) &&
+            !serviceIds.contains(e.id),
+      )
       .toList();
   final hidden = events
       .where((e) => !e.isPast(now) && !e.visibleTo(to.name))
