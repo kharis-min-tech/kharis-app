@@ -49,7 +49,11 @@ class _ClipPlayerScreenState extends ConsumerState<ClipPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _focus = ref.read(soundFocusProvider.notifier)..claim(_soundOwner);
+    _focus = ref.read(soundFocusProvider.notifier);
+    // Claimed after the first frame: a provider may not change mid-build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.claim(_soundOwner);
+    });
     // Playing again after a pause takes the sound back.
     _values = _controller.stream.listen((value) {
       if (value.playerState == PlayerState.playing) _focus.claim(_soundOwner);
