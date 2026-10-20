@@ -405,7 +405,7 @@ void main() {
 
       // A message filed under a topic but no series: the label above the
       // artwork and the one under the title both open that topic's list.
-      for (final where in ['header', 'line under the title'])
+      for (final where in ['header', 'line under the title']) {
         testWidgets('tapping "Purpose & Mission" in the $where closes the '
             'player and opens Messages on that topic alone', (tester) async {
           const current = Sermon(
@@ -487,6 +487,7 @@ void main() {
           expect(container.read(selectedSpeakerProvider), isNull);
           expect(container.read(selectedSeriesProvider), isNull);
         });
+      }
     });
 
     group('compact bar', () {
