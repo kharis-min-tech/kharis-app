@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -242,6 +243,33 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     ];
   }
 
+  /// Taps on the series or topic named under the title.
+  final TapGestureRecognizer _extraRecognizer = TapGestureRecognizer();
+
+  /// [_extraRecognizer] aimed at [label]'s messages; null when it names
+  /// nothing to open.
+  TapGestureRecognizer? _extraTap(String label) {
+    final open = _openCollection(label);
+    if (open == null) return null;
+    return _extraRecognizer..onTap = open;
+  }
+
+  /// Opens the series or topic a player label names: Messages filtered to
+  /// that series, else to the message's topic. Null when it names neither.
+  VoidCallback? _openCollection(String label) {
+    final series = _sermon.series?.trim() ?? '';
+    if (series.isNotEmpty && label == series) {
+      return () => _exploreMessages(
+        (ref) => ref.read(selectedSeriesProvider.notifier).state = series,
+      );
+    }
+    final topic = sermonTopic(_sermon);
+    if (label.isEmpty || topic.isEmpty || topic == 'All') return null;
+    return () => _exploreMessages(
+      (ref) => ref.read(selectedCategoryProvider.notifier).state = topic,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -286,6 +314,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     final owner = _videoSoundOwner;
     scheduleMicrotask(() => focus.release(owner));
     _scroll.dispose();
+    _extraRecognizer.dispose();
     super.dispose();
   }
 
@@ -1237,8 +1266,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final series = (_sermon.series ?? _sermon.category ?? 'Now playing')
-        .toUpperCase();
+    final label = (_sermon.series ?? _sermon.category ?? '').trim();
+    final series = (label.isEmpty ? 'Now playing' : label).toUpperCase();
+    final open = _openCollection(label);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
       child: Row(
@@ -1255,16 +1285,32 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             ),
           ),
           Expanded(
-            child: Text(
-              series,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.ui(
-                size: 10,
-                weight: FontWeight.w600,
-                letterSpacing: 1.0,
-                color: context.kc.muted,
+            // Names the series (or topic): a tap opens its messages.
+            child: Semantics(
+              button: open != null,
+              label: open == null ? null : 'Open $label',
+              excludeSemantics: open != null,
+              child: GestureDetector(
+                key: const Key('player-header-collection'),
+                onTap: open,
+                behavior: HitTestBehavior.opaque,
+                child: SizedBox(
+                  height: 44,
+                  child: Center(
+                    child: Text(
+                      series,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.ui(
+                        size: 10,
+                        weight: FontWeight.w600,
+                        letterSpacing: 1.0,
+                        color: context.kc.muted,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -1354,7 +1400,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                         ),
                       if (speaker.isNotEmpty && hasExtra)
                         const TextSpan(text: ' · '),
-                      if (hasExtra) TextSpan(text: extra),
+                      if (hasExtra)
+                        TextSpan(text: extra, recognizer: _extraTap(extra)),
                     ],
                   ),
                   style: AppTypography.ui(
@@ -1388,6 +1435,7 @@ class _VideoErrorBanner extends StatelessWidget {
   });
 
   final _VideoProblem problem;
+
   /// Tries the video again in the app (it never leaves for YouTube).
   final VoidCallback onRetry;
   final VoidCallback? onListen;

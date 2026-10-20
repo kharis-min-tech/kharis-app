@@ -402,6 +402,91 @@ void main() {
         expect(container.read(selectedSeriesProvider), 'Grace');
         expect(container.read(selectedSpeakerProvider), isNull);
       });
+
+      // A message filed under a topic but no series: the label above the
+      // artwork and the one under the title both open that topic's list.
+      for (final where in ['header', 'line under the title'])
+        testWidgets('tapping "Purpose & Mission" in the $where closes the '
+            'player and opens Messages on that topic alone', (tester) async {
+          const current = Sermon(
+            id: 'pm',
+            title: 'Dealing With Adversaries Of Destiny',
+            speaker: 'David Antwi',
+            audioUrl: 'https://cdn.example/pm.mp3',
+            category: 'Purpose & Mission',
+          );
+          await audio.play(current, queue: [current]);
+          final router = GoRouter(
+            initialLocation: '/home',
+            routes: [
+              GoRoute(path: '/home', builder: (_, _) => const Text('home')),
+              GoRoute(
+                path: '/messages',
+                builder: (_, _) => const Text('messages page'),
+              ),
+            ],
+          );
+          addTearDown(router.dispose);
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                audioPlayerServiceProvider.overrideWithValue(audio),
+                cacheServiceProvider.overrideWithValue(FakeCacheService()),
+                sermonsProvider.overrideWith((ref) async => [current]),
+                playlistsProvider.overrideWith(
+                  (ref) => Stream.value(const <Playlist>[]),
+                ),
+                favoritesProvider.overrideWith((ref) => Stream.value(null)),
+                notesProvider.overrideWith(
+                  (ref) => Stream.value(const <Note>[]),
+                ),
+                artworkSchemeSourceProvider.overrideWithValue(
+                  (_, _) async => null,
+                ),
+              ],
+              child: MaterialApp.router(routerConfig: router),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final container = ProviderScope.containerOf(
+            tester.element(find.text('home')),
+          );
+          container.read(selectedSpeakerProvider.notifier).state = 'Someone';
+          unawaited(
+            Navigator.of(tester.element(find.text('home'))).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    const MediaPlayerScreen(sermon: current, queue: [current]),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          if (where == 'header') {
+            expect(find.text('PURPOSE & MISSION'), findsOneWidget);
+            await tester.tap(find.byKey(const Key('player-header-collection')));
+          } else {
+            await tester.ensureVisible(
+              find.text('Dealing With Adversaries Of Destiny').first,
+            );
+            await tester.pumpAndSettle();
+            await tester.tapOnText(
+              // The line under the title comes before the Explore tile.
+              find.textRange.ofSubstring('Purpose & Mission').first,
+            );
+          }
+          await tester.pumpAndSettle();
+
+          expect(find.byType(MediaPlayerScreen), findsNothing);
+          expect(find.text('messages page'), findsOneWidget);
+          expect(
+            container.read(selectedCategoryProvider),
+            sermonTopic(current),
+          );
+          expect(sermonTopic(current), 'Purpose & Mission');
+          expect(container.read(selectedSpeakerProvider), isNull);
+          expect(container.read(selectedSeriesProvider), isNull);
+        });
     });
 
     group('compact bar', () {
