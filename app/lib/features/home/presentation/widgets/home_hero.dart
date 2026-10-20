@@ -650,37 +650,31 @@ class _VideoMediaState extends ConsumerState<_VideoMedia> {
             top: widget.video.vertical ? 0 : widget.topInset,
             bottom: widget.video.vertical ? 0 : widget.bottomInset,
           ),
-          child: Align(
-            alignment: widget.video.vertical
-                ? Alignment.topCenter
-                : Alignment.center,
-            child: AspectRatio(
-              key: const Key('home-hero-video-frame'),
-              aspectRatio: ratio,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (surface != null)
-                    IgnorePointer(
-                      child: KeyedSubtree(
-                        key: const Key('home-hero-video-surface'),
-                        child: surface(
-                          widget.video.videoId,
-                          _muted,
-                          _onPlaying,
-                        ),
-                      ),
+          // A Short spans the full width from the top and runs past the
+          // bottom (clipped there, under the fade); a landscape clip sits
+          // whole in the middle.
+          child: _FrameLayout(
+            vertical: widget.video.vertical,
+            ratio: ratio,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (surface != null)
+                  IgnorePointer(
+                    child: KeyedSubtree(
+                      key: const Key('home-hero-video-surface'),
+                      child: surface(widget.video.videoId, _muted, _onPlaying),
                     ),
-                  if (surface == null || !_playing)
-                    Image.network(
-                      widget.video.thumbnailUrl,
-                      key: const Key('home-hero-video-thumbnail'),
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, _, _) => const SizedBox.expand(),
-                    ),
-                ],
-              ),
+                  ),
+                if (surface == null || !_playing)
+                  Image.network(
+                    widget.video.thumbnailUrl,
+                    key: const Key('home-hero-video-thumbnail'),
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, _, _) => const SizedBox.expand(),
+                  ),
+              ],
             ),
           ),
         ),
@@ -902,6 +896,49 @@ try {
   @override
   Widget build(BuildContext context) {
     return WebViewWidget(controller: _controller.webViewController);
+  }
+}
+
+/// Lays out the hero's clip: a vertical Short at the full width from the
+/// top (taller than the hero; the hero clips it), a landscape clip fitted
+/// whole and centred.
+class _FrameLayout extends StatelessWidget {
+  const _FrameLayout({
+    required this.vertical,
+    required this.ratio,
+    required this.child,
+  });
+
+  final bool vertical;
+  final double ratio;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final frame = KeyedSubtree(
+      key: const Key('home-hero-video-frame'),
+      child: child,
+    );
+    if (!vertical) {
+      return Center(
+        child: AspectRatio(aspectRatio: ratio, child: frame),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, box) {
+        final height = box.maxWidth / ratio;
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.topCenter,
+            minWidth: box.maxWidth,
+            maxWidth: box.maxWidth,
+            minHeight: height,
+            maxHeight: height,
+            child: frame,
+          ),
+        );
+      },
+    );
   }
 }
 

@@ -232,7 +232,7 @@ class _SecureNote extends StatelessWidget {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            'Opens kharis.org in your browser',
+            'Secure page on kharis.org, inside the app',
             style: AppTypography.ui(size: 12, color: context.kc.muted),
           ),
         ),

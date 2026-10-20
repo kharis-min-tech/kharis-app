@@ -165,21 +165,15 @@ void main() {
   });
 
   testWidgets('logo and bell float over the top of the hero, below the '
-      'status bar; the mute chip stays clear of the title card; the '
-      'greeting follows the hero', (tester) async {
+      'status bar; the mute chip sits in the hero\'s corner; the greeting '
+      'follows the hero', (tester) async {
     await _pumpHome(tester);
 
     final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
-    final card = tester.getRect(find.byKey(const Key('home-hero-card')));
-    // The card rises over the media's bottom edge; the mute chip sits in
-    // the media's right corner above it, never under it.
-    expect(card.top, lessThan(media.bottom));
-    expect(card.bottom, greaterThan(media.bottom));
     final mute = tester.getRect(find.byKey(const Key('home-hero-mute')));
     expect(find.byKey(const Key('home-hero-mute')).hitTestable(), findsOne);
     expect(media.contains(mute.center), isTrue);
     expect(mute.center.dx, greaterThan(media.width - 60));
-    expect(mute.bottom, lessThanOrEqualTo(card.top));
     for (final key in const [Key('home-hero-logo'), Key('home-bell')]) {
       expect(find.byKey(key).hitTestable(), findsOneWidget, reason: '$key');
       final chip = tester.getRect(find.byKey(key));
@@ -195,7 +189,7 @@ void main() {
       greaterThan(200),
     );
     final greeting = tester.getRect(find.textContaining('Good '));
-    expect(greeting.top, greaterThan(card.bottom));
+    expect(greeting.top, greaterThanOrEqualTo(media.bottom - 0.5));
   });
 
   testWidgets('status bar: light icons and no backing over the hero; a '

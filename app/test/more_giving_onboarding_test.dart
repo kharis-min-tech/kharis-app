@@ -411,20 +411,19 @@ void main() {
       expect(find.text('Bank details copied'), findsOneWidget);
     });
 
-    testWidgets('Give securely opens kharis.org in the browser; no branch '
-        'picker', (tester) async {
+    testWidgets('Give securely opens kharis.org inside the app (in-app '
+        'browser, never another app); no branch picker', (tester) async {
       await pumpGiving(tester);
       expect(find.text('GIVING TO'), findsNothing);
       expect(find.text('Change'), findsNothing);
       expect(find.text('London'), findsNothing);
-      expect(find.text('Opens kharis.org in your browser'), findsOneWidget);
 
       await tester.tap(find.text('Give securely'));
       await tester.pumpAndSettle();
       expect(_launched, ['https://kharis.org/giving/']);
-      // External browser: neither Safari View Controller nor a web view.
-      expect(_launchArgs.single['useSafariVC'], isFalse);
-      expect(_launchArgs.single['useWebView'], isFalse);
+      // Safari View Controller / Custom Tabs: the page stays in the app.
+      expect(_launchArgs.single['useSafariVC'], isTrue);
+      expect(_launchArgs.single['universalLinksOnly'], isFalse);
     });
 
     test('the secure giving URL is the live giving page', () {

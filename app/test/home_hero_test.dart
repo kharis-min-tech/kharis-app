@@ -320,24 +320,20 @@ void main() {
       },
     );
 
-    testWidgets('a Short is shown whole: the hero grows to fit it at 9:16, '
-        'nothing cropped, and it ends above the title card', (tester) async {
+    testWidgets('a Short fills the hero\'s width from the top, upright, '
+        'and stays inside the hero', (tester) async {
       await _pumpHero(tester, SupabaseStub(stub), shorts: [short]);
       final media = tester.getRect(find.byKey(const Key('home-hero-pager')));
       final frame = tester.getRect(
         find.byKey(const Key('home-hero-video-frame')),
       );
-      final card = tester.getRect(find.byKey(const Key('home-hero-card')));
       expect(frame.width / frame.height, closeTo(9 / 16, 0.01));
-      expect(frame.left, greaterThanOrEqualTo(media.left - 0.5));
-      expect(frame.right, lessThanOrEqualTo(media.right + 0.5));
-      expect(frame.top, greaterThanOrEqualTo(media.top - 0.5));
-      expect(frame.bottom, lessThanOrEqualTo(card.top + 0.5));
-      // Taller than the landscape hero, so the Short is not a postage stamp.
-      expect(
-        media.height,
-        greaterThan(homeHeroMediaHeight(const Size(400, 900))),
-      );
+      expect(frame.width, closeTo(media.width, 0.5));
+      expect(frame.top, closeTo(media.top, 0.5));
+      // The clip is a native view: the hero clips it so it can never paint
+      // over the content below.
+      final hero = tester.getRect(find.byKey(const Key('home-hero')));
+      expect(media.bottom, lessThanOrEqualTo(hero.bottom + 0.5));
     });
 
     test('no Shorts: the Studio clip is the video slide', () async {
@@ -355,8 +351,8 @@ void main() {
       'news': <Map<String, dynamic>>[],
     };
 
-    testWidgets('the card names the current slide (kind, title, what a tap '
-        'does); the media keeps the title as its label; dots for more than '
+    testWidgets('no words on the media: the title is the slide\'s '
+        'screen-reader label; it fades into the page; dots for more than '
         'one slide', (tester) async {
       final semantics = tester.ensureSemantics();
       await _pumpHero(tester, SupabaseStub(withVideo));
@@ -368,22 +364,16 @@ void main() {
         find.byKey(const Key('home-hero-video-thumbnail')),
         findsOneWidget,
       );
-      final card = find.byKey(const Key('home-hero-card'));
-      for (final text in ['FEATURED', 'App clip', 'WATCH NOW']) {
-        expect(
-          find.descendant(of: card, matching: find.text(text)),
-          findsOneWidget,
-          reason: text,
-        );
-      }
+      expect(find.text('App clip'), findsNothing);
       expect(find.bySemanticsLabel('App clip'), findsOneWidget);
+      expect(find.byKey(const Key('home-hero-fade')), findsOneWidget);
       expect(find.byKey(const Key('home-hero-dots')), findsOneWidget);
       semantics.dispose();
     });
 
     testWidgets('the thumbnail covers the clip whenever it is not playing; '
-        'a landscape clip is shown whole: 16:9, below the header and above '
-        'the card', (tester) async {
+        'a landscape clip is shown whole: 16:9, below the header, inside the '
+        'hero', (tester) async {
       await _pumpHero(tester, SupabaseStub(withVideo));
       final thumbnail = find.byKey(const Key('home-hero-video-thumbnail'));
       expect(thumbnail, findsOneWidget);
@@ -404,12 +394,11 @@ void main() {
       final frame = tester.getRect(
         find.byKey(const Key('home-hero-video-frame')),
       );
-      final card = tester.getRect(find.byKey(const Key('home-hero-card')));
       expect(frame.width / frame.height, closeTo(16 / 9, 0.01));
       expect(frame.left, greaterThanOrEqualTo(media.left));
       expect(frame.right, lessThanOrEqualTo(media.right));
       expect(frame.top, greaterThanOrEqualTo(media.top + kHeroTopBarExtent));
-      expect(frame.bottom, lessThanOrEqualTo(card.top));
+      expect(frame.bottom, lessThanOrEqualTo(media.bottom));
     });
 
     testWidgets('the clip starts muted; the corner chip unmutes and mutes '
@@ -527,23 +516,18 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(_slide('Event b'), findsOneWidget);
       expect(_slide('Event a'), findsNothing);
-      // The card follows the slide.
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Event b'), findsOneWidget);
-      expect(find.text('Event a'), findsNothing);
     });
 
-    testWidgets('the latest-message fallback: its artwork, a card offering '
-        'to listen, no dots', (tester) async {
+    testWidgets('the latest-message fallback: its artwork alone, no dots', (
+      tester,
+    ) async {
       await _pumpHero(
         tester,
         SupabaseStub({'featured_videos': [], 'events': [], 'news': []}),
       );
 
       expect(_slide('Walking by faith'), findsOneWidget);
-      expect(find.text('Walking by faith'), findsOneWidget);
-      expect(find.text('LATEST MESSAGE'), findsOneWidget);
-      expect(find.text('LISTEN NOW'), findsOneWidget);
+      expect(find.text('Walking by faith'), findsNothing);
       expect(find.byKey(const Key('home-hero-dots')), findsNothing);
     });
 
