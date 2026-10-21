@@ -1,3 +1,4 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:get_it/get_it.dart';
 import 'package:kharis_app/core/services/firebase_service.dart';
 
@@ -10,6 +11,7 @@ class AppStartUp {
     await registerServices(getIt);
     if (kUseFirebase) {
       await FirebaseService.init();
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
     }
   }
 

@@ -69,7 +69,6 @@ Future<void> main() async {
       // Loudly surface a Firebase SDK vs Cloud Functions project mismatch —
       // that silently splits Firestore/Auth/FCM away from the API's content.
       ApiConfig.warnIfProjectSplit();
-
       // Run independent startup work concurrently so first paint isn't blocked
       // by prefs + Hive + Firebase in series.
       final results = await Future.wait([
@@ -78,6 +77,8 @@ Future<void> main() async {
         AppStartUp().setUp(),
       ]);
       // Pass all uncaught "fatal" errors from the framework to Crashlytics
+      final prefs = results[0] as SharedPreferences;
+      final cacheService = results[1] as CacheService;
       FlutterError.onError = (errorDetails) {
         FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
       };
@@ -86,8 +87,6 @@ Future<void> main() async {
         FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
         return true;
       };
-      final prefs = results[0] as SharedPreferences;
-      final cacheService = results[1] as CacheService;
       runApp(
         ProviderScope(
           overrides: [
@@ -105,10 +104,7 @@ Future<void> main() async {
       );
     },
     (error, stack) {
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print('Uncaught error: $error\n$stack');
-      }
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     },
   );
 }

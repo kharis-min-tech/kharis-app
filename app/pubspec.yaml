@@ -50,17 +50,18 @@ dependencies:
   shared_preferences: ^2.3.4
   url_launcher: ^6.3.1
   add_2_calendar_new: ^1.0.4
-  firebase_core: ^3.12.1
-  cloud_firestore: ^5.6.12
-  firebase_messaging: ^15.2.10
+  firebase_core: ^4.12.1
+  cloud_firestore: ^6.7.1
+  firebase_messaging: ^16.5.0
   youtube_player_iframe: ^6.0.2
   # The Home hero renders the YouTube controller's WebView inline (the
   # package's YoutubePlayer floats it in an overlay above the page, where it
   # swallows scroll drags). Same version youtube_player_iframe resolves.
   webview_flutter: ^4.13.1
   web: ^1.1.1
-  firebase_analytics: ^11.6.0
-  firebase_auth: ^5.5.1
+  firebase_crashlytics: ^5.3.0
+  firebase_analytics: ^12.4.6
+  firebase_auth: ^6.5.7
   flutter_bloc: ^9.1.1
   get_it: ^9.2.1
   flutter_screenutil: ^5.9.3
@@ -74,8 +75,7 @@ dependencies:
   in_app_review: ^2.0.9
   # App version + build number shown in More.
   package_info_plus: ^10.2.1
-  firebase_crashlytics: ^4.3.10
-  firebase_performance: ^0.10.1+10
+  firebase_performance: ^0.11.0
   video_player: ^2.14.1
   # "Use my location" in the branch picker: one approximate fix, on request.
   geolocator: ^14.0.1
@@ -97,7 +97,7 @@ dev_dependencies:
   custom_lint: ^0.7.0
   riverpod_lint: ^2.6.3
   flutter_launcher_icons: ^0.14.3
-  fake_cloud_firestore: ^3.1.0
+  fake_cloud_firestore: ^4.2.0
 flutter:
 
   # The following line ensures that the Material Icons font is
