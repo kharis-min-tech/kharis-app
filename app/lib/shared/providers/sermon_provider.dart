@@ -1169,6 +1169,39 @@ bool sermonMatchesQuery(Sermon s, String query) {
   return words.every(haystack.contains);
 }
 
+/// How well [s] matches [query]; higher ranks first. Each word scores by
+/// the best field it hits (title, then series, then
+/// description), with whole words beating partial ones, so "faith" puts
+/// "Faith From First to Last" above a sermon that mentions faithfulness in
+/// its notes. The whole query appearing in the title earns a bonus.
+double sermonSearchScore(Sermon s, String query) {
+  final q = normaliseForSearch(query);
+  final words = q.split(' ').where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) return 0;
+  final title = normaliseForSearch(s.title);
+  final fields = [
+    (title, 10.0),
+    (normaliseForSearch(s.series ?? ''), 5.0),
+    (normaliseForSearch(s.description ?? ''), 1.0),
+  ];
+  var score = 0.0;
+  for (final word in words) {
+    final whole = RegExp('(^|[^a-z0-9])${RegExp.escape(word)}(\$|[^a-z0-9])');
+    var best = 0.0;
+    for (final (text, weight) in fields) {
+      final hit = whole.hasMatch(text)
+          ? weight
+          : text.contains(word)
+          ? weight * 0.6
+          : 0.0;
+      if (hit > best) best = hit;
+    }
+    score += best;
+  }
+  if (words.length > 1 && title.contains(q)) score += 5;
+  return score;
+}
+
 /// Server-side search state for one query.
 class RemoteSearch {
   const RemoteSearch({
@@ -1204,8 +1237,9 @@ class RemoteSearch {
   );
 }
 
-/// Debounced `?search=` against the whole archive, following `next` on
-/// demand. A new query builds a new notifier, which cancels the old timer,
+/// Debounced `?search=` against the whole archive. The server orders hits by
+/// date, so the remaining pages are drained up front (up to [maxPages]) and
+/// [searchResultsProvider] can rank them all by relevance. A new query builds a new notifier, which cancels the old timer,
 /// so only the settled query reaches the network. Failures end loading with
 /// whatever local results exist.
 class RemoteSearchNotifier extends StateNotifier<RemoteSearch> {
@@ -1216,6 +1250,9 @@ class RemoteSearchNotifier extends StateNotifier<RemoteSearch> {
 
   final AbstractSermonRepository _repo;
   Timer? _timer;
+
+  /// Pages fetched per query at most, first page included.
+  static const int maxPages = 20;
 
   Future<void> _fetchFirst() async {
     try {
@@ -1229,6 +1266,11 @@ class RemoteSearchNotifier extends StateNotifier<RemoteSearch> {
       );
     } catch (_) {
       if (mounted) state = state.copyWith(isLoading: false);
+      return;
+    }
+    for (var pages = 1; pages < maxPages && mounted && state.hasMore; pages++) {
+      await loadMore();
+      if (mounted && state.isLoadingMore) return;
     }
   }
 
@@ -1277,7 +1319,7 @@ final remoteSearchProvider =
     );
 
 /// Search results: library matches for [sermonMatchesQuery] merged with the
-/// server's hits, newest first. Empty when no query is active.
+/// server's hits, best [sermonSearchScore] first, newest first within a tie. Empty when no query is active.
 final searchResultsProvider = Provider<List<Sermon>>((ref) {
   final query = ref.watch(sermonSearchProvider).trim();
   if (query.isEmpty) return const [];
@@ -1288,10 +1330,15 @@ final searchResultsProvider = Provider<List<Sermon>>((ref) {
   ];
   final remote = ref.watch(remoteSearchProvider).results;
   final seenIds = {for (final s in local) s.id};
-  return [...local, ...remote.where((s) => seenIds.add(s.id))]..sort(
-    (a, b) =>
-        (b.publishedAt ?? DateTime(0)).compareTo(a.publishedAt ?? DateTime(0)),
-  );
+  final merged = [...local, ...remote.where((s) => seenIds.add(s.id))];
+  final scores = {for (final s in merged) s.id: sermonSearchScore(s, query)};
+  return merged..sort((a, b) {
+    final byScore = scores[b.id]!.compareTo(scores[a.id]!);
+    if (byScore != 0) return byScore;
+    return (b.publishedAt ?? DateTime(0)).compareTo(
+      a.publishedAt ?? DateTime(0),
+    );
+  });
 });
 
 /// Search is still producing results: the debounce or the server's first
