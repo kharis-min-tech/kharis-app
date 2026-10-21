@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,7 +11,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart'
     show PlayerState, YoutubeError, YoutubePlayerValue;
 
 import 'package:kharis_app/core/utils/share_sermon.dart';
-import 'package:kharis_app/features/home/presentation/widgets/continue_listening_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/latest_messages_row.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/presentation/note_anchor.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
@@ -510,27 +511,44 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('an embed error offers Listen instead and Open in YouTube', (
-      tester,
-    ) async {
+    testWidgets('an embed error offers Listen instead and Try again; '
+        'nothing leaves the app', (tester) async {
+      final launched = <Object?>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        launched.add(call.arguments);
+        return true;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
       await open(tester);
       values.add(YoutubePlayerValue(error: YoutubeError.notEmbeddable));
       // One pump delivers the event, the next paints the banner.
       await tester.pump();
       await tester.pump();
 
-      expect(
-        find.text('This video can\u2019t be played inside the app.'),
-        findsOneWidget,
-      );
-      expect(find.text('Open in YouTube'), findsOneWidget);
+      const banner = 'This video can\u2019t be played inside the app.';
+      expect(find.text(banner), findsOneWidget);
+      expect(find.text('Open in YouTube'), findsNothing);
 
+      // Try again restarts the video in the app.
+      await tester.ensureVisible(find.text('Try again'));
+      await tester.tap(find.text('Try again'));
+      await tester.pump();
+      expect(find.text(banner), findsNothing);
+      expect(launched, isEmpty, reason: 'nothing opens YouTube');
+
+      values.add(YoutubePlayerValue(error: YoutubeError.notEmbeddable));
+      await tester.pump();
+      await tester.pump();
       await tester.ensureVisible(find.text('Listen instead'));
       await tester.tap(find.text('Listen instead'));
       await tester.pumpAndSettle();
 
       expect(audio.calls.single.sermon.id, both.id);
-      expect(find.text('Open in YouTube'), findsNothing, reason: 'audio mode');
+      expect(launched, isEmpty);
     });
 
     testWidgets('a video stuck unstarted for 15 s gets the banner', (
@@ -909,12 +927,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overrides(),
-          child: const MaterialApp(
-            home: Scaffold(body: ContinueListeningCard()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: LatestMessagesRow())),
         ),
       );
-      expect(find.text('CONTINUE LISTENING'), findsNothing);
+      expect(find.byKey(const Key('home-continue-card')), findsNothing);
 
       final s = _sermon(3).copyWith(duration: const Duration(minutes: 30));
       PlaybackHistory(cache)
@@ -924,18 +940,24 @@ void main() {
         ProviderScope(
           key: UniqueKey(),
           overrides: overrides(),
-          child: const MaterialApp(
-            home: Scaffold(body: ContinueListeningCard()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: LatestMessagesRow())),
         ),
       );
       await tester.pump();
 
-      expect(find.text('Message 3'), findsOneWidget);
-      expect(find.text('18 min left'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      final card = find.byKey(const Key('home-continue-card'));
+      expect(card, findsOneWidget);
+      expect(
+        find.descendant(of: card, matching: find.text('Message 3')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text('18 min left')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('home-continue-progress')), findsOneWidget);
 
-      await tester.tap(find.text('Message 3'));
+      await tester.tap(card);
       await tester.pumpAndSettle();
       expect(audio.calls.single.sermon.id, 's3');
     });

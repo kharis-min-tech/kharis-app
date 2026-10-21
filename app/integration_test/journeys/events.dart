@@ -22,6 +22,12 @@ Finder _cardFor(String id) => _inCalendar(
 );
 
 Future<void> _tab(WidgetTester t, String label) async {
+  // The tab chips scroll with the list: bring them back first.
+  final list = _inCalendar(find.byType(Scrollable));
+  if (list.evaluate().isNotEmpty) {
+    t.state<ScrollableState>(list.first).position.jumpTo(0);
+    await t.pump();
+  }
   await t.tap(_inCalendar(find.text(label)).first, warnIfMissed: false);
   await pumpFor(t, const Duration(seconds: 2));
 }
@@ -63,9 +69,17 @@ Future<void> eventsJourney(Journey j) async {
     'past ${past.map((e) => '$e').toList()}',
   );
 
-  await j.launch(branch: ''); // All branches: every Studio event applies.
+  await j.launch();
   await tapNav(t, 'Events');
   await pumpUntilFound(t, find.byType(CalendarScreen));
+  // Browse All branches (the Events tab filter): every Studio event applies.
+  final chip = _inCalendar(find.text('YOUR BRANCH'));
+  await pumpUntilFound(t, chip);
+  await t.tap(chip, warnIfMissed: false);
+  final all = find.byKey(const ValueKey('branch-choice-all'));
+  await pumpUntilFound(t, all, reason: 'branch picker sheet');
+  await t.tap(all, warnIfMissed: false);
+  await pumpUntilFound(t, _inCalendar(find.text('All branches')));
   await pumpUntil(
     t,
     () =>

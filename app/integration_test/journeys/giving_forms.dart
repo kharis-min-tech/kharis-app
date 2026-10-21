@@ -17,7 +17,7 @@ import '../support/harness.dart';
 import '../support/live_data.dart';
 
 /// (h) Giving: no branch picker; Give securely hands kharis.org to the
-/// browser (external mode); Copy bank details fills the clipboard.
+/// in-app browser; Copy bank details fills the clipboard.
 Future<void> givingJourney(Journey j) async {
   final t = j.tester;
   final branches = await studioBranches();
@@ -56,8 +56,8 @@ Future<void> givingJourney(Journey j) async {
   j.check(
     launches.length == 1 &&
         launches.single.url == kGivingUrl &&
-        launches.single.external,
-    'Give securely opens $kGivingUrl in the external browser (got $launches)',
+        !launches.single.external,
+    'Give securely opens $kGivingUrl inside the app (got $launches)',
   );
 
   final copy = find.descendant(

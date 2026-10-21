@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
@@ -99,7 +101,7 @@ void main() {
       expect(c.read(effectiveHomeLayoutProvider), HomeLayout.fallback);
     });
 
-    test('All branches uses the built-in layout', () async {
+    test('no branch chosen uses the built-in layout', () async {
       final c = await _resolve(
         campus: null,
         branches: [_branch('London', home: _campusLayout)],
@@ -204,6 +206,94 @@ void main() {
       expect(find.byKey(const Key('campus-instagram')), findsOneWidget);
     });
 
+    testWidgets('two venues: each named once with its own services under it; '
+        'notes both share said once; a repeated address part shown once', (
+      tester,
+    ) async {
+      const parking = 'Free parking is available at the venue.';
+      const station = 'The venue is approximately five minutes away.';
+      await pump(
+        tester,
+        _branch(
+          'Bristol',
+          venues: const [
+            CampusVenue(
+              id: 'sun',
+              name: 'Sunday Service',
+              addressLine1: 'Abbeywood Community School',
+              addressLine2: 'Engineering Centre,  Stoke Gifford',
+              city: 'Bristol',
+              postcode: 'BS34 8SF',
+              parkingInfo: parking,
+              publicTransportInfo: station,
+              directionsText: '',
+            ),
+            CampusVenue(
+              id: 'mid',
+              name: 'Midweek Service',
+              addressLine1: '6 Ashley Road',
+              addressLine2: '6 Ashley Road,  St. Paul\u2019s',
+              city: 'Bristol',
+              postcode: 'BS6 5NL',
+              parkingInfo: parking,
+              publicTransportInfo: station,
+            ),
+          ],
+          services: const [
+            CampusService(
+              id: 's1',
+              name: 'Sunday 1st Service',
+              day: 'Sunday',
+              startTime: '11:00',
+              venueId: 'sun',
+              order: 1,
+            ),
+            CampusService(
+              id: 'w',
+              name: 'Wednesday Service',
+              day: 'Wednesday',
+              startTime: '18:30',
+              venueId: 'mid',
+              order: 2,
+            ),
+            CampusService(
+              id: 's2',
+              name: 'Sunday 2nd Service',
+              day: 'Sunday',
+              startTime: '13:00',
+              venueId: 'sun',
+              order: 3,
+            ),
+          ],
+        ),
+      );
+
+      double top(String text) => tester.getTopLeft(find.text(text)).dy;
+      // Venue names appear once each, as headings, not under every service.
+      expect(find.text('Sunday Service'), findsOneWidget);
+      expect(find.text('Midweek Service'), findsOneWidget);
+      // Each venue's services sit under it, before the next venue.
+      expect(top('Sunday Service'), lessThan(top('Sunday 1st Service')));
+      expect(top('Sunday 1st Service'), lessThan(top('Sunday 2nd Service')));
+      expect(top('Sunday 2nd Service'), lessThan(top('Midweek Service')));
+      expect(top('Midweek Service'), lessThan(top('Wednesday Service')));
+      // Notes both venues carry: said once, after the venues.
+      expect(find.text(parking), findsOneWidget);
+      expect(find.text(station), findsOneWidget);
+      expect(top(parking), greaterThan(top('Wednesday Service')));
+      expect(
+        find.text('6 Ashley Road, St. Paul\u2019s, Bristol, BS6 5NL'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Abbeywood Community School, Engineering Centre, Stoke Gifford, '
+          'Bristol, BS34 8SF',
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('falls back to the legacy meeting fields', (tester) async {
       await pump(
         tester,
@@ -268,8 +358,15 @@ void main() {
                 ),
               ],
             ),
+            // One one-off event, so the events block has something to show.
             upcomingEventsProvider.overrideWith(
-              (ref, b) => Stream.value(const []),
+              (ref, b) => Stream.value([
+                Event(
+                  id: 'praise',
+                  title: 'Praise Night',
+                  startTime: DateTime.now().add(const Duration(days: 9)),
+                ),
+              ]),
             ),
             liveStatusProvider.overrideWith(
               (ref) => Stream.value(LiveStatus.notLive),
@@ -290,8 +387,11 @@ void main() {
             ),
             dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
             continueListeningProvider.overrideWith((ref) => null),
-            featuredVideoProvider.overrideWith((ref) async => null),
             latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
+            // The hero wall's videos as plain boxes: no video plugin here.
+            heroWallVideoProvider.overrideWithValue(
+              (asset, poster, playing) => const SizedBox.expand(),
+            ),
           ],
           child: const MaterialApp(home: HomeScreen()),
         ),
@@ -328,7 +428,7 @@ void main() {
       );
       expect(find.byKey(const Key('home-announcements-see-all')), findsNothing);
       expect(find.text('Give'), findsOneWidget);
-      expect(find.text('Read now'), findsOneWidget);
+      expect(find.byKey(const Key('home-bible-row')), findsOneWidget);
       final ys = [
         for (final id in [
           HomeSectionId.giving,
@@ -344,7 +444,7 @@ void main() {
       tester,
     ) async {
       await pumpHome(tester, null);
-      expect(find.text('Read now'), findsOneWidget);
+      expect(find.byKey(const Key('home-bible-row')), findsOneWidget);
       expect(
         find.byKey(const Key('home-announcements-see-all')),
         findsOneWidget,

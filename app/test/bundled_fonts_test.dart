@@ -25,8 +25,7 @@ void main() {
   test('every weight and style the app uses is in the asset bundle', () async {
     final expected = [
       for (final name in weights.values) ...[
-        'BricolageGrotesque-$name.ttf',
-        'HankenGrotesk-$name.ttf',
+        'PlusJakartaSans-$name.ttf',
         'Newsreader-$name.ttf',
         'Newsreader-${name == 'Regular' ? '' : name}Italic.ttf',
       ],

@@ -249,9 +249,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       backgroundColor: kc.accent,
                       disabledBackgroundColor: kc.accent.withValues(alpha: 0.4),
                       foregroundColor: kc.onAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.buttonBorder,
-                      ),
                       elevation: 0,
                       shadowColor: Colors.transparent,
                     ),
@@ -308,9 +305,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       foregroundColor: kc.onBg,
                       side: BorderSide(color: kc.outline),
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.buttonBorder,
-                      ),
                     ),
                     child: Text(
                       'Continue as guest',
@@ -482,7 +476,6 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
             backgroundColor: kc.accent,
             foregroundColor: kc.onAccent,
             elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: AppRadius.pillBorder),
           ),
           child: _sending
               ? SizedBox(

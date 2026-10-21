@@ -17,6 +17,7 @@ import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playli
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 import '../widgets/sermon_list_item.dart';
 import '../widgets/message_filters_sheet.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_discovery.dart';
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -186,13 +187,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Topics for the carousel ('All' is the cleared state, not a card).
-    final categories = ref
-        .watch(categoryLabelsProvider)
-        .where((c) => c != 'All')
-        .toList();
-    final categoryCounts = ref.watch(categoryCountsProvider);
-
     // Filtered + sorted sermon list.
     final sermons = ref.watch(librarySermonsProvider);
 
@@ -204,8 +198,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final playerState = ref.watch(playerStateProvider).valueOrNull;
     final playing = playerState?.playing ?? false;
 
-    // Active sort and filters. Year, series and speaker live in the filter
-    // sheet; the topic comes from the cards above.
+    // Active sort and filters, all chosen in the filter sheet.
     final sort = ref.watch(sermonSortProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final isFiltered = selectedCategory != 'All';
@@ -588,76 +581,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         ),
                       ],
 
-                      // ── 4. Topics ────────────────────────────────────────────
-                      const SliverToBoxAdapter(child: SizedBox(height: 18)),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 14, 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Browse by topic',
-                                  style: AppTypography.bodyLg.copyWith(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: context.kc.onBg,
-                                    letterSpacing: -0.18,
-                                  ),
-                                ),
-                              ),
-                              _HeaderLink(
-                                label: 'Playlists',
-                                color: context.kc.accentInk,
-                                weight: FontWeight.w700,
-                                // Root-navigator route: overlays the shell with
-                                // its own back affordance.
-                                onTap: () => context.push('/playlists'),
-                              ),
-                              const SizedBox(width: 4),
-                              _HeaderLink(
-                                label: 'See all',
-                                color: context.kc.muted,
-                                weight: FontWeight.w600,
-                                onTap: () {
-                                  ref
-                                          .read(
-                                            selectedCategoryProvider.notifier,
-                                          )
-                                          .state =
-                                      'All';
-                                  _scrollToList();
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (categories.isNotEmpty)
-                        SliverToBoxAdapter(
-                          child: _PillRow(
-                            spacing: 12,
-                            children: [
-                              for (final cat in categories)
-                                _TopicCard(
-                                  category: cat,
-                                  count: categoryCounts[cat] ?? 0,
-                                  active: selectedCategory == cat,
-                                  onTap: () {
-                                    ref
-                                        .read(selectedCategoryProvider.notifier)
-                                        .state = selectedCategory == cat
-                                        ? 'All'
-                                        : cat;
-                                    _scrollToList();
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-
-                      // ── 5. "All messages" + filters ──────────────────────────
+                      // ── 4. "All messages" + filters ──────────────────────────
                       const SliverToBoxAdapter(child: SizedBox(height: 28)),
                       SliverToBoxAdapter(
                         child: Padding(
@@ -666,24 +590,39 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                [
-                                  if (selectedSeries != null)
-                                    selectedSeries
-                                  else if (isFiltered)
-                                    selectedCategory
-                                  else
-                                    'All messages',
-                                  if (selectedYear != null) '$selectedYear',
-                                ].join(' \u00b7 '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.bodyLg.copyWith(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w800,
-                                  color: context.kc.onBg,
-                                  letterSpacing: -0.18,
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      [
+                                        if (selectedSeries != null)
+                                          selectedSeries
+                                        else if (isFiltered)
+                                          selectedCategory
+                                        else
+                                          'All messages',
+                                        if (selectedYear != null)
+                                          '$selectedYear',
+                                      ].join(' \u00b7 '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.bodyLg.copyWith(
+                                        fontSize: 19,
+                                        fontWeight: FontWeight.w800,
+                                        color: context.kc.onBg,
+                                        letterSpacing: -0.18,
+                                      ),
+                                    ),
+                                  ),
+                                  _HeaderLink(
+                                    label: 'Playlists',
+                                    color: context.kc.accentInk,
+                                    weight: FontWeight.w700,
+                                    // Root-navigator route: overlays the
+                                    // shell with its own back affordance.
+                                    onTap: () => context.push('/playlists'),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 6),
                               Row(
@@ -719,7 +658,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         ),
                       ),
 
-                      // ── 6. Sermon list, one page at a time ───────────────────
+                      // ── 5. Sermon list, one page at a time ───────────────────
                       if (sermons.isEmpty && !sermonsAsync.hasValue)
                         SliverList.builder(
                           itemCount: 6,
@@ -785,6 +724,13 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                             total: sermons.length,
                             onRetry: libraryNotifier.retryHydration,
                           ),
+                        ),
+                      // ── 8. Related to what's playing ─────────────────────────
+                      // Below the page numbers only, and only while a
+                      // message is playing (or paused) in the background.
+                      if (currentSermon != null)
+                        SliverToBoxAdapter(
+                          child: _NowPlayingRelated(sermon: currentSermon),
                         ),
                     ],
 
@@ -1883,98 +1829,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
   }
 }
 
-// ── Topic playlist card (150x150) ─────────────────────────────────────────────
-
-class _TopicCard extends StatelessWidget {
-  const _TopicCard({
-    required this.category,
-    required this.count,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String category;
-  final int count;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: 150,
-            height: 150,
-            // Flat design-system tile: no decorative gradient, so no scrim is
-            // needed to keep the label legible.
-            decoration: BoxDecoration(
-              color: kc.surfaceAlt,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: active ? kc.accent : kc.divider,
-                width: active ? 2.5 : 1,
-              ),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  bottom: 44,
-                  left: 10,
-                  right: 10,
-                  child: Text(
-                    category,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodyLg.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: kc.onBg,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: active ? kc.accent : kc.onBg,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                    ),
-                    child: Icon(
-                      active ? Icons.check_rounded : Icons.play_arrow_rounded,
-                      color: active ? kc.onAccent : kc.bg,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          active ? 'Filtering · $count' : '$count messages',
-          style: AppTypography.bodySm.copyWith(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: active ? context.kc.accentInk : context.kc.muted,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Active filter chip (tap to remove that filter) ────────────────────────────
+// ── Active filter chip (tap to clear) ─────────────────────────────────────────
 
 class _FilterChip extends StatelessWidget {
   const _FilterChip({required this.label, required this.onClear});
@@ -2033,35 +1888,7 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-// ── Horizontal row that takes its children's height ──────────────────────────
-
-/// A horizontally scrolling row whose height is its tallest child's, so pills
-/// and cards are never clipped by a fixed row height at any text scale.
-class _PillRow extends StatelessWidget {
-  const _PillRow({required this.children, this.spacing = 8});
-
-  final List<Widget> children;
-  final double spacing;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) SizedBox(width: spacing),
-            children[i],
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ── Filters button (opens the sheet; counts the active filters) ───────────────
+// ── Filters button (opens the sheet) ──────────────────────────────────────────
 
 class _FiltersButton extends StatelessWidget {
   const _FiltersButton({required this.count, required this.onTap});
@@ -2213,6 +2040,35 @@ class _SermonRowSkeleton extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Related to what's playing ─────────────────────────────────────────────────
+
+/// Messages related to [sermon] (the one playing in the background), in the
+/// player's discovery panel; nothing until the library can suggest any.
+class _NowPlayingRelated extends ConsumerWidget {
+  const _NowPlayingRelated({required this.sermon});
+
+  final Sermon sermon;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final related = ref.watch(relatedMessagesProvider(sermon));
+    if (related.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      key: const Key('messages-now-playing-related'),
+      padding: const EdgeInsets.only(top: 24),
+      child: PlayerDiscoveryPanel(
+        child: RelatedMessagesRail(
+          title: 'More like what\u2019s playing',
+          sermons: related,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          onOpen: (target) =>
+              startPlayback(context, ref, target, queue: related),
+        ),
       ),
     );
   }

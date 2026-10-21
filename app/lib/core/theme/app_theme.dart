@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'edged_border.dart';
+
 import 'app_colors.dart';
 import 'app_radius.dart';
 import 'app_typography.dart';
@@ -49,7 +51,7 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
     scaffoldBackgroundColor: kc.bg,
     extensions: <ThemeExtension<dynamic>>[kc],
 
-    // ── Text — Hanken body, ink that follows the active brightness ──────────
+    // ── Text — Plus Jakarta Sans body, ink that follows the active brightness ──────────
     textTheme: TextTheme(
       displayLarge: AppTypography.displayLg.copyWith(color: kc.onBg),
       headlineLarge: AppTypography.headlineLg.copyWith(color: kc.onBg),
@@ -113,7 +115,9 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
       shape: RoundedRectangleBorder(borderRadius: AppRadius.inputBorder),
     ),
 
-    // ── Elevated button — gold CTA, 15px radius, gold ink ──────────────────
+    // ── Buttons — the Kharis website's: square, 700 weight, a hard 2px edge
+    // underneath. Elevated: the yellow call to action ("Give now"). Filled:
+    // violet. Outlined: plain with a violet ring and a lilac edge.
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: kc.accent,
@@ -122,13 +126,36 @@ ThemeData kharisTheme({Brightness brightness = Brightness.light}) {
         disabledForegroundColor: kc.onAccent,
         elevation: 0,
         shadowColor: Colors.transparent,
-        textStyle: AppTypography.ui(size: 16, weight: FontWeight.w700),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.buttonBorder),
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        textStyle: AppTypography.ui(size: 15, weight: FontWeight.w700),
+        shape: const EdgedBorder(edge: AppColors.secondaryEdge),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.onPrimary,
+        disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4),
+        disabledForegroundColor: AppColors.onPrimary,
+        textStyle: AppTypography.ui(size: 15, weight: FontWeight.w700),
+        shape: const EdgedBorder(edge: AppColors.primaryEdge),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        backgroundColor: kc.surface,
+        foregroundColor: brightness == Brightness.light
+            ? AppColors.primaryDeep
+            : kc.onBg,
+        textStyle: AppTypography.ui(size: 15, weight: FontWeight.w700),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+        shape: const EdgedBorder(edge: AppColors.lilacEdge),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
       ),
     ),
 
-    // ── App bar — transparent, Bricolage title ─────────────────────────────
+    // ── App bar — transparent, Plus Jakarta Sans title ─────────────────────────────
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,

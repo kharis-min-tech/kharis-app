@@ -11,10 +11,9 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
-import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
 /// Bottom-nav shell wrapping all 5 dashboard tabs.
 ///
@@ -31,8 +30,16 @@ class DashboardShell extends ConsumerStatefulWidget {
   ConsumerState<DashboardShell> createState() => _DashboardShellState();
 }
 
+/// How long a scroll rests before the hidden tab bar slides back.
+const Duration kBarReturnDelay = Duration(milliseconds: 600);
+
 /// Branch index of the Giving tab (see the tab row below and app_router.dart).
 const _givingTabIndex = 2;
+
+/// Whether this launch has already offered the branch picker. Lives in the
+/// app's [ProviderScope], so it resets on the next launch and not when the
+/// shell is rebuilt (sign-in, deep links).
+final branchPromptShownProvider = StateProvider<bool>((ref) => false);
 
 class _DashboardShellState extends ConsumerState<DashboardShell> {
   late final AppLifecycleListener _lifecycle;
@@ -54,27 +61,34 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _barReturn?.cancel();
     super.dispose();
   }
 
-  /// Accounts created before branch selection became part of onboarding (and
-  /// guests from older builds) have no saved branch, so events default to the
-  /// all-campus mush the testers flagged. Ask exactly once.
-  Future<void> _promptBranchOnce() async {
-    // A member who just chose a campus in onboarding (or chose "All
-    // campuses") has already answered. Checked synchronously from local
-    // prefs: the branch stream can still be empty a second later on a slow
-    // device, which used to ask again right after onboarding.
-    if (ref.read(onboardingRepositoryProvider).hasBranchChoice) return;
-    // Let the branch stream emit before deciding.
-    await Future<void>.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    final branch = ref.read(currentBranchProvider).valueOrNull;
-    if (branch != null && branch.isNotEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('branch_prompt_shown') ?? false) return;
-    await prefs.setBool('branch_prompt_shown', true);
-    if (mounted) context.push('/branch-selection');
+  /// While the member has not chosen a branch, offer the picker once per
+  /// launch. Dismissable: Home meanwhile shows [homeBranchProvider]'s
+  /// branch, and the chip keeps saying "Choose your branch".
+  void _promptBranchOnce() {
+    if (ref.read(branchPromptShownProvider)) return;
+    // Decide once the branch has resolved, so a member whose profile has yet
+    // to answer is not asked by mistake. Closed with the shell if it never
+    // does.
+    ProviderSubscription<AsyncValue<String?>>? sub;
+    var resolved = false;
+    sub = ref.listenManual<AsyncValue<String?>>(currentBranchProvider, (
+      _,
+      next,
+    ) {
+      if (resolved || (!next.hasValue && !next.hasError)) return;
+      resolved = true;
+      // Null while this fires immediately; closed just below instead.
+      sub?.close();
+      if (!mounted || next.valueOrNull != null) return;
+      if (ref.read(branchPromptShownProvider)) return;
+      ref.read(branchPromptShownProvider.notifier).state = true;
+      unawaited(pickActiveBranch(context, ref));
+    }, fireImmediately: true);
+    if (resolved) sub.close();
   }
 
   /// How long the restore waits for the catalogue to place the last-played
@@ -144,10 +158,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   // member scrolls a tab's list down and returns on any scroll up, at the
   // top of the list, on a tab tap or route change, when a screen pushed over
   // the shell (the full player, a detail screen) comes or goes, when
-  // playback starts, and when the app resumes. It never needs an edge swipe
+  // playback starts, when the app resumes, and shortly after a scroll comes
+  // to rest, so it is never missing while the member reads. It never needs an edge swipe
   // to come back: that is the system home gesture.
 
   bool _barVisible = true;
+
+  /// Brings the bar back once a scroll has rested for [kBarReturnDelay].
+  Timer? _barReturn;
 
   /// Whether the shell's own route was on top at the last check; null before
   /// the first.
@@ -189,6 +207,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     if (n is UserScrollNotification) {
       // Fires as a drag starts, before the offset moves: the direction
       // decides, even at the top.
+      _barReturn?.cancel();
       switch (n.direction) {
         case ScrollDirection.reverse:
           if (metrics.maxScrollExtent > metrics.minScrollExtent) {
@@ -197,9 +216,16 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case ScrollDirection.forward:
           _setBarVisible(true);
         case ScrollDirection.idle:
-          break;
+          _barReturn = Timer(kBarReturnDelay, () {
+            if (mounted) _setBarVisible(true);
+          });
       }
-    } else if (metrics.pixels <= metrics.minScrollExtent) {
+    } else if (metrics.pixels <= metrics.minScrollExtent ||
+        (metrics.maxScrollExtent > metrics.minScrollExtent &&
+            metrics.pixels >= metrics.maxScrollExtent)) {
+      // Top or end of the page: nothing more to read in this direction, so
+      // the tabs come back. iOS's bounce at the end did this by accident;
+      // Android's clamping scroll has no bounce and left the bar hidden.
       _setBarVisible(true);
     }
     return false;
@@ -269,9 +295,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           top: BorderSide(color: context.kc.divider, width: 1),
                         ),
                       ),
-                      padding: EdgeInsets.fromLTRB(6, 10, 6, 12 + safeBottom),
+                      padding: EdgeInsets.fromLTRB(8, 10, 8, 12 + safeBottom),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _TabItem(
                             icon: Icons.home_outlined,
@@ -327,7 +352,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 }
 
-/// Single tab item: icon 24 + label 10.5px w600.
+/// Single tab item: icon 24 on a pill when active + label 11.5px.
 /// Active color: `context.kc.accentInk` (gold).
 /// Inactive color: `context.kc.muted`.
 class _TabItem extends StatelessWidget {
@@ -352,31 +377,56 @@ class _TabItem extends StatelessWidget {
     final isActive = index == currentIndex;
     final color = isActive ? context.kc.accentInk : context.kc.muted;
 
-    return GestureDetector(
-      onTap: () => onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: Semantics(
-        label: label,
-        selected: isActive,
-        button: true,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(isActive ? activeIcon : icon, size: 24, color: color),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: AppTypography.labelMd.copyWith(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                  letterSpacing: 0,
-                  height: 1.2,
+    final reduce = MediaQuery.disableAnimationsOf(context);
+
+    // An equal share of the bar each, so labels never crowd; the active tab
+    // sits on a soft pill (flat fill, no glow).
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: Semantics(
+          label: label,
+          selected: isActive,
+          button: true,
+          excludeSemantics: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: reduce
+                      ? Duration.zero
+                      : const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  width: 58,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isActive ? context.kc.chipBg : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    size: 24,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 5),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelMd.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                    color: color,
+                    letterSpacing: 0.1,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

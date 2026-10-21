@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/core/services/app_router.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
@@ -20,9 +22,9 @@ import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/continue_listening_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
+import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
-import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/shared_links/presentation/shared_link_screens.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -30,6 +32,7 @@ import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
@@ -39,6 +42,7 @@ import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 
 import 'support/fake_cache_service.dart';
+import 'support/fake_location_service.dart';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +88,7 @@ NewsItem _news(
   String id,
   String title, {
   String? branch,
+  Duration age = const Duration(hours: 2),
   String? eventId,
   String? linkUrl,
   String? ctaLabel,
@@ -91,7 +96,7 @@ NewsItem _news(
   id: id,
   title: title,
   type: 'Announcement',
-  publishedAt: _now.subtract(const Duration(hours: 2)),
+  publishedAt: _now.subtract(age),
   branch: branch,
   eventId: eventId,
   linkUrl: linkUrl,
@@ -199,9 +204,11 @@ Future<void> _pump(
         dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
         // Nothing to resume: the card collapses (its engine is WP2's).
         continueListeningProvider.overrideWith((ref) => null),
-        // No hero: these tests drive the sections under it.
-        featuredVideoProvider.overrideWith((ref) async => null),
         latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
+        // The hero wall's videos as plain boxes: tests have no video plugin.
+        heroWallVideoProvider.overrideWithValue(
+          (asset, poster, playing) => const SizedBox.expand(),
+        ),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
@@ -411,8 +418,8 @@ void main() {
   });
 
   group('location on cards', () {
-    testWidgets('Home shows the venue on event-linked announcements and on '
-        'upcoming event tiles', (tester) async {
+    testWidgets('Home shows the linked event\'s date on its announcement and '
+        'the venue on upcoming event tiles', (tester) async {
       await _pump(
         tester,
         start: () => const HomeScreen(),
@@ -422,9 +429,21 @@ void main() {
         events: [_prayerNight],
       );
 
-      // Announcement card: "venue · address" of the linked event.
+      // Announcement card: the date of the event it promotes.
+      final card = find.byKey(const Key('home-announcement-latest'));
       expect(
-        find.text('Main Hall \u00b7 12 High Street, London'),
+        find.descendant(of: card, matching: find.text('Join us for prayer')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.text(
+            DateFormat(
+              'EEE d MMM \u00b7 h:mm a',
+            ).format(_prayerNight.startTime),
+          ),
+        ),
         findsOneWidget,
       );
       // Upcoming events strip tile: the venue.
@@ -450,30 +469,77 @@ void main() {
       await _pump(
         tester,
         start: () => const HomeScreen(),
+        // Newest first, as the feed delivers them.
         news: [
-          _news('n-lon', 'London notice', branch: 'London'),
+          _news(
+            'n-man',
+            'Manchester notice',
+            branch: 'Manchester',
+            age: const Duration(hours: 1),
+          ),
           _news('n-all', 'All-campus notice'),
-          _news('n-blank', 'Blank-campus notice', branch: ''),
-          _news('n-man', 'Manchester notice', branch: 'Manchester'),
+          _news(
+            'n-lon',
+            'London notice',
+            branch: 'London',
+            age: const Duration(hours: 3),
+          ),
+          _news(
+            'n-blank',
+            'Blank-campus notice',
+            branch: '',
+            age: const Duration(hours: 4),
+          ),
         ],
         events: [_prayerNight, _allCampusConference, _manchesterPicnic],
       );
 
-      expect(find.text('London notice'), findsOneWidget);
+      // Home leads with the newest notice in scope, never another campus's.
       expect(find.text('All-campus notice'), findsOneWidget);
-      expect(find.text('Blank-campus notice'), findsOneWidget);
       expect(find.text('Manchester notice'), findsNothing);
+      // The member's feed (See all) holds their campus plus all-campus ones.
+      final feed = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      ).read(campusNewsProvider);
+      expect(feed.value!.map((n) => n.id), ['n-all', 'n-lon', 'n-blank']);
 
       expect(find.text('Prayer Night'), findsOneWidget);
       expect(find.text('Global Conference'), findsOneWidget);
       expect(find.text('Manchester Picnic'), findsNothing);
     });
 
-    test('a member on All campuses sees every campus', () async {
+    test('the Events tab "All branches" filter browses every campus, '
+        'leaving Home and the member\u2019s branch alone', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final container = ProviderContainer(
+        overrides: [
+          currentBranchProvider.overrideWith((ref) => Stream.value('London')),
+          upcomingEventsProvider.overrideWith(
+            (ref, b) => Stream.value([_prayerNight, _manchesterPicnic]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final tab = container.listen(eventsUpcomingProvider, (_, _) {});
+      final home = container.listen(campusUpcomingEventsProvider, (_, _) {});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(tab.read().value!.map((e) => e.id), ['e-prayer']);
+
+      container.read(eventsShowAllBranchesProvider.notifier).state = true;
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(tab.read().value!.map((e) => e.id), ['e-prayer', 'e-picnic']);
+      expect(home.read().value!.map((e) => e.id), ['e-prayer']);
+      expect(container.read(currentBranchProvider).value, 'London');
+    });
+
+    test('with no branch chosen, Home shows London and the Events tab every '
+        'campus', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final container = ProviderContainer(
         overrides: [
           currentBranchProvider.overrideWith((ref) => Stream.value(null)),
+          locationServiceProvider.overrideWithValue(FakeLocationService()),
           newsProvider.overrideWith(
             (ref, b) async => [
               _news('n-lon', 'London notice', branch: 'London'),
@@ -487,11 +553,11 @@ void main() {
       );
       addTearDown(container.dispose);
       final news = container.listen(campusNewsProvider, (_, _) {});
-      final events = container.listen(campusUpcomingEventsProvider, (_, _) {});
+      final tab = container.listen(eventsUpcomingProvider, (_, _) {});
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(news.read().value!.map((n) => n.id), ['n-lon', 'n-man']);
-      expect(events.read().value!.map((e) => e.id), ['e-prayer', 'e-picnic']);
+      expect(news.read().value!.map((n) => n.id), ['n-lon']);
+      expect(tab.read().value!.map((e) => e.id), ['e-prayer', 'e-picnic']);
     });
 
     test(
@@ -518,10 +584,9 @@ void main() {
   });
 
   group('states', () {
-    testWidgets('announcements: loading skeleton, then error with Retry', (
+    testWidgets('announcements: nothing while loading or after a failed load', (
       tester,
     ) async {
-      var calls = 0;
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       await tester.pumpWidget(
@@ -530,7 +595,6 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
             newsProvider.overrideWith((ref, b) async {
-              calls++;
               await Future<void>.delayed(const Duration(milliseconds: 100));
               throw Exception('offline');
             }),
@@ -539,28 +603,23 @@ void main() {
             ),
           ],
           child: const MaterialApp(
-            home: Scaffold(body: AnnouncementsCarousel()),
+            home: Scaffold(body: LatestAnnouncementCard()),
           ),
         ),
       );
       await tester.pump();
       await tester.pump();
-      expect(find.byKey(const Key('announcements-skeleton')), findsOneWidget);
+      expect(find.byKey(const Key('home-announcement-latest')), findsNothing);
       expect(find.textContaining('No announcements'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 150));
       await tester.pump();
-      expect(find.text('Couldn\u2019t load announcements.'), findsOneWidget);
+      expect(find.byKey(const Key('home-announcement-latest')), findsNothing);
       expect(find.textContaining('No announcements'), findsNothing);
-
-      await tester.tap(find.text('Retry'));
-      await tester.pump();
-      expect(calls, 2);
-      await tester.pump(const Duration(milliseconds: 150));
     });
 
-    testWidgets('reading card: a failed load hides the card, never a '
-        'made-up reading', (tester) async {
+    testWidgets('Bible row: a failed load offers the Bible, never a made-up '
+        'reading', (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       await tester.pumpWidget(
@@ -571,18 +630,18 @@ void main() {
               (ref) => Stream<DailyContent?>.error(Exception('offline')),
             ),
           ],
-          child: const MaterialApp(home: Scaffold(body: TodaysReadingCard())),
+          child: const MaterialApp(home: Scaffold(body: HomeBibleRow())),
         ),
       );
       await tester.pump();
       await tester.pump();
 
-      expect(find.byKey(const Key('reading-card-loading')), findsNothing);
-      expect(find.text('Read now'), findsNothing);
+      expect(find.byKey(const Key('home-bible-row-loading')), findsNothing);
+      expect(find.text('Read the Bible'), findsOneWidget);
       expect(find.text('Retry'), findsNothing);
     });
 
-    testWidgets('reading card: skeleton while loading, the entry once loaded', (
+    testWidgets('Bible row: skeleton while loading, the reading once loaded', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -596,18 +655,18 @@ void main() {
               yield _reading;
             }),
           ],
-          child: const MaterialApp(home: Scaffold(body: TodaysReadingCard())),
+          child: const MaterialApp(home: Scaffold(body: HomeBibleRow())),
         ),
       );
       await tester.pump();
-      expect(find.byKey(const Key('reading-card-loading')), findsOneWidget);
+      expect(find.byKey(const Key('home-bible-row-loading')), findsOneWidget);
       expect(find.text('Loading...'), findsNothing);
+      expect(find.text('Read the Bible'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 150));
-      expect(find.text("TODAY'S READING"), findsOneWidget);
-      expect(find.text('Be made complete'), findsOneWidget);
+      expect(find.byKey(const Key('home-bible-row-loading')), findsNothing);
       expect(find.text('2 Corinthians 13'), findsOneWidget);
-      expect(find.text('Lord, make us complete.'), findsOneWidget);
+      expect(find.text('Be made complete'), findsOneWidget);
     });
   });
 

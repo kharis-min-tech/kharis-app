@@ -305,11 +305,6 @@ class _EventBody extends ConsumerWidget {
                                 ? context.kc.onBg
                                 : context.kc.onAccent,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.button,
-                              ),
-                            ),
                           ),
                           onPressed: () => toggleEventRsvp(context, ref, event),
                           child: Text(isRsvped ? 'Going \u2713' : 'RSVP'),
@@ -323,11 +318,6 @@ class _EventBody extends ConsumerWidget {
                           foregroundColor: context.kc.onBg,
                           side: BorderSide(color: context.kc.outline),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppRadius.button,
-                            ),
-                          ),
                         ),
                         onPressed: () => addEventToCalendar(context, event),
                         icon: const Icon(

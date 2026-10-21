@@ -31,7 +31,7 @@ String _rowsText(List<(String, String)> rows) =>
 ///
 /// A calm, single-column giving landing: a scripture card, a full-width gold
 /// **Give securely** call to action that opens the church giving page
-/// ([kGivingUrl]) in the phone's browser, and the church-wide bank-transfer
+/// ([kGivingUrl]) in the in-app browser, and the church-wide bank-transfer
 /// details ([kBuiltInGiving]) below.
 class GivingScreen extends StatelessWidget {
   const GivingScreen({super.key});
@@ -40,7 +40,8 @@ class GivingScreen extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     final opened = await launchUrl(
       Uri.parse(kGivingUrl),
-      mode: LaunchMode.externalApplication,
+      // The giving page opens inside the app, never in another one.
+      mode: LaunchMode.inAppBrowserView,
     ).catchError((Object _) => false);
     if (opened) return;
     messenger
@@ -195,7 +196,6 @@ class _GiveSecurelyButton extends StatelessWidget {
           foregroundColor: kc.onAccent,
           elevation: 0,
           shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: AppRadius.buttonBorder),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -231,7 +231,7 @@ class _SecureNote extends StatelessWidget {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            'Opens kharis.org in your browser',
+            'Secure page on kharis.org, inside the app',
             style: AppTypography.ui(size: 12, color: context.kc.muted),
           ),
         ),
@@ -347,7 +347,6 @@ class _BankTransferCard extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               foregroundColor: kc.onBg,
               side: BorderSide(color: kc.outline),
-              shape: RoundedRectangleBorder(borderRadius: AppRadius.pillBorder),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             icon: const Icon(Icons.copy_rounded, size: 16),

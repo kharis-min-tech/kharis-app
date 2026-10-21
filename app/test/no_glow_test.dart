@@ -17,12 +17,12 @@ import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/daily_message_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/live_now_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
+import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/upcoming_events_strip.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/player/presentation/artwork_tint.dart';
@@ -234,9 +234,7 @@ void main() {
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
-      testWidgets('Messages screen with the featured carousel and topics', (
-        tester,
-      ) async {
+      testWidgets('Messages screen with the featured carousel', (tester) async {
         final live = [
           for (var i = 1; i <= 3; i++)
             testSermon(
@@ -260,9 +258,6 @@ void main() {
               cacheServiceProvider.overrideWithValue(FakeCacheService()),
               audioPlayerServiceProvider.overrideWithValue(audio),
               featuredSermonsProvider.overrideWith((ref) => live),
-              categoryLabelsProvider.overrideWith(
-                (ref) => const ['All', 'Prayer & Fasting'],
-              ),
               recentlyPlayedProvider.overrideWith(
                 (ref) => [testSermon('r1', title: 'Recent one')],
               ),
@@ -281,25 +276,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(_gloss(tester, flatFills: true), isEmpty);
 
-        // A selected topic card used to glow in the accent colour.
-        await tester.ensureVisible(find.text('Prayer & Fasting'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Prayer & Fasting'));
-        await tester.pumpAndSettle();
-        final accent = brightness == Brightness.dark
-            ? KharisColors.dark.accent
-            : KharisColors.light.accent;
-        expect(
-          find.byWidgetPredicate(
-            (w) =>
-                w is DecoratedBox &&
-                w.decoration is BoxDecoration &&
-                (w.decoration as BoxDecoration).border ==
-                    Border.all(color: accent, width: 2.5),
-          ),
-          findsOneWidget,
-          reason: 'the topic card is in its selected state',
-        );
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
@@ -333,42 +309,42 @@ void main() {
         await tester.pump();
       }
 
-      testWidgets("Home: today's reading card, loaded and loading", (
+      testWidgets("Home: Bible row with today's reading, and loading", (
         tester,
       ) async {
         await pumpCard(
           tester,
-          const TodaysReadingCard(),
+          const HomeBibleRow(),
           overrides: [
             dailyContentProvider.overrideWith(
               (ref) => Stream.value(
                 const DailyContent(
                   reading: DailyEntry(
-                    title: 'John 3:16',
+                    title: 'God so loved',
                     reference: 'John 3:16',
-                  ),
-                  prayer: DailyEntry(
-                    title: 'Lord, teach us to pray.',
-                    reference: 'Luke 11:1',
                   ),
                 ),
               ),
             ),
           ],
         );
-        expect(find.text('Read now'), findsOneWidget);
+        expect(find.text('John 3:16'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
 
         await pumpCard(
           tester,
-          const TodaysReadingCard(),
+          const HomeBibleRow(),
           overrides: [
             dailyContentProvider.overrideWith(
               (ref) => const Stream<DailyContent>.empty(),
             ),
           ],
         );
-        expect(find.text('Read now'), findsNothing, reason: 'skeleton shown');
+        expect(
+          find.byKey(const Key('home-bible-row-loading')),
+          findsOneWidget,
+          reason: 'skeleton shown',
+        );
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
@@ -482,14 +458,14 @@ void main() {
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
-      testWidgets('Home: announcement cards', (tester) async {
+      testWidgets('Home: latest announcement card', (tester) async {
         await pumpCard(
           tester,
-          const AnnouncementsCarousel(),
+          const LatestAnnouncementCard(),
           overrides: [
             campusNewsProvider.overrideWithValue(
               AsyncValue.data([
-                for (var i = 1; i <= 3; i++)
+                for (var i = 3; i >= 1; i--)
                   NewsItem(
                     id: 'n$i',
                     title: 'Notice $i',
@@ -500,7 +476,7 @@ void main() {
             ),
           ],
         );
-        expect(find.text('Notice 1'), findsOneWidget);
+        expect(find.text('Notice 3'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 

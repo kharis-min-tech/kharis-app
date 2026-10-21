@@ -26,6 +26,8 @@ import 'package:kharis_app/core/services/cache_service.dart';
 import 'package:kharis_app/main.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart'
+    show kDefaultHomeBranch;
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
@@ -351,14 +353,15 @@ class Journey {
   ///
   /// SharedPreferences are cleared; with [onboarded] the onboarding answers
   /// are written as if the member had finished it ([branch] is a branch
-  /// display name, `''` for All branches). Playback history and the
+  /// display name; null leaves no branch chosen, so the launch opens the
+  /// branch picker). Playback history and the
   /// per-member Hive preferences are cleared so no earlier journey's message
   /// reappears in the mini player. The sermon archive and the Studio content
   /// cache are kept (they are refreshed from the network on every launch).
   Future<void> launch({
     bool onboarded = true,
     String role = 'visitor',
-    String branch = '',
+    String? branch = kDefaultHomeBranch,
     List<Override> overrides = const [],
     bool armPermissionGate = false,
   }) async {
@@ -367,9 +370,8 @@ class Journey {
     if (onboarded) {
       await _prefs.setBool('onboarding_completed', true);
       await _prefs.setString('onboarding_role', role);
-      await _prefs.setString('onboarding_branch', branch);
+      if (branch != null) await _prefs.setString('onboarding_branch', branch);
     }
-    await _prefs.setBool('branch_prompt_shown', true);
     for (final key in const [
       'last_tab',
       'last_sort',

@@ -118,6 +118,41 @@ void main() {
     expect(barOffset(tester), Offset.zero, reason: 'at the top');
   });
 
+  testWidgets('comes back shortly after a scroll comes to rest; a new '
+      'scroll before then restarts the wait', (tester) async {
+    await launch(tester);
+    final list = find.byType(ListView);
+    const step = Duration(milliseconds: 100);
+
+    await tester.drag(list, const Offset(0, -400));
+    await tester.pump();
+    await tester.pump(kBarReturnDelay - step);
+    expect(barOffset(tester), const Offset(0, 1), reason: 'just rested');
+
+    // Reading on before the delay is up: the wait starts over.
+    await tester.drag(list, const Offset(0, -300));
+    await tester.pump();
+    await tester.pump(kBarReturnDelay - step);
+    expect(barOffset(tester), const Offset(0, 1), reason: 'reading on');
+
+    await tester.pump(step * 2);
+    await tester.pumpAndSettle();
+    expect(barOffset(tester), Offset.zero, reason: 'at rest');
+  });
+
+  testWidgets(
+    'reaching the end of the page brings it back (Android: no bounce)',
+    (tester) async {
+      await launch(tester);
+      await scrollList(tester, -400);
+      expect(barOffset(tester), const Offset(0, 1), reason: 'mid page');
+
+      await scrollList(tester, -20000);
+      expect(barOffset(tester), Offset.zero, reason: 'at the end');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
   testWidgets('a route change brings it back', (tester) async {
     await launch(tester);
     await scrollList(tester, -400);

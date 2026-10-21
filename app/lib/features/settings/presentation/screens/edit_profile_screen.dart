@@ -144,7 +144,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const SizedBox(height: 20),
             _label('Home branch'),
             _CampusRow(
-              label: branch ?? kAllCampusesLabel,
+              label: branch ?? kChooseBranchLabel,
               onTap: () => pickActiveBranch(context, ref),
             ),
             const SizedBox(height: 20),
@@ -210,9 +210,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   foregroundColor: context.kc.onAccent,
                   disabledBackgroundColor: context.kc.accent.withValues(
                     alpha: 0.5,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.pillBorder,
                   ),
                 ),
                 child: _saving
@@ -378,9 +375,6 @@ class _SignInPrompt extends StatelessWidget {
                   backgroundColor: kc.accent,
                   foregroundColor: kc.onAccent,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.pillBorder,
-                  ),
                 ),
                 child: Text(
                   'Sign in',

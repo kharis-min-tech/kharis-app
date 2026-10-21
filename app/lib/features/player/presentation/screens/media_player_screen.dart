@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
+import 'package:just_audio/just_audio.dart' show ProcessingState;
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
@@ -31,6 +33,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/sound_focus_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
 export 'package:kharis_app/features/player/presentation/media_mode.dart';
@@ -169,12 +172,112 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   final ScrollController _scroll = ScrollController();
 
+  /// The message video's identity in [soundFocusProvider] while it plays.
+  final Object _videoSoundOwner = Object();
+  late final SoundFocus _soundFocus;
+
+  /// The audio transport and the scroll viewport, to tell when the
+  /// transport has scrolled out of view ([_compact]).
+  final _transportKey = GlobalKey();
+  final _viewportKey = GlobalKey();
+
+  /// The transport is out of view: the compact bar shows at the top.
+  bool _compact = false;
+
+  void _onPlayerScroll() {
+    final transport =
+        _transportKey.currentContext?.findRenderObject() as RenderBox?;
+    final viewport =
+        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    if (transport == null || viewport == null || !transport.attached) return;
+    final bottom = transport.localToGlobal(Offset(0, transport.size.height)).dy;
+    final top = viewport.localToGlobal(Offset.zero).dy;
+    final compact = bottom < top;
+    if (compact != _compact) setState(() => _compact = compact);
+  }
+
+  /// Closes the player and opens Messages filtered by [apply] alone (any
+  /// earlier filter is cleared; the list goes back to page 1).
+  void _exploreMessages(void Function(WidgetRef ref) apply) {
+    ref.read(selectedCategoryProvider.notifier).state = 'All';
+    ref.read(selectedSeriesProvider.notifier).state = null;
+    ref.read(selectedSpeakerProvider.notifier).state = null;
+    ref.read(selectedArchiveYearProvider.notifier).state = null;
+    apply(ref);
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.go('/messages');
+  }
+
+  /// "Explore" tiles for the message on screen: its series, its speaker,
+  /// its topic; each opens Messages filtered to it.
+  List<ExploreTile> _exploreTiles() {
+    final series = _sermon.series?.trim() ?? '';
+    final speaker = _sermon.speaker.trim();
+    final topic = sermonTopic(_sermon);
+    return [
+      if (series.isNotEmpty)
+        (
+          id: 'series',
+          label: 'More from $series',
+          onTap: () => _exploreMessages(
+            (ref) => ref.read(selectedSeriesProvider.notifier).state = series,
+          ),
+        ),
+      if (speaker.isNotEmpty)
+        (
+          id: 'speaker',
+          label: 'More from $speaker',
+          onTap: () => _exploreMessages(
+            (ref) => ref.read(selectedSpeakerProvider.notifier).state = speaker,
+          ),
+        ),
+      if (topic.isNotEmpty && topic != 'All')
+        (
+          id: 'topic',
+          label: topic,
+          onTap: () => _exploreMessages(
+            (ref) => ref.read(selectedCategoryProvider.notifier).state = topic,
+          ),
+        ),
+    ];
+  }
+
+  /// Taps on the series or topic named under the title.
+  final TapGestureRecognizer _extraRecognizer = TapGestureRecognizer();
+
+  /// [_extraRecognizer] aimed at [label]'s messages; null when it names
+  /// nothing to open.
+  TapGestureRecognizer? _extraTap(String label) {
+    final open = _openCollection(label);
+    if (open == null) return null;
+    return _extraRecognizer..onTap = open;
+  }
+
+  /// Opens the series or topic a player label names: Messages filtered to
+  /// that series, else to the message's topic. Null when it names neither.
+  VoidCallback? _openCollection(String label) {
+    final series = _sermon.series?.trim() ?? '';
+    if (series.isNotEmpty && label == series) {
+      return () => _exploreMessages(
+        (ref) => ref.read(selectedSeriesProvider.notifier).state = series,
+      );
+    }
+    final topic = sermonTopic(_sermon);
+    if (label.isEmpty || topic.isEmpty || topic == 'All') return null;
+    return () => _exploreMessages(
+      (ref) => ref.read(selectedCategoryProvider.notifier).state = topic,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _history = ref.read(playbackHistoryProvider);
+    _soundFocus = ref.read(soundFocusProvider.notifier);
     _audio = ref.read(audioPlayerServiceProvider);
     _sermon = widget.sermon;
+    _scroll.addListener(_onPlayerScroll);
     _mode = resolveInitialMode(widget.sermon, widget.mode);
     _queueItems = widget.queue ?? _audio.queue?.items ?? const <Sermon>[];
     if (_mode == MediaMode.video) {
@@ -207,7 +310,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     // Audio deliberately keeps playing on close — the mini player takes over.
     if (_mode == MediaMode.video) _saveVideoPosition();
     _disposeVideoEngine();
+    final focus = _soundFocus;
+    final owner = _videoSoundOwner;
+    scheduleMicrotask(() => focus.release(owner));
     _scroll.dispose();
+    _extraRecognizer.dispose();
     super.dispose();
   }
 
@@ -379,6 +486,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   void _onVideoValue(YoutubePlayerValue value) {
     _syncWakelock(value);
+    // The video holds the app's one sound while it plays.
+    if (value.playerState == PlayerState.playing) {
+      _soundFocus.claim(_videoSoundOwner);
+    } else if (value.playerState == PlayerState.paused ||
+        value.playerState == PlayerState.ended) {
+      _soundFocus.release(_videoSoundOwner);
+    }
     if (value.hasError) {
       _videoWatchdog?.cancel();
       final problem = switch (value.error) {
@@ -664,12 +778,13 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         : Duration.zero;
   }
 
-  Future<void> _openInYouTube() async {
-    final url = Uri.parse(
-      'https://www.youtube.com/watch?v=${_sermon.videoId}'
-      '${_videoPosition.inSeconds > 0 ? '&t=${_videoPosition.inSeconds}s' : ''}',
-    );
-    await launchUrl(url, mode: LaunchMode.externalApplication);
+  /// Starts the video again, in the app, from where it stopped.
+  void _retryVideo() {
+    final at = _videoPosition;
+    setState(() {
+      _disposeVideoEngine();
+      _startVideoEngine(startAt: at);
+    });
   }
 
   // ── Up next / More like this ───────────────────────────────────────────────
@@ -770,6 +885,15 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       playbackQueueProvider,
       (_, next) => _followAudioQueue(next.valueOrNull),
     );
+    // Something else took the sound (a clip, the Home video unmuted, audio
+    // resumed from the lock screen): the message video pauses.
+    ref.listen(soundFocusProvider, (_, owner) {
+      if (owner != null &&
+          owner != _videoSoundOwner &&
+          _mode == MediaMode.video) {
+        unawaited(_youtubeController?.pauseVideo());
+      }
+    });
     final isVideo = _mode == MediaMode.video;
     if (isVideo && !_sermon.hasAudio) {
       // A video-only variant finds its audio twin, and the videoStart it
@@ -798,6 +922,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         0.5;
     final upNext = _upNext();
     final related = ref.watch(relatedMessagesProvider(_sermon));
+    final explore = _exploreTiles();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -839,82 +964,185 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                 top: false,
                 // Clamping: the page only scrolls when it truly overflows
                 // and never rubber-bands the artwork (tester feedback).
-                child: SingleChildScrollView(
-                  key: const Key('player-scroll'),
-                  controller: _scroll,
-                  physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      tintedBlock(
-                        (context) => DecoratedBox(
-                          key: const Key('player-tint-body'),
-                          decoration: BoxDecoration(
-                            color: context.kc.bg,
-                            borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(AppRadius.xl),
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 18, 24, 22),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (!isVideo) ...[
-                                  _buildArtwork(),
-                                  const SizedBox(height: 24),
+                child: Stack(
+                  key: _viewportKey,
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, viewport) => SingleChildScrollView(
+                        key: const Key('player-scroll'),
+                        controller: _scroll,
+                        physics: const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // The player stands alone on the first screen; the
+                            // suggestions start below it, never beside playback.
+                            ConstrainedBox(
+                              key: const Key('player-main'),
+                              constraints: BoxConstraints(
+                                minHeight: viewport.maxHeight,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  tintedBlock(
+                                    (context) => DecoratedBox(
+                                      key: const Key('player-tint-body'),
+                                      decoration: BoxDecoration(
+                                        color: context.kc.bg,
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              bottom: Radius.circular(
+                                                AppRadius.xl,
+                                              ),
+                                            ),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          24,
+                                          18,
+                                          24,
+                                          22,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            if (!isVideo) ...[
+                                              _buildArtwork(),
+                                              const SizedBox(height: 24),
+                                            ],
+                                            _buildInfoRow(context),
+                                            const SizedBox(height: 16),
+                                            MediaModeToggle(
+                                              sermon: isVideo
+                                                  ? _sermon.copyWith(
+                                                      audioUrl: _audioTwin()
+                                                          ?.audioUrl,
+                                                    )
+                                                  : _sermon,
+                                              activeMode: _mode,
+                                              onSelect: (mode) =>
+                                                  unawaited(_switchMode(mode)),
+                                            ),
+                                            const SizedBox(height: 22),
+                                            if (isVideo)
+                                              _buildVideoTransport()
+                                            else
+                                              KeyedSubtree(
+                                                key: _transportKey,
+                                                child: _buildAudioTransport(),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      24,
+                                      18,
+                                      24,
+                                      0,
+                                    ),
+                                    child: PlayerActions(
+                                      sermon: _sermon,
+                                      timeline: _videoNoteBinding(),
+                                      asVideo: isVideo,
+                                      positionOf: _sharePosition,
+                                    ),
+                                  ),
                                 ],
-                                _buildInfoRow(context),
-                                const SizedBox(height: 16),
-                                MediaModeToggle(
-                                  sermon: isVideo
-                                      ? _sermon.copyWith(
-                                          audioUrl: _audioTwin()?.audioUrl,
-                                        )
-                                      : _sermon,
-                                  activeMode: _mode,
-                                  onSelect: (mode) =>
-                                      unawaited(_switchMode(mode)),
+                              ),
+                            ),
+                            // Below the player, Spotify-style panels: about the
+                            // message, more like it, where to explore, up next.
+                            if ((_sermon.description?.trim() ?? '').isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: PlayerDiscoveryPanel(
+                                  child: AboutMessageCard(
+                                    sermon: _sermon,
+                                    onSeries:
+                                        (_sermon.series?.trim() ?? '').isEmpty
+                                        ? null
+                                        : () => _exploreMessages(
+                                            (ref) =>
+                                                ref
+                                                    .read(
+                                                      selectedSeriesProvider
+                                                          .notifier,
+                                                    )
+                                                    .state = _sermon.series!
+                                                    .trim(),
+                                          ),
+                                  ),
                                 ),
-                                const SizedBox(height: 22),
-                                if (isVideo)
-                                  _buildVideoTransport()
-                                else
-                                  _buildAudioTransport(),
-                              ],
+                              ),
+                            if (related.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: PlayerDiscoveryPanel(
+                                  child: RelatedMessagesRail(
+                                    sermons: related,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                    ),
+                                    onOpen: (target) =>
+                                        _openRelated(target, related),
+                                    onSeeAll: () => _exploreMessages((_) {}),
+                                  ),
+                                ),
+                              ),
+                            if (explore.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: PlayerDiscoveryPanel(
+                                  child: ExploreMessagesRow(
+                                    sermon: _sermon,
+                                    tiles: explore,
+                                  ),
+                                ),
+                              ),
+                            if (upNext != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: PlayerDiscoveryPanel(
+                                  child: UpNextCard(
+                                    sermon: upNext,
+                                    onTap: () => _playUpNext(upNext),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Audio: once the transport scrolls away, a compact bar
+                    // keeps the message and play/pause at the top (video keeps
+                    // its picture pinned above, so it needs none).
+                    if (!isVideo)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          ignoring: !_compact,
+                          child: AnimatedOpacity(
+                            opacity: _compact ? 1 : 0,
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : const Duration(milliseconds: 160),
+                            child: _CompactPlayerBar(
+                              sermon: _sermon,
+                              onTap: _scrollToTop,
                             ),
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
-                        child: PlayerActions(
-                          sermon: _sermon,
-                          timeline: _videoNoteBinding(),
-                          asVideo: isVideo,
-                          positionOf: _sharePosition,
-                        ),
-                      ),
-                      if (upNext != null)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-                          child: UpNextCard(
-                            sermon: upNext,
-                            onTap: () => _playUpNext(upNext),
-                          ),
-                        ),
-                      if (related.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 30),
-                          child: RelatedMessagesRail(
-                            sermons: related,
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            onOpen: (target) => _openRelated(target, related),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -1001,7 +1229,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             onListen: _audioTwin() == null
                 ? null
                 : () => unawaited(_switchMode(MediaMode.audio)),
-            onOpenYouTube: () => unawaited(_openInYouTube()),
+            onRetry: _retryVideo,
           );
     final pins = _notePins();
     MediaPlayerScreen.debugLastVideoPins = pins;
@@ -1038,8 +1266,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final series = (_sermon.series ?? _sermon.category ?? 'Now playing')
-        .toUpperCase();
+    final label = (_sermon.series ?? _sermon.category ?? '').trim();
+    final series = (label.isEmpty ? 'Now playing' : label).toUpperCase();
+    final open = _openCollection(label);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
       child: Row(
@@ -1056,16 +1285,32 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
             ),
           ),
           Expanded(
-            child: Text(
-              series,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.ui(
-                size: 10,
-                weight: FontWeight.w600,
-                letterSpacing: 1.0,
-                color: context.kc.muted,
+            // Names the series (or topic): a tap opens its messages.
+            child: Semantics(
+              button: open != null,
+              label: open == null ? null : 'Open $label',
+              excludeSemantics: open != null,
+              child: GestureDetector(
+                key: const Key('player-header-collection'),
+                onTap: open,
+                behavior: HitTestBehavior.opaque,
+                child: SizedBox(
+                  height: 44,
+                  child: Center(
+                    child: Text(
+                      series,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.ui(
+                        size: 10,
+                        weight: FontWeight.w600,
+                        letterSpacing: 1.0,
+                        color: context.kc.muted,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -1155,7 +1400,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                         ),
                       if (speaker.isNotEmpty && hasExtra)
                         const TextSpan(text: ' · '),
-                      if (hasExtra) TextSpan(text: extra),
+                      if (hasExtra)
+                        TextSpan(text: extra, recognizer: _extraTap(extra)),
                     ],
                   ),
                   style: AppTypography.ui(
@@ -1184,12 +1430,14 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 class _VideoErrorBanner extends StatelessWidget {
   const _VideoErrorBanner({
     required this.problem,
-    required this.onOpenYouTube,
+    required this.onRetry,
     this.onListen,
   });
 
   final _VideoProblem problem;
-  final VoidCallback onOpenYouTube;
+
+  /// Tries the video again in the app (it never leaves for YouTube).
+  final VoidCallback onRetry;
   final VoidCallback? onListen;
 
   String get _message => switch (problem) {
@@ -1252,9 +1500,9 @@ class _VideoErrorBanner extends StatelessWidget {
                   child: Text('Listen instead', style: labelStyle),
                 ),
               TextButton(
-                onPressed: onOpenYouTube,
+                onPressed: onRetry,
                 style: buttonStyle,
-                child: Text('Open in YouTube', style: labelStyle),
+                child: Text('Try again', style: labelStyle),
               ),
             ],
           ),
@@ -1395,4 +1643,91 @@ class _VideoCornerMask extends CustomPainter {
   @override
   bool shouldRepaint(_VideoCornerMask old) =>
       old.radius != radius || old.color != color;
+}
+
+/// The player's top bar once the transport has scrolled away (audio): the
+/// message and who preached it, play/pause, and a thin progress line.
+/// Tapping it returns to the full player.
+class _CompactPlayerBar extends ConsumerWidget {
+  const _CompactPlayerBar({required this.sermon, required this.onTap});
+
+  final Sermon sermon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final kc = context.kc;
+    final service = ref.read(audioPlayerServiceProvider);
+    final state = ref.watch(playerStateProvider).valueOrNull;
+    final playing =
+        (state?.playing ?? false) &&
+        state?.processingState != ProcessingState.completed;
+    final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
+    final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
+    final progress = duration.inMilliseconds <= 0
+        ? 0.0
+        : (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    return Material(
+      key: const Key('player-compact-bar'),
+      color: kc.surface,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          sermon.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.ui(
+                            size: 15,
+                            weight: FontWeight.w700,
+                            color: kc.onBg,
+                          ),
+                        ),
+                        if (sermon.speaker.trim().isNotEmpty)
+                          Text(
+                            sermon.speaker,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.ui(size: 13, color: kc.muted),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('player-compact-play'),
+                    tooltip: playing ? 'Pause' : 'Play',
+                    iconSize: 30,
+                    color: kc.onBg,
+                    onPressed: () =>
+                        unawaited(playing ? service.pause() : service.resume()),
+                    icon: Icon(
+                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            LinearProgressIndicator(
+              value: progress,
+              minHeight: 2,
+              color: kc.onBg,
+              backgroundColor: kc.divider,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

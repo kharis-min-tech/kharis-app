@@ -150,44 +150,25 @@ void main() {
     },
   );
 
-  testWidgets('All campuses persists and clears the stored campus', (
+  testWidgets('a legacy "All branches" pick reads as no branch chosen', (
     tester,
   ) async {
     final db = FakeFirebaseFirestore();
-    await db.collection('users').doc(uid).set({'branch': 'Bristol'});
+    await db.collection('users').doc(uid).set({'branch': null});
     final h = await harness(
-      tester,
-      db: db,
-      user: member(branch: 'Bristol'),
-      prefs: {'onboarding_branch': 'Bristol'},
-    );
-
-    await setActiveBranch(h.ref, null);
-
-    // updateProfile would have omitted a null branch, leaving Bristol behind.
-    final doc = await db.collection('users').doc(uid).get();
-    expect(
-      doc.data()?['branch'],
-      isNull,
-      reason: 'All campuses must actually clear the stored campus',
-    );
-
-    final relaunch = await harness(
       tester,
       db: db,
       user: member(),
       prefs: {'onboarding_branch': ''},
     );
-    expect(await relaunch.container.read(currentBranchProvider.future), isNull);
+    expect(await h.container.read(currentBranchProvider.future), isNull);
   });
 
   testWidgets(
-    'an unsynced All campuses pick is not overwritten by the profile',
+    'an unsynced legacy "All branches" pick yields to the profile branch',
     (tester) async {
       final db = FakeFirebaseFirestore();
       await db.collection('users').doc(uid).set({'branch': 'Bristol'});
-      // Empty string reads back as null, so without hasBranchChoice this was
-      // indistinguishable from "never chose" and the stale profile won.
       final h = await harness(
         tester,
         db: db,
@@ -197,7 +178,7 @@ void main() {
           'onboarding_branch_sync_pending': true,
         },
       );
-      expect(await h.container.read(currentBranchProvider.future), isNull);
+      expect(await h.container.read(currentBranchProvider.future), 'Bristol');
     },
   );
 }

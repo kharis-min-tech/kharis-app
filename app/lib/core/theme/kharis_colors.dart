@@ -108,7 +108,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     onChip: AppColors.primary,
     accent: AppColors.secondary,
     onAccent: AppColors.onSecondary,
-    accentInk: Color(0xFF8A5A06),
+    accentInk: Color(0xFF8A5700),
     danger: Color(0xFFBE123C),
     scrim: Color(0x8C0B0A10),
   );
@@ -125,7 +125,7 @@ class KharisColors extends ThemeExtension<KharisColors> {
     outline: AppColors.outlineVariant,
     chipBg: AppColors.darkSurface2,
     onChip: Color(0xFFC6B4FF),
-    accent: Color(0xFFE0A32B),
+    accent: Color(0xFFFFDE59),
     onAccent: AppColors.onSecondary,
     accentInk: AppColors.secondary,
     danger: Color(0xFFFB7185),

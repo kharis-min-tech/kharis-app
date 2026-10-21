@@ -17,15 +17,17 @@ Future<bool> showMessageFiltersSheet(BuildContext context) async {
   return applied ?? false;
 }
 
-/// How many of the sheet's filters (year, series, speaker) are active: the
-/// count on the Filters button. Sort is an order, not a filter.
-int activeSheetFilterCount(WidgetRef ref) => [
-  ref.watch(selectedArchiveYearProvider),
-  ref.watch(selectedSeriesProvider),
-  ref.watch(selectedSpeakerProvider),
-].where((v) => v != null).length;
+/// How many of the sheet's filters (topic, year, series, speaker) are
+/// active: the count on the Filters button. Sort is an order, not a filter.
+int activeSheetFilterCount(WidgetRef ref) =>
+    [
+      ref.watch(selectedArchiveYearProvider),
+      ref.watch(selectedSeriesProvider),
+      ref.watch(selectedSpeakerProvider),
+    ].where((v) => v != null).length +
+    (ref.watch(selectedCategoryProvider) == 'All' ? 0 : 1);
 
-/// Sort, year, speaker and series for the library list. Choices stay a draft
+/// Sort, topic, year, speaker and series for the library list. Choices stay a draft
 /// until Apply writes them to the providers; Reset clears the draft.
 class MessageFiltersSheet extends ConsumerStatefulWidget {
   const MessageFiltersSheet({super.key});
@@ -43,6 +45,9 @@ class _MessageFiltersSheetState extends ConsumerState<MessageFiltersSheet> {
   static const _seriesSearchFrom = 8;
 
   late SermonSort _sort;
+
+  /// The topic; 'All' is no topic.
+  late String _topic;
   late int? _year;
   late String? _series;
   late String? _speaker;
@@ -53,6 +58,7 @@ class _MessageFiltersSheetState extends ConsumerState<MessageFiltersSheet> {
   void initState() {
     super.initState();
     _sort = ref.read(sermonSortProvider);
+    _topic = ref.read(selectedCategoryProvider);
     _year = ref.read(selectedArchiveYearProvider);
     _series = ref.read(selectedSeriesProvider);
     _speaker = ref.read(selectedSpeakerProvider);
@@ -67,6 +73,7 @@ class _MessageFiltersSheetState extends ConsumerState<MessageFiltersSheet> {
 
   void _reset() => setState(() {
     _sort = SermonSort.newest;
+    _topic = 'All';
     _year = null;
     _series = null;
     _speaker = null;
@@ -75,6 +82,7 @@ class _MessageFiltersSheetState extends ConsumerState<MessageFiltersSheet> {
 
   void _apply() {
     ref.read(sermonSortProvider.notifier).state = _sort;
+    ref.read(selectedCategoryProvider.notifier).state = _topic;
     ref.read(selectedArchiveYearProvider.notifier).state = _year;
     ref.read(selectedSeriesProvider.notifier).state = _series;
     ref.read(selectedSpeakerProvider.notifier).state = _speaker;
@@ -84,6 +92,11 @@ class _MessageFiltersSheetState extends ConsumerState<MessageFiltersSheet> {
   @override
   Widget build(BuildContext context) {
     final kc = context.kc;
+    final topics = ref
+        .watch(categoryLabelsProvider)
+        .where((c) => c != 'All')
+        .toList();
+    final topicCounts = ref.watch(categoryCountsProvider);
     final years = ref.watch(archiveYearsProvider);
     final yearCounts = ref.watch(archiveYearCountsProvider);
     final speakers = ref.watch(speakerListProvider);
@@ -167,6 +180,28 @@ class _MessageFiltersSheetState extends ConsumerState<MessageFiltersSheet> {
                           ],
                         ),
                       ),
+                      if (topics.isNotEmpty)
+                        _section(
+                          'Topic',
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              FilterChoicePill(
+                                label: 'All topics',
+                                active: _topic == 'All',
+                                onTap: () => setState(() => _topic = 'All'),
+                              ),
+                              for (final t in topics)
+                                FilterChoicePill(
+                                  label: '$t (${topicCounts[t] ?? 0})',
+                                  active: _topic == t,
+                                  onTap: () => setState(
+                                    () => _topic = _topic == t ? 'All' : t,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       if (years.length > 1)
                         _section(
                           'Year',

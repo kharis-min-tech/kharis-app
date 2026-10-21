@@ -6,6 +6,7 @@
 // Run (from app/):   scripts/run_e2e.sh ios|android [journey ...]
 // Journeys: onboarding branch_switch events messages player playlists bible
 //           giving forms deep_links display account more_menu notifications
+//           media_focus
 
 import 'package:integration_test/integration_test.dart';
 
@@ -16,6 +17,7 @@ import 'journeys/deep_links.dart';
 import 'journeys/display.dart';
 import 'journeys/events.dart';
 import 'journeys/giving_forms.dart';
+import 'journeys/media_focus.dart';
 import 'journeys/messages.dart';
 import 'journeys/onboarding.dart';
 import 'journeys/player.dart';
@@ -39,6 +41,11 @@ void main() {
     'events',
     'upcoming / past / RSVPs, detail, directions, calendar, RSVP',
     eventsJourney,
+  );
+  journey(
+    'media_focus',
+    'one sound at a time: message, Home clip, Home video',
+    mediaFocusJourney,
   );
   journey(
     'messages',

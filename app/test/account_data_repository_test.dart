@@ -124,7 +124,7 @@ void main() {
       expect(box.isEmpty, isTrue);
       expect(onboarding.isCompleted, isFalse);
       expect(onboarding.selectedRole, isNull);
-      expect(onboarding.hasBranchChoice, isFalse);
+      expect(onboarding.selectedBranch, isNull);
       expect(onboarding.branchSyncPending, isFalse);
       // Device settings that are not personal data stay.
       expect(prefs.getString('theme_mode'), 'dark');

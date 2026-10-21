@@ -85,9 +85,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.button),
-              ),
             ),
             child: Text(
               'Delete',
@@ -286,40 +283,37 @@ class PlaylistDetailScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: sermons.isEmpty
-                          ? null
-                          : () => startPlayback(
-                              context,
-                              ref,
-                              sermons.first,
-                              queue: sermons,
-                            ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: context.kc.accent,
-                        foregroundColor: context.kc.onAccent,
-                        disabledBackgroundColor: context.kc.accent.withValues(
-                          alpha: 0.4,
+                  // An empty playlist has nothing to play: no dead button
+                  // above the empty state, which says how to add messages.
+                  if (sermons.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        key: const Key('playlist-play-all'),
+                        onPressed: () => startPlayback(
+                          context,
+                          ref,
+                          sermons.first,
+                          queue: sermons,
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.button),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: context.kc.accent,
+                          foregroundColor: context.kc.onAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                      ),
-                      icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                      label: Text(
-                        'Play all',
-                        style: AppTypography.ui(
-                          size: 15,
-                          weight: FontWeight.w700,
-                          color: context.kc.onAccent,
+                        icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                        label: Text(
+                          'Play all',
+                          style: AppTypography.ui(
+                            size: 15,
+                            weight: FontWeight.w700,
+                            color: context.kc.onAccent,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 12),
                   Divider(color: context.kc.divider, height: 1),
                 ],

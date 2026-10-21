@@ -72,7 +72,7 @@ void main() {
     'KA-001: the mini-player hides on Giving and returns on Home without '
     'stopping the message',
     (tester) async {
-      SharedPreferences.setMockInitialValues({'branch_prompt_shown': true});
+      SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       final audio = _FakeAudio();
       await audio.play(_sermon);

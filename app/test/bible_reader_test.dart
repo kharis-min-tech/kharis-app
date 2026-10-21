@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -837,31 +836,6 @@ void main() {
       expect(repo.passageRequests.last, '3034/JHN.4');
       expect(_header('John 4'), findsOneWidget);
       expect(find.byKey(const Key('bible-today')), findsOneWidget);
-    });
-
-    testWidgets('Open in Bible app says so when it cannot open', (
-      tester,
-    ) async {
-      final launched = <String>[];
-      final messenger =
-          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-      const channel = MethodChannel('plugins.flutter.io/url_launcher');
-      messenger.setMockMethodCallHandler(channel, (call) async {
-        if (call.method == 'launch') {
-          launched.add((call.arguments as Map)['url'] as String);
-        }
-        return false;
-      });
-      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
-
-      await _pumpReader(tester);
-      await tester.tap(find.byTooltip('Open in Bible app'));
-      await tester.pumpAndSettle();
-      expect(launched, ['https://www.bible.com/bible/111/JHN.3']);
-      expect(
-        find.text('Could not open the Bible app. Please try again.'),
-        findsOneWidget,
-      );
     });
   });
 

@@ -124,6 +124,31 @@ void main() {
     expect(find.text('Deep Roots'), findsOneWidget); // home again
   });
 
+  testWidgets('an empty playlist offers no Play all, only how to add '
+      'messages', (tester) async {
+    final db = await seededDb();
+    await db
+        .collection('users')
+        .doc('member-1')
+        .collection('playlists')
+        .doc('p1')
+        .update({'sermonIds': <String>[]});
+    final router = routerFor();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overridesFor(db),
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    router.go('/playlists/p1');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Deep Roots'), findsWidgets);
+    expect(find.byKey(const Key('playlist-play-all')), findsNothing);
+    expect(find.textContaining('Nothing here yet'), findsOneWidget);
+  });
+
   testWidgets('a deleted / unknown playlist renders an exitable fallback', (
     tester,
   ) async {

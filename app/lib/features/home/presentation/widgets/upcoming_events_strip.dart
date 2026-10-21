@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -5,15 +6,23 @@ import 'package:intl/intl.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
-import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 /// How many upcoming events Home previews; the Events tab has the rest.
 const int kHomeEventPreviewCount = 5;
 
-const double _kTileWidth = 264;
-const double _kTileHeight = 104;
+const double _kTileWidth = 236;
+
+/// A tile's height: the picture plus its text block, which grows with the
+/// member's text size.
+double _tileHeight(BuildContext context, {double media = _kTileMedia}) =>
+    media + MediaQuery.textScalerOf(context).scale(100);
+
+/// Height of a tile's picture: the flyer, or the date when there is none.
+const double _kTileMedia = 136;
 
 /// "Today", "Tomorrow", else "Sat 11 Oct", then the start (and end, when
 /// set) time: `Tomorrow · 7:00 PM – 9:00 PM`. A weekly event shows its
@@ -39,15 +48,31 @@ String eventWhenLabel(Event event, {DateTime? now}) {
   return '$dayLabel \u00b7 $range';
 }
 
+/// The events Home's strip lists: Home's branch plus all-branch events,
+/// less the branch's weekly services (the Next service card shows those).
+/// Empty means Home shows no events section at all.
+final homeUpcomingEventsProvider = Provider<AsyncValue<List<Event>>>((ref) {
+  final branch = ref.watch(homeCampusProvider);
+  return ref
+      .watch(campusUpcomingEventsProvider)
+      .whenData(
+        (events) => [
+          for (final e in events)
+            if (branch == null || !isBranchServiceEvent(e, branch)) e,
+        ],
+      );
+});
+
 /// Home's "Upcoming events" strip: the next few events Content Studio has
-/// published for the member's campus plus all-campus events, each showing
-/// when and where (venue) and opening the event detail on tap.
+/// published for Home's branch ([homeBranchProvider]) plus all-campus
+/// events, each showing when and where (venue) and opening the event detail
+/// on tap. The branch's weekly services are left to the Next service card.
 class UpcomingEventsStrip extends ConsumerWidget {
   const UpcomingEventsStrip({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(campusUpcomingEventsProvider);
+    final async = ref.watch(homeUpcomingEventsProvider);
     final events = async.valueOrNull;
 
     if (events == null) {
@@ -60,33 +85,47 @@ class UpcomingEventsStrip extends ConsumerWidget {
       }
       return SizedBox(
         key: const Key('events-strip-skeleton'),
-        height: _kTileHeight,
+        height: _tileHeight(context),
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: 2,
           separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (_, _) => const Skeleton(
+          itemBuilder: (_, _) => Skeleton(
             width: _kTileWidth,
-            height: _kTileHeight,
+            height: _tileHeight(context),
             radius: AppRadius.card,
           ),
         ),
       );
     }
 
-    if (events.isEmpty) {
-      final campus = ref.watch(currentBranchProvider).valueOrNull;
-      return _StripMessage(
-        text: campus == null
-            ? 'No upcoming events yet.'
-            : 'No upcoming events at $campus yet.',
-      );
-    }
+    // Nothing coming up: Home leaves the whole section out.
+    if (events.isEmpty) return const SizedBox.shrink();
 
     final preview = events.take(kHomeEventPreviewCount).toList();
+    if (preview.length == 1) {
+      // One event spans the row, its flyer at 2:1, rather than a lone tile
+      // beside empty space.
+      return Padding(
+        padding: const EdgeInsets.only(right: 20),
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final media = box.maxWidth / 2;
+            return SizedBox(
+              height: _tileHeight(context, media: media),
+              child: _EventTile(
+                event: preview.single,
+                width: box.maxWidth,
+                mediaHeight: media,
+              ),
+            );
+          },
+        ),
+      );
+    }
     return SizedBox(
-      height: _kTileHeight,
+      height: _tileHeight(context),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.only(right: 20),
@@ -99,9 +138,15 @@ class UpcomingEventsStrip extends ConsumerWidget {
 }
 
 class _EventTile extends StatelessWidget {
-  const _EventTile({required this.event});
+  const _EventTile({
+    required this.event,
+    this.width = _kTileWidth,
+    this.mediaHeight = _kTileMedia,
+  });
 
   final Event event;
+  final double width;
+  final double mediaHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -119,87 +164,93 @@ class _EventTile extends StatelessWidget {
         child: InkWell(
           onTap: () => openEventDetail(context, event),
           child: SizedBox(
-            width: _kTileWidth,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  // Calendar leaf: weekday, day, month.
-                  Container(
-                    width: 54,
-                    height: double.infinity,
-                    decoration: BoxDecoration(
-                      color: kc.chipBg,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          DateFormat(
-                            'EEE',
-                          ).format(event.startTime).toUpperCase(),
-                          style: AppTypography.ui(
-                            size: 10,
-                            weight: FontWeight.w700,
-                            letterSpacing: 0.6,
-                          ).copyWith(color: kc.onChip, height: 1),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('d').format(event.startTime),
-                          style: AppTypography.display(
-                            size: 22,
-                            weight: FontWeight.w700,
-                          ).copyWith(color: kc.onChip, height: 1),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat(
-                            'MMM',
-                          ).format(event.startTime).toUpperCase(),
-                          style: AppTypography.ui(
-                            size: 10,
-                            weight: FontWeight.w700,
-                            letterSpacing: 0.6,
-                          ).copyWith(color: kc.onChip, height: 1),
-                        ),
+            width: width,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: mediaHeight,
+                  child: _TileMedia(event: event),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.ui(
+                          size: 15,
+                          weight: FontWeight.w700,
+                        ).copyWith(color: kc.onBg, height: 1.25),
+                      ),
+                      const SizedBox(height: 6),
+                      _Line(
+                        icon: Icons.schedule_rounded,
+                        text: eventWhenLabel(event),
+                      ),
+                      if (place != null) ...[
+                        const SizedBox(height: 2),
+                        _Line(icon: Icons.place_outlined, text: place),
                       ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.ui(
-                            size: 14.5,
-                            weight: FontWeight.w700,
-                          ).copyWith(color: kc.onBg, height: 1.25),
-                        ),
-                        const SizedBox(height: 4),
-                        _Line(
-                          icon: Icons.schedule_rounded,
-                          text: eventWhenLabel(event),
-                        ),
-                        if (place != null) ...[
-                          const SizedBox(height: 2),
-                          _Line(icon: Icons.place_outlined, text: place),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The top of an event tile: the Studio's flyer filling it, else the date
+/// set large on the brand tint.
+class _TileMedia extends StatelessWidget {
+  const _TileMedia({required this.event});
+
+  final Event event;
+
+  @override
+  Widget build(BuildContext context) {
+    final kc = context.kc;
+    final date = Container(
+      color: kc.chipBg,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            DateFormat('EEEE').format(event.startTime).toUpperCase(),
+            style: AppTypography.ui(
+              size: 11,
+              weight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ).copyWith(color: kc.onChip, height: 1),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            DateFormat('d MMM').format(event.startTime),
+            style: AppTypography.display(
+              size: 40,
+              weight: FontWeight.w700,
+            ).copyWith(color: kc.onChip, height: 1),
+          ),
+        ],
+      ),
+    );
+    final url = event.imageUrl;
+    if (url == null) return date;
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      placeholder: (_, _) => ColoredBox(color: kc.chipBg),
+      errorWidget: (_, _, _) => date,
     );
   }
 }

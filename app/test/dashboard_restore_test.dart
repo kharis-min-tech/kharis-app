@@ -57,7 +57,7 @@ void main() {
     WidgetTester tester, {
     required AsyncValue<Sermon?> lookup,
   }) async {
-    SharedPreferences.setMockInitialValues({'branch_prompt_shown': true});
+    SharedPreferences.setMockInitialValues(<String, Object>{});
     final prefs = await SharedPreferences.getInstance();
     final audio = _RestoringAudio();
     final cache = FakeCacheService();

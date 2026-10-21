@@ -4,16 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/home/data/news_repository.dart';
-import 'package:kharis_app/features/home/presentation/widgets/news_section.dart';
+import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_cache_service.dart';
+import 'support/fake_location_service.dart';
 import 'support/supabase_stub.dart';
 
 /// The homepage announcements pipeline with only the network stubbed:
 /// Content Studio `news` rows → [NewsRepository] → [newsProvider] →
-/// [AnnouncementsCarousel].
+/// [LatestAnnouncementCard].
 
 final _past = DateTime.utc(2026, 8, 4).toIso8601String();
 const _future = '2036-01-01T00:00:00Z';
@@ -35,8 +37,9 @@ Widget _homeHarness(SupabaseStub stub, {String? branch}) {
     overrides: [
       newsRepositoryProvider.overrideWithValue(NewsRepository(api: stub.api())),
       currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
+      locationServiceProvider.overrideWithValue(FakeLocationService()),
     ],
-    child: const MaterialApp(home: Scaffold(body: AnnouncementsCarousel())),
+    child: const MaterialApp(home: Scaffold(body: LatestAnnouncementCard())),
   );
 }
 
@@ -166,25 +169,29 @@ void main() {
     });
   });
 
-  testWidgets('Studio announcements render on the homepage carousel', (
+  testWidgets('the newest live Studio announcement leads the homepage', (
     tester,
   ) async {
     final stub = SupabaseStub({
       'news': [
         _row(),
-        _row(id: 'go', title: 'Listen to messages on the go'),
+        _row(
+          id: 'go',
+          title: 'Listen to messages on the go',
+          extra: {'published_at': '2026-09-01T00:00:00Z'},
+        ),
         _row(
           id: 'old',
           title: 'Old expired notice',
-          extra: {'expires_at': _past},
+          extra: {'published_at': '2026-09-10T00:00:00Z', 'expires_at': _past},
         ),
       ],
     });
     await tester.pumpWidget(_homeHarness(stub));
     await _settle(tester);
 
-    expect(find.text('Welcome to the new Kharis app'), findsOneWidget);
     expect(find.text('Listen to messages on the go'), findsOneWidget);
+    expect(find.text('Welcome to the new Kharis app'), findsNothing);
     expect(find.text('Old expired notice'), findsNothing);
     expect(
       stub.requests.single.headers['apikey'],
@@ -193,7 +200,7 @@ void main() {
     );
   });
 
-  testWidgets('another branch\'s announcement stays off the carousel', (
+  testWidgets('another branch\'s announcement stays off the homepage', (
     tester,
   ) async {
     final stub = SupabaseStub({
@@ -223,8 +230,6 @@ void main() {
     await tester.pumpWidget(_homeHarness(SupabaseStub({'news': []})));
     await _settle(tester);
 
-    expect(find.textContaining('No announcements'), findsNothing);
-    expect(find.byKey(const Key('announcements-skeleton')), findsNothing);
-    expect(find.byType(ListView), findsNothing);
+    expect(find.byKey(const Key('home-announcement-latest')), findsNothing);
   });
 }

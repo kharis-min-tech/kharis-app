@@ -440,9 +440,6 @@ class SharedLinkNotFoundScreen extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: context.kc.accent,
                   foregroundColor: context.kc.onAccent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.button),
-                  ),
                 ),
                 onPressed: () => context.go('/home'),
                 child: const Text('Go to Home'),

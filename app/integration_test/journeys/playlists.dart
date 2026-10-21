@@ -26,14 +26,23 @@ Future<Finder> _findRow(Journey j, Sermon s) async {
   await t.tap(field, warnIfMissed: false);
   await t.enterText(field, s.title);
   final row = find.byKey(ValueKey(s.id));
+  // Results are newest first and the list builds lazily: once they have
+  // settled, close the keyboard and scroll the row into being.
   await pumpUntilFound(
     t,
-    row,
+    find.textContaining(RegExp(r'results? for "')),
     timeout: const Duration(seconds: 30),
-    reason: 'row for "${s.title}"',
+    reason: 'results for "${s.title}"',
   );
+  await pumpFor(t, const Duration(seconds: 1));
   FocusManager.instance.primaryFocus?.unfocus();
   await pumpFor(t, const Duration(milliseconds: 600));
+  await scrollUntilFound(
+    t,
+    row,
+    scrollable: messagesScroll,
+    timeout: const Duration(seconds: 30),
+  );
   await ensureCentred(t, row);
   return row;
 }

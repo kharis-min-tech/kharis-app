@@ -313,9 +313,6 @@ class _NoteCard extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.button),
-              ),
             ),
             child: Text(
               'Delete',

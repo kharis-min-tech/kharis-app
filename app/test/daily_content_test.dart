@@ -9,7 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/daily_message_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/todays_reading_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
@@ -260,25 +260,26 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('the reading card hides, padding included, with nothing '
-        'today or a failed load', (tester) async {
+    testWidgets('with nothing today, or a failed load, the Bible row '
+        'offers the whole Bible instead of hiding', (tester) async {
       for (final content in [
         Stream<DailyContent?>.value(null),
         Stream<DailyContent?>.error(Exception('offline')),
       ]) {
-        await pump(
-          tester,
-          const TodaysReadingCard(padding: EdgeInsets.all(20)),
-          [dailyContentProvider.overrideWith((ref) => content)],
+        await pump(tester, const HomeBibleRow(padding: EdgeInsets.all(20)), [
+          dailyContentProvider.overrideWith((ref) => content),
+        ]);
+        expect(find.text('Read the Bible'), findsOneWidget);
+        expect(
+          find.text('Every book and chapter, in your translation.'),
+          findsOneWidget,
         );
-        expect(tester.getSize(find.byType(TodaysReadingCard)).height, 0);
+        expect(find.text('John 3:16-18'), findsNothing);
       }
     });
 
-    testWidgets('the reading card shows the entries; no prayer, no section', (
-      tester,
-    ) async {
-      await pump(tester, const TodaysReadingCard(), [
+    testWidgets("the Bible row headlines today's reading", (tester) async {
+      await pump(tester, const HomeBibleRow(), [
         dailyContentProvider.overrideWith(
           (ref) => Stream.value(
             const DailyContent(
@@ -291,19 +292,16 @@ void main() {
           ),
         ),
       ]);
-      expect(find.text('God so loved'), findsOneWidget);
       expect(find.text('John 3:16-18'), findsOneWidget);
-      expect(find.text('Read it slowly.'), findsOneWidget);
-      expect(find.textContaining('DAILY PRAYER'), findsNothing);
-      expect(find.text('Read now'), findsOneWidget);
+      expect(find.text('God so loved'), findsOneWidget);
+      expect(find.text('Read the Bible'), findsNothing);
     });
 
-    testWidgets('tapping the prayer opens the reader, prayer-only too', (
-      tester,
-    ) async {
+    testWidgets("tapping today's reading opens the reader, with or without "
+        'a prayer', (tester) async {
       for (final content in const [
         DailyContent(
-          prayer: DailyEntry(title: 'A morning prayer', body: 'Lord, lead.'),
+          reading: DailyEntry(title: 'God so loved', reference: 'John 3:16'),
         ),
         DailyContent(
           reading: DailyEntry(title: 'God so loved', reference: 'John 3:16'),
@@ -314,7 +312,7 @@ void main() {
           routes: [
             GoRoute(
               path: '/',
-              builder: (_, _) => const Scaffold(body: TodaysReadingCard()),
+              builder: (_, _) => const Scaffold(body: HomeBibleRow()),
             ),
             GoRoute(
               path: '/reading',
@@ -333,7 +331,7 @@ void main() {
         );
         await tester.pump();
         await tester.pump();
-        await tester.tap(find.text('Lord, lead.'));
+        await tester.tap(find.text('John 3:16'));
         await tester.pumpAndSettle();
         expect(find.text('reader'), findsOneWidget);
       }

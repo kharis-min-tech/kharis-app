@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:kharis_app/shared/widgets/reduce_motion_scope.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,6 +25,7 @@ import 'shared/providers/cache_provider.dart';
 import 'shared/providers/sermon_provider.dart';
 import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
+import 'shared/providers/sound_focus_provider.dart';
 
 Future<void> main() async {
   // Catch all errors in release mode
@@ -40,11 +42,7 @@ Future<void> main() async {
       // over fetching), so first launch renders the same offline as online.
       // Their SIL Open Font Licenses appear in the licences page.
       LicenseRegistry.addLicense(() async* {
-        for (final family in const [
-          'bricolagegrotesque',
-          'hankengrotesk',
-          'newsreader',
-        ]) {
+        for (final family in const ['plusjakartasans', 'newsreader']) {
           yield LicenseEntryWithLineBreaks(
             ['google_fonts'],
             await rootBundle.loadString('assets/google_fonts/OFL-$family.txt'),
@@ -143,6 +141,8 @@ class KharisApp extends ConsumerWidget {
     // never signs in) so per-user data — playlists, notes — has somewhere to
     // live even on the login-free onboarding path.
     ref.watch(anonymousSignInProvider);
+    // One sound at a time: message audio yields to any other player.
+    ref.watch(audioSoundFocusProvider);
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       builder: (BuildContext context, child) => MaterialApp.router(
@@ -155,9 +155,13 @@ class KharisApp extends ConsumerWidget {
         routerConfig: ref.watch(appRouterProvider),
         // On web, a shared link opened in the browser gets the "Open in the
         // Kharis app" bar above every route.
-        builder: (context, child) => clampTextScaling(
-          context,
-          OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+        // iOS Reduce Motion reaches every reduced-motion check, as Android's
+        // Remove animations already does.
+        builder: (context, child) => ReduceMotionScope(
+          child: clampTextScaling(
+            context,
+            OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
     );

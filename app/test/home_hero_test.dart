@@ -3,157 +3,50 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/features/home/data/featured_video_repository.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
+import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
-import 'package:kharis_app/shared/providers/branch_provider.dart';
-import 'package:kharis_app/shared/providers/content_api_provider.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
-import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_audio_player_service.dart';
-import 'support/supabase_stub.dart';
+import 'support/fake_cache_service.dart';
+import 'support/fake_sermon_repository.dart';
 
-/// The Home hero with only the network stubbed: Content Studio rows
-/// (`featured_videos`, `events`, `news`) → repositories → the campus feeds →
-/// [homeHeroSlidesProvider] → [HomeHero]. The YouTube surface is swapped for
-/// a marker so no iframe ever loads.
+/// The Home hero is kharis.org's wall: the same media in the same rows,
+/// drifting right, the middle card of each row in the spot. It stands still
+/// whenever it should, plays only the videos on screen, and a tap plays the
+/// latest message's video.
 
-const _future = '2036-03-01T18:00:00Z';
-const _later = '2036-04-01T18:00:00Z';
-const _past = '2026-01-01T09:00:00Z';
+const _width = 400.0;
 
-Map<String, dynamic> _video(String workspace, String title, {String? at}) => {
-  'workspace': workspace,
-  'url': 'https://youtu.be/REhGafc8hdg',
-  'title': title,
-  'thumbnail_url': null,
-  'updated_at': at ?? _past,
-};
+/// Video cards by asset, and whether each is asked to play.
+final _videoCalls = <String, bool>{};
 
-Map<String, dynamic> _event(
-  String id, {
-  String start = _future,
-  String? image = 'https://cdn.example.org/flyer.jpg',
-  List<String> sites = const ['app'],
-  bool featured = false,
-  String? branch,
-}) => {
-  'id': id,
-  'title': 'Event $id',
-  'start_time': start,
-  'image_url': image,
-  'sites': sites,
-  'is_featured': featured,
-  'branch_name': branch,
-};
-
-Map<String, dynamic> _news(String id, {String? image, String? eventId}) => {
-  'id': id,
-  'title': 'News $id',
-  'workspace': 'app',
-  'created_at': _past,
-  'image_url': image,
-  'event_id': eventId,
-};
-
-const _latest = Sermon(
-  id: 's1',
-  title: 'Walking by faith',
-  speaker: 'Pastor Kalvert',
-  audioUrl: 'https://cdn.example.org/s1.mp3',
-  artworkUrl: 'https://cdn.example.org/s1.jpg',
-);
-
-List<Override> _overrides(
-  SupabaseStub stub, {
-  String? branch = 'London',
-  List<Sermon> latest = const [_latest],
-}) => [
-  contentApiProvider.overrideWithValue(stub.api()),
-  currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
-  latestSermonsProvider.overrideWith((ref) => latest),
-  heroVideoSurfaceProvider.overrideWithValue((videoId, muted, onPlaying) {
-    _reportPlaying = onPlaying;
-    return SizedBox(
-      key: Key('fake-video-$videoId-${muted ? 'muted' : 'sound'}'),
-    );
-  }),
-];
-
-/// What the stand-in clip last got to report its playing state with.
-ValueChanged<bool>? _reportPlaying;
-
-/// The slides once every feed has answered.
-Future<List<HeroSlide>> _slides(
-  SupabaseStub stub, {
-  String? branch = 'London',
-  List<Sermon> latest = const [_latest],
-}) async {
-  final container = ProviderContainer(
-    overrides: _overrides(stub, branch: branch, latest: latest),
-  );
-  addTearDown(container.dispose);
-  final sub = container.listen(homeHeroSlidesProvider, (_, _) {});
-  addTearDown(sub.close);
-  await container.read(currentBranchProvider.future);
-  for (var i = 0; i < 10; i++) {
-    await Future<void>.delayed(Duration.zero);
-  }
-  await Future.wait<Object?>([
-    container.read(featuredVideoProvider.future).catchError((_) => null),
-    container.read(upcomingEventsProvider(branch).future),
-    container.read(newsProvider(branch).future),
-  ]);
-  await Future<void>.delayed(Duration.zero);
-  expect(
-    [
-      container.read(featuredVideoProvider),
-      container.read(campusUpcomingEventsProvider),
-      container.read(campusNewsProvider),
-    ].every((f) => f.hasValue || f.hasError),
-    isTrue,
-    reason: 'every feed has answered',
-  );
-  return container.read(homeHeroSlidesProvider);
-}
-
-/// Home's rule: the hero when there are slides, nothing otherwise.
-class _Host extends ConsumerWidget {
-  const _Host();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final slides = ref.watch(homeHeroSlidesProvider);
-    if (slides.isEmpty) return const Text('no hero');
-    return SingleChildScrollView(
-      child: HomeHero(
-        key: const Key('home-hero'),
-        slides: slides,
-        topBar: const SizedBox(height: 42),
-      ),
-    );
-  }
-}
-
-Future<void> _pumpHero(
-  WidgetTester tester,
-  SupabaseStub stub, {
+Future<void> _pump(
+  WidgetTester tester, {
   bool reduceMotion = false,
-  List<Sermon> latest = const [_latest],
-  FakeAudioPlayerService? audio,
+  bool inView = true,
+  List<Sermon> latest = const [],
 }) async {
-  tester.view.physicalSize = const Size(400, 900);
+  tester.view.physicalSize = const Size(_width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  _videoCalls.clear();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        ..._overrides(stub, latest: latest),
-        audioPlayerServiceProvider.overrideWithValue(
-          audio ?? FakeAudioPlayerService(),
-        ),
+        latestSermonsProvider.overrideWith((ref) => latest),
+        audioPlayerServiceProvider.overrideWithValue(FakeAudioPlayerService()),
+        cacheServiceProvider.overrideWithValue(FakeCacheService()),
+        heroWallVideoProvider.overrideWithValue((asset, poster, playing) {
+          _videoCalls[asset] = (_videoCalls[asset] ?? false) || playing;
+          return ColoredBox(
+            key: Key('video-$asset-${playing ? 'playing' : 'still'}'),
+            color: Colors.black,
+          );
+        }),
       ],
       child: MaterialApp(
         builder: (context, child) => MediaQuery(
@@ -162,338 +55,234 @@ Future<void> _pumpHero(
           ).copyWith(disableAnimations: reduceMotion),
           child: child!,
         ),
-        home: const Scaffold(body: _Host()),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: HomeHero(inView: inView, topBar: const SizedBox(height: 42)),
+          ),
+        ),
       ),
     ),
   );
-  for (var i = 0; i < 6; i++) {
-    await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump();
+}
+
+/// Left edge of card [i] of [row].
+double _left(WidgetTester tester, int row, int i) =>
+    tester.getTopLeft(find.byKey(Key('home-hero-card-$row-$i'))).dx;
+
+/// The width one card plus its gap takes up.
+double _step(WidgetTester tester) => _left(tester, 0, 1) - _left(tester, 0, 0);
+
+/// How far [row] has moved since [before], within one loop of its cards.
+double _moved(WidgetTester tester, int row, double before) {
+  final set = _step(tester) * (row == 0 ? 7 : 4);
+  var moved = (_left(tester, row, 0) - before) % set;
+  if (moved > set / 2) moved -= set;
+  return moved;
+}
+
+/// Index of [row]'s card in the spot (scaled up), and how many are.
+(int, int) _spot(WidgetTester tester, int row) {
+  var index = -1;
+  var count = 0;
+  final cards = row == 0 ? 14 : 8;
+  for (var i = 0; i < cards; i++) {
+    final scale = tester
+        .widget<AnimatedScale>(
+          find.descendant(
+            of: find.byKey(Key('home-hero-card-$row-$i')),
+            matching: find.byType(AnimatedScale),
+          ),
+        )
+        .scale;
+    if (scale > 1) {
+      index = i;
+      count++;
+    }
   }
+  return (index, count);
 }
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  group('featured video choice', () {
-    test('the app\'s clip beats General, which beats Kharis; KP2 never', () {
-      final all = [
-        _video('kp2', 'Kharis Phase 2'),
-        _video('kharis', 'Year of Faith highlight'),
-        _video('general', 'General clip'),
-        _video('app', 'App clip'),
-      ];
-      expect(FeaturedVideoRepository.pick(all)?.title, 'App clip');
-      expect(
-        FeaturedVideoRepository.pick(all.sublist(0, 3))?.title,
-        'General clip',
-      );
-      expect(
-        FeaturedVideoRepository.pick(all.sublist(0, 2))?.title,
-        'Year of Faith highlight',
-      );
-      expect(FeaturedVideoRepository.pick(all.sublist(0, 1)), isNull);
-    });
-
-    test('the newest clip in a workspace wins; the thumbnail falls back to '
-        'YouTube\'s frame', () {
-      final video = FeaturedVideoRepository.pick([
-        _video('kharis', 'Older', at: '2025-01-01T00:00:00Z'),
-        _video('kharis', 'Newer', at: '2026-06-01T00:00:00Z'),
-      ])!;
-      expect(video.title, 'Newer');
-      expect(video.videoId, 'REhGafc8hdg');
-      expect(
-        video.thumbnailUrl,
-        'https://i.ytimg.com/vi/REhGafc8hdg/hqdefault.jpg',
-      );
-    });
+  test('the rows hold kharis.org\'s media in its order: both videos and '
+      'every other photo on top, the rest below', () {
+    expect(kHeroWallTop.map((i) => i.video ?? i.image), [
+      'assets/hero/hero-a.mp4',
+      'assets/hero/sunday-service-stage.jpg',
+      'assets/hero/easter-bibles-raised.jpg',
+      'assets/hero/hero-b.mp4',
+      'assets/hero/impartation-celebration.jpg',
+      'assets/hero/easter-pastor-david.jpg',
+      'assets/hero/outreach-community.jpg',
+    ]);
+    expect(kHeroWallBottom.map((i) => i.image), [
+      'assets/hero/worship-altar.jpg',
+      'assets/hero/preaching-open-bible.jpg',
+      'assets/hero/outreach-street.jpg',
+      'assets/hero/sunday-bible-raised.jpg',
+    ]);
   });
 
-  group('slides', () {
-    test(
-      'video first, then flyers (featured, then soonest), then '
-      'announcement images; a promo for a shown event is not repeated',
-      () async {
-        final slides = await _slides(
-          SupabaseStub({
-            'featured_videos': [
-              _video('kharis', 'Kharis clip'),
-              _video('general', 'General clip'),
-            ],
-            'events': [
-              _event('soon'),
-              _event('featured', start: _later, featured: true),
-              _event('plain', image: null),
-            ],
-            'news': [
-              _news('pic', image: 'https://cdn.example.org/news.jpg'),
-              _news('text-only'),
-              _news(
-                'promo',
-                image: 'https://cdn.example.org/promo.jpg',
-                eventId: 'soon',
-              ),
-            ],
-          }),
-        );
-        expect(slides.map((s) => s.id), [
-          'video:REhGafc8hdg',
-          'event:featured',
-          'event:soon',
-          'news:pic',
-        ]);
-        expect((slides.first as VideoHeroSlide).video.title, 'General clip');
-      },
+  testWidgets('cards are 80% of the screen wide; one card per row is in '
+      'the spot, the one at the middle; row one starts with its first card '
+      'there, row two half a card along', (tester) async {
+    await _pump(tester);
+    final card = tester.getSize(find.byKey(const Key('home-hero-card-0-0')));
+    expect(card.width, closeTo(_width * kHeroWallCardWidth, 0.5));
+
+    for (final row in [0, 1]) {
+      final (index, count) = _spot(tester, row);
+      expect(count, 1, reason: 'row $row');
+      final centre = tester
+          .getCenter(find.byKey(Key('home-hero-card-$row-$index')))
+          .dx;
+      expect((centre - _width / 2).abs(), lessThan(_step(tester) / 2 + 1));
+    }
+    // The first item (either copy of it: the row loops) is in the middle.
+    final (spot, _) = _spot(tester, 0);
+    expect(spot % 7, 0);
+    expect(
+      tester.getCenter(find.byKey(Key('home-hero-card-0-$spot'))).dx,
+      closeTo(_width / 2, 1),
     );
-
-    test('only events the app shows for the member\'s Branch', () async {
-      final slides = await _slides(
-        SupabaseStub({
-          'featured_videos': [],
-          'events': [
-            _event('mine', branch: 'London'),
-            _event('everyone'),
-            _event('website-only', sites: ['kharis']),
-            _event('unpublished', sites: []),
-            _event('leeds', branch: 'Leeds'),
-          ],
-          'news': [],
-        }),
-      );
-      expect(slides.map((s) => s.id), ['event:mine', 'event:everyone']);
-    });
-
-    test('nothing else → the latest message; a failed video feed does not '
-        'hide it', () async {
-      final slides = await _slides(
-        // No `featured_videos` table: the stub fails it like a dropped line.
-        SupabaseStub({
-          'events': [_event('no-flyer', image: null)],
-          'news': [_news('text-only')],
-        }),
-      );
-      expect(slides, hasLength(1));
-      expect((slides.single as LatestMessageHeroSlide).sermon.id, 's1');
-    });
-
-    test('nothing at all → no slides', () async {
-      final slides = await _slides(
-        SupabaseStub({'featured_videos': [], 'events': [], 'news': []}),
-        latest: const [],
-      );
-      expect(slides, isEmpty);
-    });
+    // Row two's cards fall half a card along from row one's.
+    final step = _step(tester);
+    expect(
+      ((_left(tester, 1, 0) - _left(tester, 0, 0)) % step + step) % step,
+      closeTo(step / 2, 1),
+    );
   });
 
-  group('HomeHero', () {
-    final withVideo = {
-      'featured_videos': [_video('app', 'App clip')],
-      'events': [_event('soon')],
-      'news': <Map<String, dynamic>>[],
-    };
+  testWidgets('rows drift right: one card every 6 s on top, every 7.5 s '
+      'below; the spot moves on with them', (tester) async {
+    await _pump(tester);
+    final top = _left(tester, 0, 0);
+    final bottom = _left(tester, 1, 0);
+    final step = _step(tester);
+    // Frame by frame, as the ticker sees them.
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(_moved(tester, 0, top), closeTo(step * 3 / 6, 2));
+    expect(_moved(tester, 1, bottom), closeTo(step * 3 / 7.5, 2));
 
-    testWidgets('media only: no caption text, the title as the slide\'s '
-        'screen-reader label, dots for more than one slide', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await _pumpHero(tester, SupabaseStub(withVideo));
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    // A card along: the spot has passed to the card on the left.
+    expect(_spot(tester, 0).$1, anyOf(6, 13));
+  });
 
-      expect(find.byKey(const Key('home-hero')), findsOneWidget);
-      expect(_clip(muted: true), findsOneWidget);
-      // The thumbnail stays until the surface reports frames.
-      expect(
-        find.byKey(const Key('home-hero-video-thumbnail')),
-        findsOneWidget,
-      );
-      for (final text in ['App clip', 'Watch', 'Play', 'FEATURED VIDEO']) {
-        expect(find.text(text), findsNothing, reason: text);
-      }
-      expect(find.bySemanticsLabel('App clip'), findsOneWidget);
-      expect(find.byKey(const Key('home-hero-dots')), findsOneWidget);
-      semantics.dispose();
-    });
+  testWidgets('reduced motion: the wall stands still and no video plays', (
+    tester,
+  ) async {
+    await _pump(tester, reduceMotion: true);
+    final top = _left(tester, 0, 0);
+    await tester.pump(const Duration(seconds: 6));
+    expect(_left(tester, 0, 0), top);
+    expect(_videoCalls.values, everyElement(isFalse));
+  });
 
-    testWidgets('the thumbnail covers the clip whenever it is not playing; '
-        'the clip is enlarged to crop the player\'s edges', (tester) async {
-      await _pumpHero(tester, SupabaseStub(withVideo));
-      final thumbnail = find.byKey(const Key('home-hero-video-thumbnail'));
-      expect(thumbnail, findsOneWidget);
+  testWidgets('scrolled away: the wall stands still and no video plays', (
+    tester,
+  ) async {
+    await _pump(tester, inView: false);
+    final top = _left(tester, 0, 0);
+    await tester.pump(const Duration(seconds: 6));
+    expect(_left(tester, 0, 0), top);
+    expect(_videoCalls.values, everyElement(isFalse));
+  });
 
-      _reportPlaying!(true);
-      await tester.pump();
-      expect(thumbnail, findsNothing);
+  testWidgets('only a video on screen plays', (tester) async {
+    await _pump(tester);
+    // The first card (video A) starts in the middle; video B is three
+    // cards to its right, off screen.
+    expect(
+      find.byKey(const Key('video-assets/hero/hero-a.mp4-playing')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('video-assets/hero/hero-b.mp4-playing')),
+      findsNothing,
+    );
+  });
 
-      // Buffering, paused, cued, ended: YouTube would draw its own UI.
-      _reportPlaying!(false);
-      await tester.pump();
-      expect(thumbnail, findsOneWidget);
+  test('one player per video however often its cards come and go; it '
+      'plays while any card is on screen and pauses when none is', () {
+    final log = <String>[];
+    final pool = HeroVideoPool<String>(
+      create: (asset) {
+        log.add('create $asset');
+        return 'player:$asset';
+      },
+      play: (p) => log.add('play $p'),
+      pause: (p) => log.add('pause $p'),
+      release: (p) => log.add('release $p'),
+    );
+    final first = Object();
+    final copy = Object(); // the row's second copy of the same card
 
-      final scale = tester.widget<Transform>(
-        find
-            .ancestor(of: _clip(muted: true), matching: find.byType(Transform))
-            .first,
-      );
-      expect(
-        scale.transform.getMaxScaleOnAxis(),
-        closeTo(kHeroClipCropScale, 1e-9),
-      );
-      expect(kHeroClipCropScale, greaterThan(1));
-    });
+    pool.want(first, 'a.mp4', on: false);
+    expect(log, isEmpty, reason: 'nothing made before a card needs it');
 
-    testWidgets('the clip starts muted; the corner chip unmutes and mutes '
-        'it inline', (tester) async {
-      final semantics = tester.ensureSemantics();
-      await _pumpHero(tester, SupabaseStub(withVideo));
+    pool.want(first, 'a.mp4', on: true);
+    pool.want(copy, 'a.mp4', on: true);
+    // The drifting wall reports the same state every frame.
+    for (var i = 0; i < 5; i++) {
+      pool.want(first, 'a.mp4', on: true);
+    }
+    pool.want(first, 'a.mp4', on: false); // first card drifts off
+    expect(log, ['create a.mp4', 'play player:a.mp4'], reason: 'copy on');
 
-      expect(_clip(muted: true), findsOneWidget);
-      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
-      expect(find.bySemanticsLabel('Unmute video'), findsOneWidget);
+    pool.want(copy, 'a.mp4', on: false); // last card off screen
+    pool.want(first, 'a.mp4', on: true); // back round again
+    expect(log, [
+      'create a.mp4',
+      'play player:a.mp4',
+      'pause player:a.mp4',
+      'play player:a.mp4',
+    ]);
 
-      await tester.tap(find.byKey(const Key('home-hero-mute')));
-      await tester.pump();
-      expect(_clip(muted: false), findsOneWidget);
-      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
-      expect(find.bySemanticsLabel('Mute video'), findsOneWidget);
+    pool.dispose();
+    expect(log.last, 'release player:a.mp4');
+  });
 
-      await tester.tap(find.byKey(const Key('home-hero-mute')));
-      await tester.pump();
-      expect(_clip(muted: true), findsOneWidget);
-      semantics.dispose();
-    });
-
-    testWidgets('unmuting pauses a message playing in the app', (tester) async {
-      final audio = FakeAudioPlayerService()..current = _latest;
-      await _pumpHero(tester, SupabaseStub(withVideo), audio: audio);
-
-      await tester.tap(find.byKey(const Key('home-hero-mute')));
-      await tester.pump();
-      expect(audio.pauseCalls, 1);
-
-      // Muting again leaves the app's audio alone.
-      await tester.tap(find.byKey(const Key('home-hero-mute')));
-      await tester.pump();
-      expect(audio.pauseCalls, 1);
-    });
-
-    testWidgets('nothing playing in the app: unmuting pauses nothing', (
+  testWidgets('a tap plays the newest message that has a video, as video', (
+    tester,
+  ) async {
+    MediaPlayerScreen.debugDisableVideoEngine = true;
+    addTearDown(() => MediaPlayerScreen.debugDisableVideoEngine = false);
+    await _pump(
       tester,
-    ) async {
-      final audio = FakeAudioPlayerService();
-      await _pumpHero(tester, SupabaseStub(withVideo), audio: audio);
+      latest: [
+        testSermon('audio-only', publishedAt: DateTime(2026, 10, 19)),
+        testSermon(
+          'with-video',
+          title: 'Christ: The Eternally Blessed God',
+          videoId: 'abc123',
+          publishedAt: DateTime(2026, 10, 12),
+        ),
+      ],
+    );
+    await tester.tap(find.byKey(const Key('home-hero-wall')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-      await tester.tap(find.byKey(const Key('home-hero-mute')));
-      await tester.pump();
-      expect(_clip(muted: false), findsOneWidget);
-      expect(audio.pauseCalls, 0);
-    });
+    final player = tester.widget<MediaPlayerScreen>(
+      find.byType(MediaPlayerScreen),
+    );
+    expect(player.sermon.id, 'with-video');
+    expect(player.mode, MediaMode.video);
+  });
 
-    testWidgets('a stopped clip comes back muted: after a slide change and '
-        'after the app was backgrounded', (tester) async {
-      await _pumpHero(tester, SupabaseStub(withVideo));
-      final pager = find.byKey(const Key('home-hero-pager'));
-
-      await tester.tap(find.byKey(const Key('home-hero-mute')));
-      await tester.pump();
-      expect(_clip(muted: false), findsOneWidget);
-
-      await tester.drag(pager, const Offset(-300, 0));
-      await tester.pumpAndSettle();
-      expect(_clipAny, findsNothing);
-      await tester.drag(pager, const Offset(300, 0));
-      await tester.pumpAndSettle();
-      expect(_clip(muted: true), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('home-hero-mute')));
-      await tester.pump();
-      expect(_clip(muted: false), findsOneWidget);
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      await tester.pump();
-      expect(_clipAny, findsNothing);
-      expect(find.byKey(const Key('home-hero-mute')), findsNothing);
-
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pump();
-      expect(_clip(muted: true), findsOneWidget);
-      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
-    });
-
-    testWidgets('reduced motion: the still thumbnail, no player, no mute '
-        'button, no auto-advance', (tester) async {
-      await _pumpHero(tester, SupabaseStub(withVideo), reduceMotion: true);
-
-      expect(_clipAny, findsNothing);
-      expect(find.byKey(const Key('home-hero-mute')), findsNothing);
-      expect(
-        find.byKey(const Key('home-hero-video-thumbnail')),
-        findsOneWidget,
-      );
-      await tester.pump(kHeroAdvanceInterval * 2);
-      await tester.pump(const Duration(seconds: 1));
-      expect(_slide('App clip'), findsOneWidget);
-    });
-
-    testWidgets('image slides advance on their own, without a mute button', (
-      tester,
-    ) async {
-      await _pumpHero(
-        tester,
-        SupabaseStub({
-          'featured_videos': [],
-          'events': [_event('a'), _event('b', start: _later)],
-          'news': [],
-        }),
-      );
-      expect(_slide('Event a'), findsOneWidget);
-      expect(find.byKey(const Key('home-hero-mute')), findsNothing);
-
-      await tester.pump(kHeroAdvanceInterval);
-      await tester.pump(const Duration(seconds: 1));
-      expect(_slide('Event b'), findsOneWidget);
-      expect(_slide('Event a'), findsNothing);
-      expect(find.text('Event b'), findsNothing, reason: 'no caption');
-    });
-
-    testWidgets('the latest-message fallback: artwork only, no text, no '
-        'dots', (tester) async {
-      await _pumpHero(
-        tester,
-        SupabaseStub({'featured_videos': [], 'events': [], 'news': []}),
-      );
-
-      expect(_slide('Walking by faith'), findsOneWidget);
-      expect(find.text('Walking by faith'), findsNothing);
-      expect(find.text('LATEST MESSAGE'), findsNothing);
-      expect(find.byKey(const Key('home-hero-dots')), findsNothing);
-    });
-
-    testWidgets('nothing to show → no hero', (tester) async {
-      await _pumpHero(
-        tester,
-        SupabaseStub({'featured_videos': [], 'events': [], 'news': []}),
-        latest: const [],
-      );
-
-      expect(find.byKey(const Key('home-hero')), findsNothing);
-      expect(find.text('no hero'), findsOneWidget);
-    });
+  testWidgets('no message with a video yet: the tap does nothing', (
+    tester,
+  ) async {
+    await _pump(tester, latest: [testSermon('audio-only')]);
+    await tester.tap(find.byKey(const Key('home-hero-wall')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(MediaPlayerScreen), findsNothing);
   });
 }
-
-/// The stand-in clip, in the given sound state.
-Finder _clip({required bool muted}) =>
-    find.byKey(Key('fake-video-REhGafc8hdg-${muted ? 'muted' : 'sound'}'));
-
-final Finder _clipAny = find.byWidgetPredicate(
-  (w) =>
-      w.key is ValueKey<String> &&
-      (w.key! as ValueKey<String>).value.startsWith('fake-video-'),
-);
-
-/// The current slide, by the title it gives screen readers.
-Finder _slide(String title) => find.byWidgetPredicate(
-  (w) => w is Semantics && w.properties.label == title,
-);

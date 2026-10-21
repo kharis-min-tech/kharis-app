@@ -115,13 +115,20 @@ class CampusVenue {
   final String? publicTransportInfo;
   final String? directionsText;
 
-  /// Address lines joined for display / maps search.
-  String get address => [
-    addressLine1,
-    addressLine2,
-    city,
-    postcode,
-  ].whereType<String>().join(', ');
+  /// Address lines joined for display / maps search. Each line may hold
+  /// several comma-separated parts; a part repeated across lines (the Studio
+  /// allows "6 Ashley Road" then "6 Ashley Road, St. Paul's") shows once.
+  String get address {
+    final seen = <String>{};
+    return [
+      for (final line in [addressLine1, addressLine2, city, postcode])
+        if (line != null)
+          for (final part in line.split(','))
+            if (part.trim().replaceAll(RegExp(r'\s+'), ' ') case final p
+                when p.isNotEmpty && seen.add(p.toLowerCase()))
+              p,
+    ].join(', ');
+  }
 }
 
 /// One weekly service of a branch. [day] is a weekday name ("Sunday");
@@ -205,14 +212,17 @@ class HomeLayout {
 
   final List<HomeSection> sections;
 
-  /// Built-in order when Studio has set nothing.
+  /// Built-in order when Studio has set nothing: the next service first,
+  /// then the Bible (with the latest messages after it), one-off events and
+  /// the latest announcement. Continue listening leads the messages row, so
+  /// its own block shows nothing on Home.
   static const fallback = HomeLayout([
     HomeSection(HomeSectionId.profileCompletion),
     HomeSection(HomeSectionId.live),
-    HomeSection(HomeSectionId.reading),
-    HomeSection(HomeSectionId.announcements),
-    HomeSection(HomeSectionId.events),
     HomeSection(HomeSectionId.campus),
+    HomeSection(HomeSectionId.reading),
+    HomeSection(HomeSectionId.events),
+    HomeSection(HomeSectionId.announcements),
     HomeSection(HomeSectionId.continueListening),
     HomeSection(HomeSectionId.giving, enabled: false),
   ]);

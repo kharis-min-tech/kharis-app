@@ -10,7 +10,7 @@ import '../../features/onboarding/data/onboarding_repository.dart';
 import 'notification_provider.dart';
 
 /// Normalises a stored branch name: blank/whitespace-only becomes `null` so
-/// callers get a single "unscoped" sentinel instead of three of them.
+/// callers get a single "not chosen" sentinel instead of three of them.
 String? _normalise(String? raw) {
   final trimmed = raw?.trim();
   if (trimmed == null || trimmed.isEmpty) return null;
@@ -22,9 +22,10 @@ final firestoreProvider = Provider<FirebaseFirestore>(
   (ref) => FirebaseFirestore.instance,
 );
 
-/// The active branch name used to scope content (events, announcements,
-/// giving, venue details). `null` means "all campuses" — callers must treat it
-/// as unscoped rather than substituting a default branch.
+/// The member's chosen branch name, used to scope content (events,
+/// announcements, giving, venue details). `null` means no branch is chosen
+/// yet; legacy "All branches" picks (stored as `''`) read as not chosen too.
+/// Home's scope while none is chosen is [homeBranchProvider].
 ///
 /// Resolution order:
 ///   1. Firestore `users/{uid}.branch`, streamed live so a branch switch
@@ -56,10 +57,7 @@ final currentBranchProvider = StreamProvider<String?>((ref) {
   // The member picked a campus but the profile write did not land. Trust the
   // explicit local choice over the stale remote value — otherwise reopening
   // the app silently reverts them — and retry the push in the background.
-  // Keyed on hasBranchChoice, not on `local != null`, so an unsynced
-  // "All campuses" pick is honoured rather than falling through to the stale
-  // profile branch.
-  if (onboarding.branchSyncPending && onboarding.hasBranchChoice) {
+  if (onboarding.branchSyncPending && local != null) {
     _retryBranchPush(ref, local, onboarding);
     return Stream.value(local);
   }
@@ -67,15 +65,15 @@ final currentBranchProvider = StreamProvider<String?>((ref) {
   return _profileBranchStream(ref.watch(firestoreProvider), user.id, local);
 });
 
-/// Writes `users/{uid}.branch`, allowing an explicit `null` for all campuses.
+/// Writes `users/{uid}.branch`.
 ///
-/// Not routed through `FirebaseAuthRepository.updateProfile`: that builds its
-/// payload with null-aware entries, so a null branch is omitted rather than
-/// written, and "All campuses" could never clear a previously set campus.
+/// Not routed through `FirebaseAuthRepository.updateProfile`, which builds
+/// its payload with null-aware entries; this keeps the one write path for
+/// the branch obvious.
 Future<void> _writeProfileBranch(
   FirebaseFirestore db,
   String uid,
-  String? branch,
+  String branch,
 ) => db.collection('users').doc(uid).set({
   'branch': branch,
 }, SetOptions(merge: true));
@@ -87,11 +85,7 @@ Future<void> _writeProfileBranch(
 /// disposed, the pending flag simply stays set, the local choice keeps winning,
 /// and the next launch tries again. Letting this throw would take down branch
 /// scoping for the whole app to fix a background sync.
-void _retryBranchPush(
-  Ref ref,
-  String? branch,
-  OnboardingRepository onboarding,
-) {
+void _retryBranchPush(Ref ref, String branch, OnboardingRepository onboarding) {
   scheduleMicrotask(() async {
     try {
       final user = ref.read(currentUserProvider).valueOrNull;
@@ -122,11 +116,9 @@ class BranchSwitchResult {
 /// through here leaves the three stores disagreeing, which is what made a
 /// switch appear to revert on the next launch.
 ///
-/// `branch == null` means all campuses and is a real, persisted choice.
-Future<BranchSwitchResult> setActiveBranch(
-  WidgetRef ref,
-  String? branch,
-) async {
+/// A branch is always a real branch name: "All branches" is not a member
+/// choice (the Events tab keeps it as a session-only browse filter).
+Future<BranchSwitchResult> setActiveBranch(WidgetRef ref, String branch) async {
   final onboarding = ref.read(onboardingRepositoryProvider);
   final previous = onboarding.selectedBranch;
 

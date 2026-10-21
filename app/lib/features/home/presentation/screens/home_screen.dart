@@ -2,22 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
+import 'package:kharis_app/shared/widgets/reveal_on_scroll.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import '../widgets/continue_listening_card.dart';
 import '../widgets/giving_shortcut_card.dart';
 import '../widgets/live_now_card.dart';
-import '../widgets/todays_reading_card.dart';
 import '../widgets/daily_message_card.dart';
-import '../widgets/campus_card.dart';
 import '../widgets/profile_completion_card.dart';
-import '../widgets/news_section.dart';
 import '../widgets/home_hero.dart';
+import '../widgets/latest_messages_row.dart';
 import '../widgets/upcoming_events_strip.dart';
 
 /// Space under a full-width Home block.
@@ -73,8 +77,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Pull-to-refresh reloads everything Home shows and holds the spinner
-  /// until it has all answered: today's reading and message, the featured
-  /// video, the campus announcements and events, and the branch settings
+  /// until it has all answered: today's reading and message, the campus
+  /// announcements and events, and the branch settings
   /// (branches with services and giving, and the live stream) behind the
   /// layout and the campus card.
   Future<void> _refresh() {
@@ -84,7 +88,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Future.wait<void>([
       settleRefresh(ref.refresh(dailyContentProvider.future)),
       settleRefresh(ref.refresh(dailyMessageProvider.future)),
-      settleRefresh(ref.refresh(featuredVideoProvider.future)),
       refreshCampusContent(ref),
       refreshCampusConfig(ref),
     ]);
@@ -93,13 +96,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final sections = ref.watch(effectiveHomeLayoutProvider).visible;
-    final slides = ref.watch(homeHeroSlidesProvider);
-    final hasHero = slides.isNotEmpty;
-    // Light status-bar icons over the hero's dark media; the theme's own
-    // once it has scrolled away (or when there is no hero).
+    // Light status-bar icons over the hero's dark wall; the theme's own
+    // once it has scrolled away.
     final lightIcons =
-        (hasHero && _heroUnderStatusBar) ||
-        Theme.of(context).brightness == Brightness.dark;
+        _heroUnderStatusBar || Theme.of(context).brightness == Brightness.dark;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -116,48 +116,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               backgroundColor: context.kc.surface,
               edgeOffset: MediaQuery.of(context).padding.top,
               onRefresh: _refresh,
-              child: CustomScrollView(
-                controller: _scroll,
-                slivers: [
-                  if (hasHero) ...[
+              // Sections below the first screen rise into view once each.
+              child: RevealScope(
+                scroll: _scroll,
+                child: CustomScrollView(
+                  controller: _scroll,
+                  slivers: [
                     // Full-bleed from the very top, under the status bar.
                     SliverToBoxAdapter(
                       child: HomeHero(
                         key: const Key('home-hero'),
-                        slides: slides,
                         inView: _heroInView,
+                        scroll: _scroll,
                         topBar: const _HeroTopBar(),
                       ),
                     ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                  ] else
-                    // Greeting header
-                    SliverToBoxAdapter(
+                    // The greeting straight under the hero's faded bottom:
+                    // who and which Branch (tap to change), then the content.
+                    const SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          MediaQuery.of(context).padding.top + 8,
-                          20,
-                          18,
-                        ),
-                        child: const _HomeHeader(),
+                        padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
+                        child: _Greeting(),
                       ),
                     ),
 
-                  for (final id in sections)
-                    SliverToBoxAdapter(
-                      key: ValueKey('home-section-${id.name}'),
-                      child: _HomeSection(id),
-                    ),
+                    // The Studio's blocks in its order; the newest messages
+                    // follow Today's reading (or lead when the Studio hides it).
+                    if (!sections.contains(HomeSectionId.reading))
+                      const SliverToBoxAdapter(
+                        child: RevealOnScroll(child: _LatestMessagesBlock()),
+                      ),
+                    for (final id in sections) ...[
+                      SliverToBoxAdapter(
+                        key: ValueKey('home-section-${id.name}'),
+                        child: RevealOnScroll(child: _HomeSection(id)),
+                      ),
+                      if (id == HomeSectionId.reading)
+                        const SliverToBoxAdapter(
+                          child: RevealOnScroll(child: _LatestMessagesBlock()),
+                        ),
+                    ],
 
-                  // Bottom safe area: 150 clears mini player + tab bar
-                  const SliverToBoxAdapter(child: SizedBox(height: 150)),
-                ],
+                    // Bottom safe area: 150 clears mini player + tab bar
+                    const SliverToBoxAdapter(child: SizedBox(height: 150)),
+                  ],
+                ),
               ),
             ),
             // Solid backing behind the status bar once the hero has left it,
             // so the list never shows through under the clock.
-            if (!(hasHero && _heroUnderStatusBar))
+            if (!_heroUnderStatusBar)
               Positioned(
                 key: const Key('home-status-bar-backing'),
                 top: 0,
@@ -180,21 +188,81 @@ class _AnnouncementsBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The heading only with something under it: the latest announcement.
     final items = ref.watch(campusNewsProvider).valueOrNull;
-    if (items != null && items.isEmpty) return const SizedBox.shrink();
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SectionHeader(
+          eyebrow: 'News',
           title: 'Announcements',
           actionKey: const Key('home-announcements-see-all'),
           // The full announcements list, pushed so Back returns here.
           onSeeAll: () => context.push('/announcements'),
         ),
-        // Edge-to-edge carousel with a left pad.
+        // The newest one; See all lists the rest.
+        const LatestAnnouncementCard(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
+        ),
+      ],
+    );
+  }
+}
+
+/// The newest messages under their heading; collapses, heading included,
+/// until there are messages.
+class _LatestMessagesBlock extends ConsumerWidget {
+  const _LatestMessagesBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The row leads with the message in progress, so it shows with either.
+    if (ref.watch(latestSermonsProvider).isEmpty &&
+        ref.watch(continueListeningProvider) == null) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          eyebrow: 'Teachings',
+          title: 'Latest messages',
+          actionKey: const Key('home-messages-see-all'),
+          // Messages is a tab: switch to it rather than stacking it.
+          onSeeAll: () => context.go('/messages'),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 28),
+          child: LatestMessagesRow(),
+        ),
+      ],
+    );
+  }
+}
+
+/// Upcoming events: the heading and strip, or nothing when Home's branch
+/// has no events beyond its weekly services.
+class _EventsBlock extends ConsumerWidget {
+  const _EventsBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final events = ref.watch(homeUpcomingEventsProvider).valueOrNull;
+    if (events != null && events.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          eyebrow: 'What\u2019s on',
+          title: 'Upcoming events',
+          actionKey: const Key('home-events-see-all'),
+          // Events is a tab: switch to it rather than stacking it.
+          onSeeAll: () => context.go('/calendar'),
+        ),
         const Padding(
           padding: EdgeInsets.only(left: 20, bottom: 28),
-          child: AnnouncementsCarousel(),
+          child: UpcomingEventsStrip(),
         ),
       ],
     );
@@ -214,37 +282,25 @@ class _HomeSection extends StatelessWidget {
       // phone are set.
       HomeSectionId.profileCompletion => const ProfileCompletionCard(),
       HomeSectionId.live => const LiveNowCard(padding: _blockPadding),
-      // Today's reading, then the Daily Message; each collapses when the
-      // Studio has nothing for today.
+      // The Bible as one row, then the Daily Message when the Studio has
+      // one for today.
       HomeSectionId.reading => const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TodaysReadingCard(padding: _blockPadding),
+          HomeBibleRow(padding: _blockPadding),
           DailyMessageCard(padding: _blockPadding),
         ],
       ),
       HomeSectionId.announcements => const _AnnouncementsBlock(),
-      HomeSectionId.events => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SectionHeader(
-            title: 'Upcoming events',
-            actionKey: const Key('home-events-see-all'),
-            // Events is a tab: switch to it rather than stacking it.
-            onSeeAll: () => context.go('/calendar'),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 20, bottom: 28),
-            child: UpcomingEventsStrip(),
-          ),
-        ],
-      ),
-      HomeSectionId.campus => const CampusCard(
+      // Hidden, heading included, when nothing is coming up.
+      HomeSectionId.events => const _EventsBlock(),
+      // The branch's next service (flyer, times, venue, contact); the full
+      // timetable is one tap away on the Branch page.
+      HomeSectionId.campus => const NextServiceCard(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
       ),
-      HomeSectionId.continueListening => const ContinueListeningCard(
-        padding: _blockPadding,
-      ),
+      // Leads the Latest messages row instead (no second copy here).
+      HomeSectionId.continueListening => const SizedBox.shrink(),
       HomeSectionId.giving => const Padding(
         padding: _blockPadding,
         child: GivingShortcutCard(),
@@ -253,42 +309,76 @@ class _HomeSection extends StatelessWidget {
   }
 }
 
+/// A Home section's heading, set as on the Kharis website: a violet
+/// eyebrow ("TEACHINGS"), then the title with its last word in violet
+/// ("Latest messages"), and See all at the right.
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
+    required this.eyebrow,
     required this.title,
     required this.onSeeAll,
     this.actionKey,
   });
 
+  final String eyebrow;
   final String title;
   final VoidCallback onSeeAll;
   final Key? actionKey;
 
   @override
   Widget build(BuildContext context) {
+    final kc = context.kc;
+    final brand = AppColors.brandInk(Theme.of(context).brightness);
+    final split = title.lastIndexOf(' ');
+    final lead = split < 0 ? '' : title.substring(0, split + 1);
+    final last = split < 0 ? title : title.substring(split + 1);
+    final heading = AppTypography.display(
+      size: 24,
+      weight: FontWeight.w800,
+    ).copyWith(color: kc.onBg, height: 1.1);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 8, 6),
+      padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: AppTypography.display(
-                size: 19,
-                weight: FontWeight.w700,
-              ).copyWith(color: context.kc.onBg, height: 1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  eyebrow.toUpperCase(),
+                  style: AppTypography.eyebrow(color: brand),
+                ),
+                const SizedBox(height: 8),
+                Text.rich(
+                  TextSpan(
+                    style: heading,
+                    children: [
+                      TextSpan(text: lead),
+                      TextSpan(
+                        text: last,
+                        style: TextStyle(color: brand),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           TextButton(
             key: actionKey,
             onPressed: onSeeAll,
-            style: TextButton.styleFrom(foregroundColor: context.kc.muted),
+            style: TextButton.styleFrom(
+              foregroundColor: kc.accentInk,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(48, 44),
+            ),
             child: Text(
               'See all',
               style: AppTypography.ui(
-                size: 12.5,
-                weight: FontWeight.w600,
-              ).copyWith(color: context.kc.muted, height: 1),
+                size: 13.5,
+                weight: FontWeight.w700,
+              ).copyWith(color: brand, height: 1),
             ),
           ),
         ],
@@ -298,31 +388,6 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
-
-/// The greeting header Home leads with when there is no hero: dove mark,
-/// greeting, bell.
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Brand dove mark
-        Image.asset(
-          AppAssets.dovePurple,
-          width: 34,
-          height: 34,
-          filterQuality: FilterQuality.medium,
-        ),
-        const SizedBox(width: 12),
-        const Expanded(child: _Greeting()),
-        const _BellButton(),
-      ],
-    );
-  }
-}
 
 /// The header floating over the hero: the dove mark and the bell, each in
 /// a round surface chip so they stay legible on any image without a scrim.
@@ -361,8 +426,8 @@ class _HeroTopBar extends StatelessWidget {
   }
 }
 
-/// Where the member belongs (small line) and the greeting (big line), with
-/// their name only when they have told us one.
+/// The greeting (big line), with the member's name only when they have told
+/// us one, then their Branch (small line) which opens the Branch picker.
 class _Greeting extends ConsumerWidget {
   const _Greeting();
 
@@ -384,36 +449,64 @@ class _Greeting extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
-    final branch = (user?.branch != null && user!.branch!.isNotEmpty)
-        ? user.branch!
-        : 'Kharis Church';
+    final branch =
+        ref.watch(currentBranchProvider).valueOrNull ??
+        ((user?.branch?.isNotEmpty ?? false) ? user!.branch : null);
     final firstName = _firstName(user?.displayName);
     final greeting = firstName == null
         ? _greeting()
         : '${_greeting()}, $firstName';
+    final kc = context.kc;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          branch,
-          style: AppTypography.ui(
-            size: 12.5,
-            weight: FontWeight.w500,
-          ).copyWith(color: context.kc.muted, height: 1.1),
+          greeting,
+          style: AppTypography.display(
+            size: 24,
+            weight: FontWeight.w700,
+          ).copyWith(color: kc.onBg, height: 1.15),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 2),
-        Text(
-          greeting,
-          style: AppTypography.display(
-            size: 22,
-            weight: FontWeight.w700,
-          ).copyWith(color: context.kc.onBg, height: 1.15),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        // The member's Branch; tap to change it.
+        Semantics(
+          button: true,
+          label: 'Branch: ${branch ?? 'none chosen'}. Change',
+          excludeSemantics: true,
+          child: InkWell(
+            key: const Key('home-branch-change'),
+            onTap: () => pickActiveBranch(context, ref),
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 36),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.location_on_rounded,
+                    size: 15,
+                    color: kc.accentInk,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      branch ?? 'Choose your branch',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.ui(
+                        size: 13.5,
+                        weight: FontWeight.w600,
+                      ).copyWith(color: kc.muted, height: 1.1),
+                    ),
+                  ),
+                  Icon(Icons.expand_more_rounded, size: 18, color: kc.muted),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );

@@ -7,6 +7,7 @@ import '../../features/calendar/presentation/screens/event_detail_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../features/giving/presentation/screens/giving_screen.dart';
+import '../../features/home/presentation/screens/branch_screen.dart';
 import '../../features/home/presentation/screens/dashboard_shell.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/messages/presentation/screens/messages_screen.dart';
@@ -35,9 +36,9 @@ import '../../shared/providers/auth_provider.dart';
 ///     complete or the member is signed in.
 ///
 /// Overlay routes (`/reading`, `/notifications`, `/announcements`,
-/// `/events/:id`, ...) sit on the root navigator above the tab shell and are
-/// meant to be PUSHED, so the AppBar back button always returns to the tab
-/// underneath.
+/// `/branch`, `/events/:id`, ...) sit on the root navigator above the tab
+/// shell and are meant to be PUSHED, so the AppBar back button always
+/// returns to the tab underneath.
 final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
 
@@ -178,6 +179,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => NotificationsScreen.announcements(
           focusId: state.uri.queryParameters['id'],
         ),
+      ),
+
+      // ── Branch (Home "Next service" card): full timetable ─────────────────
+      GoRoute(
+        path: '/branch',
+        builder: (context, state) => const BranchScreen(),
       ),
 
       // ── Event detail (cards, linked announcements, event pushes) ──────────
