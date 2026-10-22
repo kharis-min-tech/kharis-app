@@ -76,6 +76,8 @@
 		<string>Calendar access is needed to add church events to your calendar.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Kharis uses your location once, when you ask, to find the branch nearest you.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Kharis uses your location once, when you ask, to find the branch nearest you. It never tracks you in the background.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>Camera access is needed to record video testimonies.</string>
 		<key>NSMicrophoneUsageDescription</key>
