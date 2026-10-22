@@ -201,6 +201,8 @@ NotificationPermission notificationPermissionFor(
       return platform == TargetPlatform.iOS
           ? NotificationPermission.blocked
           : NotificationPermission.askable;
+    case AuthorizationStatus.deniedPermanently:
+      return NotificationPermission.blocked;
   }
 }
 
