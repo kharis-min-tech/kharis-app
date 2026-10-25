@@ -1,8 +1,14 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 
+import 'package:kharis_app/core/utils/media_url.dart';
 import 'package:kharis_app/features/player/data/audio_player_service.dart';
 import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -18,6 +24,21 @@ import 'package:kharis_app/shared/models/sermon.dart';
 /// Tests construct it directly, without the platform.
 class KharisAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
+  /// [brandArtwork] is the artwork shown for messages without any.
+  KharisAudioHandler({this.brandArtwork});
+
+  /// The app's square brand artwork (the launcher dove on brand violet).
+  static const String brandArtworkAsset = 'assets/icon/icon.png';
+
+  /// Edge of the brand artwork copy: plenty for the notification and lock
+  /// screen, without parcelling a 1024-px bitmap to the system.
+  static const int _brandArtworkSize = 512;
+
+  /// `file://` URI of the brand artwork the OS shows for a message without
+  /// usable artwork of its own, instead of a blank tile. Null when it could
+  /// not be written (web), leaving the OS's own placeholder.
+  final Uri? brandArtwork;
+
   /// Skip back [TimeSkip.back]. The interval the OS shows comes from
   /// `AudioServiceConfig.rewindInterval`.
   static const MediaControl skipBack = MediaControl(
@@ -36,17 +57,54 @@ class KharisAudioHandler extends BaseAudioHandler
   /// Registers the app's one handler with the OS. Call once, before any
   /// player is created. The intervals are what the iOS lock screen and
   /// Control Center label their skip buttons with.
-  static Future<KharisAudioHandler> init() => AudioService.init(
-    builder: KharisAudioHandler.new,
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.kharis.church.channel.audio',
-      androidNotificationChannelName: 'Kharis audio playback',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-      rewindInterval: TimeSkip.back,
-      fastForwardInterval: TimeSkip.forward,
-    ),
-  );
+  static Future<KharisAudioHandler> init() async {
+    final brand = await _writeBrandArtwork();
+    return AudioService.init(
+      builder: () => KharisAudioHandler(brandArtwork: brand),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.kharis.church.channel.audio',
+        androidNotificationChannelName: 'Kharis audio playback',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+        rewindInterval: TimeSkip.back,
+        fastForwardInterval: TimeSkip.forward,
+      ),
+    );
+  }
+
+  /// Copies [brandArtworkAsset] into the app support directory as a PNG, once
+  /// (an existing copy is reused), so media items can point the OS at a file.
+  /// Bundled bytes only, never the network.
+  static Future<Uri?> _writeBrandArtwork() async {
+    if (kIsWeb) return null;
+    try {
+      final directory = await getApplicationSupportDirectory();
+      final file = File('${directory.path}/now_playing_artwork.png');
+      if (!await file.exists()) {
+        final asset = await rootBundle.load(brandArtworkAsset);
+        final codec = await ui.instantiateImageCodec(
+          asset.buffer.asUint8List(asset.offsetInBytes, asset.lengthInBytes),
+          targetWidth: _brandArtworkSize,
+          targetHeight: _brandArtworkSize,
+        );
+        final frame = await codec.getNextFrame();
+        final png = await frame.image.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        frame.image.dispose();
+        codec.dispose();
+        if (png == null) return null;
+        await file.writeAsBytes(
+          png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes),
+          flush: true,
+        );
+      }
+      return file.uri;
+    } catch (_) {
+      // No writable support directory: the OS shows its own placeholder.
+      return null;
+    }
+  }
 
   AudioPlayerService? _service;
   final List<StreamSubscription<Object?>> _subscriptions = [];
@@ -120,15 +178,16 @@ class KharisAudioHandler extends BaseAudioHandler
   }
 
   /// [sermon] as the OS shows it: title, speaker as artist, series as album,
-  /// artwork and length ([duration] when the catalogue has none).
-  static MediaItem itemFor(Sermon sermon, {Duration? duration}) {
-    final art = sermon.artworkUrl;
+  /// artwork (the [brandArtwork] when it has none usable) and length
+  /// ([duration] when the catalogue has none).
+  MediaItem itemFor(Sermon sermon, {Duration? duration}) {
+    final art = usableMediaUrl(sermon.artworkUrl);
     return MediaItem(
       id: sermon.id,
       title: sermon.title,
       artist: sermon.speaker,
       album: sermon.series ?? 'Kharis Church',
-      artUri: art != null ? Uri.tryParse(art) : null,
+      artUri: art != null ? Uri.parse(art) : brandArtwork,
       duration: sermon.duration ?? duration,
     );
   }

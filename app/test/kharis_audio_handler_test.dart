@@ -28,6 +28,7 @@ void main() {
   );
   final library = [for (var n = 1; n <= 4; n++) sermon(n)];
   const end = FakeAudioPlatformPlayer.itemDuration;
+  final brand = Uri.file('/app-support/now_playing_artwork.png');
 
   late FakeJustAudioPlatform platform;
   late AudioPlayerService service;
@@ -48,7 +49,7 @@ void main() {
   setUp(() {
     platform = FakeJustAudioPlatform.install();
     service = AudioPlayerService(FakeCacheService());
-    handler = KharisAudioHandler()..attach(service);
+    handler = KharisAudioHandler(brandArtwork: brand)..attach(service);
   });
 
   tearDown(() async {
@@ -73,6 +74,34 @@ void main() {
       expect(state().queueIndex, 1);
     },
   );
+
+  test('a message without artwork shows the brand artwork file; one with '
+      'artwork shows its URL', () async {
+    final bare = Sermon(
+      id: 'bare',
+      title: 'In Spirit And Truth',
+      speaker: 'Pastor A',
+      audioUrl: 'https://cdn.example/bare.mp3',
+    );
+    await service.play(bare, queue: [bare, library[0]]);
+    await settle();
+
+    expect(handler.mediaItem.value?.artUri, brand);
+    expect(handler.mediaItem.value!.artUri!.scheme, 'file');
+
+    await service.skipToNext();
+    await settle();
+
+    expect(handler.mediaItem.value?.id, 's1');
+    expect(
+      handler.mediaItem.value?.artUri,
+      Uri.parse('https://cdn.example/s1.jpg'),
+    );
+    expect(handler.queue.value.map((i) => i.artUri), [
+      brand,
+      Uri.parse('https://cdn.example/s1.jpg'),
+    ]);
+  });
 
   test('controls: back 15, play/pause, forward 30 (the compact three), '
       'Previous / Next only with neighbours, and scrubbing', () async {
