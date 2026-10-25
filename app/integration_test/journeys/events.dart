@@ -39,9 +39,9 @@ Future<void> _tab(WidgetTester t, String label) async {
 /// occurrence has not ended yet.
 DateTime _nextOccurrence(StudioEvent e, DateTime now) {
   final length = (e.end ?? e.start).difference(e.start);
-  final today = DateTime(now.year, now.month, now.day);
+  // Calendar days, not 24-hour steps: a clock-change day lasts 23 or 25 h.
   for (var d = 0; d <= 7; d++) {
-    final day = today.add(Duration(days: d));
+    final day = DateTime(now.year, now.month, now.day + d);
     if (!e.days.contains(day.weekday % 7)) continue;
     final start = DateTime(
       day.year,
