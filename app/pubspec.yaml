@@ -66,7 +66,6 @@ dependencies:
   get_it: ^9.2.1
   flutter_screenutil: ^5.9.3
   flutter_native_splash: ^2.4.8
-  just_audio_background: ^0.0.1-beta.17
   audio_session: ^0.1.25
   # youtube_player_iframe does not hold a wakelock; without this the screen can
   # sleep mid-video. Enabled only while the video engine reports playing.

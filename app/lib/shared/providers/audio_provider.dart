@@ -3,6 +3,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/sermon.dart';
 import '../../features/player/data/audio_player_service.dart';
+import '../../features/player/data/kharis_audio_handler.dart';
 import '../../features/player/data/playback_history.dart';
 import 'cache_provider.dart';
 
@@ -23,15 +24,26 @@ final listeningProgressProvider = Provider.autoDispose
       return history.progressOf(sermon);
     });
 
-/// Singleton [AudioPlayerService] scoped to the widget tree root.
-/// Disposed automatically when the provider scope is destroyed.
+/// The OS media controls (notification, lock screen, CarPlay). `main`
+/// overrides this with the one instance `AudioService.init` created; null
+/// (tests, hosts without the platform) runs the engine without them.
+final audioHandlerProvider = Provider<KharisAudioHandler?>((ref) => null);
+
+/// Singleton [AudioPlayerService] scoped to the widget tree root, bound to
+/// the OS media controls. Disposed automatically when the provider scope is
+/// destroyed.
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final cache = ref.read(cacheServiceProvider);
   final service = AudioPlayerService(
     cache,
     history: ref.read(playbackHistoryProvider),
   );
-  ref.onDispose(() => service.dispose());
+  final handler = ref.read(audioHandlerProvider);
+  handler?.attach(service);
+  ref.onDispose(() {
+    handler?.detach(service);
+    service.dispose();
+  });
   return service;
 });
 

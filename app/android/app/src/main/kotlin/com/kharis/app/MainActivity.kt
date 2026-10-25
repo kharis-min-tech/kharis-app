@@ -15,8 +15,8 @@ import io.flutter.plugin.common.MethodChannel
 /**
  * Host activity.
  *
- * Extends [AudioServiceActivity] because just_audio_background requires it for
- * lock-screen / CarPlay media controls, and creates the FCM default
+ * Extends [AudioServiceActivity] because audio_service requires it for the
+ * notification / lock-screen media controls, and creates the FCM default
  * notification channel named by `default_notification_channel_id` in the
  * manifest. Firebase never creates that channel itself, and on API 26+ the
  * system silently drops notifications posted to a channel that doesn't exist.

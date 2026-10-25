@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/data/playback_queue.dart';
+import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 
 /// A snapshot of whichever engine currently owns playback, so [PlayerControls]
@@ -72,25 +73,6 @@ class PlayerControls extends ConsumerWidget {
 
   static const List<double> speeds = [1, 1.25, 1.5, 2, 0.75];
 
-  /// Podcast-app skips: back a little to re-hear, forward further to skip.
-  static const Duration backSkip = Duration(seconds: 15);
-  static const Duration forwardSkip = Duration(seconds: 30);
-
-  /// [position] moved by [offset], kept within the message ([duration] may
-  /// be unknown, in which case only the start bounds it).
-  static Duration skipTarget(
-    Duration position,
-    Duration offset,
-    Duration? duration,
-  ) {
-    var target = position + offset;
-    if (target < Duration.zero) target = Duration.zero;
-    if (duration != null && duration > Duration.zero && target > duration) {
-      target = duration;
-    }
-    return target;
-  }
-
   /// The speed after [current] in [speeds]; unknown rates restart the cycle.
   static double nextSpeed(double current) {
     final index = speeds.indexWhere((s) => (s - current).abs() < 0.01);
@@ -120,7 +102,7 @@ class PlayerControls extends ConsumerWidget {
               _TimeSkipButton(
                 seconds: 15,
                 forward: false,
-                onPressed: seekBy == null ? null : () => seekBy(-backSkip),
+                onPressed: seekBy == null ? null : () => seekBy(-TimeSkip.back),
               ),
               _PlayPauseButton(
                 isPlaying: binding.isPlaying,
@@ -130,7 +112,9 @@ class PlayerControls extends ConsumerWidget {
               _TimeSkipButton(
                 seconds: 30,
                 forward: true,
-                onPressed: seekBy == null ? null : () => seekBy(forwardSkip),
+                onPressed: seekBy == null
+                    ? null
+                    : () => seekBy(TimeSkip.forward),
               ),
               _SkipButton(
                 icon: Icons.skip_next_rounded,
@@ -195,15 +179,7 @@ class PlayerControls extends ConsumerWidget {
       onToggleRepeat: () => unawaited(service.setRepeatOne(!repeatOn)),
       onPrevious: skips.previous,
       onNext: skips.next,
-      onSeekBy: (offset) => unawaited(
-        service.seek(
-          skipTarget(
-            ref.read(positionProvider).valueOrNull ?? Duration.zero,
-            offset,
-            ref.read(durationProvider).valueOrNull,
-          ),
-        ),
-      ),
+      onSeekBy: (offset) => unawaited(service.seekBy(offset)),
     );
   }
 }

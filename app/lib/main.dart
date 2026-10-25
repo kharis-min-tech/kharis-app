@@ -9,7 +9,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:kharis_app/shared/widgets/reduce_motion_scope.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -21,6 +20,8 @@ import 'core/services/notification_service.dart';
 import 'shared/providers/theme_provider.dart';
 import 'core/theme/theme.dart';
 import 'shared/providers/auth_provider.dart';
+import 'shared/providers/audio_provider.dart';
+import 'features/player/data/kharis_audio_handler.dart';
 import 'shared/providers/cache_provider.dart';
 import 'shared/providers/sermon_provider.dart';
 import 'shared/providers/notification_provider.dart';
@@ -50,16 +51,11 @@ Future<void> main() async {
         }
       });
 
-      // Lock-screen / notification / CarPlay media controls (Now Playing).
-      // Must run before any AudioPlayer is created. The transport is
-      // Previous / Next message, driven by the queue window the audio
-      // service loads (see AudioPlayerService), so the OS shows the same
-      // controls as the in-app player and no ±seconds skip buttons.
-      await JustAudioBackground.init(
-        androidNotificationChannelId: 'com.kharis.church.channel.audio',
-        androidNotificationChannelName: 'Kharis audio playback',
-        androidNotificationOngoing: true,
-      );
+      // Lock-screen / notification / CarPlay media controls (Now Playing):
+      // skip back 15 s, play/pause, skip forward 30 s, and Previous / Next
+      // message when the queue has them (see KharisAudioHandler). Registered
+      // once, before any AudioPlayer is created.
+      final audioHandler = await KharisAudioHandler.init();
       FlutterError.onError = (details) {
         if (kDebugMode) {
           FlutterError.dumpErrorToConsole(details);
@@ -91,6 +87,7 @@ Future<void> main() async {
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            audioHandlerProvider.overrideWithValue(audioHandler),
             cacheServiceProvider.overrideWithValue(cacheService),
             sermonArchiveCacheProvider.overrideWithValue(cacheService),
           ],

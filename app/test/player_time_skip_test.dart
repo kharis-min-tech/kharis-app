@@ -3,46 +3,35 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
-  group('skipTarget', () {
+  group('TimeSkip.target', () {
     const len = Duration(minutes: 50);
 
     test('moves by the offset inside the message', () {
       expect(
-        PlayerControls.skipTarget(
-          const Duration(minutes: 10),
-          -PlayerControls.backSkip,
-          len,
-        ),
+        TimeSkip.target(const Duration(minutes: 10), -TimeSkip.back, len),
         const Duration(minutes: 9, seconds: 45),
       );
       expect(
-        PlayerControls.skipTarget(
-          const Duration(minutes: 10),
-          PlayerControls.forwardSkip,
-          len,
-        ),
+        TimeSkip.target(const Duration(minutes: 10), TimeSkip.forward, len),
         const Duration(minutes: 10, seconds: 30),
       );
     });
 
     test('stops at the start and at the end', () {
       expect(
-        PlayerControls.skipTarget(
-          const Duration(seconds: 5),
-          -PlayerControls.backSkip,
-          len,
-        ),
+        TimeSkip.target(const Duration(seconds: 5), -TimeSkip.back, len),
         Duration.zero,
       );
       expect(
-        PlayerControls.skipTarget(
+        TimeSkip.target(
           const Duration(minutes: 49, seconds: 50),
-          PlayerControls.forwardSkip,
+          TimeSkip.forward,
           len,
         ),
         len,
@@ -51,11 +40,7 @@ void main() {
 
     test('an unknown length only bounds the start', () {
       expect(
-        PlayerControls.skipTarget(
-          const Duration(minutes: 3),
-          PlayerControls.forwardSkip,
-          null,
-        ),
+        TimeSkip.target(const Duration(minutes: 3), TimeSkip.forward, null),
         const Duration(minutes: 3, seconds: 30),
       );
     });
