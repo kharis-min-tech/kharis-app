@@ -10,6 +10,7 @@ import 'package:kharis_app/features/home/presentation/widgets/continue_listening
 import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
 import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/latest_messages_row.dart';
+import 'package:kharis_app/features/messages/data/kharis_api_sermon_repository.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
@@ -22,14 +23,17 @@ import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
+import 'support/bible_overrides.dart';
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
 
+/// Message n, published on n October 2026.
 Sermon _sermon(int n) => Sermon(
   id: 's$n',
   title: 'Message $n',
   speaker: 'Pastor $n',
   audioUrl: 'https://cdn.example/s$n.mp3',
+  publishedAt: DateTime(2026, 10, n),
 );
 
 void main() {
@@ -39,7 +43,10 @@ void main() {
   // ── Read the Bible row ──────────────────────────────────────────────────────
 
   group('Home Bible row', () {
-    Future<void> pump(WidgetTester tester, Stream<DailyContent?> content) {
+    Future<void> pump(
+      WidgetTester tester,
+      Stream<DailyContent?> content,
+    ) async {
       final router = GoRouter(
         routes: [
           GoRoute(
@@ -56,39 +63,82 @@ void main() {
           ),
         ],
       );
-      return tester.pumpWidget(
+      final bible = await bibleRowOverrides();
+      await tester.pumpWidget(
         ProviderScope(
           key: UniqueKey(),
-          overrides: [dailyContentProvider.overrideWith((ref) => content)],
+          overrides: [
+            ...bible,
+            dailyContentProvider.overrideWith((ref) => content),
+          ],
           child: MaterialApp.router(routerConfig: router),
         ),
       );
     }
 
-    testWidgets("today's reading headlines the row and opens the reader", (
+    Stream<DailyContent?> reading(String reference) => Stream.value(
+      DailyContent(
+        reading: DailyEntry(
+          title: 'God so loved',
+          reference: reference,
+          body: 'Read it slowly.',
+        ),
+      ),
+    );
+
+    testWidgets("today's chapter headlines the row and opens the reader", (
       tester,
     ) async {
-      await pump(
-        tester,
-        Stream.value(
-          const DailyContent(
-            reading: DailyEntry(
-              title: 'God so loved',
-              reference: 'John 3:16-18',
-              body: 'Read it slowly.',
-            ),
-          ),
-        ),
-      );
+      await pump(tester, reading('John 3:16-18'));
       await tester.pump();
 
-      expect(find.text('John 3:16-18'), findsOneWidget);
-      expect(find.text('God so loved'), findsOneWidget);
+      expect(find.text("Today's reading"), findsOneWidget);
+      expect(find.text('John 3'), findsOneWidget);
+      expect(find.text('John 3:16-18'), findsNothing);
       expect(find.text('Read the Bible'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('home-bible-row')));
+      await tester.tap(find.byKey(const Key('home-bible-row-open')));
       await tester.pumpAndSettle();
       expect(find.text('reader'), findsOneWidget);
+    });
+
+    testWidgets('several passages name each chapter once, in order', (
+      tester,
+    ) async {
+      await pump(tester, reading('Romans 8:1-11; Romans 8:28; John 3:16'));
+      await tester.pump();
+
+      expect(find.text('Romans 8 \u00b7 John 3'), findsOneWidget);
+    });
+
+    testWidgets("a reference that names no chapter shows the Studio's text", (
+      tester,
+    ) async {
+      await pump(tester, reading('A word for the week'));
+      await tester.pump();
+
+      expect(find.text('A word for the week'), findsOneWidget);
+    });
+
+    testWidgets('Whole Bible opens the book list, not the reader', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await pump(tester, reading('John 3:16'));
+      await tester.pump();
+
+      final wholeBible = find.byKey(const Key('home-bible-row-whole-bible'));
+      expect(find.text('Whole Bible'), findsOneWidget);
+      expect(find.bySemanticsLabel('Open the whole Bible'), findsOneWidget);
+      final size = tester.getSize(wholeBible);
+      expect(size.height, greaterThanOrEqualTo(44));
+      expect(size.width, greaterThanOrEqualTo(44));
+
+      await tester.tap(wholeBible);
+      await tester.pumpAndSettle();
+      expect(find.text('bible books'), findsOneWidget);
+      expect(find.text('reader'), findsNothing);
+      semantics.dispose();
     });
 
     testWidgets('without a reading it offers the whole Bible', (tester) async {
@@ -107,6 +157,7 @@ void main() {
           find.text('Every book and chapter, in your translation.'),
           findsOneWidget,
         );
+        expect(find.text('Whole Bible'), findsNothing);
 
         await tester.tap(find.byKey(const Key('home-bible-row')));
         await tester.pumpAndSettle();
@@ -126,7 +177,9 @@ void main() {
     });
     tearDown(() => MediaPlayerScreen.debugDisableVideoEngine = false);
 
-    final latest = [_sermon(1), _sermon(2), _sermon(3)];
+    // Ten messages, oldest first: Home shows the eight newest.
+    final library = [for (var n = 1; n <= 10; n++) _sermon(n)];
+    const newest = ['s10', 's9', 's8', 's7', 's6', 's5', 's4', 's3'];
 
     Future<void> pump(WidgetTester tester, UnfinishedPlay? unfinished) async {
       await tester.pumpWidget(
@@ -135,8 +188,7 @@ void main() {
           overrides: [
             audioPlayerServiceProvider.overrideWithValue(audio),
             cacheServiceProvider.overrideWithValue(FakeCacheService()),
-            sermonsProvider.overrideWith((ref) async => latest),
-            latestSermonsProvider.overrideWith((ref) => latest),
+            sermonsProvider.overrideWith((ref) async => library),
             continueListeningProvider.overrideWith((ref) => unfinished),
             playlistsProvider.overrideWith(
               (ref) => Stream.value(const <Playlist>[]),
@@ -150,12 +202,32 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('the unfinished message leads with its progress and time '
-        'left, and is not repeated', (tester) async {
+    /// The row's message tiles, left to right.
+    List<String> tileIds(WidgetTester tester) {
+      final tiles =
+          tester
+              .widgetList<GestureDetector>(find.byType(GestureDetector))
+              .map((g) => g.key)
+              .whereType<ValueKey<String>>()
+              .where((k) => k.value.startsWith('home-message-'))
+              .toList()
+            ..sort(
+              (a, b) => tester
+                  .getTopLeft(find.byKey(a))
+                  .dx
+                  .compareTo(tester.getTopLeft(find.byKey(b)).dx),
+            );
+      return [for (final k in tiles) k.value.substring('home-message-'.length)];
+    }
+
+    testWidgets('the unfinished message leads once, with its progress and '
+        'time left, and the eight newest of the rest follow', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(2400, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await pump(
         tester,
         UnfinishedPlay(
-          sermon: _sermon(2),
+          sermon: _sermon(9),
           position: const Duration(minutes: 12),
           duration: const Duration(minutes: 30),
         ),
@@ -166,14 +238,24 @@ void main() {
       expect(
         tester.getTopLeft(continueCard).dx,
         lessThan(
-          tester.getTopLeft(find.byKey(const Key('home-message-s1'))).dx,
+          tester.getTopLeft(find.byKey(const Key('home-message-s10'))).dx,
         ),
       );
       expect(find.text('18 min left'), findsOneWidget);
-      // Listed once: as the continue card, not again among the newest.
-      expect(find.text('Message 2'), findsOneWidget);
-      expect(find.byKey(const Key('home-message-s2')), findsNothing);
-      expect(find.byKey(const Key('home-message-s3')), findsOneWidget);
+      // Listed once: as the continue card, not again among the newest, which
+      // reach one further back instead.
+      expect(find.text('Message 9'), findsOneWidget);
+      expect(find.byKey(const Key('home-message-s9')), findsNothing);
+      expect(tileIds(tester), [
+        's10',
+        's8',
+        's7',
+        's6',
+        's5',
+        's4',
+        's3',
+        's2',
+      ]);
 
       // 12 of 30 minutes listened: the bar is filled two fifths of the way.
       final bar = find.byKey(const Key('home-continue-progress'));
@@ -205,15 +287,40 @@ void main() {
       expect(audio.calls.single.sermon.id, 's2');
     });
 
-    testWidgets('with nothing to resume the row is just the newest', (
-      tester,
-    ) async {
+    testWidgets('with nothing to resume the row is the eight newest, newest '
+        'first, each dated', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(2400, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await pump(tester, null);
 
       expect(find.byKey(const Key('home-continue-card')), findsNothing);
-      for (final id in ['s1', 's2', 's3']) {
-        expect(find.byKey(Key('home-message-$id')), findsOneWidget);
-      }
+      expect(tileIds(tester), newest);
+      expect(find.text('10 Oct'), findsOneWidget);
+      expect(find.text('3 Oct'), findsOneWidget);
+      expect(find.text('2 Oct'), findsNothing);
+      // The date sits under the speaker.
+      expect(
+        tester.getTopLeft(find.text('10 Oct')).dy,
+        greaterThan(tester.getTopLeft(find.text('Pastor 10')).dy),
+      );
+    });
+  });
+
+  group('Message artwork', () {
+    test("the sermon host's default image counts as no artwork", () {
+      expect(
+        biggerSermonImage(
+          'https://cdn.sermons.example/images/Kharis_resized_H6Mr63b.jpeg'
+          '?width=256',
+        ),
+        isNull,
+      );
+      expect(
+        biggerSermonImage(
+          'https://cdn.sermons.example/a/own-art.jpg?width=256',
+        ),
+        'https://cdn.sermons.example/a/own-art.jpg?width=512',
+      );
     });
   });
 

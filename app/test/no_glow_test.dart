@@ -40,6 +40,7 @@ import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 
+import 'support/bible_overrides.dart';
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
 import 'support/fake_sermon_repository.dart';
@@ -316,6 +317,7 @@ void main() {
           tester,
           const HomeBibleRow(),
           overrides: [
+            ...await bibleRowOverrides(),
             dailyContentProvider.overrideWith(
               (ref) => Stream.value(
                 const DailyContent(
@@ -328,7 +330,7 @@ void main() {
             ),
           ],
         );
-        expect(find.text('John 3:16'), findsOneWidget);
+        expect(find.text('John 3'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
 
         await pumpCard(

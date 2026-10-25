@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:youtube_player_iframe/youtube_player_iframe.dart'
     show PlayerState, YoutubeError, YoutubePlayerValue;
 
@@ -19,6 +20,7 @@ import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/data/playback_queue.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/like_button.dart';
+import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
@@ -188,6 +190,39 @@ void main() {
       await tester.tap(find.text('1×'));
       expect(audio.speedCalls, [1.25]);
     });
+  });
+
+  testWidgets('the mini player offers Play over an idle engine that still '
+      'says playing (Android fatal error), and Play resumes', (tester) async {
+    await audio.play(_library.first);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides(),
+        child: const MaterialApp(
+          home: Scaffold(bottomNavigationBar: MiniPlayer()),
+        ),
+      ),
+    );
+    audio.playerStates.add(
+      just_audio.PlayerState(true, just_audio.ProcessingState.ready),
+    );
+    // One pump delivers the event, the next rebuilds the bar.
+    await tester.pump();
+    await tester.pump();
+    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+
+    // Android's fatal error: ExoPlayer idles, the playing flag stays set.
+    audio.playerStates.add(
+      just_audio.PlayerState(true, just_audio.ProcessingState.idle),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byIcon(Icons.pause_rounded), findsNothing);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+    expect(audio.resumeCalls, 1);
+    expect(audio.pauseCalls, 0);
   });
 
   // ── Engine handoff and video position ───────────────────────────────────────
@@ -481,6 +516,125 @@ void main() {
         ]);
       },
     );
+
+    group('leaving the app while the video plays', () {
+      late StreamController<YoutubePlayerValue> values;
+
+      setUp(() {
+        values = StreamController<YoutubePlayerValue>.broadcast();
+        MediaPlayerScreen.debugVideoValues = values.stream;
+      });
+
+      tearDown(() async {
+        MediaPlayerScreen.debugVideoValues = null;
+        await values.close();
+      });
+
+      /// Drives the app lifecycle through [states]; the test ends back in
+      /// the foreground whatever it left the binding in.
+      Future<void> lifecycle(
+        WidgetTester tester,
+        List<AppLifecycleState> states,
+      ) async {
+        addTearDown(() {
+          final binding = tester.binding;
+          if (binding.lifecycleState == AppLifecycleState.hidden) {
+            binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+          }
+          binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        });
+        for (final state in states) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pump();
+      }
+
+      Future<void> playVideoAt(WidgetTester tester, Duration at) async {
+        values.add(YoutubePlayerValue(playerState: PlayerState.playing));
+        videoPositions.add(at);
+        await tester.pump();
+      }
+
+      testWidgets('minimising hands the message to audio at the video '
+          'position; back in the app it is in Audio mode, Video a tap '
+          'away', (tester) async {
+        await open(tester, MediaMode.video);
+        await playVideoAt(tester, const Duration(minutes: 5, seconds: 15));
+
+        await lifecycle(tester, [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+        ]);
+
+        final call = audio.calls.single;
+        expect(call.sermon.id, both.id);
+        expect(call.startAt, const Duration(minutes: 5, seconds: 15));
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        MediaPlayerScreen.debugLastVideoStart = null;
+        await tapChip(tester, 'Video');
+        expect(
+          MediaPlayerScreen.debugLastVideoStart,
+          const Duration(minutes: 5, seconds: 15),
+          reason: 'audio mode, picking the video up where audio is',
+        );
+      });
+
+      testWidgets('Control Center / the notification shade (inactive only) '
+          'leave the video alone', (tester) async {
+        await open(tester, MediaMode.video);
+        await playVideoAt(tester, const Duration(minutes: 2));
+
+        await lifecycle(tester, [AppLifecycleState.inactive]);
+
+        expect(audio.calls, isEmpty);
+        expect(audio.stopCalls, 1, reason: 'only the video-mode open');
+      });
+
+      testWidgets('a paused video stays paused', (tester) async {
+        await open(tester, MediaMode.video);
+        await playVideoAt(tester, const Duration(minutes: 2));
+        values.add(YoutubePlayerValue(playerState: PlayerState.paused));
+        await tester.pump();
+
+        await lifecycle(tester, [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+        ]);
+
+        expect(audio.calls, isEmpty);
+      });
+
+      testWidgets('a message with no audio version says why it paused, on '
+          'return', (tester) async {
+        final videoOnly = _sermon(9, audio: false, videoId: 'v9');
+        await open(tester, MediaMode.video, sermon: videoOnly);
+        await playVideoAt(tester, const Duration(minutes: 2));
+
+        await lifecycle(tester, [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+        ]);
+        expect(audio.calls, isEmpty);
+        const note =
+            'Video pauses in the background; this message has no audio '
+            'version.';
+        expect(find.text(note), findsNothing);
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text(note), findsOneWidget);
+      });
+    });
   });
 
   group('video errors', () {

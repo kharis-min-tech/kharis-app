@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/cache_service.dart';
 import '../../core/utils/sermon_categorizer.dart';
 import '../../core/services/firebase_service.dart';
+import '../../features/calendar/data/branch_service_events.dart';
 import '../../features/calendar/data/event_repository.dart';
 import '../../features/calendar/data/rsvp_repository.dart';
 import '../../features/home/data/daily_content_repository.dart';
@@ -13,10 +14,12 @@ import '../../features/home/data/news_repository.dart';
 import '../../features/home/data/live_repository.dart';
 import '../../features/messages/data/curation_repository.dart';
 import '../../features/messages/data/firestore_sermon_repository.dart';
+import '../../features/onboarding/data/branch_repository.dart';
 import '../../features/messages/data/r2_messages_repository.dart';
 import '../../features/messages/data/video_repository.dart';
 import '../../features/messages/data/sermon_repository_base.dart';
 import '../models/sermon.dart';
+import 'admin_provider.dart';
 import 'audio_provider.dart';
 import 'branch_provider.dart';
 import 'cache_provider.dart';
@@ -984,20 +987,31 @@ List<Sermon> _distinct(List<Sermon> sermons) {
 /// How many messages lead the Messages tab when the featured carousel is off.
 const int kLatestLimit = 3;
 
+/// How many of the newest messages Home shows; the Messages tab has the rest.
+const int kHomeLatestMessagesCount = 8;
+
+/// Every message in the library but short clips, newest first.
+final _newestSermonsProvider = Provider<List<Sermon>>((ref) {
+  return [
+    for (final s in ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[])
+      if (!s.isShortClip) s,
+  ]..sort(
+    (a, b) =>
+        (b.publishedAt ?? DateTime(0)).compareTo(a.publishedAt ?? DateTime(0)),
+  );
+});
+
 /// The newest messages in the library, newest first, at most [kLatestLimit].
 /// What the Messages tab leads with when Studio turns featured off.
 final latestSermonsProvider = Provider<List<Sermon>>((ref) {
-  final library =
-      [
-        for (final s
-            in ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[])
-          if (!s.isShortClip) s,
-      ]..sort(
-        (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
-          a.publishedAt ?? DateTime(0),
-        ),
-      );
-  return library.take(kLatestLimit).toList();
+  return ref.watch(_newestSermonsProvider).take(kLatestLimit).toList();
+});
+
+/// Home's latest-messages row: every message, newest first. The row sets
+/// aside the one in progress (it leads as the continue card) and shows the
+/// next [kHomeLatestMessagesCount].
+final homeLatestSermonsProvider = Provider<List<Sermon>>((ref) {
+  return ref.watch(_newestSermonsProvider);
 });
 
 // ── Lookup by id ──────────────────────────────────────────────────────────────
@@ -1401,7 +1415,8 @@ final isEventRsvpedProvider = Provider.autoDispose.family<bool, String>((
 /// The events behind [myRsvpsProvider], split into upcoming and past on the
 /// same cutoff the Events tabs use, so an RSVP'd event whose date has passed
 /// is never shown as upcoming. RSVPs whose event has since been deleted drop
-/// out.
+/// out. Branch service events (`service:` ids) resolve from the branches
+/// list.
 ///
 /// The past group carries the same [EventRepository.pastEventLimit] cap as
 /// the Past tab — a member with years of RSVPs sees the recent ones, not an
@@ -1409,10 +1424,21 @@ final isEventRsvpedProvider = Provider.autoDispose.family<bool, String>((
 final myRsvpEventsProvider = FutureProvider<RsvpEvents>((ref) async {
   final rsvps = await ref.watch(myRsvpsProvider.future);
   if (rsvps.isEmpty) return RsvpEvents.empty;
-  final events = await ref
-      .watch(eventRepositoryProvider)
-      .getEventsByIds(rsvps.map((r) => r.eventId).toList());
-  final grouped = RsvpEvents.split(events, DateTime.now());
+  final repository = ref.watch(eventRepositoryProvider);
+  final ids = rsvps.map((r) => r.eventId).toList();
+  final serviceIds = ids.where(isBranchServiceEventId).toSet();
+  final branches = serviceIds.isEmpty
+      ? const <Branch>[]
+      : await ref.watch(branchesProvider.future);
+  final now = DateTime.now();
+  final events = [
+    ...await repository.getEventsByIds(
+      ids.where((id) => !serviceIds.contains(id)).toList(),
+    ),
+    for (final id in serviceIds)
+      ?branchServiceEventById(branches, id, now: now),
+  ];
+  final grouped = RsvpEvents.split(events, now);
   return RsvpEvents(
     upcoming: grouped.upcoming,
     past: grouped.past.take(EventRepository.pastEventLimit).toList(),

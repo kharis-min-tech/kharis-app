@@ -61,8 +61,8 @@ void main() {
             for (final path in [
               '/home',
               '/messages',
-              '/giving',
               '/calendar',
+              '/giving',
               '/more',
             ])
               StatefulShellBranch(

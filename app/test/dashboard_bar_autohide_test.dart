@@ -57,7 +57,7 @@ void main() {
                 ),
               ],
             ),
-            for (final path in ['/messages', '/giving', '/calendar', '/more'])
+            for (final path in ['/messages', '/calendar', '/giving', '/more'])
               StatefulShellBranch(
                 routes: [
                   GoRoute(

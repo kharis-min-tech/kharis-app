@@ -164,10 +164,13 @@ class PlayerControls extends ConsumerWidget {
     final playerState = ref.watch(playerStateProvider).valueOrNull;
     final processingState = playerState?.processingState;
     // A finished message is not "playing", whatever the engine's flag says:
-    // the button must offer Play, and Play restarts it.
+    // the button must offer Play, and Play restarts it. Neither is an idle
+    // engine: a fatal Android error idles ExoPlayer while the flag stays
+    // set, and Pause over a stopped player does nothing.
     final isPlaying =
         (playerState?.playing ?? false) &&
-        processingState != ProcessingState.completed;
+        processingState != ProcessingState.completed &&
+        processingState != ProcessingState.idle;
     final queue = ref.watch(playbackQueueProvider).valueOrNull;
     final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
     final repeatOn = ref.watch(repeatOneProvider).valueOrNull ?? false;

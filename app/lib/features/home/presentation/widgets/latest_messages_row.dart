@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/media_url.dart';
@@ -15,20 +16,18 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/press_effect.dart';
 
-/// How many of the newest messages Home shows; the Messages tab has the rest.
-const int kHomeLatestMessagesCount = 8;
-
 const double _kArtSize = 156;
 
 /// Extra height the continue card's progress bar adds under its artwork
 /// (bar plus the gap below it, less the plain tiles' gap).
 const double _kProgressBlock = 8;
 
-/// Home's row of the newest messages: large square artwork, the title and
-/// the speaker beneath, each starting playback on tap. When a message is
-/// part-way through ([continueListeningProvider]) it leads the row with how
-/// far the member got, and is not repeated among the newest. Renders nothing
-/// until there is something to show.
+/// Home's row of the newest messages ([homeLatestSermonsProvider]): large
+/// square artwork, the title, the speaker and the date beneath, each
+/// starting playback on tap. When a message is part-way through
+/// ([continueListeningProvider]) it leads the row with how far the member
+/// got and is not repeated; the [kHomeLatestMessagesCount] newest of the
+/// rest follow. Renders nothing until there is something to show.
 class LatestMessagesRow extends ConsumerWidget {
   const LatestMessagesRow({super.key});
 
@@ -39,7 +38,7 @@ class LatestMessagesRow extends ConsumerWidget {
         ? null
         : NoteTimelineKey.of(unfinished.sermon).canonical;
     final sermons = ref
-        .watch(latestSermonsProvider)
+        .watch(homeLatestSermonsProvider)
         .where(
           (s) =>
               unfinished == null ||
@@ -52,11 +51,12 @@ class LatestMessagesRow extends ConsumerWidget {
     final leading = unfinished == null ? 0 : 1;
     return SizedBox(
       key: const Key('home-latest-messages'),
-      // Artwork plus two title lines and the speaker, at the member's text
-      // size, plus the continue card's progress bar when it leads.
+      // Artwork plus two title lines, the speaker and the date, at the
+      // member's text size, plus the continue card's progress bar when it
+      // leads.
       height:
           _kArtSize +
-          MediaQuery.textScalerOf(context).scale(66) +
+          MediaQuery.textScalerOf(context).scale(84) +
           (unfinished == null ? 0 : _kProgressBlock),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -212,9 +212,15 @@ class _MessageTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final kc = context.kc;
+    final published = sermon.publishedAt;
+    final date = published == null
+        ? null
+        : DateFormat('d MMM').format(published);
     return Semantics(
       button: true,
-      label: '${sermon.title}, ${sermon.speaker}. Play',
+      label:
+          '${sermon.title}, ${sermon.speaker}'
+          '${date == null ? '' : ', $date'}. Play',
       excludeSemantics: true,
       child: GestureDetector(
         key: Key('home-message-${sermon.id}'),
@@ -245,6 +251,18 @@ class _MessageTile extends ConsumerWidget {
                   size: 12,
                 ).copyWith(color: kc.muted, height: 1.2),
               ),
+              if (date != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  date,
+                  key: Key('home-message-date-${sermon.id}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.ui(
+                    size: 12,
+                  ).copyWith(color: kc.muted, height: 1.2),
+                ),
+              ],
             ],
           ),
         ),

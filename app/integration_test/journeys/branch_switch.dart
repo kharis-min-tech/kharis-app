@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
+import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
@@ -201,15 +202,25 @@ Future<void> branchSwitchJourney(Journey j) async {
     () => j.c.read(eventsUpcomingProvider).hasValue,
     timeout: const Duration(seconds: 30),
   );
+  final shown = j.c.read(eventsUpcomingProvider).valueOrNull ?? const [];
   final shownIds = {
-    for (final e in j.c.read(eventsUpcomingProvider).valueOrNull ?? const [])
-      e.id,
+    for (final e in shown)
+      if (!isBranchServiceEventId(e.id)) e.id,
   };
   j.check(
     shownIds.length == allUpcoming.map((e) => e.id).toSet().length &&
         allUpcoming.every((e) => shownIds.contains(e.id)),
     'All branches lists every upcoming Studio event '
     '(${allUpcoming.map((e) => e.title).toList()}, app ids $shownIds)',
+  );
+  final serviceBranches = {
+    for (final e in shown)
+      if (isBranchServiceEventId(e.id)) e.branch,
+  };
+  j.check(
+    serviceBranches.every((b) => b == to.name),
+    'All branches adds only the member\'s branch services '
+    '(got $serviceBranches)',
   );
   for (final e in allUpcoming.take(3)) {
     j.check(
