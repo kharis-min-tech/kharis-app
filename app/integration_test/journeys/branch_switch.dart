@@ -222,20 +222,36 @@ Future<void> branchSwitchJourney(Journey j) async {
     'All branches adds only the member\'s branch services '
     '(got $serviceBranches)',
   );
+  // The list builds lazily and the branch's services sort in among the
+  // Studio events, so scroll each card into view before checking it.
+  final eventsList = find
+      .descendant(
+        of: find.byType(CalendarScreen),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   for (final e in allUpcoming.take(3)) {
-    j.check(
-      find
-          .descendant(
-            of: find.byType(CalendarScreen),
-            matching: find.byWidgetPredicate(
-              (w) => w is EventCard && w.event.id == e.id,
-            ),
-          )
-          .evaluate()
-          .isNotEmpty,
-      'Events tab card for "${e.title}"',
+    final card = find.descendant(
+      of: find.byType(CalendarScreen),
+      matching: find.byWidgetPredicate(
+        (w) => w is EventCard && w.event.id == e.id,
+      ),
     );
+    var found = true;
+    try {
+      await scrollUntilFound(
+        t,
+        card,
+        scrollable: eventsList,
+        timeout: const Duration(seconds: 20),
+      );
+    } on Object {
+      found = false;
+    }
+    j.check(found, 'Events tab card for "${e.title}"');
   }
+  t.state<ScrollableState>(eventsList).position.jumpTo(0);
+  await pumpFor(t, const Duration(milliseconds: 600));
   await j.shot('events-all-branches');
 
   // Home still follows the member's branch, and their own picker offers
