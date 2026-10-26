@@ -666,7 +666,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 150));
       expect(find.byKey(const Key('home-bible-row-loading')), findsNothing);
       expect(find.text('2 Corinthians 13'), findsOneWidget);
-      expect(find.text('Be made complete'), findsOneWidget);
+      expect(find.text("Today's reading"), findsOneWidget);
     });
   });
 

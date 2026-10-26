@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:audio_session/audio_session.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
@@ -73,28 +75,132 @@ void main() {
     platform.failDispose = false;
   });
 
-  test(
-    'a failure clears itself once the message is actually playing again',
-    () async {
-      await service.play(library[0]);
+  group('a stream that drops mid-playback', () {
+    Future<void> playAt(Duration at) async {
+      await service.play(library[1], queue: library);
       await settle();
+      await native().seek(SeekRequest(position: at));
+      await settle();
+    }
+
+    Future<bool> playingFlag() async =>
+        (await service.playerStateStream.first).playing;
+
+    /// just_audio extrapolates a playing position from the last event, so
+    /// the point handed on is the seek target plus a few milliseconds.
+    void expectNear(Duration? actual, Duration expected) =>
+        expect(actual?.inMilliseconds, closeTo(expected.inMilliseconds, 1000));
+
+    test('is reloaded once, silently, from the same point and queue', () async {
+      await playAt(const Duration(minutes: 3));
 
       native().failStream();
       await settle();
+
+      expect(service.failure, isNull, reason: 'a brief drop shows no banner');
+      expect(native().loads, hasLength(2), reason: 'one silent reload');
+      final reload = native().loads.last;
+      expectNear(reload.initialPosition, const Duration(minutes: 3));
+      expect(reload.initialIndex, 1, reason: 'same queue window');
+      expect(service.currentSermon?.id, 's2');
+      expect(native().playing, isTrue);
+    });
+
+    test('a failed reload pauses (Play shows) and reports; Retry resumes '
+        'from where it stopped', () async {
+      await playAt(const Duration(minutes: 3));
+
+      // Android's fatal error: ExoPlayer idles while the flag says playing.
+      // The failed reload tears the native player down before reporting.
+      final reported = service.failureStream
+          .firstWhere((failure) => failure != null)
+          .timeout(const Duration(seconds: 2));
+      platform.failNextLoad = true;
+      native().failStream(idle: true);
+      await reported;
+      await settle();
+
+      expect(service.failure?.sermonId, 's2');
       expect(
-        service.failure?.sermonId,
-        's1',
-        reason: 'the dropped stream is reported',
+        service.failure?.message,
+        startsWith('Playback stopped unexpectedly'),
+      );
+      expect(await playingFlag(), isFalse, reason: 'Play, not Pause');
+      expectNear(
+        PlaybackHistory(cache).savedPosition(library[1]),
+        const Duration(minutes: 3),
       );
 
-      // The native player rebuffers and carries on. Before the fix the
-      // banner stayed up over working audio and covered the player actions.
-      native().recover();
+      expect(await service.retry(), isTrue);
       await settle();
-      expect(native().playing, isTrue);
+      expectNear(
+        native().loads.last.initialPosition,
+        const Duration(minutes: 3),
+      );
       expect(service.failure, isNull);
-    },
-  );
+      expect(native().playing, isTrue);
+    });
+
+    test('a second drop before the reload proves itself pauses and reports '
+        'instead of retrying again', () async {
+      await playAt(const Duration(minutes: 3));
+      native().failStream();
+      await settle();
+      expect(native().loads, hasLength(2));
+
+      native().failStream();
+      await settle();
+
+      expect(native().loads, hasLength(2), reason: 'retried only once');
+      expect(service.failure?.sermonId, 's2');
+      expect(await playingFlag(), isFalse);
+    });
+
+    test('just_audio\'s "Connection aborted" (code 10000000) is not a '
+        'failure', () async {
+      await playAt(const Duration(minutes: 3));
+
+      native().failStream(code: 10000000);
+      await settle();
+
+      expect(service.failure, isNull);
+      expect(native().loads, hasLength(1), reason: 'nothing to recover');
+      expect(native().playing, isTrue);
+    });
+  });
+
+  test('every start and resume re-applies the speech audio session, so '
+      'the Home wall video\'s mixWithOthers cannot keep it', () async {
+    final configured = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.ryanheise.audio_session'),
+          (call) async {
+            if (call.method == 'setConfiguration') configured.add(call);
+            return null;
+          },
+        );
+    await settle();
+    configured.clear();
+
+    await service.play(library[0]);
+    await settle();
+    expect(configured, hasLength(1), reason: 'before the first play');
+
+    await service.pause();
+    await settle();
+    await service.resume();
+    await settle();
+    expect(configured, hasLength(2), reason: 'again before resuming');
+
+    final args = configured.last.arguments as List<Object?>;
+    expect(
+      args.single,
+      const AudioSessionConfiguration.speech().toJson(),
+      reason: 'the speech configuration, without mixWithOthers',
+    );
+    expect(native().playing, isTrue);
+  });
 
   test('only the load that wins is recorded as recently played', () async {
     final first = service.play(library[0]);

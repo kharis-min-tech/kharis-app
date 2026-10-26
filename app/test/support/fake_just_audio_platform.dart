@@ -28,6 +28,10 @@ class FakeJustAudioPlatform extends JustAudioPlatform {
   /// just_audio surfaces an UnimplementedError from stop().
   bool failDispose = false;
 
+  /// When set, the next load fails the way a dead connection does. Consumed
+  /// by that one load.
+  bool failNextLoad = false;
+
   /// Installs the fake platform and silences the audio_session channel.
   static FakeJustAudioPlatform install() {
     final platform = FakeJustAudioPlatform();
@@ -132,10 +136,13 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
   }
 
   /// The stream drops mid-playback: the native player reports an error on
-  /// its playback event, as a lost connection does.
-  void failStream() {
-    _errorCode = 2001;
+  /// its playback event, as a lost connection does. [idle] is Android's
+  /// fatal error: ExoPlayer drops to idle (just_audio still says playing).
+  /// [code] 10000000 is just_audio's "Connection aborted" interruption.
+  void failStream({int code = 2001, bool idle = false}) {
+    _errorCode = code;
     _errorMessage = 'Source error: connection reset';
+    if (idle) _state = ProcessingStateMessage.idle;
     _broadcast();
   }
 
@@ -157,6 +164,9 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
     final serial = ++_loadSerial;
     loads.add(request);
     final source = request.audioSourceMessage;
+    // A fresh load starts clean, as the native players do.
+    _errorCode = null;
+    _errorMessage = null;
     _length = source is ConcatenatingAudioSourceMessage
         ? source.children.length
         : 1;
@@ -166,6 +176,12 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
     _platform?.holdNextLoad = null;
     if (hold != null) await hold;
     await Future<void>.delayed(Duration.zero);
+    if (_platform?.failNextLoad ?? false) {
+      _platform!.failNextLoad = false;
+      _state = ProcessingStateMessage.idle;
+      _broadcast();
+      throw PlatformException(code: '2001', message: 'connection reset');
+    }
     if (serial != _loadSerial) return LoadResponse(duration: itemDuration);
     _index = request.initialIndex ?? 0;
     _position = request.initialPosition ?? Duration.zero;

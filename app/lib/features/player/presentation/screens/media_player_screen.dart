@@ -143,6 +143,16 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   final List<StreamSubscription<Object?>> _videoSubs = [];
   Timer? _videoWatchdog;
   bool _wakelockOn = false;
+
+  /// Whether the video is playing (or buffering towards it) right now, so
+  /// leaving the app knows whether there is anything to hand to audio.
+  bool _videoPlaying = false;
+
+  /// Backgrounding: a playing video hands off to its audio recording (the
+  /// WebView embed may not play in the background), or, with none, the
+  /// member is told why it paused once they are back.
+  late final AppLifecycleListener _lifecycle;
+  bool _owesBackgroundNote = false;
   bool _switching = false;
 
   /// Last position the video engine reported (VIDEO timeline), kept so a
@@ -278,6 +288,12 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     _audio = ref.read(audioPlayerServiceProvider);
     _sermon = widget.sermon;
     _scroll.addListener(_onPlayerScroll);
+    // onHide, not onInactive: Control Center and the notification shade
+    // only make the app inactive, and must not cut the video.
+    _lifecycle = AppLifecycleListener(
+      onHide: _onAppHidden,
+      onShow: _onAppShown,
+    );
     _mode = resolveInitialMode(widget.sermon, widget.mode);
     _queueItems = widget.queue ?? _audio.queue?.items ?? const <Sermon>[];
     if (_mode == MediaMode.video) {
@@ -314,6 +330,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     final owner = _videoSoundOwner;
     scheduleMicrotask(() => focus.release(owner));
     _scroll.dispose();
+    _lifecycle.dispose();
     _extraRecognizer.dispose();
     super.dispose();
   }
@@ -447,6 +464,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   void _disposeVideoEngine() {
     _videoWatchdog?.cancel();
     _videoWatchdog = null;
+    _videoPlaying = false;
     for (final sub in _videoSubs) {
       unawaited(sub.cancel());
     }
@@ -486,6 +504,10 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
 
   void _onVideoValue(YoutubePlayerValue value) {
     _syncWakelock(value);
+    _videoPlaying =
+        !value.hasError &&
+        (value.playerState == PlayerState.playing ||
+            value.playerState == PlayerState.buffering);
     // The video holds the app's one sound while it plays.
     if (value.playerState == PlayerState.playing) {
       _soundFocus.claim(_videoSoundOwner);
@@ -605,6 +627,12 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       _switching = false;
     }
     if (!mounted || _mode != MediaMode.video) return;
+    _handOffToAudio(twin, handoff);
+  }
+
+  /// Video -> audio at [handoff] (audio timeline): saves the shared point,
+  /// releases the video engine and starts [twin] there.
+  void _handOffToAudio(Sermon twin, Duration handoff) {
     _history.savePosition(_sermon, handoff);
     _lastVideoSave = DateTime.now();
     // Dispose, don't pause: an iframe kept alive under an audio session is
@@ -623,6 +651,34 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         twin,
         startAt: handoff > Duration.zero ? handoff : null,
         queue: _queueItems,
+      ),
+    );
+  }
+
+  /// The app left the screen (home, app switcher, lock): a playing video
+  /// carries on as its audio recording from the same point, so the message
+  /// keeps going on the lock screen / notification. Uses the last reported
+  /// tick, not a live bridge query: the WebView may already be suspending.
+  void _onAppHidden() {
+    if (_mode != MediaMode.video || !_videoPlaying || _switching) return;
+    final twin = _audioTwin();
+    if (twin == null) {
+      _owesBackgroundNote = true;
+      return;
+    }
+    _handOffToAudio(twin, _toAudio(_videoPosition));
+  }
+
+  void _onAppShown() {
+    if (!_owesBackgroundNote || !mounted) return;
+    _owesBackgroundNote = false;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Video pauses in the background; this message has no audio '
+          'version.',
+        ),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -1659,9 +1715,11 @@ class _CompactPlayerBar extends ConsumerWidget {
     final kc = context.kc;
     final service = ref.read(audioPlayerServiceProvider);
     final state = ref.watch(playerStateProvider).valueOrNull;
+    // Idle counts as stopped: see PlayerControls.
     final playing =
         (state?.playing ?? false) &&
-        state?.processingState != ProcessingState.completed;
+        state?.processingState != ProcessingState.completed &&
+        state?.processingState != ProcessingState.idle;
     final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
     final duration = ref.watch(durationProvider).valueOrNull ?? Duration.zero;
     final progress = duration.inMilliseconds <= 0

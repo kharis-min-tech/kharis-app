@@ -114,6 +114,17 @@ class AudioPlayerService {
   /// mid-stream error channel stays quiet meanwhile.
   int _loadsInFlight = 0;
 
+  /// Where the one silent reload after a mid-stream failure started, while
+  /// that reload is on probation: a second failure before playback has run
+  /// [_recoveryProof] past it is reported instead of retried again.
+  Duration? _recoveredFrom;
+
+  /// The last position the engine reported while it held a live source, and
+  /// the message it belongs to. A fatal error idles the player and
+  /// just_audio's idle stand-in reports 0:00, so recovery cannot read
+  /// [AudioPlayer.position] once the error lands.
+  (String, Duration)? _livePosition;
+
   final StreamController<PlaybackFailure?> _failureController =
       StreamController<PlaybackFailure?>.broadcast();
   PlaybackFailure? _failure;
@@ -133,7 +144,16 @@ class AudioPlayerService {
     _subscriptions.add(
       _player.positionStream.listen((pos) {
         final sermon = _currentSermon;
-        if (sermon == null || !_player.playing) return;
+        if (sermon == null) return;
+        final state = _player.processingState;
+        if (state != ProcessingState.idle && state != ProcessingState.loading) {
+          _livePosition = (sermon.id, pos);
+        }
+        if (!_player.playing) return;
+        final recoveredFrom = _recoveredFrom;
+        if (recoveredFrom != null && pos >= recoveredFrom + _recoveryProof) {
+          _recoveredFrom = null;
+        }
         final now = DateTime.now();
         final last = _lastPositionSave;
         if (last == null ||
@@ -202,6 +222,15 @@ class AudioPlayerService {
 
   static void _ignore(Object _) {}
 
+  /// just_audio's code for an operation another one cut short ('Connection
+  /// aborted' when a load replaces the source). errorStream carries it as a
+  /// plain [PlayerException]; playback itself never failed.
+  static const int _interruptedErrorCode = 10000000;
+
+  /// Healthy playback a silent recovery must reach before another drop
+  /// earns its own silent retry.
+  static const Duration _recoveryProof = Duration(seconds: 10);
+
   /// Spoken-word session: ducks for navigation prompts, pauses for calls.
   /// just_audio's own `handleInterruptions` (on by default) does the pausing,
   /// resuming and headphone-unplug handling against this configuration.
@@ -228,9 +257,52 @@ class AudioPlayerService {
 
   void _onStreamError(Object error, [StackTrace? _]) {
     if (_loadsInFlight > 0 || error is PlayerInterruptedException) return;
+    if (error is PlayerException && error.code == _interruptedErrorCode) {
+      return;
+    }
     final sermon = _currentSermon;
-    if (sermon == null) return;
-    _saveCurrentPosition();
+    final queue = _queue;
+    if (sermon == null || queue == null) return;
+    final live = _livePosition;
+    final at = live != null && live.$1 == sermon.id ? live.$2 : Duration.zero;
+    _history.savePosition(sermon, at);
+    _lastPositionSave = DateTime.now();
+    unawaited(_recoverFromStreamError(sermon, queue, at));
+  }
+
+  /// A dropped stream gets one silent reload of the same message, in the
+  /// same queue, from where it stopped. If that reload fails, or the stream
+  /// drops again before the reload has proven itself, the player is paused
+  /// and the member told; [retry] picks up from the saved position.
+  ///
+  /// The pause matters on Android: a fatal error idles ExoPlayer while
+  /// just_audio still reports `playing`, which left Pause showing over a
+  /// stopped player under the banner.
+  Future<void> _recoverFromStreamError(
+    Sermon sermon,
+    PlaybackQueue queue,
+    Duration at,
+  ) async {
+    if (_recoveredFrom == null) {
+      _recoveredFrom = at;
+      final token = ++_loadToken;
+      final loaded = await _loadSource(
+        queue,
+        token,
+        initialPosition: at,
+        report: false,
+      );
+      if (token != _loadToken) return;
+      if (loaded) {
+        await _startEngine(token);
+        return;
+      }
+    }
+    await _safely(_player.pause());
+    // The reload's fresh sources read to just_audio as an auto-advance off
+    // this message, which marked it finished: put its resume point back so
+    // [retry] picks up where the stream stopped.
+    _history.savePosition(sermon, at);
     _setFailure(
       PlaybackFailure(
         sermonId: sermon.id,
@@ -331,6 +403,7 @@ class AudioPlayerService {
     _queue = queue.moveTo(index);
     _currentSermon = sermon;
     _lastPositionSave = null;
+    _recoveredFrom = null;
     _setFailure(null);
     _emitQueue();
     _history.recordPlay(sermon);
@@ -462,12 +535,24 @@ class AudioPlayerService {
   /// completes only when playback pauses, stops or ends, so awaiting it held
   /// every caller (handoff seeks, note anchors, history) hostage until the
   /// member pressed pause.
-  void _startEngine() {
+  ///
+  /// The speech session is re-applied first, every time: video_player adds
+  /// `.mixWithOthers` to the shared iOS session whenever a Home wall video
+  /// initialises, a mixable session is never the Now Playing app (Control
+  /// Center and the lock screen showed "Not Playing"), and just_audio's play
+  /// only re-activates the session, it never re-applies it.
+  ///
+  /// Returns false, without starting, when the load behind [token] was
+  /// superseded meanwhile.
+  Future<bool> _startEngine([int? token]) async {
+    await _configureSession();
+    if (token != null && token != _loadToken) return false;
     unawaited(
       _player.play().catchError((Object _) {
         // Reported through the playback event stream.
       }),
     );
+    return true;
   }
 
   /// Whether [sermon] is already loaded and healthy, so a new request can
@@ -517,7 +602,7 @@ class AudioPlayerService {
       } else if (_player.processingState == ProcessingState.completed) {
         await _player.seek(Duration.zero, index: _player.currentIndex);
       }
-      _startEngine();
+      await _startEngine();
       return true;
     }
 
@@ -527,6 +612,7 @@ class AudioPlayerService {
     _queue = playbackQueue;
     _currentSermon = sermon;
     _expectedIndex = null;
+    _recoveredFrom = null;
     _setFailure(null);
     _emitQueue();
 
@@ -561,8 +647,7 @@ class AudioPlayerService {
         resume >= duration - PlaybackHistory.endGuard) {
       await _player.seek(Duration.zero);
     }
-    if (token != _loadToken) return false;
-    _startEngine();
+    if (!await _startEngine(token)) return false;
 
     // Recorded for this load only, once the source is real, so a failed or
     // superseded load never lands in "Recently played" or the play metric.
@@ -635,7 +720,7 @@ class AudioPlayerService {
       case PreviousAction.restart:
         if (_isLive(queue.current)) {
           await _player.seek(Duration.zero, index: _player.currentIndex);
-          _startEngine();
+          await _startEngine();
         } else {
           await play(queue.current, startAt: Duration.zero, queue: queue.items);
         }
@@ -668,7 +753,7 @@ class AudioPlayerService {
         index: nativeIndex,
       ),
     );
-    _startEngine();
+    await _startEngine();
   }
 
   /// Pauses playback; position is saved via the [playerStateStream] listener.
@@ -689,7 +774,7 @@ class AudioPlayerService {
     if (_player.processingState == ProcessingState.completed) {
       await _player.seek(Duration.zero, index: _player.currentIndex);
     }
-    _startEngine();
+    await _startEngine();
   }
 
   /// Stops playback and releases the current audio source and queue.
@@ -699,6 +784,7 @@ class AudioPlayerService {
   Future<void> stop() async {
     _loadToken++;
     _saveCurrentPosition();
+    _recoveredFrom = null;
     _setFailure(null);
     _hasWindow = false;
     try {

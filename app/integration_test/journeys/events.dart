@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/event_detail_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import '../support/channels.dart';
@@ -37,9 +39,9 @@ Future<void> _tab(WidgetTester t, String label) async {
 /// occurrence has not ended yet.
 DateTime _nextOccurrence(StudioEvent e, DateTime now) {
   final length = (e.end ?? e.start).difference(e.start);
-  final today = DateTime(now.year, now.month, now.day);
+  // Calendar days, not 24-hour steps: a clock-change day lasts 23 or 25 h.
   for (var d = 0; d <= 7; d++) {
-    final day = today.add(Duration(days: d));
+    final day = DateTime(now.year, now.month, now.day + d);
     if (!e.days.contains(day.weekday % 7)) continue;
     final start = DateTime(
       day.year,
@@ -89,12 +91,32 @@ Future<void> eventsJourney(Journey j) async {
   await pumpFor(t, const Duration(seconds: 1));
 
   // ── Upcoming ─────────────────────────────────────────────────────────────
+  // The Home branch's weekly services are listed too (generated from its
+  // services, `service:` ids), so an empty Studio shows them instead of
+  // "No upcoming events" whenever the branch meets.
+  final serviceCards = t
+      .widgetList<EventCard>(
+        _inCalendar(find.byType(EventCard, skipOffstage: false)),
+      )
+      .map((c) => c.event.id)
+      .where(isBranchServiceEventId)
+      .toSet();
+  final homeBranch = j.c.read(homeCampusProvider);
+  j.check(
+    serviceCards.every(
+      (id) => homeBranch != null && id.startsWith('service:${homeBranch.id}:'),
+    ),
+    'All branches adds only the Home branch\'s services '
+    '(${homeBranch?.id}, app $serviceCards)',
+  );
   if (upcoming.isEmpty) {
     j.note('DATA: the Studio has no upcoming events');
-    j.check(
-      _inCalendar(find.text('No upcoming events')).evaluate().isNotEmpty,
-      'Upcoming shows "No upcoming events"',
-    );
+    if (serviceCards.isEmpty) {
+      j.check(
+        _inCalendar(find.text('No upcoming events')).evaluate().isNotEmpty,
+        'Upcoming shows "No upcoming events"',
+      );
+    }
   }
   for (final e in upcoming) {
     final cards = _cardFor(e.id);
@@ -116,6 +138,7 @@ Future<void> eventsJourney(Journey j) async {
         _inCalendar(find.byType(EventCard, skipOffstage: false)),
       )
       .map((c) => c.event.id)
+      .where((id) => !isBranchServiceEventId(id))
       .toSet();
   j.check(
     setEquals(appUpcoming, upcoming.map((e) => e.id).toSet()),

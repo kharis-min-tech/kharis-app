@@ -45,10 +45,13 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
 
     final playerState = ref.watch(playerStateProvider).valueOrNull;
     final processing = playerState?.processingState;
-    // A finished message offers Play (which restarts it), not Pause.
+    // A finished message offers Play (which restarts it), not Pause; so does
+    // an idle engine (a fatal Android error idles ExoPlayer while the flag
+    // stays set), whose Play reloads it. Same rule as PlayerControls.
     final isPlaying =
         (playerState?.playing ?? false) &&
-        processing != ProcessingState.completed;
+        processing != ProcessingState.completed &&
+        processing != ProcessingState.idle;
     final isBuffering =
         processing == ProcessingState.loading ||
         processing == ProcessingState.buffering;

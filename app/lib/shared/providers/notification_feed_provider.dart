@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/calendar/data/branch_service_events.dart';
 import '../../features/calendar/data/event_repository.dart';
 import '../../features/home/data/news_repository.dart';
+import 'admin_provider.dart';
 import 'branch_provider.dart';
 import 'campus_config_provider.dart';
 import 'dismissed_notifications_provider.dart';
@@ -77,12 +79,30 @@ final eventsBranchProvider = Provider<AsyncValue<String?>>((ref) {
   return ref.watch(currentBranchProvider);
 });
 
-/// Upcoming events the Events tab lists ([eventsBranchProvider]).
+/// Upcoming events the Events tab lists ([eventsBranchProvider]): the
+/// Studio's events plus the weekly services of [homeCampusProvider] (the
+/// member's branch, or Home's branch while browsing "All branches"), so a
+/// branch that meets is never "No upcoming events". A Studio weekly event
+/// for that branch on a service's weekday replaces the generated one (see
+/// [withBranchServiceEvents]).
 final eventsUpcomingProvider = Provider<AsyncValue<List<Event>>>((ref) {
-  return _forCampus<Event>(
+  final studio = _forCampus<Event>(
     ref.watch(eventsBranchProvider),
     (branch) => ref.watch(upcomingEventsProvider(branch)),
     (e, branch) => e.isVisibleTo(branch),
+  );
+  bool pending(AsyncValue<Object?> v) => !v.hasValue && !v.hasError;
+  // An empty Studio list waits for the branch's services rather than
+  // flashing "No upcoming events" before they arrive.
+  if (studio.valueOrNull?.isEmpty ?? false) {
+    if (pending(ref.watch(homeBranchProvider)) ||
+        pending(ref.watch(branchesProvider))) {
+      return const AsyncLoading();
+    }
+  }
+  final home = ref.watch(homeCampusProvider);
+  return studio.whenData(
+    (events) => withBranchServiceEvents(events, home, now: DateTime.now()),
   );
 });
 

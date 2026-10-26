@@ -13,6 +13,7 @@ import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dar
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
+import 'support/bible_overrides.dart';
 import 'support/fake_cache_service.dart';
 import 'support/supabase_stub.dart';
 
@@ -278,8 +279,9 @@ void main() {
       }
     });
 
-    testWidgets("the Bible row headlines today's reading", (tester) async {
+    testWidgets("the Bible row headlines today's chapter", (tester) async {
       await pump(tester, const HomeBibleRow(), [
+        ...await bibleRowOverrides(),
         dailyContentProvider.overrideWith(
           (ref) => Stream.value(
             const DailyContent(
@@ -292,8 +294,8 @@ void main() {
           ),
         ),
       ]);
-      expect(find.text('John 3:16-18'), findsOneWidget);
-      expect(find.text('God so loved'), findsOneWidget);
+      expect(find.text("Today's reading"), findsOneWidget);
+      expect(find.text('John 3'), findsOneWidget);
       expect(find.text('Read the Bible'), findsNothing);
     });
 
@@ -324,6 +326,7 @@ void main() {
           ProviderScope(
             key: UniqueKey(),
             overrides: [
+              ...await bibleRowOverrides(),
               dailyContentProvider.overrideWith((ref) => Stream.value(content)),
             ],
             child: MaterialApp.router(routerConfig: router),
@@ -331,7 +334,7 @@ void main() {
         );
         await tester.pump();
         await tester.pump();
-        await tester.tap(find.text('John 3:16'));
+        await tester.tap(find.text('John 3'));
         await tester.pumpAndSettle();
         expect(find.text('reader'), findsOneWidget);
       }

@@ -11,17 +11,25 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/constants/app_links.dart';
 import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
+import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/skeleton.dart';
 
 /// One event, read fresh by document id. `null` when the doc does not exist
-/// (deleted, or a stale push) or could not be read.
+/// (deleted, or a stale push) or could not be read. A branch service id
+/// (`service:<branchId>:<serviceId>`) resolves from the branches list, not
+/// the Studio events table.
 final eventByIdProvider = FutureProvider.autoDispose.family<Event?, String>((
   ref,
   id,
-) {
+) async {
+  if (isBranchServiceEventId(id)) {
+    final branches = await ref.watch(branchesProvider.future);
+    return branchServiceEventById(branches, id, now: DateTime.now());
+  }
   return ref.watch(eventRepositoryProvider).getEventById(id);
 });
 

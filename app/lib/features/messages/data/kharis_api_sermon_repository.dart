@@ -145,9 +145,19 @@ String _absolutise(String? url) {
   return 'https://${url.replaceFirst(RegExp(r'^/+'), '')}';
 }
 
+/// File names the sermon host gives messages uploaded without their own
+/// artwork (headphones and "OFFICIAL DAVID ANTWI"): not the message's art.
+final RegExp _hostDefaultImage = RegExp(r'^Kharis_resized_');
+
 /// Bumps the CDN thumbnail from `?width=256` to a sharper-but-light `512`.
+/// The host's default image counts as none, so the app's own placeholder
+/// shows instead.
 String? biggerSermonImage(String? url) {
   if (url == null || url.isEmpty) return null;
+  final segments = Uri.tryParse(url)?.pathSegments ?? const <String>[];
+  if (segments.isNotEmpty && _hostDefaultImage.hasMatch(segments.last)) {
+    return null;
+  }
   return url.contains('width=')
       ? url.replaceAll(RegExp(r'width=\d+'), 'width=512')
       : url;

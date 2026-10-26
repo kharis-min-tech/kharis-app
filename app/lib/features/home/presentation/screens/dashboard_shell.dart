@@ -9,6 +9,7 @@ import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/feedback/presentation/review_prompt_listener.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -34,7 +35,7 @@ class DashboardShell extends ConsumerStatefulWidget {
 const Duration kBarReturnDelay = Duration(milliseconds: 600);
 
 /// Branch index of the Giving tab (see the tab row below and app_router.dart).
-const _givingTabIndex = 2;
+const _givingTabIndex = 3;
 
 /// Whether this launch has already offered the branch picker. Lives in the
 /// app's [ProviderScope], so it resets on the next launch and not when the
@@ -149,7 +150,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       index,
       initialLocation: index == widget.navigationShell.currentIndex,
     );
-    ref.read(cacheServiceProvider).cachePreference('last_tab', index);
+    ref
+        .read(cacheServiceProvider)
+        .cachePreference(kLastTabKey, kTabPaths[index]);
   }
 
   // ── Hide on scroll ──────────────────────────────────────────────────────────
@@ -315,17 +318,17 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                             onTap: _onTap,
                           ),
                           _TabItem(
-                            icon: Icons.volunteer_activism_outlined,
-                            activeIcon: Icons.volunteer_activism,
-                            label: 'Giving',
+                            icon: Icons.calendar_today_outlined,
+                            activeIcon: Icons.calendar_today,
+                            label: 'Events',
                             index: 2,
                             currentIndex: widget.navigationShell.currentIndex,
                             onTap: _onTap,
                           ),
                           _TabItem(
-                            icon: Icons.calendar_today_outlined,
-                            activeIcon: Icons.calendar_today,
-                            label: 'Events',
+                            icon: Icons.volunteer_activism_outlined,
+                            activeIcon: Icons.volunteer_activism,
+                            label: 'Giving',
                             index: 3,
                             currentIndex: widget.navigationShell.currentIndex,
                             onTap: _onTap,

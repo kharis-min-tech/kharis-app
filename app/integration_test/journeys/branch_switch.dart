@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/features/home/presentation/widgets/next_service_card.dart';
+import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
@@ -201,9 +202,10 @@ Future<void> branchSwitchJourney(Journey j) async {
     () => j.c.read(eventsUpcomingProvider).hasValue,
     timeout: const Duration(seconds: 30),
   );
+  final shown = j.c.read(eventsUpcomingProvider).valueOrNull ?? const [];
   final shownIds = {
-    for (final e in j.c.read(eventsUpcomingProvider).valueOrNull ?? const [])
-      e.id,
+    for (final e in shown)
+      if (!isBranchServiceEventId(e.id)) e.id,
   };
   j.check(
     shownIds.length == allUpcoming.map((e) => e.id).toSet().length &&
@@ -211,20 +213,45 @@ Future<void> branchSwitchJourney(Journey j) async {
     'All branches lists every upcoming Studio event '
     '(${allUpcoming.map((e) => e.title).toList()}, app ids $shownIds)',
   );
+  final serviceBranches = {
+    for (final e in shown)
+      if (isBranchServiceEventId(e.id)) e.branch,
+  };
+  j.check(
+    serviceBranches.every((b) => b == to.name),
+    'All branches adds only the member\'s branch services '
+    '(got $serviceBranches)',
+  );
+  // The list builds lazily and the branch's services sort in among the
+  // Studio events, so scroll each card into view before checking it.
+  final eventsList = find
+      .descendant(
+        of: find.byType(CalendarScreen),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   for (final e in allUpcoming.take(3)) {
-    j.check(
-      find
-          .descendant(
-            of: find.byType(CalendarScreen),
-            matching: find.byWidgetPredicate(
-              (w) => w is EventCard && w.event.id == e.id,
-            ),
-          )
-          .evaluate()
-          .isNotEmpty,
-      'Events tab card for "${e.title}"',
+    final card = find.descendant(
+      of: find.byType(CalendarScreen),
+      matching: find.byWidgetPredicate(
+        (w) => w is EventCard && w.event.id == e.id,
+      ),
     );
+    var found = true;
+    try {
+      await scrollUntilFound(
+        t,
+        card,
+        scrollable: eventsList,
+        timeout: const Duration(seconds: 20),
+      );
+    } on Object {
+      found = false;
+    }
+    j.check(found, 'Events tab card for "${e.title}"');
   }
+  t.state<ScrollableState>(eventsList).position.jumpTo(0);
+  await pumpFor(t, const Duration(milliseconds: 600));
   await j.shot('events-all-branches');
 
   // Home still follows the member's branch, and their own picker offers

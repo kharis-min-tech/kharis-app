@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 // ── The wall's media ─────────────────────────────────────────────────────────
@@ -183,8 +184,12 @@ class _HomeHeroState extends ConsumerState<HomeHero>
   /// Ticks once per frame while the wall moves; the rows listen.
   final ValueNotifier<int> _frame = ValueNotifier(0);
 
-  /// One player per wall video while the wall exists.
-  final HeroVideoPool<VideoPlayerController> _videos = _videoPlayerPool();
+  /// One player per wall video while the wall exists. A player made while a
+  /// message is loaded must not mix: see [_videoPlayerPool].
+  late final HeroVideoPool<VideoPlayerController> _videos = _videoPlayerPool(
+    mixWithOthers: () =>
+        ref.read(audioPlayerServiceProvider).currentSermon == null,
+  );
 
   @override
   void initState() {
@@ -586,15 +591,23 @@ class HeroVideoPool<T extends Object> {
   }
 }
 
-/// The wall's pool of real players: silent, looping, mixing with any
-/// message playing, never taking the app's sound.
-HeroVideoPool<VideoPlayerController> _videoPlayerPool() {
+/// The wall's pool of real players: silent, looping, never taking the app's
+/// sound.
+///
+/// [mixWithOthers] is asked per player. With nothing of ours playing the
+/// wall mixes, so it never interrupts another app's music. With a message
+/// loaded it must not: video_player applies the option to the SHARED iOS
+/// audio session on every initialise, and a mixable session cannot be the
+/// Now Playing app, so the lock screen and Control Center lose the message.
+HeroVideoPool<VideoPlayerController> _videoPlayerPool({
+  required bool Function() mixWithOthers,
+}) {
   final ready = <VideoPlayerController, Future<void>>{};
   return HeroVideoPool<VideoPlayerController>(
     create: (asset) {
       final c = VideoPlayerController.asset(
         asset,
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: mixWithOthers()),
       );
       ready[c] = c.initialize().then((_) async {
         await c.setVolume(0);
