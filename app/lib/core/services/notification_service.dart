@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../features/home/data/bible_reference.dart';
+import '../../features/home/data/bible_repository.dart';
 import 'firebase_service.dart';
 
 /// Messenger used to surface foreground pushes as in-app banners.
@@ -34,10 +36,18 @@ class KharisTopics {
   // Every topic here has a publisher in `backend/functions/src`: events are
   // sent under `'events' in topics && '<branch topic>' in topics`, service
   // reminders under `'service_reminders' in topics && ...`, and the daily
-  // reading straight to `daily_reading`.
+  // reading straight to `daily_reading_v2` (`READING_AUDIENCES` in
+  // `topics.ts`).
   static const String serviceReminders = 'service_reminders';
   static const String events = 'events';
-  static const String dailyReading = 'daily_reading';
+  static const String dailyReading = 'daily_reading_v2';
+
+  /// The daily reading's old topic. An earlier reading-plan push sent
+  /// chapters that do not exist ("2 Corinthians 40") here, and the OS shows a
+  /// background push without asking the app, so every launch leaves it.
+  /// The backend still reaches builds that never left it with a condition
+  /// excluding [dailyReading] devices.
+  static const String legacyDailyReading = 'daily_reading';
 
   /// Maps a `notificationPrefsProvider` key to the topic it gates.
   static const Map<String, String> byPreference = <String, String>{
@@ -141,10 +151,32 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
       return const NotificationTarget('/home');
     case 'reading':
     case KharisTopics.dailyReading:
+    case KharisTopics.legacyDailyReading:
       return const NotificationTarget('/reading', overlay: true);
     default:
       return const NotificationTarget('/home');
   }
+}
+
+/// Whether a push that arrived in the foreground may be shown in-app.
+///
+/// A daily reading push ([notificationTargetFor] routes it to `/reading`) is
+/// shown only when its reference, `data['reference']` else [body], names one
+/// or more passages and every one is a real book of the 66-book canon with a
+/// chapter that book has. An older backend sent "2 Corinthians 40"; the app
+/// never presents that. Every other push is shown.
+bool isShowableForegroundPush(Map<String, dynamic> data, String? body) {
+  final type = data['type'];
+  if (type != 'reading' &&
+      type != KharisTopics.dailyReading &&
+      type != KharisTopics.legacyDailyReading) {
+    return true;
+  }
+  final reference = data['reference'];
+  final text = reference is String && reference.trim().isNotEmpty
+      ? reference
+      : body;
+  return text != null && isValidReading(text, BibleIndex.bundled());
 }
 
 /// Opens [target] without leaving a one-page stack: overlays are pushed above
@@ -364,7 +396,11 @@ class NotificationService {
   /// Applies the whole notification-preference map to this device's topics.
   ///
   /// Unknown keys are ignored, so adding a preference without a topic is safe.
+  /// Always leaves [KharisTopics.legacyDailyReading] first, whatever the
+  /// preferences say (this runs on every launch, and on iOS again once
+  /// permission is granted).
   Future<void> applyPreferences(Map<String, bool> prefs) async {
+    await unsubscribeFromTopic(KharisTopics.legacyDailyReading);
     for (final entry in KharisTopics.byPreference.entries) {
       final enabled = prefs[entry.key];
       if (enabled == null) continue;
@@ -408,6 +444,10 @@ class NotificationService {
     final title = message.notification?.title;
     final body = message.notification?.body;
     debugPrint('[FCM] Foreground: $title / $body');
+    if (!isShowableForegroundPush(message.data, body)) {
+      debugPrint('[FCM] Foreground reading dropped: not a real passage');
+      return;
+    }
     // FCM draws nothing while the app is foregrounded, so surface it in-app.
     final text = [
       title,
@@ -438,8 +478,8 @@ class NotificationService {
   /// Subscribe to an FCM topic.
   ///
   /// Built-in topics: [KharisTopics.all], [KharisTopics.events],
-  /// [KharisTopics.dailyReading], [KharisTopics.serviceReminders]. Branch
-  /// topics: [KharisTopics.branch].
+  /// [KharisTopics.dailyReading] (`daily_reading_v2`),
+  /// [KharisTopics.serviceReminders]. Branch topics: [KharisTopics.branch].
   Future<void> subscribeToTopic(String topic) async {
     if (!kUseFirebase) return;
     try {

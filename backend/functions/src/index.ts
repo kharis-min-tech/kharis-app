@@ -332,15 +332,14 @@ export const getEvents = onRequest(
   }
 );
 
-/** FCM topic for the daily reading — mirrors the app's `KharisTopics.dailyReading`. */
-const DAILY_READING_TOPIC = 'daily_reading';
-
 /**
-
  * Daily reading notification. Fires once a day at 07:00 Europe/London and
  * pushes today's Content Studio reading (`daily-reading.ts`: the same
- * `daily_entries` row the app shows) to the `daily_reading` topic, the topic
- * the app's notification preference toggles. No Studio reading, no push.
+ * `daily_entries` row the app shows) to `READING_AUDIENCES` (`topics.ts`):
+ * the `daily_reading_v2` topic the app's notification preference toggles,
+ * and app builds still on the legacy `daily_reading` topic. No Studio
+ * reading, or a reference naming a book or chapter that does not exist, no
+ * push.
  *
  * Idempotency: `dailyReadingPushes/{YYYY-MM-DD}` is CLAIMED in a transaction
  * before the lookup, so a re-run (scheduler retry, redeploy, manual trigger)
@@ -370,9 +369,9 @@ export const pushDailyReading = onSchedule(
           return true;
         }),
       lookup: () => fetchStudioReading(date),
-      send: ({ title, body, data }) =>
+      send: ({ title, body, data }, audience) =>
         getMessaging().send({
-          topic: DAILY_READING_TOPIC,
+          ...audience,
           notification: { title, body },
           data,
           android: { priority: 'high' },

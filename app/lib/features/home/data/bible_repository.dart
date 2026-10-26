@@ -75,9 +75,11 @@ class BibleRepository {
     return _biblesCache!;
   }
 
-  /// Books of [bibleId] in canonical order, with each book's chapters and
-  /// verse counts. Versions differ (NT-only, partial OT, deuterocanon), so
-  /// navigation and reference search use this rather than a fixed table.
+  /// Books of [bibleId] that belong to the 66-book Protestant canon, in
+  /// canonical order, with each book's chapters and verse counts. Versions
+  /// differ (NT-only, partial OT), so navigation and reference search use
+  /// this rather than a fixed table. Books outside the canon (deuterocanon,
+  /// apocrypha) are dropped: the app never shows them.
   Future<List<BibleBook>> getBooks(int bibleId) async {
     final cached = _booksCache[bibleId];
     if (cached != null) return cached;
@@ -92,6 +94,8 @@ class BibleRepository {
         .cast<Map<String, dynamic>>();
     final books = <BibleBook>[];
     for (final b in data) {
+      final canon = _canonByUsfm[b['id']];
+      if (canon == null) continue;
       final chapters = <int>[];
       final verseCounts = <int, int>{};
       for (final c
@@ -113,18 +117,18 @@ class BibleRepository {
       if (chapters.isEmpty) continue;
       books.add(
         BibleBook(
-          usfm: b['id'] as String,
-          title: (b['title'] ?? b['id']) as String,
-          testament: switch (b['canon']) {
-            'old_testament' => Testament.old,
-            'new_testament' => Testament.newTestament,
-            _ => Testament.other,
-          },
+          usfm: canon.book.usfm,
+          title: (b['title'] ?? canon.book.name) as String,
+          testament: canon.book.testament,
           chapters: chapters,
           verseCounts: verseCounts,
         ),
       );
     }
+    books.sort(
+      (a, b) =>
+          _canonByUsfm[a.usfm]!.order.compareTo(_canonByUsfm[b.usfm]!.order),
+    );
     if (books.isEmpty) throw StateError('No books for Bible $bibleId');
     return _booksCache[bibleId] = books;
   }
@@ -507,3 +511,8 @@ class BibleIndex {
     );
   }
 }
+
+/// The 66-book canon by USFM id, with each book's canonical position.
+final Map<String, ({int order, CanonBook book})> _canonByUsfm = {
+  for (final (i, b) in kCanonBooks.indexed) b.usfm: (order: i, book: b),
+};

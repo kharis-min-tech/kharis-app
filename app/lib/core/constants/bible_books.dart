@@ -6,7 +6,7 @@
 /// read it, so names and chapter counts cannot drift between them.
 library;
 
-enum Testament { old, newTestament, other }
+enum Testament { old, newTestament }
 
 class CanonBook {
   const CanonBook(this.usfm, this.name, this.chapters, this.testament);

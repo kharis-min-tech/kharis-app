@@ -27,13 +27,34 @@ export type PushAudience = { topic: string } | { condition: string };
 
 /**
  * FCM topics behind the app's notification preference toggles. MUST match
- * `KharisTopics.events` / `KharisTopics.serviceReminders` in
+ * `KharisTopics.events` / `KharisTopics.serviceReminders` /
+ * `KharisTopics.dailyReading` in
  * `app/lib/core/services/notification_service.dart`.
+ *
+ * `dailyReading` is `daily_reading_v2`: app builds that validate the reading
+ * subscribe to it and leave `legacyDailyReading` (`daily_reading`), the topic
+ * an earlier reading-plan push sent invented chapters to.
  */
 export const PREF_TOPIC = {
   events: 'events',
   serviceReminders: 'service_reminders',
+  dailyReading: 'daily_reading_v2',
+  legacyDailyReading: 'daily_reading',
 } as const;
+
+/**
+ * Where the daily reading goes: current app builds on `daily_reading_v2`, and
+ * older builds still only on `daily_reading` (never both, so nobody gets it
+ * twice).
+ */
+export const READING_AUDIENCES: readonly PushAudience[] = [
+  { topic: PREF_TOPIC.dailyReading },
+  {
+    condition:
+      `'${PREF_TOPIC.legacyDailyReading}' in topics && ` +
+      `!('${PREF_TOPIC.dailyReading}' in topics)`,
+  },
+];
 
 /**
  * Devices that opted into [prefTopic] AND follow [branch]'s campus, so turning
