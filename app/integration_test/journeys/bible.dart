@@ -165,12 +165,15 @@ Future<void> bibleJourney(Journey j) async {
   } else {
     final index = BibleIndex.bundled();
     final reference = content.reading?.reference ?? '';
-    final want = reference.isEmpty
-        ? null
-        : switch (parseBibleReference(reference, index)) {
-            ReferenceFound(:final location) => location,
-            ReferenceError() => null,
-          };
+    // A reading can name several passages ("Romans 8:1-11; Psalm 23"); the
+    // reader opens on the first, as the app does.
+    final passages = reference.isEmpty
+        ? const <BibleLocation>[]
+        : parseReadingReferences(reference, index);
+    final want = passages.isEmpty ? null : passages.first;
+    if (passages.length > 1) {
+      j.note('today names ${passages.length} passages: $reference');
+    }
     if (want == null) {
       j.check(
         _inReader(
