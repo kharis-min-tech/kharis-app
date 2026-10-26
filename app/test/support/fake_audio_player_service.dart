@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/features/player/data/audio_player_service.dart';
+import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 
 /// One [FakeAudioPlayerService.play] request, as the caller made it.
@@ -82,6 +83,21 @@ class FakeAudioPlayerService implements AudioPlayerService {
 
   @override
   Stream<Duration?> get durationStream => durations.stream;
+
+  @override
+  Stream<PlaybackEvent> get playbackEventStream => const Stream.empty();
+
+  @override
+  bool get playing => false;
+
+  @override
+  ProcessingState get processingState => ProcessingState.idle;
+
+  @override
+  Duration get bufferedPosition => Duration.zero;
+
+  @override
+  Duration? get duration => current?.duration;
 
   @override
   double get speed => _speed;
@@ -173,6 +189,10 @@ class FakeAudioPlayerService implements AudioPlayerService {
     seekCalls.add(position);
     positionValue = position;
   }
+
+  @override
+  Future<void> seekBy(Duration offset) =>
+      seek(TimeSkip.target(positionValue, offset, duration));
 
   @override
   Future<void> setSpeed(double speed) async {

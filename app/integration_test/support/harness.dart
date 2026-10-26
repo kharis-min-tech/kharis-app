@@ -17,12 +17,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/configs/app_startup.dart';
 import 'package:kharis_app/core/services/app_router.dart';
 import 'package:kharis_app/core/services/cache_service.dart';
+import 'package:kharis_app/features/player/data/kharis_audio_handler.dart';
 import 'package:kharis_app/main.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
@@ -275,6 +275,7 @@ Future<void> tapBack(WidgetTester tester) async {
 
 late SharedPreferences _prefs;
 late CacheService _cache;
+late KharisAudioHandler _audioHandler;
 bool _booted = false;
 
 /// Mirrors lib/main.dart once per process: audio service, Firebase, Hive and
@@ -282,11 +283,7 @@ bool _booted = false;
 Future<void> bootstrapOnce() async {
   if (_booted) return;
   _booted = true;
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.kharis.church.channel.audio',
-    androidNotificationChannelName: 'Kharis audio playback',
-    androidNotificationOngoing: true,
-  );
+  _audioHandler = await KharisAudioHandler.init();
   final results = await Future.wait([
     SharedPreferences.getInstance(),
     CacheService.init(),
@@ -388,6 +385,7 @@ class Journey {
     final container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(_prefs),
+        audioHandlerProvider.overrideWithValue(_audioHandler),
         cacheServiceProvider.overrideWithValue(_cache),
         sermonArchiveCacheProvider.overrideWithValue(_cache),
         // FCM handlers registered by NotificationService.init() are never

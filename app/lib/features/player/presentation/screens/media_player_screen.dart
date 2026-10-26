@@ -17,6 +17,7 @@ import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_shee
     show NoteTimelineBinding;
 import 'package:kharis_app/features/player/data/audio_player_service.dart';
 import 'package:kharis_app/features/player/data/playback_history.dart';
+import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart'
     show startAudioPlayback;
@@ -1654,9 +1655,8 @@ class _VideoTransport extends StatelessWidget {
                     onToggleRepeat: onToggleRepeat,
                     onPrevious: skips.previous,
                     onNext: skips.next,
-                    onSeekBy: (offset) => _seek(
-                      PlayerControls.skipTarget(position, offset, duration),
-                    ),
+                    onSeekBy: (offset) =>
+                        _seek(TimeSkip.target(position, offset, duration)),
                   ),
                 ),
               ],

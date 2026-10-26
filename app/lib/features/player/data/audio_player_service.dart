@@ -6,12 +6,12 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 
 import 'package:kharis_app/core/constants/http_constants.dart';
 import 'package:kharis_app/core/services/cache_service.dart';
 import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/data/playback_queue.dart';
+import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 
 export 'package:kharis_app/features/player/data/playback_queue.dart';
@@ -45,15 +45,17 @@ class PlaybackFailure {
 ///
 /// Queue: every [play] carries the list the member launched from as a
 /// [PlaybackQueue]. The native player holds a window of that queue (the
-/// current message and its neighbours) as the player's playlist, so
-/// the lock screen, notification and CarPlay show the same Previous / Next
-/// as the app, and a finished message advances on its own. The window grows
-/// at its edges as the member moves, never reloading the message on air.
+/// current message and its neighbours) as the player's playlist, so a
+/// finished message advances on its own. The window grows at its edges as
+/// the member moves, never reloading the message on air. The OS media
+/// controls (notification, lock screen, CarPlay) drive this service through
+/// `KharisAudioHandler`.
 ///
 /// Playback resume: position is persisted through [PlaybackHistory] every
 /// ~5 s while playing and immediately on pause/stop/skip/dispose. [play]
-/// starts at an explicit `startAt` or the saved resume point; a finished
-/// message resets to 0.
+/// starts at an explicit `startAt` or the saved resume point. A message is
+/// finished only when it plays to its end, or when the member moves on from
+/// its closing [finishWindow]; leaving it anywhere else keeps its place.
 ///
 /// Failures: [play] never throws. It returns whether playback started, and a
 /// load or mid-stream failure is recorded on [failure] / [failureStream] so
@@ -119,11 +121,11 @@ class AudioPlayerService {
   /// [_recoveryProof] past it is reported instead of retried again.
   Duration? _recoveredFrom;
 
-  /// The last position the engine reported while it held a live source, and
-  /// the message it belongs to. A fatal error idles the player and
-  /// just_audio's idle stand-in reports 0:00, so recovery cannot read
-  /// [AudioPlayer.position] once the error lands.
-  (String, Duration)? _livePosition;
+  /// The last position the engine reported while it held a live source, the
+  /// message it belongs to and that message's length. A fatal error idles
+  /// the player and just_audio's idle stand-in reports 0:00, so recovery
+  /// cannot read [AudioPlayer.position] once the error lands.
+  (String, Duration, Duration?)? _livePosition;
 
   final StreamController<PlaybackFailure?> _failureController =
       StreamController<PlaybackFailure?>.broadcast();
@@ -143,11 +145,11 @@ class AudioPlayerService {
     // Throttle-save position every ~5 s while actively playing.
     _subscriptions.add(
       _player.positionStream.listen((pos) {
-        final sermon = _currentSermon;
+        final sermon = _onAir;
         if (sermon == null) return;
         final state = _player.processingState;
         if (state != ProcessingState.idle && state != ProcessingState.loading) {
-          _livePosition = (sermon.id, pos);
+          _livePosition = (sermon.id, pos, _player.duration);
         }
         if (!_player.playing) return;
         final recoveredFrom = _recoveredFrom;
@@ -164,14 +166,16 @@ class AudioPlayerService {
       }, onError: _ignore),
     );
 
-    // Save on pause; clear on natural completion.
+    // Save on pause; finish on natural completion.
     _subscriptions.add(
       _player.playerStateStream.listen((state) {
         final sermon = _currentSermon;
         if (sermon == null) return;
         if (state.processingState == ProcessingState.completed) {
-          // Reset so the next play() starts from the beginning.
-          _history.markFinished(sermon);
+          // Only the message the engine actually played to its end. A load
+          // replacing the sources is not an ending.
+          final ended = _onAir;
+          if (ended != null) _history.markFinished(ended);
           return;
         }
         // The engine is the ground truth: once this message is ready and
@@ -194,17 +198,8 @@ class AudioPlayerService {
     // there left a silent player with a Pause button.
     _subscriptions.add(_player.errorStream.listen(_onStreamError));
 
-    // The native player moves on its own: a finished message advances, and
-    // the lock screen / CarPlay skip buttons seek the window directly.
+    // The native player moves on its own when a message plays to its end.
     _subscriptions.add(_player.currentIndexStream.listen(_onNativeIndex));
-
-    _subscriptions.add(
-      _player.positionDiscontinuityStream.listen((event) {
-        if (event.reason != PositionDiscontinuityReason.autoAdvance) return;
-        final finished = _sermonAtNative(event.previousEvent.currentIndex);
-        if (finished != null) _history.markFinished(finished);
-      }, onError: _ignore),
-    );
 
     // Learn lengths the catalogue lacks, so "Continue listening" can draw
     // progress for them later.
@@ -231,6 +226,9 @@ class AudioPlayerService {
   /// earns its own silent retry.
   static const Duration _recoveryProof = Duration(seconds: 10);
 
+  /// Moving on from a message this close to its end counts as finishing it.
+  static const Duration finishWindow = Duration(seconds: 30);
+
   /// Spoken-word session: ducks for navigation prompts, pauses for calls.
   /// just_audio's own `handleInterruptions` (on by default) does the pausing,
   /// resuming and headphone-unplug handling against this configuration.
@@ -248,10 +246,48 @@ class AudioPlayerService {
     return value is num && value > 0 ? value.toDouble() : 1.0;
   }
 
-  void _saveCurrentPosition() {
+  /// [_currentSermon] while the native player is really on it, else null.
+  ///
+  /// Null while a load replaces the sources: the new playlist is already in
+  /// place but the index, position and state still describe the outgoing
+  /// message, which just_audio even reports as an auto-advance. Null too
+  /// for the moment between the native player moving on and the service
+  /// following it. Positions and endings are only ever attributed to this.
+  Sermon? get _onAir {
     final sermon = _currentSermon;
+    if (sermon == null || _loadsInFlight > 0) return null;
+    return _sermonAtNative(_player.currentIndex)?.id == sermon.id
+        ? sermon
+        : null;
+  }
+
+  static bool _inClosingStretch(Duration position, Duration? duration) =>
+      duration != null &&
+      duration > Duration.zero &&
+      position >= duration - finishWindow;
+
+  void _saveCurrentPosition() {
+    final sermon = _onAir;
     if (sermon == null) return;
     _history.savePosition(sermon, _player.position);
+    _lastPositionSave = DateTime.now();
+  }
+
+  /// The member is moving from the message on air to another one: it is
+  /// finished when they leave it in its closing [finishWindow], otherwise
+  /// its place is kept for "Continue listening".
+  void _leaveOnAir() {
+    final sermon = _onAir;
+    if (sermon == null) return;
+    _leave(sermon, _player.position, _player.duration ?? sermon.duration);
+  }
+
+  void _leave(Sermon sermon, Duration position, Duration? duration) {
+    if (_inClosingStretch(position, duration)) {
+      _history.markFinished(sermon);
+    } else {
+      _history.savePosition(sermon, position);
+    }
     _lastPositionSave = DateTime.now();
   }
 
@@ -299,9 +335,8 @@ class AudioPlayerService {
       }
     }
     await _safely(_player.pause());
-    // The reload's fresh sources read to just_audio as an auto-advance off
-    // this message, which marked it finished: put its resume point back so
-    // [retry] picks up where the stream stopped.
+    // Pin the resume point to where the stream stopped (a failed engine's
+    // own position is not to be trusted), so [retry] picks up there.
     _history.savePosition(sermon, at);
     _setFailure(
       PlaybackFailure(
@@ -341,6 +376,16 @@ class AudioPlayerService {
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
 
+  /// Raw engine events, for mirroring playback onto the OS media controls.
+  Stream<PlaybackEvent> get playbackEventStream => _player.playbackEventStream;
+  bool get playing => _player.playing;
+  ProcessingState get processingState => _player.processingState;
+  Duration get bufferedPosition => _player.bufferedPosition;
+
+  /// The length of the message on air once the engine knows it; null
+  /// meanwhile, never the outgoing message's length mid-skip.
+  Duration? get duration => _onAir == null ? null : _player.duration;
+
   /// The playback rate, persisted across launches.
   double get speed => _player.speed;
   Stream<double> get speedStream => _player.speedStream;
@@ -352,25 +397,12 @@ class AudioPlayerService {
 
   // ── Source management ──────────────────────────────────────────────────────
 
-  /// One queue entry as a native source, tagged with a [MediaItem] so the OS
-  /// shows artwork, title and transport controls for it.
+  /// One queue entry as a native source, tagged with its [Sermon.id].
   ///
   /// The browser User-Agent the host demands is set once on the [AudioPlayer],
   /// so no per-source headers are needed (and no header proxy is engaged).
-  static AudioSource _child(Sermon sermon) {
-    final art = sermon.artworkUrl;
-    return AudioSource.uri(
-      Uri.parse(sermon.audioUrl),
-      tag: MediaItem(
-        id: sermon.id,
-        title: sermon.title,
-        artist: sermon.speaker,
-        album: sermon.series ?? 'Kharis Church',
-        artUri: art != null ? Uri.tryParse(art) : null,
-        duration: sermon.duration,
-      ),
-    );
-  }
+  static AudioSource _child(Sermon sermon) =>
+      AudioSource.uri(Uri.parse(sermon.audioUrl), tag: sermon.id);
 
   /// The queue entry behind native index [nativeIndex], matched by tag id so
   /// a window that shifted under an insert still resolves correctly.
@@ -380,9 +412,8 @@ class AudioPlayerService {
     if (queue == null || nativeIndex == null) return null;
     if (nativeIndex < 0 || nativeIndex >= sequence.length) return null;
     final tag = sequence[nativeIndex].tag;
-    if (tag is! MediaItem) return null;
     for (final sermon in queue.items) {
-      if (sermon.id == tag.id) return sermon;
+      if (sermon.id == tag) return sermon;
     }
     return null;
   }
@@ -400,6 +431,12 @@ class AudioPlayerService {
 
     final appInitiated = _expectedIndex == index;
     _expectedIndex = null;
+    final left = _currentSermon;
+    final live = _livePosition;
+    if (!appInitiated && left != null && live != null && live.$1 == left.id) {
+      // The engine moved on by itself, which it does at the end of a message.
+      _leave(left, live.$2, live.$3 ?? left.duration);
+    }
     _queue = queue.moveTo(index);
     _currentSermon = sermon;
     _lastPositionSave = null;
@@ -408,8 +445,8 @@ class AudioPlayerService {
     _emitQueue();
     _history.recordPlay(sermon);
     if (!appInitiated) {
-      // Lock-screen skips and auto-advance land at 0:00; pick the message up
-      // where the member left it, like a tap in the app would.
+      // Auto-advance lands at 0:00; pick the message up where the member
+      // left it, like a tap in the app would.
       final resume = _history.resumePoint(sermon);
       if (resume != null) unawaited(_safely(_player.seek(resume)));
     }
@@ -417,8 +454,8 @@ class AudioPlayerService {
   }
 
   /// Keeps a neighbour on each side of the current message in the native
-  /// window, so the lock screen always offers Previous / Next when the queue
-  /// has them. Only appends or prepends: the message on air is never touched.
+  /// window, so a finished message always has the next one to advance to.
+  /// Only appends or prepends: the message on air is never touched.
   Future<void> _extendWindow() async {
     final queue = _queue;
     if (!_hasWindow || queue == null) return;
@@ -607,7 +644,11 @@ class AudioPlayerService {
     }
 
     final token = ++_loadToken;
-    _saveCurrentPosition();
+    if (_currentSermon?.id == sermon.id) {
+      _saveCurrentPosition();
+    } else {
+      _leaveOnAir();
+    }
     final playbackQueue = PlaybackQueue.from(sermon, queue);
     _queue = playbackQueue;
     _currentSermon = sermon;
@@ -745,7 +786,7 @@ class AudioPlayerService {
       await play(target, queue: queue.items);
       return;
     }
-    _saveCurrentPosition();
+    _leaveOnAir();
     _expectedIndex = index;
     await _safely(
       _player.seek(
@@ -790,11 +831,9 @@ class AudioPlayerService {
     try {
       await _player.stop();
     } catch (e) {
-      // just_audio_background 0.0.1-beta.17 has no AudioPlayerPlatform
-      // dispose(), so when its native disposePlayer call fails (the player is
-      // already released) just_audio's fallback throws UnimplementedError.
-      // The engine is stopped either way; never let it escape the caller
-      // (an audio-to-video switch).
+      // A native dispose that fails (the player is already released)
+      // surfaces from stop(). The engine is stopped either way; never let it
+      // escape the caller (an audio-to-video switch).
       debugPrint('AudioPlayerService.stop: $e');
     } finally {
       _currentSermon = null;
@@ -804,6 +843,17 @@ class AudioPlayerService {
   }
 
   Future<void> seek(Duration position) => _player.seek(position);
+
+  /// Moves the playhead by [offset] within the message ([TimeSkip]). The
+  /// in-app skip buttons and the notification / lock-screen rewind and
+  /// fast-forward all land here.
+  Future<void> seekBy(Duration offset) => seek(
+    TimeSkip.target(
+      _player.position,
+      offset,
+      duration ?? _currentSermon?.duration,
+    ),
+  );
 
   /// Sets and persists the playback rate.
   Future<void> setSpeed(double speed) {

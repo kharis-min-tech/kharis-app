@@ -404,6 +404,87 @@ void main() {
     expect(PlaybackHistory(cache).savedPosition(library[0]), Duration.zero);
   });
 
+  group('moving between messages', () {
+    const end = FakeAudioPlatformPlayer.itemDuration;
+
+    /// just_audio extrapolates a playing position from the last event.
+    void expectNear(Duration actual, Duration expected) =>
+        expect(actual.inMilliseconds, closeTo(expected.inMilliseconds, 1000));
+
+    Future<void> playFirstAt(Duration at) async {
+      await service.play(library[0], queue: library);
+      await settle();
+      await native().seek(SeekRequest(position: at));
+      await settle();
+    }
+
+    test('starting another message from the list keeps the first one\'s '
+        'place, and Continue listening shows it', () async {
+      await playFirstAt(const Duration(minutes: 7));
+
+      // A fresh load of s2's window: just_audio reads the source swap as an
+      // auto-advance off s1, which used to mark s1 finished at 0:00.
+      await service.play(library[1], queue: library);
+      await settle();
+
+      final history = PlaybackHistory(cache);
+      expectNear(history.savedPosition(library[0]), const Duration(minutes: 7));
+      expect(history.progressOf(library[0]), isNot(isA<Finished>()));
+      final resume = history.lastUnfinished();
+      expect(resume?.sermon.id, 's1', reason: 's2 has not really started');
+      expectNear(resume!.position, const Duration(minutes: 7));
+    });
+
+    test('Next mid-message keeps its place', () async {
+      await playFirstAt(const Duration(minutes: 7));
+
+      await service.skipToNext();
+      await settle();
+
+      expect(service.currentSermon?.id, 's2');
+      final history = PlaybackHistory(cache);
+      expectNear(history.savedPosition(library[0]), const Duration(minutes: 7));
+      expect(history.progressOf(library[0]), isNot(isA<Finished>()));
+    });
+
+    test('Next within the last 30 s marks it finished', () async {
+      await playFirstAt(end - const Duration(seconds: 20));
+
+      await service.skipToNext();
+      await settle();
+
+      final history = PlaybackHistory(cache);
+      expect(history.progressOf(library[0]), isA<Finished>());
+      expect(history.savedPosition(library[0]), Duration.zero);
+    });
+
+    test('playing to the end marks it finished', () async {
+      await service.play(library[0]);
+      await settle();
+      await native().seek(SeekRequest(position: const Duration(minutes: 7)));
+      await settle();
+
+      native().complete();
+      await settle();
+
+      final history = PlaybackHistory(cache);
+      expect(history.progressOf(library[0]), isA<Finished>());
+      expect(history.savedPosition(library[0]), Duration.zero);
+    });
+
+    test('advancing on its own off the end marks it finished and opens the '
+        'next message', () async {
+      await playFirstAt(end - const Duration(seconds: 1));
+
+      // The native player moves to the next item by itself.
+      await native().seek(SeekRequest(position: Duration.zero, index: 1));
+      await settle();
+
+      expect(service.currentSermon?.id, 's2');
+      expect(PlaybackHistory(cache).progressOf(library[0]), isA<Finished>());
+    });
+  });
+
   test('speed persists across service instances', () async {
     await service.setSpeed(1.5);
     expect(

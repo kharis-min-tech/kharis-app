@@ -23,9 +23,9 @@ class FakeJustAudioPlatform extends JustAudioPlatform {
   /// this completes: a slow network. Consumed by that one load.
   Future<void>? holdNextLoad;
 
-  /// Mirrors just_audio_background 0.0.1-beta.17 on Android: the native
-  /// disposePlayer call fails and the player has no dispose() fallback, so
-  /// just_audio surfaces an UnimplementedError from stop().
+  /// A native player that is already released: the disposePlayer call fails
+  /// and the player has no dispose() fallback, so just_audio surfaces an
+  /// UnimplementedError from stop().
   bool failDispose = false;
 
   /// When set, the next load fails the way a dead connection does. Consumed

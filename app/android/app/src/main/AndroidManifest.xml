@@ -3,7 +3,7 @@
          plugin manifests merging it in: streaming, the API and Firebase all
          need it in release builds. -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- Lock-screen / notification media controls (just_audio_background). -->
+    <!-- Lock-screen / notification media controls (audio_service). -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
