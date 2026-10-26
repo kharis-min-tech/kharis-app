@@ -126,8 +126,10 @@ Future<BranchSwitchResult> setActiveBranch(WidgetRef ref, String branch) async {
   await onboarding.setSelectedBranch(branch);
 
   // The FCM topic move is a network round trip (14 s seen on a slow
-  // connection) and notificationTopicSyncProvider re-applies topics anyway,
-  // so it must never hold the member on the branch screen.
+  // connection), so it must never hold the member on the branch screen. A
+  // move that fails is retried on the next launch, where
+  // notificationTopicSyncProvider re-subscribes the branch topic and leaves
+  // the stored old one.
   unawaited(
     ref
         .read(notificationServiceProvider)

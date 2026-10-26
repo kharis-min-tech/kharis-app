@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../features/home/data/bible_reference.dart';
@@ -42,6 +43,16 @@ class KharisTopics {
   static const String events = 'events';
   static const String dailyReading = 'daily_reading_v2';
 
+  /// Opt-OUT topic: a device here is left out of branch announcements
+  /// (`'<branch topic>' in topics && !('mute_announcements' in topics)`).
+  /// Opt-out rather than opt-in so builds that predate the switch, which
+  /// never subscribe to it, keep receiving announcements.
+  static const String muteAnnouncements = 'mute_announcements';
+
+  /// The `notificationPrefsProvider` key that drives [muteAnnouncements],
+  /// inverted: ON leaves the topic, OFF joins it.
+  static const String announcementsPreference = 'announcements';
+
   /// The daily reading's old topic. An earlier reading-plan push sent
   /// chapters that do not exist ("2 Corinthians 40") here, and the OS shows a
   /// background push without asking the app, so every launch leaves it.
@@ -49,7 +60,8 @@ class KharisTopics {
   /// excluding [dailyReading] devices.
   static const String legacyDailyReading = 'daily_reading';
 
-  /// Maps a `notificationPrefsProvider` key to the topic it gates.
+  /// Maps an opt-in `notificationPrefsProvider` key to the topic it gates.
+  /// [announcementsPreference] is handled separately (inverted).
   static const Map<String, String> byPreference = <String, String>{
     'serviceReminders': serviceReminders,
     'events': events,
@@ -65,9 +77,9 @@ class KharisTopics {
   /// service reminder every Sunday. A member who wants a campus's pushes
   /// picks that campus.
   ///
-  /// The slug MUST stay character-identical to the backend's in
-  /// `backend/functions/src/index.ts` (`pushPendingAnnouncements`), which is
-  /// the only other implementation of it.
+  /// The slug MUST stay character-identical to the backend's `branchTopic`
+  /// in `backend/functions/src/topics.ts`, the only other implementation of
+  /// it.
   static String branch(String name) => 'branch_${slugifyBranch(name)}';
 
   /// Branch name -> FCM topic suffix. Single source of truth on the client.
@@ -286,8 +298,8 @@ class NotificationService {
       return;
     }
 
-    // Global announcements are not opt-out; the preference-gated topics are
-    // applied by `notificationTopicSyncProvider`.
+    // Global announcements are not opt-out; the preference-gated topics and
+    // the branch topic are applied by `notificationTopicSyncProvider`.
     await subscribeToTopic(KharisTopics.all);
 
     try {
@@ -307,10 +319,7 @@ class NotificationService {
   /// here, and the token is (re)persisted.
   Future<void> onPermissionGranted({String? branch}) async {
     await subscribeToTopic(KharisTopics.all);
-    final name = branch?.trim();
-    if (name != null && name.isNotEmpty) {
-      await subscribeToTopic(KharisTopics.branch(name));
-    }
+    await syncBranchTopic(branch);
     await syncToken();
   }
 
@@ -354,7 +363,8 @@ class NotificationService {
     try {
       final settings = await FirebaseMessaging.instance.requestPermission(
         alert: true,
-        badge: true,
+        // The backend never sets a badge count, so do not ask for one.
+        badge: false,
         sound: true,
         announcement: false,
         carPlay: false,
@@ -401,18 +411,33 @@ class NotificationService {
   /// permission is granted).
   Future<void> applyPreferences(Map<String, bool> prefs) async {
     await unsubscribeFromTopic(KharisTopics.legacyDailyReading);
-    for (final entry in KharisTopics.byPreference.entries) {
-      final enabled = prefs[entry.key];
-      if (enabled == null) continue;
-      await _setTopic(entry.value, enabled);
+    for (final entry in prefs.entries) {
+      await applyPreference(entry.key, entry.value);
     }
   }
 
   /// Applies a single preference toggle. No-op for keys without a topic.
   Future<void> applyPreference(String key, bool enabled) async {
+    if (key == KharisTopics.announcementsPreference) {
+      await _setTopic(KharisTopics.muteAnnouncements, !enabled);
+      return;
+    }
     final topic = KharisTopics.byPreference[key];
     if (topic == null) return;
     await _setTopic(topic, enabled);
+  }
+
+  /// SharedPreferences key of the branch topic this device last subscribed.
+  @visibleForTesting
+  static const String subscribedBranchTopicKey = 'fcm_subscribed_branch_topic';
+
+  /// Puts this device on [branch]'s topic, leaving the one it last joined if
+  /// that differs (the branch was switched while offline, or renamed).
+  /// Runs on every launch; a missing branch is left alone. Never throws.
+  Future<void> syncBranchTopic(String? branch) async {
+    final name = branch?.trim();
+    if (name == null || name.isEmpty) return;
+    await _moveToBranchTopic(KharisTopics.branch(name));
   }
 
   /// Moves this device from one branch topic to another.
@@ -420,23 +445,47 @@ class NotificationService {
   /// The single code path used by both Switch Branch and Edit Profile. Pass
   /// `null`/empty for [from] on first selection; a no-change call is a no-op.
   ///
-  /// Topics are keyed on the slugged branch NAME, so renaming a branch in
-  /// Firestore orphans everyone already subscribed under the old name: they
-  /// keep the stale topic until they re-select the branch, and pushes for the
-  /// new name reach nobody. Rename a branch only alongside a re-subscribe.
+  /// Topics are keyed on the slugged branch NAME. A renamed branch moves the
+  /// device on its next launch: [syncBranchTopic] subscribes the new name's
+  /// topic and leaves the stored old one.
   Future<void> switchBranchTopic({String? from, String? to}) async {
     final previous = (from ?? '').trim();
     final next = (to ?? '').trim();
     if (previous == next) return;
-    if (previous.isNotEmpty) {
-      await unsubscribeFromTopic(KharisTopics.branch(previous));
+    final previousTopic = previous.isEmpty
+        ? null
+        : KharisTopics.branch(previous);
+    if (next.isEmpty) {
+      if (previousTopic != null) await unsubscribeFromTopic(previousTopic);
+      return;
     }
-    if (next.isNotEmpty) {
-      await subscribeToTopic(KharisTopics.branch(next));
+    await _moveToBranchTopic(KharisTopics.branch(next), from: previousTopic);
+  }
+
+  /// Subscribes [topic], unsubscribing [from] and the stored topic when they
+  /// differ from it, and records [topic] once every step has succeeded (a
+  /// failed leave keeps the old record, so the next launch retries it).
+  Future<void> _moveToBranchTopic(String topic, {String? from}) async {
+    SharedPreferences? store;
+    try {
+      store = await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('[FCM] branch topic store unavailable: $e');
+    }
+    final stored = store?.getString(subscribedBranchTopicKey);
+    var left = true;
+    for (final old in {from, stored}) {
+      if (old == null || old == topic) continue;
+      final ok = await unsubscribeFromTopic(old);
+      if (old == stored) left = ok;
+    }
+    final joined = await subscribeToTopic(topic);
+    if (joined && left && stored != topic) {
+      await store?.setString(subscribedBranchTopicKey, topic);
     }
   }
 
-  Future<void> _setTopic(String topic, bool enabled) =>
+  Future<bool> _setTopic(String topic, bool enabled) =>
       enabled ? subscribeToTopic(topic) : unsubscribeFromTopic(topic);
 
   void _handleForegroundMessage(RemoteMessage message) {
@@ -475,28 +524,34 @@ class NotificationService {
     openNotificationTarget(router, notificationTargetFor(message.data));
   }
 
-  /// Subscribe to an FCM topic.
+  /// Subscribe to an FCM topic. Returns whether it succeeded; never throws.
   ///
   /// Built-in topics: [KharisTopics.all], [KharisTopics.events],
   /// [KharisTopics.dailyReading] (`daily_reading_v2`),
-  /// [KharisTopics.serviceReminders]. Branch topics: [KharisTopics.branch].
-  Future<void> subscribeToTopic(String topic) async {
-    if (!kUseFirebase) return;
+  /// [KharisTopics.serviceReminders], [KharisTopics.muteAnnouncements].
+  /// Branch topics: [KharisTopics.branch].
+  Future<bool> subscribeToTopic(String topic) async {
+    if (!kUseFirebase) return false;
     try {
       await FirebaseMessaging.instance.subscribeToTopic(topic);
       debugPrint('[FCM] Subscribed to $topic');
+      return true;
     } catch (e) {
       debugPrint('[FCM] subscribeToTopic($topic) error: $e');
+      return false;
     }
   }
 
-  Future<void> unsubscribeFromTopic(String topic) async {
-    if (!kUseFirebase) return;
+  /// Unsubscribe from an FCM topic. Returns whether it succeeded.
+  Future<bool> unsubscribeFromTopic(String topic) async {
+    if (!kUseFirebase) return false;
     try {
       await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
       debugPrint('[FCM] Unsubscribed from $topic');
+      return true;
     } catch (e) {
       debugPrint('[FCM] unsubscribeFromTopic($topic) error: $e');
+      return false;
     }
   }
 }

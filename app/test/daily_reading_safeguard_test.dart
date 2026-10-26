@@ -9,10 +9,16 @@ class _RecordingTopics extends NotificationService {
   final calls = <String>[];
 
   @override
-  Future<void> subscribeToTopic(String topic) async => calls.add('+$topic');
+  Future<bool> subscribeToTopic(String topic) async {
+    calls.add('+$topic');
+    return true;
+  }
 
   @override
-  Future<void> unsubscribeFromTopic(String topic) async => calls.add('-$topic');
+  Future<bool> unsubscribeFromTopic(String topic) async {
+    calls.add('-$topic');
+    return true;
+  }
 }
 
 void main() {

@@ -54,10 +54,8 @@ export function toAnnouncement({ id, data }: NewsRecord): AnnouncementJson {
 }
 
 /**
- * What a member may see at [nowMs]: published (a Studio-scheduled future
- * `publishedAt` stays hidden until it arrives) and not yet expired. The one
- * rule shared by getAnnouncements and the push poller, so a notice is never
- * pushed that the API would then refuse to show, or shown before its time.
+ * What a member may see at [nowMs]: published (a future `publishedAt` stays
+ * hidden until it arrives) and not yet expired.
  */
 export function isLiveNews(data: NewsDoc, nowMs: number): boolean {
   const pub = data.publishedAt;
@@ -110,62 +108,4 @@ export function pickAnnouncements(
     .filter((a) => !seen.has(a.id))
     .slice(0, limit - scoped.length);
   return [...scoped, ...campus].sort(BY_NEWEST);
-}
-
-/**
- * The poller's pick: live notices published inside the last [windowMs] that
- * have not been pushed yet. Scheduled notices become due when their
- * `publishedAt` arrives, never before.
- */
-export function isPushDue(
-  data: NewsDoc & { pushedAt?: unknown },
-  nowMs: number,
-  windowMs: number,
-): boolean {
-  if (data.pushedAt) return false;
-  if (!isLiveNews(data, nowMs)) return false;
-  return (data.publishedAt as Timestamp).toMillis() >= nowMs - windowMs;
-}
-
-/** Side effects of pushing one announcement; injected so the order is testable. */
-export interface AnnouncementPushSteps {
-  /** Create the one-shot `pushLog/news_<id>` marker; false when it already exists. */
-  claim(): Promise<boolean>;
-  /** Send the FCM message; resolves to the message id. */
-  send(): Promise<string>;
-  /** Record `pushedAt` etc. on the news doc after a successful send. */
-  markPushed(messageId: string): Promise<void>;
-  /** Drop the claim after a failed send so the next run retries. */
-  release(): Promise<void>;
-  /** Record the send error on the news doc. */
-  recordError(error: unknown): Promise<void>;
-}
-
-export type AnnouncementPushOutcome = 'sent' | 'already-claimed' | 'failed';
-
-/**
- * Pushes one announcement at most once. The claim comes BEFORE the send, so
- * overlapping scheduler runs (at-least-once delivery) cannot both send; a
- * failed send releases it so the next minute retries. Bookkeeping after a
- * successful send has its own try: if it fails, the claim still stands, so a
- * later run (which sees no `pushedAt`) loses the claim and does not resend.
- */
-export async function pushAnnouncementOnce(
-  steps: AnnouncementPushSteps,
-): Promise<AnnouncementPushOutcome> {
-  if (!(await steps.claim())) return 'already-claimed';
-  let messageId: string;
-  try {
-    messageId = await steps.send();
-  } catch (e) {
-    await steps.release().catch(() => undefined);
-    await steps.recordError(e).catch(() => undefined);
-    return 'failed';
-  }
-  try {
-    await steps.markPushed(messageId);
-  } catch (e) {
-    console.error('[push] sent, but recording pushedAt failed:', e);
-  }
-  return 'sent';
 }

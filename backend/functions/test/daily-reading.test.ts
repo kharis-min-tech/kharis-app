@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CONTENT_STUDIO_KEY,
   ReadingLookup,
   ReadingPushDeps,
   ReadingPushMessage,
@@ -9,6 +8,7 @@ import {
   pickReading,
   runDailyReadingPush,
 } from '../src/daily-reading';
+import { CONTENT_STUDIO_KEY } from '../src/content-studio';
 import { referenceProblem } from '../src/bible-chapters';
 import { PushAudience } from '../src/topics';
 

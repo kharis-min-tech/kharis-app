@@ -1,22 +1,11 @@
 import { initializeApp } from 'firebase-admin/app';
-import {
-  getFirestore,
-  Timestamp,
-  FieldValue,
-  Query,
-} from 'firebase-admin/firestore';
+import { getFirestore, Timestamp, FieldValue, Query } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getMessaging } from 'firebase-admin/messaging';
 import { EventDoc, NewsDoc } from './types';
-import { branchTopic } from './topics';
 import { todayInLondon } from './london-time';
-import {
-  NewsRecord,
-  isPushDue,
-  pickAnnouncements,
-  pushAnnouncementOnce,
-} from './announcements';
+import { NewsRecord, pickAnnouncements } from './announcements';
 import { EventRecord, IN_PROGRESS_LOOKBACK_MS, pickEvents } from './events-api';
 import { fetchStudioReading, runDailyReadingPush } from './daily-reading';
 
@@ -28,16 +17,16 @@ export { syncYouTube } from './sync-youtube';
 export { syncWebsiteEvents } from './sync-website-events';
 export { sermonApiProxy } from './sermon-proxy';
 
-// Content Studio -> device pushes: Firestore triggers that fire on the write
-// itself (events, branch venue details), plus the service reminder schedule.
-// See `content-notifications.ts`.
+// Content Studio -> device pushes: schedules that poll the Studio's Supabase
+// tables (announcements, events, branch services, service reminders), plus
+// the push bookkeeping purge. See `content-notifications.ts`.
 export {
-  onEventWritten,
-  onBranchVenueWritten,
+  pushPendingAnnouncements,
+  pushEventUpdates,
+  pushBranchUpdates,
   pushServiceReminders,
   purgePushLog,
 } from './content-notifications';
-import { PUSH_LOG, claimPush } from './content-notifications';
 import { PUBLIC_MAX_INSTANCES, TtlCache } from './response-cache';
 import { isBirthdayCelebrant } from './birthdays';
 
@@ -120,103 +109,6 @@ export const getAnnouncements = onRequest(
 
     res.status(200).json(payload);
   }
-);
-
-const PUSH_WINDOW_MS = 15 * 60 * 1000;
-
-/**
- * Push pending announcements. Finds recently-published `news` docs that haven't
- * been pushed and sends an FCM notification to the branch topic (branch-scoped)
- * or `all` (all-campus) — topic names mirror the app's subscriptions
- * (`branch_<slug(branchName)>` / `all`), and the topic is derived from the very
- * same `branch` field getAnnouncements scopes on, so an announcement is pushed
- * to exactly the audience that can later read it back. Idempotent via a
- * `pushLog/news_<id>` claim taken before the send (see
- * `pushAnnouncementOnce`); only the last 15 minutes are considered, so it
- * never blasts the backlog.
- *
- * A Studio-scheduled notice (future `publishedAt`) is pushed when its time
- * arrives, not when it is saved: the query and `isPushDue` both require
- * `publishedAt <= now`, the same rule getAnnouncements serves by.
- *
- * Scheduled every minute, which is what keeps the 15-minute window meaningful:
- * an announcement is picked up within a minute of publishing, and one bad run
- * still leaves 14 minutes of retries before a doc ages out.
- */
-export const pushPendingAnnouncements = onSchedule(
-  {
-    schedule: 'every 1 minutes',
-    timeZone: 'Europe/London',
-    memory: '256MiB',
-    timeoutSeconds: 60,
-  },
-  async () => {
-    const db = getFirestore();
-    const now = Timestamp.now();
-    const nowMs = now.toMillis();
-    const snap = await db
-      .collection('news')
-      .where('publishedAt', '<=', now)
-      .where('publishedAt', '>=', Timestamp.fromMillis(nowMs - PUSH_WINDOW_MS))
-      .orderBy('publishedAt', 'desc')
-      .limit(25)
-      .get();
-
-    const pending = snap.docs.filter((d) =>
-      isPushDue(d.data() as NewsDoc & { pushedAt?: unknown }, nowMs, PUSH_WINDOW_MS),
-    );
-
-    let pushed = 0;
-    for (const doc of pending) {
-      const data = doc.data() as NewsDoc;
-      // `branch` is the exact field getAnnouncements scopes on; blank/absent
-      // means all-campus, which branchTopic maps to the `all` topic.
-      const branch = (data.branch ?? '').toString().trim();
-      const topic = branchTopic(branch);
-      const title = data.title || 'Kharis';
-      const body =
-        (data.body && data.body.length > 140
-          ? `${data.body.slice(0, 137)}...`
-          : data.body) || 'New announcement';
-      const eventId = (data.eventId ?? '').toString().trim();
-      const claimKey = `news_${doc.id}`;
-      const outcome = await pushAnnouncementOnce({
-        claim: () => claimPush(claimKey),
-        send: () =>
-          getMessaging().send({
-            topic,
-            notification: { title, body },
-            data: {
-              type: 'announcement',
-              newsId: doc.id,
-              branch,
-              ...(eventId ? { eventId } : {}),
-            },
-            android: { priority: 'high' },
-            apns: { payload: { aps: { sound: 'default' } } },
-          }),
-        markPushed: async (id) => {
-          await doc.ref.set(
-            { pushedAt: FieldValue.serverTimestamp(), pushTopic: topic, pushMessageId: id },
-            { merge: true },
-          );
-          console.log(`[push] ${doc.id} -> ${topic} (${id})`);
-        },
-        release: async () => {
-          await db.collection(PUSH_LOG).doc(claimKey).delete();
-        },
-        recordError: async (e) => {
-          console.error(`[push] failed for ${doc.id} topic ${topic}:`, e);
-          await doc.ref.set({ pushError: String(e) }, { merge: true });
-        },
-      });
-      if (outcome === 'sent') pushed++;
-    }
-
-    console.log(
-      `[push] pushed ${pushed}/${pending.length} pending announcement(s)`,
-    );
-  },
 );
 
 const EVENT_PAGE_SIZE = 50;

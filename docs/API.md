@@ -20,7 +20,7 @@ Contents
 2. [Public sermon API (yetanothersermon.host)](#2-public-sermon-api-yetanothersermonhost)
 3. [Media engine: Cloudflare import Worker and R2 bucket](#3-media-engine-cloudflare-import-worker-and-r2-bucket)
 4. [YouTube Data API](#4-youtube-data-api)
-5. [Cloud Functions (schedulers and Firestore triggers)](#5-cloud-functions-schedulers-and-firestore-triggers)
+5. [Cloud Functions (schedulers)](#5-cloud-functions-schedulers)
 6. [Firestore collections](#6-firestore-collections)
 7. [Push notifications](#7-push-notifications)
 8. [Ops: R2 bucket CORS](#8-ops-r2-bucket-cors)
@@ -470,31 +470,32 @@ The app drops videos shorter than 120 s and titles that look like Shorts or musi
 
 ---
 
-## 5. Cloud Functions (schedulers and Firestore triggers)
+## 5. Cloud Functions (schedulers)
 
 All functions run in `us-central1` (the default region) unless noted. Times are Europe/London unless noted.
 
+The Content Studio writes Supabase only, so every content push polls the Studio's tables over PostgREST (`content-studio.ts`, the same URL and publishable key as the app and `pushDailyReading`; no secrets or env vars) and keeps its bookkeeping in `push-state.ts` (claims in `pushLog`, snapshots and checkpoints in `pushState`). The senders are in `studio-pushes.ts`; the schedules in `content-notifications.ts`.
+
 | Function | Trigger | What it does | Audience / topic | Idempotency |
 |---|---|---|---|---|
-| `pushPendingAnnouncements` | every 1 minute | Pushes `news` docs that became live within the last 15 minutes and have not been pushed yet. A future `publishedAt` is pushed when it arrives. Body is capped at 140 chars. Data: `{type:'announcement', newsId, branch, eventId?}` | `branchTopic(news.branch)`: `branch_<slug>` or `all` | Claims `pushLog/news_<newsId>` with `create()` before sending, so overlapping runs cannot both send; a failed send releases the claim (retried next minute) and writes `pushError`. After a good send it writes `pushedAt`, `pushTopic` and `pushMessageId` onto the news doc; if that write fails, the claim still prevents a resend. The 15-minute window stops it from sending the backlog. |
+| `pushPendingAnnouncements` | every 1 minute | Pushes Studio `news` rows in workspace `app` or `general` whose `published_at` is within the last 15 minutes and not in the future, and that have not expired (`expires_at` null or later). A future `published_at` is pushed when it arrives. Title: `title`; body: `body` capped at 140 chars, else "New announcement". Data: `{type:'announcement', newsId (Supabase id), branch (branch_name or ''), eventId?}` | condition `'<branch topic>' in topics && !('mute_announcements' in topics)`, the branch topic being `branch_<slug>` of `branch_name`, or `all` | Claims `pushLog/news_<id>` before sending, so overlapping runs cannot both send; a failed send releases the claim and is retried next minute. The 15-minute window stops it from sending the backlog. |
 | `pushDailyReading` | cron `0 7 * * *` (07:00) | Pushes "Today's Bible reading" with today's (Europe/London) Content Studio reading, the same row the app shows: Supabase `daily_entries`, `kind=reading`, workspace `app` before `general` (`daily-reading.ts`). Body: the row's `reference`, else its `title`. No row, a missing table (404) or a failed lookup sends nothing; there is no fallback. Every passage of the body must name a book of the 66-book canon and a chapter that book has (`bible-chapters.ts`); otherwise nothing is sent and the claim records `skipped: 'invalid reference: …'`. Data: `{type:'reading', date, reference}` | topic `daily_reading_v2`, plus condition `'daily_reading' in topics && !('daily_reading_v2' in topics)` for app builds still on the legacy topic (`READING_AUDIENCES` in `topics.ts`) | Claims `dailyReadingPushes/{date}` in a transaction before the lookup. A day with no or an invalid reading records `skipped`; a failed send records `pushError` (`pushMessageId` lists the sends that succeeded). Neither is retried. |
 | `pushBirthdays` | cron `0 8 * * *` (08:00) | Direct push to each user whose `dob` month-day is today and who has an `fcmToken`, found by the query `dobMMDD == 'MM-DD'` (the app writes `dobMMDD` with `dob` and backfills it on sign-in; `scripts/backfill-dob-mmdd.mjs` backfills all profiles at once). Title: "Happy birthday!" followed by a party emoji. Data: `{type:'birthday'}`. Deletes tokens that FCM reports as unregistered. | device token `users/{uid}.fcmToken` | `birthdayPushes/{date}` created with `create()`; the run is skipped if it already exists. |
-| `pushServiceReminders` | every 15 minutes | One hour before each Branch's service, parsed from `meetingDays` and `meetingTime`. Branches whose schedule is ambiguous (no weekday, or several times) get no reminder. Data: `{type:'service_reminder', branchId, branch, startTime, address}` | condition `'service_reminders' in topics && '<branch topic>' in topics` | `pushLog/service_<branchId>_<YYYY-MM-DD>` |
-| `onEventWritten` | Firestore `events/{eventId}` write | "New event: …" when an event is created, or "Event updated: …" when the title, time, location, address or branch changes. A Branch move also notifies the old Branch. Data: `{type:'event', eventId, branch, startTime, location}` | condition `'events' in topics && '<branch topic>' in topics` | `pushLog/<cloudEventId>_<topic>`. The claim is released if the send fails. |
-| `onBranchVenueWritten` | Firestore `branches/{branchId}` update | "<Branch>: service details updated" when `address`, `meetingDays` or `meetingTime` changes. Data: `{type:'venue', branchId, branch, address, schedule}` | `branch_<slug>` | `pushLog/<cloudEventId>_<topic>` |
-| `purgePushLog` | `every day 03:30` | Deletes `pushLog` markers older than 30 days, at most 10 batches of 500 per run. | none | n/a |
+| `pushServiceReminders` | every 15 minutes | One hour before each active Studio service (`services.day` and `start_time`, branches and venues joined as the app joins them). A service without a readable weekday or time gets no reminder. Body names the service's venue address. Data: `{type:'service_reminder', branchId (slug), branch, startTime, address}` | condition `'service_reminders' in topics && '<branch topic>' in topics` | `pushLog/service_<branchSlug>_<YYYY-MM-DD>_<HH:MM>` |
+| `pushEventUpdates` | every 5 minutes | Polls Studio `events` rows whose `updated_at` or `created_at` is after the checkpoint `pushState/events` (less 2 minutes of overlap) and that the app shows (`sites` contains `app` or `general`) and that are not over (a weekly event: it has an upcoming occurrence before `recurrence_until`). A row created since the checkpoint: "New event: …". A row whose title, time (start, end, weekly days, `recurrence_until`), `location` or `branch_name` differs from its last pushed snapshot `pushState/event_<id>`: "Event updated: …", led by what changed. A Branch move also notifies the old Branch ("Moved to …"). Body: date (a weekly event: "Every Sunday"), time and location in London time. Data: `{type:'event', eventId (Supabase id), branch, startTime (next occurrence), location}` | condition `'events' in topics && '<branch topic>' in topics` (`all` when the event has no branch) | `pushLog/event_<id>_<updated_at ms>_<topic>`. A failed send releases its claim and holds the checkpoint, so the next poll retries. |
+| `pushBranchUpdates` | every 5 minutes | "<Branch>: service details updated" when an active branch's active services change day, start time, or venue name or address, compared with `pushState/branches` (branch uuid → signature). Body: "We now meet Sundays 1:00 PM · <address>; …". Data: `{type:'venue', branchId (slug), branch, address, schedule}` | condition `'service_reminders' in topics && '<branch topic>' in topics` | `pushLog/branch_<uuid>_<old hash>_<new hash>`. A failed send keeps the old signature, so the next poll retries. |
+| `purgePushLog` | `every day 03:30` | Deletes `pushLog` claims older than 30 days and `pushState` snapshots past their `keepUntil`, at most 10 batches of 500 each per run. | none | n/a |
 | `syncYouTube` | every 60 minutes (America/New_York) | Upserts the newest 50 channel uploads into `sermons/yt_<videoId>` ([section 4](#4-youtube-data-api)). | none | Deterministic doc ids plus merge |
-| `syncWebsiteEvents` | every 60 minutes | Imports kharis.org events from EventON (this month plus 2 more) into `events/web_<wpId>[_<ri>][_<branchSlug>]`. Fields: title, start and end times, location, address, description, `source:'website'`, `sourceId`, `sourceUrl`, `syncedAt`. The Branch is mapped from the WordPress `event_type`. Upcoming imports that disappear from the site are deleted, except `hidden: true` tombstones and every doc of a post skipped this run (post missing from the REST API, unknown campus or unresolved `event_type`), so a transient gap cannot wipe admin overrides or resurrect an admin-deleted event. | none (its creates are not pushed by `onEventWritten`) | Doc ids derived from the WordPress id. Unchanged events are not rewritten. Admin-owned fields (`branch`, `imageUrl`, `isFeatured`) are kept. `hidden: true` tombstones are never rewritten or deleted. |
+| `syncWebsiteEvents` | every 60 minutes | Imports kharis.org events from EventON (this month plus 2 more) into `events/web_<wpId>[_<ri>][_<branchSlug>]`. Fields: title, start and end times, location, address, description, `source:'website'`, `sourceId`, `sourceUrl`, `syncedAt`. The Branch is mapped from the WordPress `event_type`. Upcoming imports that disappear from the site are deleted, except `hidden: true` tombstones and every doc of a post skipped this run (post missing from the REST API, unknown campus or unresolved `event_type`), so a transient gap cannot wipe admin overrides or resurrect an admin-deleted event. | none | Doc ids derived from the WordPress id. Unchanged events are not rewritten. Admin-owned fields (`branch`, `imageUrl`, `isFeatured`) are kept. `hidden: true` tombstones are never rewritten or deleted. |
 
-`onEventWritten` sends nothing in these cases:
+`pushEventUpdates` sends nothing for:
 
-- deletes
-- `hidden` docs
-- events without a `startTime`
-- events in the past
-- writes that change only cosmetic fields such as `isFeatured`, the image or the description
+- deletes, and rows the app does not show (website-only `sites`, or unpublished: empty `sites`)
+- events that are over
+- saves that change only other fields, such as the image, the description or `is_featured`
+- an event created before the checkpoint and never seen before (its snapshot is recorded instead, so its next real change is pushed)
 
-`onBranchVenueWritten` sends nothing for creates, deletes, renames, or a cleared venue.
+`pushBranchUpdates` sends nothing on its first run (it only records the snapshot), for a branch seen for the first time, or for a branch whose services were all removed.
 
 ---
 
@@ -514,7 +515,7 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 | `users/{uid}/notes/{id}` | owner only (not admins) | Owner. `body` must be 1..20000 chars; `updatedAt` must be a timestamp. |
 | `users/{uid}/playlists/{id}` | owner only | Owner. `name` 1..80 chars, `sermonIds` a list, `createdAt` and `updatedAt` timestamps. |
 | `branches/{id}` | public | nobody (Firebase console / Admin SDK only) |
-| `news/{id}` | public | nobody (`pushPendingAnnouncements` writes push fields through the Admin SDK) |
+| `news/{id}` | public | nobody (Firebase console / Admin SDK only) |
 | `events/{id}` | public | nobody (`web_*` docs are written by `syncWebsiteEvents`) |
 | `sermons/{id}` | public | nobody (`syncYouTube` writes `yt_*` docs) |
 | `dailyContent/{YYYY-MM-DD}` | public | nobody (Firebase console). Legacy: no longer read by the app or the functions. |
@@ -522,7 +523,7 @@ The Admin SDK (Cloud Functions) bypasses the rules. Anything not listed below is
 | `config/{doc}` | public | nobody (Firebase console). `featured.mode` is `auto`, `pinned` or `off`. |
 | `app_feedback/{uid}_{yyyymmdd}` | nobody | Create or overwrite: any signed-in user, one doc per user per UTC day (the id must be the caller's uid plus the UTC date of the write). Keys are limited to `uid, rating, comment, source, platform, createdAt`. `uid` must be the caller, `rating` an int 1..5, `comment` ≤2000 chars, `source` `prompt` or `settings`, `platform` ≤20 chars, `createdAt == request.time`. |
 | `rsvps/{uid}_{eventId}` | get: owner (by id prefix). list: queries constrained to `userId == auth.uid`. | Create: signed-in user, `userId == uid`, id `{uid}_{eventId}`. Update: never. Delete: owner. |
-| `pushLog`, `dailyReadingPushes` | nobody | Admin SDK only |
+| `pushLog`, `pushState`, `dailyReadingPushes` | nobody | Admin SDK only |
 | `birthdayPushes` | nobody (default deny) | Admin SDK only |
 
 The member app no longer reads `branches`, `news`, `events` or `config/live|giving|home` (6.2 to 6.5): branches with their services and venues, events, announcements and the live stream come from the Kharis Content Studio (Supabase tables `branches`, `services`, `venues`, `events`, `news`, `app_config`), as described in [MOBILE-INTEGRATION.md §1](MOBILE-INTEGRATION.md#1-repository-map). The collections below remain for the Cloud Functions that still use them.
@@ -540,7 +541,7 @@ The doc id is a slug (e.g. `london-hq`) or an auto id. Fields as written by the 
 | `subtitle`, `shortDescription`, `description` | string | The app shows `subtitle`, falling back to the others in that order |
 | `imageUrl` | string | URL |
 | `gradientStart`, `gradientEnd` | `#RRGGBB` | Also under `branding` |
-| `address`, `meetingDays`, `meetingTime` | string | Venue summary. These drive service reminders and venue pushes. `meetingTime` is `2:00 PM` or `14:00`. |
+| `address`, `meetingDays`, `meetingTime` | string | Venue summary. No longer read by the functions: service reminders and service-detail pushes come from the Studio's `services` and `venues` tables. |
 | `contact` | `{email, phone}` | |
 | `instagram` | string | |
 | `venues[]` | `{id, name, addressLine1, addressLine2, city, postcode, country, latitude, longitude, parkingInfo, publicTransportInfo, directionsText}` | |
@@ -552,7 +553,7 @@ The doc id is a slug (e.g. `london-hq`) or an auto id. Fields as written by the 
 
 Fields: `title`, `body`, `type` (`Announcement`/`Ministry`/`Notice`/`Update`), `branch` (name or null), `imageUrl`, `publishedAt` (timestamp; a future value schedules the item), `expiresAt` (timestamp or null), `eventId`, `linkUrl`, `ctaLabel`, `createdAt`.
 
-Server-written: `pushedAt`, `pushTopic`, `pushMessageId`, `pushError`.
+Server-written by the retired Firestore announcement poller: `pushedAt`, `pushTopic`, `pushMessageId`, `pushError`.
 
 ### 6.4 events
 
@@ -609,11 +610,12 @@ Neither collection is read any more: today's reading comes from the Content Stud
 
 `app_feedback` is write-only for members (a same-day resubmission overwrites that day's doc) and is not removed.
 
-### 6.9 rsvps, app_feedback, pushLog
+### 6.9 rsvps, app_feedback, pushLog, pushState
 
 - `rsvps/{uid}_{eventId}`: `{userId, eventId, branch, eventStartTime, createdAt}`.
 - `app_feedback/{uid}_{yyyymmdd}`: `{uid, rating, comment, source, platform, createdAt}`, where `platform` is `web`, `iOS`, `android` and so on.
-- `pushLog/{key}`: `{claimedAt, target, title, body, messageId, sentAt}`. Server only.
+- `pushLog/{key}`: one claim per push, `{claimedAt, target, title, body, messageId, sentAt}`. Server only; purged after 30 days.
+- `pushState/{key}`: `{value, savedAt, keepUntil?}`. Server only. Keys: `events` (`{checkedAt}`, the event poll's checkpoint), `event_<supabaseId>` (the last pushed title, times, weekly days, location and branch of an event; kept until a month after it ends, a year for an open-ended weekly event) and `branches` (branch uuid → service signature). Purged once `keepUntil` passes. Both collections are reached only through `push-state.ts`.
 
 ---
 
@@ -625,10 +627,11 @@ Server: `backend/functions/src/topics.ts`. Client: `KharisTopics` in `app/lib/co
 
 | Topic | Who is subscribed | Publishers |
 |---|---|---|
-| `all` | every device, always | church-wide announcements |
-| `branch_<slug>` | devices whose member picked that Branch. The slug is `name.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-')`, e.g. `KP2 London` → `branch_kp2-london` | Branch announcements, venue changes, and the branch half of event and reminder conditions |
-| `events` | the Events preference toggle | `onEventWritten` (condition with the Branch topic) |
-| `service_reminders` | the Service Reminders toggle | `pushServiceReminders` (condition) |
+| `all` | every device, always | church-wide announcements (condition with `mute_announcements`) |
+| `branch_<slug>` | devices whose member picked that Branch. The slug is `name.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-')`, e.g. `KP2 London` → `branch_kp2-london` | the branch half of announcement, event, service-detail and reminder conditions |
+| `mute_announcements` | opt-out: devices whose member turned the Announcements toggle off. App builds from before the toggle never join it, so they keep receiving announcements | `pushPendingAnnouncements` (condition `'<branch topic>' in topics && !('mute_announcements' in topics)`) |
+| `events` | the Events preference toggle | `pushEventUpdates` (condition with the Branch topic) |
+| `service_reminders` | the Service Reminders toggle | `pushServiceReminders` and `pushBranchUpdates` (condition with the Branch topic) |
 | `daily_reading_v2` | the Daily Reading toggle | `pushDailyReading` |
 | `daily_reading` | legacy: app builds before `daily_reading_v2`. Current builds unsubscribe from it on every launch | `pushDailyReading`, only to devices not also on `daily_reading_v2` |
 
@@ -719,12 +722,14 @@ Every export of `backend/functions/src/index.ts`:
 | `getBranches` | HTTP | [1.2](#12-get-getbranches) |
 | `getEvents` | HTTP | [1.3](#13-get-getevents) |
 | `sermonApiProxy` | HTTP | [1.4](#14-get-sermonapiproxyresource) |
-| `pushPendingAnnouncements` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `pushDailyReading` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `pushBirthdays` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `pushServiceReminders` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `purgePushLog` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `syncYouTube` | scheduler | [4](#4-youtube-data-api), [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `syncWebsiteEvents` | scheduler | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `onEventWritten` | Firestore trigger | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
-| `onBranchVenueWritten` | Firestore trigger | [5](#5-cloud-functions-schedulers-and-firestore-triggers) |
+| `pushPendingAnnouncements` | scheduler | [5](#5-cloud-functions-schedulers) |
+| `pushDailyReading` | scheduler | [5](#5-cloud-functions-schedulers) |
+| `pushBirthdays` | scheduler | [5](#5-cloud-functions-schedulers) |
+| `pushServiceReminders` | scheduler | [5](#5-cloud-functions-schedulers) |
+| `pushEventUpdates` | scheduler | [5](#5-cloud-functions-schedulers) |
+| `pushBranchUpdates` | scheduler | [5](#5-cloud-functions-schedulers) |
+| `purgePushLog` | scheduler | [5](#5-cloud-functions-schedulers) |
+| `syncYouTube` | scheduler | [4](#4-youtube-data-api), [5](#5-cloud-functions-schedulers) |
+| `syncWebsiteEvents` | scheduler | [5](#5-cloud-functions-schedulers) |
+
+`onEventWritten` and `onBranchVenueWritten` (Firestore triggers on `events` and `branches`, which the Studio no longer writes) were replaced by `pushEventUpdates` and `pushBranchUpdates`; delete them from production with `firebase functions:delete onEventWritten onBranchVenueWritten --region us-central1`.

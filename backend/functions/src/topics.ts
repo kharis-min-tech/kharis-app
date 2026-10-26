@@ -28,18 +28,23 @@ export type PushAudience = { topic: string } | { condition: string };
 /**
  * FCM topics behind the app's notification preference toggles. MUST match
  * `KharisTopics.events` / `KharisTopics.serviceReminders` /
- * `KharisTopics.dailyReading` in
+ * `KharisTopics.dailyReading` / `KharisTopics.muteAnnouncements` in
  * `app/lib/core/services/notification_service.dart`.
  *
  * `dailyReading` is `daily_reading_v2`: app builds that validate the reading
  * subscribe to it and leave `legacyDailyReading` (`daily_reading`), the topic
  * an earlier reading-plan push sent invented chapters to.
+ *
+ * `muteAnnouncements` is the one opt-OUT topic: a device joins it when the
+ * member turns Announcements off. App builds from before that toggle never
+ * join it, so they keep receiving announcements.
  */
 export const PREF_TOPIC = {
   events: 'events',
   serviceReminders: 'service_reminders',
   dailyReading: 'daily_reading_v2',
   legacyDailyReading: 'daily_reading',
+  muteAnnouncements: 'mute_announcements',
 } as const;
 
 /**
@@ -63,4 +68,14 @@ export const READING_AUDIENCES: readonly PushAudience[] = [
  */
 export function prefAudience(prefTopic: string, branch?: string | null): PushAudience {
   return { condition: `'${prefTopic}' in topics && '${branchTopic(branch)}' in topics` };
+}
+
+/**
+ * Where an announcement for [branch] goes: devices on that campus's topic
+ * (`all` for church-wide notices) that have not muted announcements.
+ */
+export function announcementAudience(branch?: string | null): PushAudience {
+  return {
+    condition: `'${branchTopic(branch)}' in topics && !('${PREF_TOPIC.muteAnnouncements}' in topics)`,
+  };
 }
