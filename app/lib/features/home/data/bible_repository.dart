@@ -31,6 +31,22 @@ class BibleRepository {
   static const defaultBibleId = 111;
   static const defaultBibleAbbreviation = 'NIV';
 
+  /// Translations the church has approved (26 Oct 2026), by YouVersion id.
+  /// Only these are ever offered. Ids not yet licensed for this app key
+  /// (KJV 1, NKJV 114, ESV 59, AMPC 8, MSG 97, RSV 2020) appear on their
+  /// own once YouVersion licenses them.
+  static const approvedBibleIds = <int>{
+    111, // NIV 2011
+    12, // ASV
+    1588, // AMP
+    2692, // NASB 2020
+    1, // KJV
+    114, // NKJV
+    59, // ESV
+    8, // AMPC
+    97, // MSG
+    2020, // RSV
+  };
   final Dio _dio;
 
   final _passageCache = <String, BiblePassage>{};
@@ -49,12 +65,12 @@ class BibleRepository {
     );
   }
 
-  /// Lists the Bible versions licensed for this app key.
+  /// Lists the church-approved Bible versions licensed for this app key.
   Future<List<BibleVersion>> getBibles() async {
     if (_biblesCache != null) return _biblesCache!;
     final response = await _dio.get<Map<String, dynamic>>(
       '$_base/bibles',
-      queryParameters: {'language_ranges[]': 'en', 'page_size': 50},
+      queryParameters: {'language_ranges[]': 'en', 'page_size': 99},
       options: _options,
     );
     final data = (response.data?['data'] as List? ?? const [])
@@ -64,13 +80,14 @@ class BibleRepository {
     if (data.isEmpty) throw StateError('No Bible versions returned');
     _biblesCache = [
       for (final b in data)
-        BibleVersion(
-          id: (b['id'] as num).toInt(),
-          abbreviation:
-              (b['localized_abbreviation'] ?? b['abbreviation'] ?? '?')
-                  as String,
-          title: (b['localized_title'] ?? b['title'] ?? '') as String,
-        ),
+        if (approvedBibleIds.contains((b['id'] as num).toInt()))
+          BibleVersion(
+            id: (b['id'] as num).toInt(),
+            abbreviation:
+                (b['localized_abbreviation'] ?? b['abbreviation'] ?? '?')
+                    as String,
+            title: (b['localized_title'] ?? b['title'] ?? '') as String,
+          ),
     ];
     return _biblesCache!;
   }

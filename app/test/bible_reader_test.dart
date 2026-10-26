@@ -74,7 +74,7 @@ class _FakeBibleRepository extends BibleRepository {
   @override
   Future<List<BibleVersion>> getBibles() async => const [
     BibleVersion(id: 111, abbreviation: 'NIV', title: 'New International'),
-    BibleVersion(id: 3034, abbreviation: 'BSB', title: 'Berean Standard'),
+    BibleVersion(id: 2692, abbreviation: 'NASB2020', title: 'NASB 2020'),
   ];
 
   @override
@@ -463,6 +463,28 @@ void main() {
     });
   });
 
+  group('repository versions', () {
+    test('offers only the translations the church approved', () async {
+      final dio = Dio()
+        ..httpClientAdapter = _JsonAdapter(
+          () =>
+              '{"data":['
+              '{"id":111,"abbreviation":"NIV11","title":"NIV"},'
+              '{"id":3034,"abbreviation":"BSB","title":"Berean"},'
+              '{"id":1849,"abbreviation":"TPT","title":"Passion"},'
+              '{"id":42,"abbreviation":"CPDV","title":"Catholic"},'
+              '{"id":2692,"abbreviation":"NASB2020","title":"NASB"},'
+              '{"id":100,"abbreviation":"NASB1995","title":"NASB 1995"},'
+              '{"id":113,"abbreviation":"NIVUK11","title":"NIV UK"}]}',
+        );
+      final versions = await BibleRepository(
+        dio: dio,
+        appKey: 'test',
+      ).getBibles();
+      expect(versions.map((v) => v.id), [111, 2692]);
+    });
+  });
+
   group('repository books', () {
     test('parses books, chapters and verse counts once per version', () async {
       var calls = 0;
@@ -549,12 +571,12 @@ void main() {
       expect(controller.state.abbreviation, 'NIV');
 
       await controller.select(
-        const BibleVersion(id: 3034, abbreviation: 'BSB', title: 'Berean'),
+        const BibleVersion(id: 2692, abbreviation: 'NASB2020', title: 'NASB'),
       );
       final relaunch = SelectedBibleController(prefs);
-      expect(relaunch.state.id, 3034);
-      expect(relaunch.state.abbreviation, 'BSB');
-      expect(relaunch.state.title, 'Berean');
+      expect(relaunch.state.id, 2692);
+      expect(relaunch.state.abbreviation, 'NASB2020');
+      expect(relaunch.state.title, 'NASB');
     });
   });
 
@@ -733,15 +755,28 @@ void main() {
 
       await tester.tap(find.text('NIV'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('bible-version-3034')));
+      await tester.tap(find.byKey(const Key('bible-version-2692')));
       await tester.pumpAndSettle();
 
-      expect(repo.passageRequests.last, '3034/JHN.3');
-      expect(find.text('BSB'), findsOneWidget);
-      expect(prefs.getInt(SelectedBibleController.idKey), 3034);
+      expect(repo.passageRequests.last, '2692/JHN.3');
+      expect(find.text('NASB2020'), findsOneWidget);
+      expect(prefs.getInt(SelectedBibleController.idKey), 2692);
     });
 
     testWidgets('a remembered translation is used on open', (tester) async {
+      final (repo, _) = await _pumpReader(
+        tester,
+        prefs: {
+          SelectedBibleController.idKey: 2692,
+          SelectedBibleController.abbreviationKey: 'NASB2020',
+          SelectedBibleController.titleKey: 'NASB 2020',
+        },
+      );
+      expect(repo.passageRequests, ['2692/JHN.3']);
+    });
+
+    testWidgets('a remembered translation the church no longer approves '
+        'reopens on NIV', (tester) async {
       final (repo, _) = await _pumpReader(
         tester,
         prefs: {
@@ -750,7 +785,7 @@ void main() {
           SelectedBibleController.titleKey: 'Berean Standard',
         },
       );
-      expect(repo.passageRequests, ['3034/JHN.3']);
+      expect(repo.passageRequests, ['111/JHN.3']);
     });
 
     testWidgets('offline shows Retry, and Retry loads the chapter', (
@@ -855,10 +890,13 @@ void main() {
 
       await tester.tap(find.text('Change version'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('bible-version-3034')));
+      await tester.tap(find.byKey(const Key('bible-version-2692')));
       await tester.pumpAndSettle();
-      expect(repo.passageRequests.last, '3034/PSA.23');
-      expect(find.textContaining('Verse 1 of PSA.23 in BSB'), findsOneWidget);
+      expect(repo.passageRequests.last, '2692/PSA.23');
+      expect(
+        find.textContaining('Verse 1 of PSA.23 in NASB2020'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('switching version while browsing stays on that chapter', (
@@ -871,9 +909,9 @@ void main() {
 
       await tester.tap(find.text('NIV'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('bible-version-3034')));
+      await tester.tap(find.byKey(const Key('bible-version-2692')));
       await tester.pumpAndSettle();
-      expect(repo.passageRequests.last, '3034/JHN.4');
+      expect(repo.passageRequests.last, '2692/JHN.4');
       expect(_header('John 4'), findsOneWidget);
       expect(find.byKey(const Key('bible-today')), findsOneWidget);
     });
