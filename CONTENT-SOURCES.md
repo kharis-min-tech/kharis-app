@@ -41,7 +41,7 @@
 - **API:** `https://api.youversion.com/v1`, header `x-yvp-app-key` (`YOUVERSION_API_KEY` dart-define, from `app/env.json`)
 - **Used by:** the in-app Bible reader (More > Bible, Home's Today's reading, `/reading`, `/bible`)
 - `/bibles` lists the licensed versions (NIV default; the member's choice is remembered on the device)
-- `/bibles/{id}/books` gives each version's books, chapters and verse counts (versions differ: NT-only, partial OT, deuterocanon); the bundled 66-book table in `app/lib/core/constants/bible_books.dart` is the offline fallback
+- `/bibles/{id}/books` gives each version's books, chapters and verse counts (versions differ: NT-only, partial OT, deuterocanon). The app keeps only the 66-book Protestant canon, in canonical order (`BibleRepository.getBooks`), so deuterocanon/apocrypha books are never listed, searched or stepped into; the bundled 66-book table in `app/lib/core/constants/bible_books.dart` is the offline fallback
 - `/bibles/{id}/passages/{BOOK.chapter}?format=html` gives chapter text; cached in memory per version, one retry on a dropped connection
 
 ---

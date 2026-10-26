@@ -6,7 +6,12 @@
 //
 // There is no fallback. When the Studio has no reading for today (no row, the
 // table not created yet, the request failing) nothing is pushed: a made-up
-// reading is worse than none.
+// reading is worse than none. Nor is anything pushed when the reference names
+// a book outside the 66-book canon or a chapter that book does not have
+// (`bible-chapters.ts`).
+
+import { referenceProblem } from './bible-chapters';
+import { PushAudience, READING_AUDIENCES } from './topics';
 
 /** Content Studio Supabase project, read over PostgREST. */
 export const CONTENT_STUDIO_URL = 'https://cqgyiqxhpxwasogpdghx.supabase.co';
@@ -130,7 +135,8 @@ export interface ReadingPushDeps {
   /** Claims [date] once; false when an earlier run already claimed it. */
   claim(): Promise<boolean>;
   lookup(): Promise<ReadingLookup>;
-  send(message: ReadingPushMessage): Promise<string>;
+  /** Sends [message] to one of [READING_AUDIENCES]; resolves to the FCM message id. */
+  send(message: ReadingPushMessage, audience: PushAudience): Promise<string>;
   recordSkipped(reason: string): Promise<void>;
   recordSent(messageId: string, reference: string, workspace: string): Promise<void>;
   recordError(error: unknown): Promise<void>;
@@ -139,9 +145,9 @@ export interface ReadingPushDeps {
 export type ReadingPushOutcome = 'already-claimed' | 'skipped' | 'sent' | 'failed';
 
 /**
- * One 07:00 run: claim the date, look the reading up, send at most once.
- * The claim comes first so a re-run can never send twice; a failed send is
- * recorded, not retried.
+ * One 07:00 run: claim the date, look the reading up, check its reference,
+ * send at most once to each of [READING_AUDIENCES]. The claim comes first so
+ * a re-run can never send twice; a failed send is recorded, not retried.
  */
 export async function runDailyReadingPush(
   date: string,
@@ -160,10 +166,31 @@ export async function runDailyReadingPush(
   }
 
   const message = readingPushMessage(date, lookup.reading);
+  const problem = referenceProblem(message.data.reference);
+  if (problem) {
+    const reason = `invalid reference: ${problem}`;
+    await deps.recordSkipped(reason);
+    console.warn(`[reading-push] ${date} not sent, ${reason}`);
+    return 'skipped';
+  }
+
+  // Every audience gets its send, even when another's fails.
+  const ids: string[] = [];
+  const errors: unknown[] = [];
+  await Promise.all(
+    READING_AUDIENCES.map((audience) =>
+      deps.send(message, audience).then(
+        (id) => ids.push(id),
+        (e) => errors.push(e),
+      ),
+    ),
+  );
   try {
-    const id = await deps.send(message);
-    await deps.recordSent(id, message.body, lookup.reading.workspace);
-    console.log(`[reading-push] ${date} -> ${message.body} (${id})`);
+    if (ids.length > 0) {
+      await deps.recordSent(ids.join(','), message.body, lookup.reading.workspace);
+      console.log(`[reading-push] ${date} -> ${message.body} (${ids.join(',')})`);
+    }
+    if (errors.length > 0) throw new Error(errors.map(String).join('; '));
     return 'sent';
   } catch (e) {
     console.error(`[reading-push] failed for ${date}:`, e);

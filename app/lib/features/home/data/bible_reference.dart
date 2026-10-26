@@ -144,7 +144,7 @@ _BookMatch _matchBook(String query, BibleIndex? index) {
   final canon = _canonLookup[query];
   if (canon != null) return _Book(canon);
 
-  // Books outside the canon table (deuterocanon in some versions).
+  // The version's own titles for its books ("Psalm" in some versions).
   final extra = index?.books ?? const <BibleBook>[];
   for (final b in extra) {
     if (_normalize(b.title) == query || _normalize(b.usfm) == query) {
@@ -298,8 +298,22 @@ ReferenceLookup _resolve(
 /// is two. Parts are split on `;`, line breaks and " and "; a part that is
 /// only numbers ("9:1-5") continues the previous part's book. Parts that do
 /// not parse are skipped.
-List<BibleLocation> parseReadingReferences(String text, BibleIndex index) {
-  final out = <BibleLocation>[];
+List<BibleLocation> parseReadingReferences(String text, BibleIndex index) => [
+  for (final part in _readingParts(text, index))
+    if (part case ReferenceFound(:final location)) location,
+];
+
+/// Whether [text] names at least one passage and every passage it names is a
+/// real book of [index] with a chapter (and verse) that book has. One bad
+/// part ("Romans 8; 2 Corinthians 40") makes the whole reading invalid.
+bool isValidReading(String text, BibleIndex index) {
+  final parts = _readingParts(text, index);
+  return parts.isNotEmpty && parts.every((p) => p is ReferenceFound);
+}
+
+/// [text]'s non-empty parts, each looked up in [index].
+List<ReferenceLookup> _readingParts(String text, BibleIndex index) {
+  final out = <ReferenceLookup>[];
   String? lastBook;
   for (final raw in text.split(
     RegExp(r';|\n|\s+and\s+', caseSensitive: false),
@@ -311,8 +325,8 @@ List<BibleLocation> parseReadingReferences(String text, BibleIndex index) {
       part = '$lastBook $part';
     }
     final found = parseBibleReference(part, index);
+    out.add(found);
     if (found is ReferenceFound) {
-      out.add(found.location);
       lastBook = RegExp(
         r'^(.*?)\s*\d+\s*([:.].*)?$',
       ).firstMatch(part)?.group(1);

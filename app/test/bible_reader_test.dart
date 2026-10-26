@@ -473,30 +473,70 @@ void main() {
               '{"id":"GEN","title":"Genesis","canon":"old_testament",'
               '"chapters":[{"id":"1","verses":[{"id":"1"},{"id":"31"}]},'
               '{"id":"2","verses":[{"id":"1"},{"id":"25"}]}]},'
-              '{"id":"PS2","title":"Psalm 151","canon":"deuterocanon",'
-              '"chapters":[{"id":"1_1","verses":[]}]},'
-              '{"id":"TOB","title":"Tobit","canon":"deuterocanon",'
-              '"chapters":[{"id":"1","verses":[{"id":"22"}]}]},'
               '{"id":"MAT","title":"Matthew","canon":"new_testament",'
               '"chapters":[{"id":"1","verses":[{"id":"25"}]}]}]}';
         });
       final repo = BibleRepository(dio: dio, appKey: 'test');
 
       final books = await repo.getBooks(206);
-      expect(books.map((b) => b.usfm), ['GEN', 'TOB', 'MAT']);
+      expect(books.map((b) => b.usfm), ['GEN', 'MAT']);
       expect(books.first.chapters, [1, 2]);
       expect(books.first.verseCounts, {1: 31, 2: 25});
-      expect(books[1].testament, Testament.other);
+      expect(books.first.testament, Testament.old);
       expect(books.last.testament, Testament.newTestament);
 
       await repo.getBooks(206);
       expect(calls, 1, reason: 'cached per version');
+    });
 
+    test('books outside the 66-book canon are never shown, searched or '
+        'stepped into', () async {
+      // Like engWEBUS: the Apocrypha sits between Malachi and Matthew.
+      final dio = Dio()
+        ..httpClientAdapter = _JsonAdapter(
+          () =>
+              '{"data":['
+              '{"id":"MAL","title":"Malachi","canon":"old_testament",'
+              '"chapters":[{"id":"1"},{"id":"2"},{"id":"3"},{"id":"4"}]},'
+              '{"id":"TOB","title":"Tobit","canon":"deuterocanon",'
+              '"chapters":[{"id":"1","verses":[{"id":"22"}]}]},'
+              '{"id":"JDT","title":"Judith","canon":"deuterocanon",'
+              '"chapters":[{"id":"1"}]},'
+              '{"id":"1MA","title":"1 Maccabees","canon":"deuterocanon",'
+              '"chapters":[{"id":"1"}]},'
+              '{"id":"SIR","title":"Sirach","canon":"deuterocanon",'
+              '"chapters":[{"id":"1"}]},'
+              '{"id":"PS2","title":"Psalm 151","canon":"deuterocanon",'
+              '"chapters":[{"id":"1_1","verses":[]}]},'
+              '{"id":"MAT","title":"Matthew","canon":"new_testament",'
+              '"chapters":[{"id":"1"},{"id":"2"}]},'
+              '{"id":"GEN","title":"Genesis","canon":"old_testament",'
+              '"chapters":[{"id":"1"}]}]}',
+        );
+      final books = await BibleRepository(
+        dio: dio,
+        appKey: 'test',
+      ).getBooks(206);
+      expect(books.map((b) => b.usfm), [
+        'GEN',
+        'MAL',
+        'MAT',
+      ], reason: 'canon books only, in canonical order');
+
+      final index = BibleIndex(books);
       expect(
-        parseBibleReference('Tobit 1', BibleIndex(books)),
-        isA<ReferenceFound>(),
-        reason: 'extra books are searchable by their title',
+        index.next(const BibleLocation('MAL', 4)),
+        const BibleLocation('MAT', 1),
       );
+      expect(
+        index.previous(const BibleLocation('MAT', 1)),
+        const BibleLocation('MAL', 4),
+      );
+      expect(parseBibleReference('Tobit 1', index), isA<ReferenceError>());
+      expect(parseBibleReference('Sirach 1', index), isA<ReferenceError>());
+      expect(parseReadingReferences('Judith 1; Malachi 4', index), [
+        const BibleLocation('MAL', 4),
+      ]);
     });
   });
 

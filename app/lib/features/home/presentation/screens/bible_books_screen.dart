@@ -116,7 +116,6 @@ class _BibleBooksScreenState extends ConsumerState<BibleBooksScreen> {
           final groups = [
             ('Old Testament', Testament.old),
             ('New Testament', Testament.newTestament),
-            ('Other books', Testament.other),
           ];
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
