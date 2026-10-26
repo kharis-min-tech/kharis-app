@@ -105,7 +105,7 @@ class _NotificationsSettingsScreenState
       child: Column(
         children: [
           // Toggles can't deliver anything while the OS blocks
-          // us, so say so rather than lying with three switches.
+          // us, so say so rather than lying with four switches.
           if (permission == NotificationPermission.askable ||
               permission == NotificationPermission.blocked) ...[
             NotificationPermissionCard(
@@ -117,8 +117,17 @@ class _NotificationsSettingsScreenState
             const SizedBox(height: 14),
           ],
           _ToggleRow(
+            label: 'Announcements',
+            subtitle: 'News and notices from your branch',
+            value: prefs['announcements'] ?? true,
+            onChanged: (v) => _onToggle('announcements', v),
+          ),
+          const SizedBox(height: 14),
+          _ToggleRow(
             label: 'Service reminders',
-            subtitle: 'An hour before your branch\u2019s service starts',
+            subtitle:
+                'An hour before your branch\u2019s service, and when its '
+                'time or place changes',
             value: prefs['serviceReminders'] ?? true,
             onChanged: (v) => _onToggle('serviceReminders', v),
           ),

@@ -131,12 +131,14 @@ final notificationPermissionAnsweredProvider =
 
 // ── Preference enforcement ────────────────────────────────────────────────────
 
-/// Keeps this device's preference-gated FCM topics in step with the user's
-/// saved notification preferences.
+/// Keeps this device's preference-gated FCM topics and its branch topic in
+/// step with the user's saved notification preferences and campus.
 ///
 /// Without this the toggles in Notification settings would only ever write to
 /// Firestore. Watched by `KharisApp` so it applies on launch and on every
-/// later preference change (including changes made on another device).
+/// later preference or branch change (including changes made on another
+/// device); re-subscribing the branch topic on every launch also moves a
+/// device whose branch was switched offline or renamed.
 final notificationTopicSyncProvider = Provider<void>((ref) {
   if (!kUseFirebase) return;
   final service = ref.watch(notificationServiceProvider);
@@ -146,6 +148,10 @@ final notificationTopicSyncProvider = Provider<void>((ref) {
   ) {
     final prefs = next.valueOrNull;
     if (prefs != null) service.applyPreferences(prefs);
+  }, fireImmediately: true);
+  ref.listen<AsyncValue<String?>>(currentBranchProvider, (_, next) {
+    final branch = next.valueOrNull;
+    if (branch != null) service.syncBranchTopic(branch);
   }, fireImmediately: true);
 });
 

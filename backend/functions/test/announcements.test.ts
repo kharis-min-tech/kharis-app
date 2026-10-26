@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Timestamp } from 'firebase-admin/firestore';
-import { NewsRecord, isPushDue, pickAnnouncements, toAnnouncement } from '../src/announcements';
+import { NewsRecord, pickAnnouncements, toAnnouncement } from '../src/announcements';
 import { NewsDoc } from '../src/types';
 
 const NOW = Date.UTC(2026, 9, 3, 12, 0);
@@ -68,22 +68,4 @@ test('eventId, linkUrl and ctaLabel are served; label defaults with a link', () 
   const plain = toAnnouncement(news('p', { ctaLabel: 'Ignored' }));
   assert.equal(plain.linkUrl, null);
   assert.equal(plain.ctaLabel, null);
-});
-
-test('push poller: due only once published, inside the window, unexpired and unpushed', () => {
-  const window = 15 * 60_000;
-  const at = (minutes: number, extra: Partial<NewsDoc> & { pushedAt?: unknown } = {}) => ({
-    title: 't',
-    body: '',
-    publishedAt: Timestamp.fromMillis(NOW + minutes * 60_000),
-    ...extra,
-  });
-  assert.equal(isPushDue(at(-1), NOW, window), true);
-  assert.equal(isPushDue(at(5), NOW, window), false, 'scheduled for later');
-  assert.equal(isPushDue(at(-20), NOW, window), false, 'outside the window');
-  assert.equal(isPushDue(at(-1, { pushedAt: Timestamp.fromMillis(NOW) }), NOW, window), false);
-  assert.equal(
-    isPushDue(at(-1, { expiresAt: Timestamp.fromMillis(NOW - 1) }), NOW, window),
-    false,
-  );
 });

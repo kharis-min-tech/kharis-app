@@ -29,6 +29,10 @@ class SelectedBibleController extends StateNotifier<BibleVersion> {
     final id = prefs.getInt(idKey);
     final abbreviation = prefs.getString(abbreviationKey);
     if (id == null || abbreviation == null) return kDefaultBibleVersion;
+    // A version the church no longer approves is never reopened.
+    if (!BibleRepository.approvedBibleIds.contains(id)) {
+      return kDefaultBibleVersion;
+    }
     return BibleVersion(
       id: id,
       abbreviation: abbreviation,
