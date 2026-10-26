@@ -272,7 +272,16 @@ Future<void> bibleJourney(Journey j) async {
   );
 
   // ── Translation ──────────────────────────────────────────────────────────
-  final offered = (await youVersionBibles()).where((v) => v.id != 111).toList();
+  // The picker offers only church-approved translations the key is licensed
+  // for; everything else YouVersion lists must stay out of the picker.
+  final licensed = await youVersionBibles();
+  final offered = licensed
+      .where((v) => v.id != 111)
+      .where((v) => BibleRepository.approvedBibleIds.contains(v.id))
+      .toList();
+  final notApproved = licensed
+      .where((v) => !BibleRepository.approvedBibleIds.contains(v.id))
+      .toList();
   final before = j.c.read(selectedBibleProvider);
   j.check(
     before.id == 111,
@@ -286,6 +295,15 @@ Future<void> bibleJourney(Journey j) async {
       t,
       find.text('BIBLE VERSION'),
       reason: 'version sheet',
+    );
+    final listed = j.c.read(biblesProvider).valueOrNull ?? const [];
+    j.check(
+      listed.every((v) => BibleRepository.approvedBibleIds.contains(v.id)) &&
+          notApproved.every(
+            (v) => find.byKey(Key('bible-version-${v.id}')).evaluate().isEmpty,
+          ),
+      'picker lists only approved versions '
+      '(${listed.map((v) => v.abbreviation).join(', ')})',
     );
     final tile = find.byKey(Key('bible-version-$id'));
     await scrollUntilFound(
