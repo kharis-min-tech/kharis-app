@@ -85,9 +85,11 @@ class AnonymousSignIn {
 // ── Notification preferences ──────────────────────────────────────────────────
 
 /// One entry per FCM topic the backend actually publishes to (see
-/// `KharisTopics.byPreference`). A toggle with no publisher behind it is a
-/// promise the app cannot keep, so there is no "new sermons" switch.
+/// `KharisTopics.byPreference`, plus `announcements`, which drives the
+/// opt-out `mute_announcements` topic). A toggle with no publisher behind it
+/// is a promise the app cannot keep, so there is no "new sermons" switch.
 const _kDefaultNotificationPrefs = <String, bool>{
+  'announcements': true,
   'serviceReminders': true,
   'events': true,
   'dailyReading': true,

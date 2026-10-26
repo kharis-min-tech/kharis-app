@@ -1,7 +1,7 @@
-// Service reminders: when each campus's next service starts, from the free-text
-// `meetingDays` / `meetingTime` fields the Content Studio writes on a branch.
-// Pure, so the parsing and London-time arithmetic can be exercised directly;
-// the scheduled sender lives in content-notifications.ts.
+// Service reminders: when a weekly service next starts, from its day (`Sunday`,
+// `Sundays & Thursdays`) and start time (`14:00`, `2:00 PM`). Pure, so the
+// parsing and London-time arithmetic can be exercised directly; the sender
+// is `runServiceReminderPush` in studio-pushes.ts.
 
 import { londonClock, londonWallTime } from './london-time';
 

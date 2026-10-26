@@ -11,23 +11,8 @@
 // (`bible-chapters.ts`).
 
 import { referenceProblem } from './bible-chapters';
+import { APP_WORKSPACES, fetchStudioRows } from './content-studio';
 import { PushAudience, READING_AUDIENCES } from './topics';
-
-/** Content Studio Supabase project, read over PostgREST. */
-export const CONTENT_STUDIO_URL = 'https://cqgyiqxhpxwasogpdghx.supabase.co';
-
-/**
- * Supabase publishable (anon) key. Public by design: it ships in the app
- * (`ApiConfig.supabasePublishableKey`) and in the Studio's web bundle, and
- * row-level security only grants reads of published content.
- */
-export const CONTENT_STUDIO_KEY = 'sb_publishable_fT5_NGYsk0Uh4IO_uYfXvg_ZhR8bl7K';
-
-/** Studio workspaces whose daily entries the app shows, most specific first. */
-export const READING_WORKSPACES = ['app', 'general'] as const;
-
-/** How long the 07:00 run waits for the Studio before giving up. */
-const LOOKUP_TIMEOUT_MS = 15_000;
 
 /** One Studio Daily Reading entry. */
 export interface StudioReading {
@@ -50,7 +35,7 @@ function text(value: unknown): string | null {
 
 /** Today's reading among Studio [rows], the app workspace's first. */
 export function pickReading(rows: unknown[], date: string): StudioReading | null {
-  for (const workspace of READING_WORKSPACES) {
+  for (const workspace of APP_WORKSPACES) {
     for (const row of rows) {
       if (!row || typeof row !== 'object') continue;
       const r = row as Record<string, unknown>;
@@ -70,16 +55,6 @@ export function pickReading(rows: unknown[], date: string): StudioReading | null
   return null;
 }
 
-/** The `daily_entries` query for [date]'s readings. */
-export function readingQueryUrl(date: string): string {
-  const url = new URL(`${CONTENT_STUDIO_URL}/rest/v1/daily_entries`);
-  url.searchParams.set('select', '*');
-  url.searchParams.set('kind', 'eq.reading');
-  url.searchParams.set('date', `eq.${date}`);
-  url.searchParams.set('workspace', `in.(${READING_WORKSPACES.join(',')})`);
-  return url.toString();
-}
-
 /**
  * [date]'s reading from the Studio. Never throws: any failure, including the
  * 404 PostgREST answers while the table does not exist, is "no reading".
@@ -88,25 +63,15 @@ export async function fetchStudioReading(
   date: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ReadingLookup> {
-  let rows: unknown;
+  let rows: unknown[];
   try {
-    const res = await fetchImpl(readingQueryUrl(date), {
-      headers: {
-        apikey: CONTENT_STUDIO_KEY,
-        Authorization: `Bearer ${CONTENT_STUDIO_KEY}`,
-        Accept: 'application/json',
-      },
-      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      return { reading: null, reason: `Content Studio answered ${res.status}` };
-    }
-    rows = await res.json();
+    rows = await fetchStudioRows(
+      'daily_entries',
+      { kind: 'eq.reading', date: `eq.${date}`, workspace: `in.(${APP_WORKSPACES.join(',')})` },
+      fetchImpl,
+    );
   } catch (e) {
-    return { reading: null, reason: `Content Studio lookup failed: ${String(e)}` };
-  }
-  if (!Array.isArray(rows)) {
-    return { reading: null, reason: 'Content Studio answered a non-array body' };
+    return { reading: null, reason: e instanceof Error ? e.message : String(e) };
   }
   const reading = pickReading(rows, date);
   return reading ? { reading } : { reading: null, reason: 'no reading in the Content Studio' };

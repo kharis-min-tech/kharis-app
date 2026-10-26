@@ -49,8 +49,8 @@ four behaviours we verified end-to-end this cycle:
 | Daily reading | plans (book, start date, advance rule, verse ranges) | Home "Today's Reading", daily 06:00 push |
 
 Rules already enforced and to keep: branch scoping (`'branch' == null` = all
-campuses, explicit null), push on create/meaningful edit (`onEventWritten`,
-`onBranchVenueWritten`, `pushPendingAnnouncements`, `pushDailyReading`),
+campuses, explicit null), push on create/meaningful edit (`pushEventUpdates`,
+`pushBranchUpdates`, `pushPendingAnnouncements`, `pushDailyReading`),
 publish-timestamp = now when the chosen date is today, expired plans pin to
 their last day.
 

@@ -210,13 +210,17 @@ service cloud.firestore {
       allow delete: if ownsRsvpId(rsvpId);
     }
 
-    // pushLog — one document per FCM notification the Firestore triggers in
-    // `content-notifications.ts` have sent, keyed on the CloudEvent id. It is
-    // written only by the Admin SDK (which bypasses these rules) and exists
-    // purely so a redelivered trigger cannot double-send. Nothing client-side
-    // reads it, and a client that could write it could suppress real pushes,
-    // so it is closed to everyone.
+    // pushLog and pushState — push bookkeeping (`push-state.ts`): one claim
+    // per FCM notification the Content Studio pollers have sent, and the
+    // snapshots and checkpoints they compare against. Written only by the
+    // Admin SDK (which bypasses these rules). Nothing client-side reads them,
+    // and a client that could write them could suppress or repeat real
+    // pushes, so both are closed to everyone.
     match /pushLog/{pushKey} {
+      allow read, write: if false;
+    }
+
+    match /pushState/{stateKey} {
       allow read, write: if false;
     }
 
