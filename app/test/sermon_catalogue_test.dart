@@ -280,11 +280,8 @@ void main() {
 
         await Future<void>.delayed(const Duration(milliseconds: 10));
         expect(c.read(searchLoadingProvider), isFalse);
-        expect(c.read(searchResultsProvider).map((s) => s.id), ['900']);
 
-        // Following `next` brings in the second server page.
-        expect(c.read(remoteSearchProvider).hasMore, isTrue);
-        await c.read(remoteSearchProvider.notifier).loadMore();
+        // Later server pages drain on their own so the whole set is ranked.
         expect(
           c.read(searchResultsProvider).map((s) => s.id),
           containsAll(['900', '901']),
@@ -302,6 +299,41 @@ void main() {
         results.every((s) => sermonMatchesQuery(s, 'Oil Campaign')),
         isTrue,
       );
+    });
+  });
+
+  group('search ranking', () {
+    test('title matches outrank description-only matches', () async {
+      final c = await library([
+        testSermon(
+          'desc',
+          title: 'The Deity Of Christ',
+          description: 'A message about faith and grace.',
+          publishedAt: DateTime(2026),
+        ),
+        testSermon(
+          'partial',
+          title: 'Faithful Servants',
+          publishedAt: DateTime(2025),
+        ),
+        testSermon(
+          'title',
+          title: 'Faith From First to Last',
+          publishedAt: DateTime(2018),
+        ),
+      ]);
+      c.read(sermonSearchProvider.notifier).state = 'faith';
+      expect(c.read(searchResultsProvider).map((s) => s.id), [
+        'title',
+        'partial',
+        'desc',
+      ]);
+    });
+
+    test('equal scores fall back to newest first', () {
+      final a = testSermon('a', title: 'Faith', publishedAt: DateTime(2020));
+      final b = testSermon('b', title: 'Faith', publishedAt: DateTime(2024));
+      expect(sermonSearchScore(a, 'faith'), sermonSearchScore(b, 'faith'));
     });
   });
 
