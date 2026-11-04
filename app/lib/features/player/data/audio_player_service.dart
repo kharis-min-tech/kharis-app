@@ -12,6 +12,7 @@ import 'package:kharis_app/core/services/cache_service.dart';
 import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/data/playback_queue.dart';
 import 'package:kharis_app/features/player/data/time_skip.dart';
+import 'package:kharis_app/features/player/data/sermon_localization.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 
 export 'package:kharis_app/features/player/data/playback_queue.dart';
@@ -401,8 +402,60 @@ class AudioPlayerService {
   ///
   /// The browser User-Agent the host demands is set once on the [AudioPlayer],
   /// so no per-source headers are needed (and no header proxy is engaged).
-  static AudioSource _child(Sermon sermon) =>
-      AudioSource.uri(Uri.parse(sermon.audioUrl), tag: sermon.id);
+  final Map<String, (String, SermonLanguageTrack)> _languageTracks = {};
+
+  SermonLanguageTrack? languageTrackFor(Sermon sermon) {
+    final saved = _languageTracks[sermon.id];
+    return saved != null && saved.$1 == sermon.audioUrl ? saved.$2 : null;
+  }
+
+  AudioSource _child(Sermon sermon) => AudioSource.uri(
+    Uri.parse(languageTrackFor(sermon)?.audioUrl ?? sermon.audioUrl),
+    tag: sermon.id,
+  );
+
+  /// Rebuilds the native playlist at the same moment; metadata, queue and notes
+  /// keep the original sermon identity. A failed dub restores the prior track.
+  Future<bool> selectLanguageTrack(
+    Sermon sermon,
+    SermonLanguageTrack? track,
+  ) async {
+    final queue = _queue;
+    if (queue == null ||
+        _currentSermon?.id != sermon.id ||
+        _loadsInFlight > 0) {
+      return false;
+    }
+    final previous = _languageTracks[sermon.id];
+    final at = position;
+    final shouldPlay = playing;
+    final token = ++_loadToken;
+    _saveCurrentPosition();
+    await _player.pause();
+    if (token != _loadToken) return false;
+    if (track == null) {
+      _languageTracks.remove(sermon.id);
+    } else {
+      _languageTracks[sermon.id] = (sermon.audioUrl, track);
+    }
+    _setFailure(null);
+    if (await _loadSource(queue, token, initialPosition: at, report: false)) {
+      _emitQueue();
+      if (shouldPlay) await _startEngine(token);
+      return token == _loadToken;
+    }
+    if (token != _loadToken) return false;
+    if (previous == null) {
+      _languageTracks.remove(sermon.id);
+    } else {
+      _languageTracks[sermon.id] = previous;
+    }
+    if (await _loadSource(queue, token, initialPosition: at)) {
+      if (shouldPlay) await _startEngine(token);
+    }
+    _emitQueue();
+    return false;
+  }
 
   /// The queue entry behind native index [nativeIndex], matched by tag id so
   /// a window that shifted under an insert still resolves correctly.

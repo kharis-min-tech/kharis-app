@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/features/player/data/audio_player_service.dart';
 import 'package:kharis_app/features/player/data/time_skip.dart';
+import 'package:kharis_app/features/player/data/sermon_localization.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 
 /// One [FakeAudioPlayerService.play] request, as the caller made it.
@@ -21,6 +22,21 @@ class PlayCall {
 /// drives it to do and keeps a real [PlaybackQueue], so Previous / Next obey
 /// the production rules. Extend it to override a single behaviour.
 class FakeAudioPlayerService implements AudioPlayerService {
+  SermonLanguageTrack? selectedTrack;
+
+  @override
+  SermonLanguageTrack? languageTrackFor(Sermon sermon) => selectedTrack;
+
+  @override
+  Future<bool> selectLanguageTrack(
+    Sermon sermon,
+    SermonLanguageTrack? track,
+  ) async {
+    selectedTrack = track;
+    _queueController.add(_queue);
+    return true;
+  }
+
   final List<PlayCall> calls = [];
   final List<Duration> seekCalls = [];
   final List<double> speedCalls = [];

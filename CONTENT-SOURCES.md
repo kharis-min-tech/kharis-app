@@ -131,3 +131,10 @@ Events / News ──→ [Admin Dashboard] ──→ Firestore ──→ App
 - `audio_service` — system media integration (iOS + Android)
 - `cached_network_image` — sermon artwork caching
 - `hive` — local storage for playback position, preferences
+# French audio and timed subtitles
+
+The audio player supports independently selected dubbed audio and WebVTT
+subtitles. Reviewed media is published separately from the imported catalogue
+under `dubs/` and `localizations/` in the existing R2 bucket. See
+[the generation and publishing guide](tools/sermon-localization/README.md) for
+the local French narrator workflow, ElevenLabs option and YouTube channel setup.

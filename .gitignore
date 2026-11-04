@@ -52,6 +52,10 @@ app-audit/
 # Temp
 *.log
 tmp/
+tools/sermon-localization/localization-work/
+tools/sermon-localization/.venv/
+tools/sermon-localization/models/
+**/__pycache__/
 storybook/node_modules/
 storybook/storybook-static/
 node_modules/

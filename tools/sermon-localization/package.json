@@ -1,0 +1,15 @@
+{
+  "name": "kharis-sermon-localization",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "api-anything": "git+https://github.com/goodnight000/api-anything.git#2a64070e56a60c5274aabaec3d52877c1d2db94a",
+    "undici": "^7.30.1"
+  }
+}

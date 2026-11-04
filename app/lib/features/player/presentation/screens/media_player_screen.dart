@@ -29,6 +29,7 @@ import 'package:kharis_app/features/player/presentation/widgets/player_actions.d
 import 'package:kharis_app/features/player/presentation/widgets/player_discovery.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
+import 'package:kharis_app/features/player/presentation/widgets/sermon_languages.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -1273,6 +1274,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         ),
         const SizedBox(height: 18),
         const PlayerControls(),
+        SermonLanguages(sermon: _sermon),
       ],
     );
   }
