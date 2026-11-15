@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -27,6 +28,7 @@ import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/shared_links/presentation/shared_link_screens.dart';
 import '../../shared/providers/auth_provider.dart';
+import '../../ui/gallery/component_gallery_screen.dart';
 
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
 /// reactive redirects when auth state changes.
@@ -206,6 +208,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/profile/edit',
         builder: (context, state) => const EditProfileScreen(),
       ),
+
+      // ── Design check (debug builds only; never ships in release) ──────────
+      if (kDebugMode)
+        GoRoute(
+          path: '/design',
+          builder: (context, state) => const ComponentGalleryScreen(),
+        ),
     ],
   );
 
