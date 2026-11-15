@@ -40,11 +40,6 @@ class _PassagePickerState extends ConsumerState<PassagePicker> {
   /// follows [_usfm].
   Testament? _testament;
 
-  BibleIndex get _index =>
-      ref.read(bibleIndexProvider(ref.read(selectedBibleProvider).id))
-          .valueOrNull ??
-      BibleIndex.bundled();
-
   void _chooseBook(BibleBook book) {
     // A book with one chapter has nothing more to choose.
     if (book.chapters.length == 1) {

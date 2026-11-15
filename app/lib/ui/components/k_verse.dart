@@ -127,7 +127,7 @@ class _KVerseState extends State<KVerse> {
               // In the text run, so the tint runs through the number; the
               // height gives the smaller number the body's line box.
               ? TextSpan(
-                  text: '$verse\u00A0',
+                  text: '$verse\u00A0\u00A0',
                   semanticsLabel: '',
                   style: number.copyWith(
                     backgroundColor: tint,

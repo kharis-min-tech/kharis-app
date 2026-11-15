@@ -22,7 +22,7 @@ import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/playlists/presentation/screens/favorites_screen.dart';
 import '../../features/playlists/presentation/screens/playlist_detail_screen.dart';
 import '../../features/playlists/presentation/screens/playlists_screen.dart';
-import '../../features/home/presentation/screens/reading_screen.dart';
+import '../../features/bible/presentation/bible_routes.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
 import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
@@ -107,11 +107,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             observers: [SheetObserver(openSheets)],
             routes: [
-              // The book list, until the Bible stage replaces it.
-              GoRoute(
-                path: '/bible',
-                builder: (context, state) => const ReadingScreen(browse: true),
-              ),
+              // Bible: the landing screen, today's reading, the reader,
+              // Highlights and My notes.
+              bibleTabRoute,
             ],
           ),
           StatefulShellBranch(
@@ -142,13 +140,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const FullPlayerScreen(),
       ),
 
-      // ── Today's reading (overlays shell) ──────────────────────────────────
-      // /reading (Home card, More's "Daily reading", reading pushes) opens the
-      // reader on today's reading.
-      GoRoute(
-        path: '/reading',
-        builder: (context, state) => const ReadingScreen(),
-      ),
+      // ── /reading and /highlights land in the Bible tab ────────────────────
+      ...bibleRedirectRoutes,
 
       // ── Playlists (overlays shell) ────────────────────────────────────────
       // The member's own playlists. Home and detail are both pushed routes on
