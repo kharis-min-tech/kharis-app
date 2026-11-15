@@ -1,79 +1,120 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
+import 'package:kharis_app/features/messages/presentation/message_list.dart';
+import 'package:kharis_app/features/messages/presentation/screens/message_search_screen.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import '../support/actions.dart';
 import '../support/harness.dart';
 import '../support/live_data.dart';
 
-Finder get _sheetScroll => find.byKey(const Key('message-filters-scroll'));
+Finder get _search => find.byType(MessageSearchScreen);
 
-/// Opens the filter sheet from the control row under "All messages".
-Future<void> _openFilterSheet(Journey j) async {
+Finder _inSearch(Finder f) => find.descendant(of: _search, matching: f);
+
+Finder get _filterSheet => find.byWidgetPredicate((w) => w is KFilterSheet);
+
+/// Opens Search from the Messages header with an empty field and no filter.
+Future<void> _openSearch(Journey j) async {
   final t = j.tester;
-  final button = find.byKey(const Key('messages-filters-button'));
-  // The search below only scrolls down, so start from the top: a previous
-  // step may have left a page of rows above the filter row's place.
-  if (button.evaluate().isEmpty) {
-    final scrollable = find.descendant(
-      of: messagesScroll,
-      matching: find.byType(Scrollable),
-    );
-    if (scrollable.evaluate().isNotEmpty) {
-      t.state<ScrollableState>(scrollable.first).position.jumpTo(0);
-      await pumpFor(t, const Duration(milliseconds: 500));
-    }
-  }
-  await scrollUntilFound(
-    t,
-    button,
-    scrollable: messagesScroll,
-    step: const Offset(0, -150),
+  if (_search.evaluate().isNotEmpty) await _closeSearch(j);
+  await openMessagesReset(j);
+  await tapVisible(t, find.byKey(const Key('messages-search')));
+  await pumpUntilFound(t, _search, reason: 'Search');
+  await pumpFor(t, const Duration(milliseconds: 600));
+}
+
+Future<void> _closeSearch(Journey j) async {
+  final t = j.tester;
+  FocusManager.instance.primaryFocus?.unfocus();
+  await pumpFor(t, const Duration(milliseconds: 400));
+  await goBack(j.tester);
+  await pumpUntil(t, () => _search.evaluate().isEmpty);
+}
+
+Future<void> _type(Journey j, String query) async {
+  final t = j.tester;
+  final field = _inSearch(
+    find.descendant(
+      of: find.byKey(const Key('search-field')),
+      matching: find.byType(EditableText),
+    ),
   );
-  await t.ensureVisible(button);
-  await pumpFor(t, const Duration(milliseconds: 300));
-  await t.tap(button, warnIfMissed: false);
-  await pumpUntilFound(
-    t,
-    find.byKey(const Key('message-filters-apply')),
-    reason: 'filter sheet',
-  );
+  // Focus first: after the keyboard was closed, entering text straight away
+  // can reach the previously attached input connection.
+  await t.tap(field, warnIfMissed: false);
   await pumpFor(t, const Duration(milliseconds: 500));
+  await t.enterText(field, query);
+  await pumpFor(t, const Duration(milliseconds: 400));
 }
 
-/// Scrolls the open filter sheet to [target] and taps it.
-Future<void> _tapInSheet(Journey j, Finder target) async {
+/// The result count Search shows ("12 messages · Sorted by …"); null while
+/// it shows none.
+int? _shownCount(WidgetTester t) {
+  final count = _inSearch(find.byKey(const Key('search-count')));
+  if (count.evaluate().isEmpty) return null;
+  final m = RegExp(
+    r'^([\d,]+) messages?',
+  ).firstMatch(t.widget<Text>(count).data ?? '');
+  return m == null ? null : int.parse(m.group(1)!.replaceAll(',', ''));
+}
+
+/// The messages Search lists, in order.
+List<Sermon> _rows(WidgetTester t) => [
+  for (final e in _inSearch(
+    find.byType(MessageRow, skipOffstage: false),
+  ).evaluate())
+    (e.widget as MessageRow).sermon,
+];
+
+/// Taps the [chip] filter, picks [label] in its sheet and applies it.
+Future<void> _filter(Journey j, String chip, String label) async {
   final t = j.tester;
+  FocusManager.instance.primaryFocus?.unfocus();
+  await pumpFor(t, const Duration(milliseconds: 400));
+  // The chip row scrolls sideways and builds lazily: start from its left
+  // end and scroll on until the chip is built.
+  final chips = find.descendant(
+    of: find.byKey(const Key('search-filters')),
+    matching: find.byType(Scrollable),
+  );
+  final chipFinder = _inSearch(find.byKey(ValueKey('search-filter-$chip')));
+  if (chips.evaluate().isNotEmpty) {
+    t.state<ScrollableState>(chips.first).position.jumpTo(0);
+    await pumpFor(t, const Duration(milliseconds: 300));
+    await scrollUntilFound(
+      t,
+      chipFinder,
+      scrollable: chips.first,
+      step: const Offset(-150, 0),
+    );
+  }
+  await tapVisible(t, chipFinder);
+  await pumpUntilFound(t, _filterSheet, reason: '$chip sheet');
+  final option = find.descendant(of: _filterSheet, matching: find.text(label));
   await scrollUntilFound(
     t,
-    target,
-    scrollable: _sheetScroll,
+    option,
+    scrollable: verticalScrollableIn(_filterSheet),
     step: const Offset(0, -150),
   );
-  await t.ensureVisible(target.first);
-  await pumpFor(t, const Duration(milliseconds: 300));
-  await t.tap(target.first, warnIfMissed: false);
-  await pumpFor(t, const Duration(milliseconds: 300));
-}
-
-Future<void> _applyFilters(Journey j) async {
-  await j.tester.tap(
-    find.byKey(const Key('message-filters-apply')),
-    warnIfMissed: false,
+  await tapVisible(t, option);
+  await tapVisible(
+    t,
+    find.descendant(of: _filterSheet, matching: find.text('Show results')),
   );
-  await pumpFor(j.tester, const Duration(seconds: 2));
+  await pumpUntil(t, () => _filterSheet.evaluate().isEmpty);
+  await pumpFor(t, const Duration(seconds: 1));
 }
 
-List<Sermon> _list(Journey j) => j.c.read(librarySermonsProvider);
-
-/// (d) Messages: the archive hydrates to the live API total; a search for a
-/// word from a live title hits it, nonsense shows the empty state; the list
-/// pages 30 at a time with numbered pages; the filter sheet's topic, series
-/// and year each narrow the list to what they say; the sheet's Oldest / Newest order it; pull to refresh refetches.
+/// (d) Messages: the archive hydrates to the live API total; Search finds a
+/// word from a live title and shows the empty state for nonsense; its Theme,
+/// Series and Date filters each narrow the archive to what they say, and
+/// Themes / Series browse the same groups; Sort orders by Oldest / Newest;
+/// pull to refresh refetches.
 Future<void> messagesJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'messages');
@@ -112,237 +153,173 @@ Future<void> messagesJourney(Journey j) async {
         ..sort((a, b) => b.length.compareTo(a.length));
   final query = words.first;
   j.note('search probe: "$query" from "${probe['title']}" (${probe['id']})');
-  final field = find.byType(TextField).first;
-  await t.tap(field, warnIfMissed: false);
-  await t.enterText(field, query);
-  final resultsRe = RegExp(
-    '^([\\d,]+) results? for "${RegExp.escape(query)}"\$',
+  await _openSearch(j);
+  await _type(j, query);
+  final found = await pumpUntil(
+    t,
+    () => (_shownCount(t) ?? 0) > 0 && !j.c.read(searchLoadingProvider),
+    timeout: const Duration(seconds: 30),
   );
-  int? hits;
-  final found = await pumpUntil(t, () {
-    for (final s in paintedTexts()) {
-      final m = resultsRe.firstMatch(s);
-      if (m != null) {
-        hits = int.parse(m.group(1)!.replaceAll(',', ''));
-        return true;
-      }
-    }
-    return false;
-  }, timeout: const Duration(seconds: 30));
   final results = j.c.read(searchResultsProvider);
-  j.check(found && (hits ?? 0) > 0, '"$query" reports results ($hits)');
+  j.check(found, '"$query" reports results (${_shownCount(t)})');
   j.check(
     results.any((s) => s.id == '${probe['id']}'),
     'results include "${probe['title']}"',
   );
   j.check(
-    results.every((s) => sermonMatchesQuery(s, query)),
-    'every result matches "$query"',
+    results.every(
+      (s) =>
+          sermonMatchesQuery(s, query) ||
+          j.c.read(remoteSearchProvider).results.any((r) => r.id == s.id),
+    ),
+    'every result matches "$query" in the library or is a server hit',
+  );
+  final libraryHits = lib.sermons.where((s) => sermonMatchesQuery(s, query));
+  j.check(
+    libraryHits.every((s) => results.any((r) => r.id == s.id)),
+    'every library message matching "$query" is listed',
   );
   FocusManager.instance.primaryFocus?.unfocus();
   await j.shot('search-hit');
 
   const nonsense = 'zxqvj plorbft 7731';
-  await clearMessagesSearch(t);
-  await t.tap(field, warnIfMissed: false);
-  await t.enterText(field, nonsense);
+  await _type(j, nonsense);
   j.check(
     await pumpUntil(
       t,
-      () => find.text('No messages match "$nonsense"').evaluate().isNotEmpty,
+      () =>
+          _inSearch(find.byKey(const Key('search-empty'))).evaluate().isNotEmpty,
       timeout: const Duration(seconds: 60),
     ),
-    'nonsense query shows "No messages match"',
+    'nonsense query shows "No messages found"',
   );
   FocusManager.instance.primaryFocus?.unfocus();
   await j.shot('search-empty');
-  await clearMessagesSearch(t);
-  await openMessagesReset(j);
-  final all = _list(j).length;
+  await _type(j, '');
+  await _closeSearch(j);
+  final all = lib.sermons.length;
 
-  // ── Topic ────────────────────────────────────────────────────────────────
+  // ── Theme ────────────────────────────────────────────────────────────────
   final counts = j.c.read(categoryCountsProvider);
   final topics = j.c
       .read(categoryLabelsProvider)
       .where((l) => l != 'All' && (counts[l] ?? 0) > 0)
       .toList();
   if (topics.isEmpty) {
-    j.check(false, 'the library has at least one topic with messages');
+    j.check(false, 'the library has at least one theme with messages');
   } else {
     final topic = pick(r, topics);
-    // Topics live in the filter sheet (no topic cards on the page).
-    await _openFilterSheet(j);
-    await _tapInSheet(j, find.text('$topic (${counts[topic]})'));
-    await _applyFilters(j);
-    final rows = _list(j);
+    await _openSearch(j);
+    await _filter(j, 'theme', topic);
+    final rows = _rows(t);
     j.check(
-      j.c.read(selectedCategoryProvider) == topic,
-      'topic "$topic" selected',
-    );
-    j.check(
-      rows.length == counts[topic] &&
+      _shownCount(t) == counts[topic] &&
           rows.isNotEmpty &&
-          rows.length < all &&
+          counts[topic]! < all &&
           rows.every((s) => sermonTopic(s) == topic),
-      'topic "$topic" narrows $all to ${counts[topic]} of that topic '
-      '(got ${rows.length})',
+      'theme "$topic" narrows $all to ${counts[topic]} of that theme '
+      '(shows ${_shownCount(t)})',
     );
     j.check(
-      find.text('Filters \u00b7 1').evaluate().isNotEmpty,
-      'Filters button counts the topic filter',
+      _inSearch(
+        find.descendant(
+          of: find.byKey(const ValueKey('search-filter-theme')),
+          matching: find.text(topic),
+        ),
+      ).evaluate().isNotEmpty,
+      'the Theme chip reads "$topic"',
     );
-    await j.shot('topic-$topic');
-    await openMessagesReset(j);
-  }
+    await j.shot('theme-$topic');
+    await _closeSearch(j);
 
-  // ── Pages ────────────────────────────────────────────────────────────────
-  if (all > kMessagesPageSize) {
-    final total = NumberFormat.decimalPattern().format(all);
-    final pages = messagesPageCount(all);
-    j.check(
-      j.c.read(libraryPageProvider) == 0,
-      'the list opens on page 1 of $pages',
-    );
-    final status = find.byKey(const Key('messages-page-status'));
-    await scrollUntilFound(
-      t,
-      status,
-      scrollable: messagesScroll,
-      timeout: const Duration(seconds: 60),
-    );
-    final text = t.widget<Text>(status).data ?? '';
-    j.check(
-      text == '1–$kMessagesPageSize of $total messages',
-      'pager reads "1–$kMessagesPageSize of $total messages" (got "$text")',
-    );
-    j.check(
-      find.byKey(Key('messages-page-$pages')).evaluate().isNotEmpty,
-      'the last page number ($pages) is offered',
-    );
-    await j.shot('pager');
-    final next = find.byKey(const Key('messages-page-next'));
-    await t.ensureVisible(next);
-    await pumpFor(t, const Duration(milliseconds: 300));
-    await t.tap(next, warnIfMissed: false);
-    await pumpFor(t, const Duration(seconds: 1));
-    j.check(j.c.read(libraryPageProvider) == 1, 'Next opens page 2');
-    j.check(
-      next.evaluate().isEmpty,
-      'the new page starts at its first row (the pager is out of view)',
-    );
-    await j.shot('page-2');
-    await openMessagesReset(j);
+    // The Themes tab lists the same theme with the same messages.
+    await _openGroup(j, 'Themes', topic, counts[topic]!);
   }
 
   // ── Series ───────────────────────────────────────────────────────────────
   final series = j.c.read(seriesListProvider);
-  await _openFilterSheet(j);
   if (series.isEmpty) {
     j.note('DATA: no message in the library carries a series');
-    j.check(
-      find.text('Series').evaluate().isEmpty,
-      'no Series section when nothing has a series',
-    );
-    await _applyFilters(j);
   } else {
     final s = pick(r, series.take(12).toList());
-    // Past eight series the sheet offers a search field.
-    if (series.length > 8) {
-      final search = find.byKey(const Key('message-filters-series-search'));
-      await scrollUntilFound(
-        t,
-        search,
-        scrollable: _sheetScroll,
-        step: const Offset(0, -150),
-      );
-      await t.ensureVisible(search);
-      await t.enterText(search, s.name);
-      FocusManager.instance.primaryFocus?.unfocus();
-      await pumpFor(t, const Duration(milliseconds: 600));
-    }
-    await _tapInSheet(j, find.byKey(ValueKey('series-option-${s.name}')));
-    await _applyFilters(j);
-    final rows = _list(j);
+    await _openSearch(j);
+    await _filter(j, 'series', s.name);
+    final rows = _rows(t);
     j.check(
-      rows.length == s.count && rows.every((x) => x.series == s.name),
-      'series "${s.name}" lists its ${s.count} messages (got ${rows.length})',
-    );
-    j.check(
-      find.text('Filters \u00b7 1').evaluate().isNotEmpty,
-      'Filters button counts the series filter',
+      _shownCount(t) == s.count && rows.every((x) => x.series == s.name),
+      'series "${s.name}" lists its ${s.count} messages '
+      '(shows ${_shownCount(t)})',
     );
     await j.shot('series');
-    await openMessagesReset(j);
+    await _closeSearch(j);
+    await _openGroup(j, 'Series', s.name, s.count);
   }
 
-  // ── Year ─────────────────────────────────────────────────────────────────
+  // ── Date ─────────────────────────────────────────────────────────────────
   final years = j.c.read(archiveYearsProvider);
-  final yearCounts = j.c.read(archiveYearCountsProvider);
   final yearsFromApiData = lib.sermons
       .map((s) => s.publishedAt?.year)
       .whereType<int>()
       .toSet();
   j.check(
     years.toSet().containsAll(yearsFromApiData),
-    'the sheet offers every year in the archive ($years)',
+    'Date offers every year in the archive ($years)',
   );
   if (years.length > 1) {
     final year = pick(r, years);
-    await _openFilterSheet(j);
-    await _tapInSheet(j, find.text('$year (${yearCounts[year]})'));
-    await _applyFilters(j);
-    final rows = _list(j);
+    await _openSearch(j);
+    await _filter(j, 'date', '$year');
     final expected = lib.sermons
         .where((s) => s.publishedAt?.year == year)
         .length;
     j.check(
-      rows.length == expected && rows.every((s) => s.publishedAt?.year == year),
-      '$year filter lists the $expected messages dated $year (got ${rows.length})',
-    );
-    j.check(
-      find.text('All messages \u00b7 $year').evaluate().isNotEmpty,
-      'list header reads "All messages · $year"',
+      _shownCount(t) == expected &&
+          _rows(t).every((s) => s.publishedAt?.year == year),
+      '$year lists the $expected messages dated $year '
+      '(shows ${_shownCount(t)})',
     );
     await j.shot('year-$year');
-    await openMessagesReset(j);
-  }
 
-  // ── Sort ─────────────────────────────────────────────────────────────────
-  bool ordered(List<Sermon> rows, {required bool ascending}) {
-    final dates = rows.map((s) => s.publishedAt).whereType<DateTime>().toList();
-    for (var i = 1; i < dates.length; i++) {
-      final c = dates[i - 1].compareTo(dates[i]);
-      if (ascending ? c > 0 : c < 0) return false;
+    // ── Sort ───────────────────────────────────────────────────────────────
+    bool ordered(List<Sermon> rows, {required bool ascending}) {
+      final dates = rows
+          .map((s) => s.publishedAt)
+          .whereType<DateTime>()
+          .toList();
+      for (var i = 1; i < dates.length; i++) {
+        final c = dates[i - 1].compareTo(dates[i]);
+        if (ascending ? c > 0 : c < 0) return false;
+      }
+      return dates.length > 1;
     }
-    return dates.length > 1;
-  }
 
-  await _openFilterSheet(j);
-  await _tapInSheet(j, find.text('Oldest'));
-  await _applyFilters(j);
-  j.check(ordered(_list(j), ascending: true), 'Oldest lists oldest first');
-  j.check(
-    find.text('Oldest first').evaluate().isNotEmpty,
-    'the control row shows "Oldest first"',
-  );
-  await scrollUntilFound(
-    t,
-    find.byType(SermonListItem),
-    scrollable: messagesScroll,
-  );
-  final firstPainted = t.widget<SermonListItem>(
-    find.byType(SermonListItem).first,
-  );
-  j.check(
-    firstPainted.title == _list(j).first.title,
-    'first row is the oldest message "${_list(j).first.title}" '
-    '(painted "${firstPainted.title}")',
-  );
-  await j.shot('sort-oldest');
-  await _openFilterSheet(j);
-  await _tapInSheet(j, find.text('Newest'));
-  await _applyFilters(j);
-  j.check(ordered(_list(j), ascending: false), 'Newest lists newest first');
+    final inYear = lib.sermons.where((s) => s.publishedAt?.year == year);
+    final oldest = inYear.reduce(
+      (a, b) => a.publishedAt!.isAfter(b.publishedAt!) ? b : a,
+    );
+    await _filter(j, 'sort', SearchSort.oldest.label);
+    j.check(
+      ordered(_rows(t), ascending: true),
+      'Oldest first lists oldest first',
+    );
+    j.check(
+      _inSearch(find.text(SearchSort.oldest.label)).evaluate().isNotEmpty,
+      'the Sort chip reads "Oldest first"',
+    );
+    final first = _rows(t).firstOrNull;
+    j.check(
+      first?.publishedAt == oldest.publishedAt,
+      'first row is the oldest message of $year "${oldest.title}" '
+      '(painted "${first?.title}")',
+    );
+    await j.shot('sort-oldest');
+    await _filter(j, 'sort', SearchSort.newest.label);
+    j.check(
+      ordered(_rows(t), ascending: false),
+      'Newest first lists newest first',
+    );
+    await _closeSearch(j);
+  }
 
   // ── Pull to refresh ──────────────────────────────────────────────────────
   await openMessagesReset(j);
@@ -374,4 +351,30 @@ Future<void> messagesJourney(Journey j) async {
     'archive still holds $apiCount after refresh',
   );
   await j.shot('refreshed');
+}
+
+/// Messages' [tab] (Themes / Series) lists [name] with its [count] messages
+/// and opens the list of them.
+Future<void> _openGroup(Journey j, String tab, String name, int count) async {
+  final t = j.tester;
+  await openMessagesReset(j);
+  await tapVisible(
+    t,
+    find.descendant(of: messagesTabs, matching: find.text(tab)),
+  );
+  final row = find.byKey(ValueKey('group-$name'));
+  await scrollUntilFound(t, row, scrollable: messagesScroll);
+  final n = count == 1 ? '1 message' : '$count messages';
+  j.check(
+    find.descendant(of: row, matching: find.text(n)).evaluate().isNotEmpty,
+    '$tab lists "$name" with $n',
+  );
+  await tapVisible(t, row);
+  final list = find.byType(MessageListScreen);
+  await pumpUntilFound(t, list);
+  final shown = t.widget<MessageListScreen>(list).sermons.length;
+  j.check(shown == count, '"$name" opens its $count messages (got $shown)');
+  await j.shot('${tab.toLowerCase()}-list');
+  await goBack(t);
+  await pumpUntil(t, () => list.evaluate().isEmpty);
 }

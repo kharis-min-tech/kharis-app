@@ -164,7 +164,7 @@ const navTabs = <String, String>{
 /// The floating nav, when the tab shell is the screen on top.
 final Finder _floatingNav = find.byKey(const Key('dashboard-nav'));
 
-GoRouter _appRouter(WidgetTester tester) => ProviderScope.containerOf(
+GoRouter appRouter(WidgetTester tester) => ProviderScope.containerOf(
   tester.element(find.byType(MaterialApp)),
   listen: false,
 ).read(appRouterProvider);
@@ -172,41 +172,17 @@ GoRouter _appRouter(WidgetTester tester) => ProviderScope.containerOf(
 /// Opens the tab labelled [label] (Home, Messages, Bible, More) by tapping
 /// it in the floating nav. When a pushed screen, a sheet or the keyboard has
 /// the nav out of reach, goes to the tab's path through the router instead.
-///
-/// 'Events' and 'Giving' were tabs before the redesign: journeys written for
-/// the five-tab bar still pass those labels, and they open the screen
-/// through [openEventsViaRouter] and [openGiveViaRouter].
+/// Events and Give are not tabs: open them from their real entry points
+/// (`openEvents` / `openGive` in actions.dart).
 Future<void> tapNav(WidgetTester tester, String label) async {
-  if (label == 'Events') return openEventsViaRouter(tester);
-  if (label == 'Giving' || label == 'Give') return openGiveViaRouter(tester);
   final path = navTabs[label];
   if (path == null) throw TestFailure('No tab is labelled "$label"');
   final tab = find.descendant(of: _floatingNav, matching: find.text(label));
   if (tab.evaluate().isEmpty) {
-    _appRouter(tester).go(path);
+    appRouter(tester).go(path);
   } else {
     await tester.tap(tab, warnIfMissed: false);
   }
-  await pumpFor(tester, const Duration(milliseconds: 700));
-}
-
-/// Opens the events list by pushing `/calendar` over Home through the
-/// router. ROUTER SHORTCUT: replace with taps on the member's real entry
-/// point (Home's events section) once the Home stage has built it.
-Future<void> openEventsViaRouter(WidgetTester tester) =>
-    _pushOverHome(tester, '/calendar');
-
-/// Opens Give by pushing `/give` over Home through the router. ROUTER
-/// SHORTCUT: replace with taps on the member's real entry point (Home's or
-/// More's Give row) once those stages have built it.
-Future<void> openGiveViaRouter(WidgetTester tester) =>
-    _pushOverHome(tester, '/give');
-
-Future<void> _pushOverHome(WidgetTester tester, String location) async {
-  final router = _appRouter(tester);
-  router.go('/home');
-  await pumpFor(tester, const Duration(milliseconds: 300));
-  unawaited(router.push(location));
   await pumpFor(tester, const Duration(milliseconds: 700));
 }
 
@@ -258,38 +234,40 @@ List<String> paintedTexts({Finder? within}) => [
     (e.widget as RichText).text.toPlainText(),
 ];
 
-/// Back / close affordances the app uses on pushed surfaces.
-final _backIcons = <IconData>{
-  Icons.arrow_back,
-  Icons.arrow_back_rounded,
-  Icons.arrow_back_ios,
-  Icons.arrow_back_ios_new,
-  Icons.arrow_back_ios_new_rounded,
-  Icons.keyboard_arrow_down_rounded,
-  Icons.chevron_left_rounded,
-  Icons.close,
-  Icons.close_rounded,
-};
+/// The route on top of the app's root navigator (pages, sheets, dialogs).
+Route<dynamic>? topRoute(WidgetTester tester) {
+  Route<dynamic>? top;
+  appRouter(tester).routerDelegate.navigatorKey.currentState?.popUntil((r) {
+    top ??= r;
+    return true;
+  });
+  return top;
+}
 
-/// Taps the top-left-most back affordance (the app-bar leading button).
-Future<void> tapBack(WidgetTester tester) async {
-  final candidates = find.byWidgetPredicate(
-    (w) => w is BackButton || (w is Icon && _backIcons.contains(w.icon)),
-  );
-  if (candidates.evaluate().isEmpty) {
-    throw TestFailure('no back affordance on screen');
-  }
-  var best = 0;
-  var bestScore = double.infinity;
-  for (var i = 0; i < candidates.evaluate().length; i++) {
-    final c = tester.getCenter(candidates.at(i));
-    final score = c.dy * 10 + c.dx;
-    if (score < bestScore) {
-      bestScore = score;
-      best = i;
+/// Where the member is: the root navigator's top route (pages, sheets,
+/// dialogs) plus the router location (routes inside the tab shell).
+String _whereAmI(WidgetTester tester) =>
+    '${identityHashCode(topRoute(tester))}|'
+    '${appRouter(tester).routerDelegate.currentConfiguration.uri}';
+
+/// Leaves the screen on top the way a member does, since the redesign has
+/// no on-screen back buttons: a pushed page by the iOS edge swipe-back; a
+/// sheet or dialog (or a page the swipe did not leave) by the system back,
+/// as Android's back button does.
+Future<void> goBack(WidgetTester tester) async {
+  final before = _whereAmI(tester);
+  if (topRoute(tester) is PageRoute) {
+    final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+    final gesture = await tester.startGesture(Offset(4, size.height / 2));
+    for (var i = 1; i <= 8; i++) {
+      await gesture.moveTo(Offset(4 + size.width * 0.08 * i, size.height / 2));
+      await tester.pump(const Duration(milliseconds: 16));
     }
+    await gesture.up();
+    await pumpFor(tester, const Duration(milliseconds: 800));
+    if (_whereAmI(tester) != before) return;
   }
-  await tester.tap(candidates.at(best), warnIfMissed: false);
+  await tester.binding.handlePopRoute();
   await pumpFor(tester, const Duration(milliseconds: 800));
 }
 

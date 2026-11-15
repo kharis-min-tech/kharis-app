@@ -5,15 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
+import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/branch_selection_screen.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import '../support/channels.dart';
 import '../support/harness.dart';
 import '../support/actions.dart';
 import '../support/live_data.dart';
+
+const _main = 'Branches';
+const _kp2 = 'Kharis Phase Two';
 
 const _roles = {
   'Member': 'member',
@@ -73,8 +79,16 @@ Future<void> onboardingJourney(Journey j) async {
     'still no permission request while choosing a branch',
   );
   await _chooseBranch(j, choice, branches);
-  await pumpUntilFound(t, find.text('Home'), reason: 'Home after onboarding');
+  await pumpUntilFound(
+    t,
+    find.byType(HomeScreen),
+    reason: 'Home after onboarding',
+  );
   await pumpFor(t, const Duration(seconds: 2));
+  j.check(
+    find.byType(BranchPickerSheet).evaluate().isEmpty,
+    'Home does not ask for the branch again right after onboarding',
+  );
 
   final repo = j.c.read(onboardingRepositoryProvider);
   j.check(repo.isCompleted, 'onboarding marked complete');
@@ -114,7 +128,7 @@ Future<void> onboardingJourney(Journey j) async {
     branches.where((b) => b.name != choice.name).toList(),
   );
   await _chooseBranch(j, guestChoice, branches);
-  await pumpUntilFound(t, find.text('Home'));
+  await pumpUntilFound(t, find.byType(HomeScreen));
   await pumpFor(t, const Duration(seconds: 2));
   final user = fb.FirebaseAuth.instance.currentUser;
   j.check(
@@ -154,9 +168,12 @@ Future<void> _checkBranchGroups(Journey j, List<StudioBranch> branches) async {
   final groups = <String, List<String>>{};
   String? header;
   for (final child in children) {
-    final inner = child is Padding ? child.child : child;
-    if (inner is Text) header = inner.data;
-    if (inner is BranchTile) (groups[header ?? '?'] ??= []).add(inner.name);
+    if (child is KSectionHeader) header = child.title;
+    if (child is KListGroup) {
+      for (final tile in child.children.whereType<BranchTile>()) {
+        (groups[header ?? '?'] ??= []).add(tile.name);
+      }
+    }
   }
   List<String> sorted(Iterable<String> names) => names.toList()..sort();
   final wantMain = sorted(
@@ -166,24 +183,24 @@ Future<void> _checkBranchGroups(Journey j, List<StudioBranch> branches) async {
     branches.where((b) => b.isPhaseTwo).map((b) => b.tileName),
   );
   j.check(
-    listEquals(sorted(groups['BRANCHES'] ?? const []), wantMain),
+    listEquals(sorted(groups[_main] ?? const []), wantMain),
     'BRANCHES group = Studio "Kharis" branches '
-    '(app ${groups['BRANCHES']}, Studio $wantMain)',
+    '(app ${groups[_main]}, Studio $wantMain)',
   );
   if (wantKp2.isEmpty) {
     j.check(
-      !groups.containsKey('KHARIS PHASE TWO'),
+      !groups.containsKey(_kp2),
       'no KHARIS PHASE TWO header when the Studio has no Phase 2 branch',
     );
   } else {
     j.check(
-      listEquals(sorted(groups['KHARIS PHASE TWO'] ?? const []), wantKp2),
+      listEquals(sorted(groups[_kp2] ?? const []), wantKp2),
       'KHARIS PHASE TWO group = Studio Phase 2 branches '
-      '(app ${groups['KHARIS PHASE TWO']}, Studio $wantKp2)',
+      '(app ${groups[_kp2]}, Studio $wantKp2)',
     );
     j.check(
-      groups.keys.toList().indexOf('BRANCHES') <
-          groups.keys.toList().indexOf('KHARIS PHASE TWO'),
+      groups.keys.toList().indexOf(_main) <
+          groups.keys.toList().indexOf(_kp2),
       'main branches listed before Phase 2',
     );
   }
@@ -191,7 +208,7 @@ Future<void> _checkBranchGroups(Journey j, List<StudioBranch> branches) async {
   if (wantKp2.isNotEmpty) {
     await scrollUntilFound(
       t,
-      find.text('KHARIS PHASE TWO'),
+      find.text(_kp2),
       scrollable: verticalScrollableIn(
         find.descendant(of: screen, matching: find.byType(ListView)),
       ),

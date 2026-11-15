@@ -76,7 +76,7 @@ Future<List<StudioBranch>> studioBranches() async {
   ];
 }
 
-/// "14:00:00" -> "2:00 PM"; null when unusable.
+/// "14:00:00" -> "14:00", the app's 24-hour clock; null when unusable.
 String? formatClock(Object? raw) {
   final s = '${raw ?? ''}'.trim();
   final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
@@ -88,10 +88,10 @@ String? formatClock(Object? raw) {
     int.parse(m.group(1)!),
     int.parse(m.group(2)!),
   );
-  return DateFormat('h:mm a').format(t);
+  return DateFormat('HH:mm').format(t);
 }
 
-/// "Sunday · 10:00 AM – 12:00 PM" for a Studio service row.
+/// "Sunday · 10:00 – 12:00" for a Studio service row.
 String? serviceWhen(Map<String, dynamic> s) {
   final start = formatClock(s['start_time']);
   final end = formatClock(s['end_time']);
@@ -157,14 +157,18 @@ class StudioEvent {
     'Saturday',
   ];
 
-  /// What the Studio means for a weekly event: "Every Sunday · 9:00 AM".
-  String get everyLabel {
+  /// "Every Sunday", "Every Sunday and Wednesday".
+  String get everyDays {
     final names = [for (final d in days) _weekdays[d]];
     final joined = names.length == 1
         ? names.single
         : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
-    return 'Every $joined \u00b7 ${DateFormat('h:mm a').format(start)}';
+    return 'Every $joined';
   }
+
+  /// How the app writes a weekly event: "Every Sunday · 09:00".
+  String get everyLabel =>
+      '$everyDays \u00b7 ${DateFormat('HH:mm').format(start)}';
 
   @override
   String toString() => '$title${weekly ? ' (weekly)' : ''}';
