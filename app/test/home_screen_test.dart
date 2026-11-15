@@ -23,6 +23,7 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
