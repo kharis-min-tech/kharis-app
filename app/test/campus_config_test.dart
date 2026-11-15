@@ -2,26 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/theme/kharis_theme.dart';
-import 'package:kharis_app/features/calendar/data/event_repository.dart';
-import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
-import 'package:kharis_app/features/home/data/daily_content_repository.dart';
-import 'package:kharis_app/features/home/data/live_repository.dart';
-import 'package:kharis_app/features/home/data/news_repository.dart';
-import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/continue_listening_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
-import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
-import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 Branch _branch(
   String name, {
@@ -331,131 +319,6 @@ void main() {
         'https://instagram.com/kharis',
       );
       expect(instagramUri('@'), isNull);
-    });
-  });
-
-  group('Home', () {
-    Future<void> pumpHome(WidgetTester tester, HomeLayout? campusHome) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final prefs = await SharedPreferences.getInstance();
-      tester.view.physicalSize = const Size(1200, 4000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            sharedPreferencesProvider.overrideWithValue(prefs),
-            currentBranchProvider.overrideWith((ref) => Stream.value('London')),
-            currentUserProvider.overrideWith((ref) => Stream.value(null)),
-            branchesProvider.overrideWith(
-              (ref) => Stream.value([_branch('London', home: campusHome)]),
-            ),
-            // One live notice, so the Announcements block has something to
-            // show (it hides, heading included, when empty).
-            newsProvider.overrideWith(
-              (ref, b) async => [
-                NewsItem(
-                  id: 'n1',
-                  title: 'Welcome',
-                  type: 'Announcement',
-                  publishedAt: DateTime(2026),
-                ),
-              ],
-            ),
-            // One one-off event, so the events block has something to show.
-            upcomingEventsProvider.overrideWith(
-              (ref, b) => Stream.value([
-                Event(
-                  id: 'praise',
-                  title: 'Praise Night',
-                  startTime: DateTime.now().add(const Duration(days: 9)),
-                ),
-              ]),
-            ),
-            liveStatusProvider.overrideWith(
-              (ref) => Stream.value(LiveStatus.notLive),
-            ),
-            dailyContentProvider.overrideWith(
-              (ref) => Stream.value(
-                const DailyContent(
-                  reading: DailyEntry(
-                    title: 'John 3:16',
-                    reference: 'John 3:16',
-                  ),
-                  prayer: DailyEntry(
-                    title: 'Lord, teach us to pray.',
-                    reference: 'Luke 11:1',
-                  ),
-                ),
-              ),
-            ),
-            dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
-            continueListeningProvider.overrideWith((ref) => null),
-            latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
-            // The hero wall's videos as plain boxes: no video plugin here.
-            heroWallVideoProvider.overrideWithValue(
-              (asset, poster, playing) => const SizedBox.expand(),
-            ),
-          ],
-          child: const MaterialApp(home: HomeScreen()),
-        ),
-      );
-      for (var i = 0; i < 6; i++) {
-        await tester.pump(const Duration(milliseconds: 150));
-      }
-    }
-
-    /// The block inside a Home section's sliver (a box, so it has a position).
-    Finder section(HomeSectionId id) => find
-        .descendant(
-          of: find.byKey(ValueKey('home-section-${id.name}')),
-          matching: find.byWidgetPredicate((_) => true),
-        )
-        .first;
-
-    testWidgets('renders a branch layout in order, hiding disabled blocks', (
-      tester,
-    ) async {
-      await pumpHome(
-        tester,
-        const HomeLayout([
-          HomeSection(HomeSectionId.giving),
-          HomeSection(HomeSectionId.events),
-          HomeSection(HomeSectionId.reading),
-          HomeSection(HomeSectionId.announcements, enabled: false),
-        ]),
-      );
-
-      expect(
-        find.byKey(const ValueKey('home-section-announcements')),
-        findsNothing,
-      );
-      expect(find.byKey(const Key('home-announcements-see-all')), findsNothing);
-      expect(find.text('Give'), findsOneWidget);
-      expect(find.byKey(const Key('home-bible-row')), findsOneWidget);
-      final ys = [
-        for (final id in [
-          HomeSectionId.giving,
-          HomeSectionId.events,
-          HomeSectionId.reading,
-        ])
-          tester.getTopLeft(section(id)).dy,
-      ];
-      expect(ys, orderedEquals([...ys]..sort()));
-    });
-
-    testWidgets('the built-in layout has no hero message and no giving', (
-      tester,
-    ) async {
-      await pumpHome(tester, null);
-      expect(find.byKey(const Key('home-bible-row')), findsOneWidget);
-      expect(
-        find.byKey(const Key('home-announcements-see-all')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('home-events-see-all')), findsOneWidget);
-      expect(find.byKey(const Key('home-giving')), findsNothing);
-      expect(find.byKey(const Key('home-live-now')), findsNothing);
     });
   });
 }

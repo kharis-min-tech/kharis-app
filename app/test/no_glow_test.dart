@@ -12,16 +12,13 @@ import 'package:kharis_app/features/giving/presentation/screens/giving_screen.da
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
-import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/daily_message_card.dart';
 import 'package:kharis_app/features/home/presentation/widgets/live_now_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/upcoming_events_strip.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_branch_news.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
@@ -38,17 +35,33 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
 import 'package:kharis_app/theme/kharis_theme.dart' as redesign;
 
-import 'support/bible_overrides.dart';
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
 import 'support/fake_sermon_repository.dart';
 
 /// DESIGN.md: "No glows", "No glassmorphism", restrained flat surfaces.
-/// The only shadow allowed is the design system's [AppShadows.card].
-bool _isCardShadow(BoxShadow s) => AppShadows.card.contains(s);
+/// The only shadows allowed are the design tokens ([redesign.KShadow]);
+/// [AppShadows.card] stays only while the old theme still exists.
+final _tokenShadows = <BoxShadow>{
+  ...AppShadows.card,
+  ...redesign.KShadow.cardLight,
+  ...redesign.KShadow.cardDark,
+  ...redesign.KShadow.floatingLight,
+  ...redesign.KShadow.floatingDark,
+  ...redesign.KShadow.sheet,
+  ...redesign.KShadow.grace,
+};
+bool _isCardShadow(BoxShadow s) => _tokenShadows.contains(s);
 
 /// A scrim keeps text legible over a photo: grey/black only, never a hue.
 bool _isNeutral(Color c) => c.r == c.g && c.g == c.b;
+
+/// An edge fade: one colour going to or from transparent (only the alpha
+/// changes), e.g. a list fading into the canvas. Not decoration.
+bool _isFade(List<Color> colors) => colors.every(
+  (c) =>
+      c.r == colors.first.r && c.g == colors.first.g && c.b == colors.first.b,
+);
 
 /// Every glow, lift, glass blur, shine or (with [flatFills]) decorative
 /// colour gradient in the tree. Gradients inside [ArtworkImage] are message
@@ -74,7 +87,9 @@ List<String> _gloss(WidgetTester tester, {bool flatFills = false}) {
     if (gradient == null || inArtwork.contains(owner)) return;
     if (gradient is! LinearGradient) {
       found.add('${owner.runtimeType}: ${gradient.runtimeType} shine');
-    } else if (flatFills && !gradient.colors.every(_isNeutral)) {
+    } else if (flatFills &&
+        !gradient.colors.every(_isNeutral) &&
+        !_isFade(gradient.colors)) {
       found.add('${owner.runtimeType}: colour gradient ${gradient.colors}');
     }
   }
@@ -131,6 +146,36 @@ void main() {
     favoritesProvider.overrideWith((ref) => Stream.value(null)),
     notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
   ];
+
+  testWidgets('a shadow that is not a design token is reported', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(color: Color(0x667C3AED), blurRadius: 24),
+            ],
+          ),
+          child: SizedBox(width: 40, height: 40),
+        ),
+      ),
+    );
+    expect(_gloss(tester), hasLength(1));
+
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: DecoratedBox(
+          decoration: BoxDecoration(boxShadow: redesign.KShadow.cardLight),
+          child: SizedBox(width: 40, height: 40),
+        ),
+      ),
+    );
+    expect(_gloss(tester), isEmpty);
+  });
 
   for (final brightness in Brightness.values) {
     group('no glow or gloss ($brightness)', () {
@@ -208,7 +253,7 @@ void main() {
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
-      testWidgets('Messages screen with the featured carousel', (tester) async {
+      testWidgets('Messages screen', (tester) async {
         final live = [
           for (var i = 1; i <= 3; i++)
             testSermon(
@@ -236,20 +281,23 @@ void main() {
                 (ref) => [testSermon('r1', title: 'Recent one')],
               ),
             ],
-            child: MaterialApp(theme: theme(), home: const MessagesScreen()),
+            child: MaterialApp(
+              theme: playerTheme(),
+              home: const MessagesScreen(),
+            ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // The first featured card is the active page: it used to glow.
-        expect(find.text('FEATURED'), findsWidgets);
+        expect(find.byType(MessagesScreen), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
 
-        // The Recently played play chip used to float on a drop shadow.
-        await tester.ensureVisible(find.text('Recent one'));
+        await tester.fling(
+          find.byType(Scrollable).first,
+          const Offset(0, -2000),
+          3000,
+        );
         await tester.pumpAndSettle();
-        expect(_gloss(tester, flatFills: true), isEmpty);
-
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
@@ -284,50 +332,11 @@ void main() {
         await tester.pump();
       }
 
-      testWidgets("Home: Bible row with today's reading, and loading", (
-        tester,
-      ) async {
-        await pumpCard(
-          tester,
-          const HomeBibleRow(),
-          overrides: [
-            ...await bibleRowOverrides(),
-            dailyContentProvider.overrideWith(
-              (ref) => Stream.value(
-                const DailyContent(
-                  reading: DailyEntry(
-                    title: 'God so loved',
-                    reference: 'John 3:16',
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-        expect(find.text('John 3'), findsOneWidget);
-        expect(_gloss(tester, flatFills: true), isEmpty);
-
-        await pumpCard(
-          tester,
-          const HomeBibleRow(),
-          overrides: [
-            dailyContentProvider.overrideWith(
-              (ref) => const Stream<DailyContent>.empty(),
-            ),
-          ],
-        );
-        expect(
-          find.byKey(const Key('home-bible-row-loading')),
-          findsOneWidget,
-          reason: 'skeleton shown',
-        );
-        expect(_gloss(tester, flatFills: true), isEmpty);
-      });
-
       testWidgets('Home: daily message card', (tester) async {
         await pumpCard(
           tester,
           const DailyMessageCard(),
+          themeData: playerTheme(),
           overrides: [
             dailyMessageProvider.overrideWith(
               (ref) => Stream.value(
@@ -358,6 +367,7 @@ void main() {
         await pumpCard(
           tester,
           const LiveNowCard(),
+          themeData: playerTheme(),
           overrides: [
             liveStatusProvider.overrideWith(
               (ref) => Stream.value(
@@ -372,7 +382,7 @@ void main() {
         );
         await tester.pump();
         expect(find.text('Sunday service'), findsOneWidget);
-        expect(find.text('LIVE NOW'), findsOneWidget);
+        expect(find.text('Live now'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
@@ -414,31 +424,11 @@ void main() {
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
-      testWidgets('Home: upcoming event tiles', (tester) async {
+      testWidgets('Home: branch news carousel', (tester) async {
         await pumpCard(
           tester,
-          const UpcomingEventsStrip(),
-          overrides: [
-            campusUpcomingEventsProvider.overrideWithValue(
-              AsyncValue.data([
-                Event(
-                  id: 'e1',
-                  title: 'Prayer Night',
-                  location: 'Main Hall',
-                  startTime: DateTime(2026, 10, 9, 19),
-                ),
-              ]),
-            ),
-          ],
-        );
-        expect(find.text('Prayer Night'), findsOneWidget);
-        expect(_gloss(tester, flatFills: true), isEmpty);
-      });
-
-      testWidgets('Home: latest announcement card', (tester) async {
-        await pumpCard(
-          tester,
-          const LatestAnnouncementCard(),
+          const HomeBranchNews(),
+          themeData: playerTheme(),
           overrides: [
             campusNewsProvider.overrideWithValue(
               AsyncValue.data([

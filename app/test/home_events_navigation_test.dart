@@ -19,7 +19,7 @@ import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
-import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
+import 'package:kharis_app/features/bible/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_branch_news.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_stats_strip.dart';
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
@@ -678,29 +678,6 @@ void main() {
   });
 
   group('reading', () {
-    test('Mark as read persists the date and toggles back off', () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final prefs = await SharedPreferences.getInstance();
-      final container = ProviderContainer(
-        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-      );
-      addTearDown(container.dispose);
-      final day = DateTime(2026, 10, 3);
-
-      await container.read(readingMarksProvider.notifier).toggle(day);
-      expect(container.read(readingMarksProvider), {'2026-10-03'});
-      expect(prefs.getStringList(ReadingMarksController.prefsKey), [
-        '2026-10-03',
-      ]);
-
-      // A fresh controller (next launch) reads the mark back.
-      final relaunch = ReadingMarksController(prefs);
-      expect(relaunch.isRead(day), isTrue);
-
-      await container.read(readingMarksProvider.notifier).toggle(day);
-      expect(container.read(readingMarksProvider), isEmpty);
-    });
-
     testWidgets('a reference that cannot be opened shows the Studio text', (
       tester,
     ) async {
@@ -709,6 +686,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            cacheServiceProvider.overrideWithValue(FakeCacheService()),
             sharedPreferencesProvider.overrideWithValue(prefs),
             bibleIndexProvider.overrideWith(
               (ref, id) async => BibleIndex.bundled(),
@@ -725,7 +703,10 @@ void main() {
               ),
             ),
           ],
-          child: const MaterialApp(home: ReadingScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const ReadingScreen(),
+          ),
         ),
       );
       await tester.pump();
@@ -734,7 +715,7 @@ void main() {
       expect(find.byKey(const Key('reading-today-text')), findsOneWidget);
       expect(find.text('Finish well'), findsOneWidget);
       expect(find.text('The book has thirteen chapters.'), findsOneWidget);
-      expect(find.text('Browse the Bible'), findsOneWidget);
+      expect(find.text('Choose a passage'), findsOneWidget);
       expect(find.text('Retry'), findsNothing);
     });
   });

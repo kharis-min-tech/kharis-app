@@ -5,15 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/daily_message_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-import 'support/bible_overrides.dart';
 import 'support/fake_cache_service.dart';
 import 'support/supabase_stub.dart';
 
@@ -253,6 +251,7 @@ void main() {
           key: UniqueKey(),
           overrides: overrides,
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Scaffold(body: Column(children: [card])),
           ),
         ),
@@ -260,85 +259,6 @@ void main() {
       await tester.pump();
       await tester.pump();
     }
-
-    testWidgets('with nothing today, or a failed load, the Bible row '
-        'offers the whole Bible instead of hiding', (tester) async {
-      for (final content in [
-        Stream<DailyContent?>.value(null),
-        Stream<DailyContent?>.error(Exception('offline')),
-      ]) {
-        await pump(tester, const HomeBibleRow(padding: EdgeInsets.all(20)), [
-          dailyContentProvider.overrideWith((ref) => content),
-        ]);
-        expect(find.text('Read the Bible'), findsOneWidget);
-        expect(
-          find.text('Every book and chapter, in your translation.'),
-          findsOneWidget,
-        );
-        expect(find.text('John 3:16-18'), findsNothing);
-      }
-    });
-
-    testWidgets("the Bible row headlines today's chapter", (tester) async {
-      await pump(tester, const HomeBibleRow(), [
-        ...await bibleRowOverrides(),
-        dailyContentProvider.overrideWith(
-          (ref) => Stream.value(
-            const DailyContent(
-              reading: DailyEntry(
-                title: 'God so loved',
-                reference: 'John 3:16-18',
-                body: 'Read it slowly.',
-              ),
-            ),
-          ),
-        ),
-      ]);
-      expect(find.text("Today's reading"), findsOneWidget);
-      expect(find.text('John 3'), findsOneWidget);
-      expect(find.text('Read the Bible'), findsNothing);
-    });
-
-    testWidgets("tapping today's reading opens the reader, with or without "
-        'a prayer', (tester) async {
-      for (final content in const [
-        DailyContent(
-          reading: DailyEntry(title: 'God so loved', reference: 'John 3:16'),
-        ),
-        DailyContent(
-          reading: DailyEntry(title: 'God so loved', reference: 'John 3:16'),
-          prayer: DailyEntry(title: 'A morning prayer', body: 'Lord, lead.'),
-        ),
-      ]) {
-        final router = GoRouter(
-          routes: [
-            GoRoute(
-              path: '/',
-              builder: (_, _) => const Scaffold(body: HomeBibleRow()),
-            ),
-            GoRoute(
-              path: '/reading',
-              builder: (_, _) => const Scaffold(body: Text('reader')),
-            ),
-          ],
-        );
-        await tester.pumpWidget(
-          ProviderScope(
-            key: UniqueKey(),
-            overrides: [
-              ...await bibleRowOverrides(),
-              dailyContentProvider.overrideWith((ref) => Stream.value(content)),
-            ],
-            child: MaterialApp.router(routerConfig: router),
-          ),
-        );
-        await tester.pump();
-        await tester.pump();
-        await tester.tap(find.text('John 3'));
-        await tester.pumpAndSettle();
-        expect(find.text('reader'), findsOneWidget);
-      }
-    });
 
     testWidgets('the message card shows its sermon and note, and hides '
         'while the sermon is unknown', (tester) async {

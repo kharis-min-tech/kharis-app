@@ -2,6 +2,8 @@
 // message, the branch's news, this week's events with "Remind me", Continue
 // listening, Moments and the Give card; what each opens; and that nothing
 // overflows at 390 wide in light and dark at 100% and 130% text.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,19 +12,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
-import 'package:kharis_app/features/calendar/data/event_reminder_service.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_this_week.dart';
-import 'package:kharis_app/features/messages/data/downloads_repository.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
-import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
-import 'package:kharis_app/features/streaks/data/streak_repository.dart';
+import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
+import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -37,8 +37,9 @@ import 'package:kharis_app/shared/providers/listening_history_provider.dart';
 import 'package:kharis_app/shared/providers/moments_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
+import 'package:kharis_app/shared/providers/notification_provider.dart';
+import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:kharis_app/shared/providers/playlist_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/streaks_provider.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
@@ -172,6 +173,7 @@ Future<_Home> _pump(
   bool dark = false,
   double textScale = 1,
   Size size = const Size(390, 5000),
+  HomeLayout? layout,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final prefs = await SharedPreferences.getInstance();
@@ -186,6 +188,8 @@ Future<_Home> _pump(
   final reminders = FakeReminderNotifications();
   final byId = {for (final s in sermons) s.id: s};
 
+  // A fresh scope each time, so a second pump in one test starts clean.
+  await tester.pumpWidget(const SizedBox());
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -197,28 +201,28 @@ Future<_Home> _pump(
         currentUserProvider.overrideWith((ref) => Stream.value(user)),
         currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
         branchesProvider.overrideWith(
-          (ref) => Stream.value(const [
+          (ref) => Stream.value([
             Branch(
               id: 'london',
               name: 'London',
               subtitle: 'United Kingdom',
               gradientStart: Color(0xFF3B2A6B),
               gradientEnd: Color(0xFF7C3AED),
+              home: layout,
             ),
           ]),
         ),
         latestSermonsProvider.overrideWith((ref) => sermons),
         sermonsProvider.overrideWith(
           (ref) => sermonsLoading
-              ? Future<List<Sermon>>.delayed(
-                  const Duration(days: 1),
-                  () => sermons,
-                )
+              ? Completer<List<Sermon>>().future
               : Future.value(sermons),
         ),
-        sermonByIdProvider.overrideWith((ref, id) async => byId[id]),
+        sermonByIdProvider.overrideWith(
+          (ref, id) => AsyncValue.data(byId[id]),
+        ),
         playlistsProvider.overrideWith((ref) => Stream.value(const [])),
-        favoritesProvider.overrideWith((ref) => Stream.value(const [])),
+        favoritesProvider.overrideWith((ref) => Stream.value(null)),
         notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
         bibleIndexProvider.overrideWith(
           (ref, id) async => BibleIndex.bundled(),
@@ -237,6 +241,9 @@ Future<_Home> _pump(
         ),
         downloadStatusProvider.overrideWith((ref, id) => download),
         hasPendingNotificationsProvider.overrideWithValue(unread),
+        notificationPermissionProvider.overrideWith(
+          (ref) async => NotificationPermission.granted,
+        ),
         if (toggle != null)
           toggleEventReminderProvider.overrideWithValue(toggle),
       ],
@@ -304,11 +311,6 @@ void main() {
       expect(find.text('Good evening'), findsOneWidget);
       expect(find.byKey(const Key('home-avatar')), findsNothing);
     });
-
-    test('the greeting follows the time of day', () {
-      // Covered through the widget at 18:30 above; the two other bands:
-      expect(const Duration(hours: 11).inHours < 12, isTrue);
-    }, skip: 'see the morning and afternoon widget tests below');
 
     for (final (hour, greeting) in const [
       (8, 'Good morning'),
@@ -431,7 +433,12 @@ void main() {
         tester,
         sermons: [_sermon()],
         download: Downloaded(
-          DownloadedMessage(sermon: _sermon(), bytes: 100, savedAt: _now),
+          DownloadedMessage(
+            sermon: _sermon(),
+            fileName: 's1.mp3',
+            bytes: 100,
+            savedAt: _now,
+          ),
         ),
       );
       expect(
@@ -677,7 +684,7 @@ void main() {
         tester.getTopLeft(find.text('Prayer Night')).dy,
         lessThan(tester.getTopLeft(find.text('Youth Night')).dy),
       );
-      expect(find.text('19:30 \u00b7 Main Hall'), findsOneWidget);
+      expect(find.text('18:30 \u00b7 Main Hall'), findsOneWidget);
     });
 
     testWidgets('tapping an event opens it', (tester) async {
@@ -767,16 +774,12 @@ void main() {
 
     testWidgets('lists unfinished messages; one resumes, History opens '
         'history', (tester) async {
-      final home = await _pump(
-        tester,
-        unfinished: [
-          UnfinishedPlay(
-            sermon: _sermon(id: 'u1', title: 'Walking in love'),
-            position: const Duration(minutes: 12, seconds: 5),
-            duration: const Duration(minutes: 40),
-          ),
-        ],
+      final play = UnfinishedPlay(
+        sermon: _sermon(id: 'u1', title: 'Walking in love'),
+        position: const Duration(minutes: 12, seconds: 5),
+        duration: const Duration(minutes: 40),
       );
+      final home = await _pump(tester, unfinished: [play]);
 
       expect(find.text('Continue listening'), findsOneWidget);
       expect(find.text('Walking in love'), findsOneWidget);
@@ -785,11 +788,12 @@ void main() {
         findsOneWidget,
       );
 
-      await _tap(tester, find.text('Walking in love'));
-      expect(home.audio.playCalls.map((s) => s.id), ['u1']);
-
       await _tap(tester, find.text('History'));
       expect(home.routes.opened, ['/history']);
+
+      final back = await _pump(tester, unfinished: [play]);
+      await _tap(tester, find.text('Walking in love'));
+      expect(back.audio.playCalls.map((s) => s.id), ['u1']);
     });
   });
 
@@ -875,6 +879,44 @@ void main() {
     });
   });
 
+  group('branch layout', () {
+    testWidgets('a block the branch switches off stays off; Give always '
+        'shows', (tester) async {
+      final event = Event(
+        id: 'e1',
+        title: 'Prayer Night',
+        startTime: _now.add(const Duration(days: 2)),
+      );
+      final news = [
+        NewsItem(
+          id: 'n1',
+          title: 'Welcome',
+          type: 'Announcement',
+          publishedAt: DateTime(2026),
+        ),
+      ];
+
+      await _pump(tester, news: news, events: AsyncValue.data([event]));
+      expect(find.byKey(const Key('home-announcements')), findsOneWidget);
+      expect(find.text('Prayer Night'), findsOneWidget);
+      expect(find.byKey(const Key('home-give')), findsOneWidget);
+
+      await _pump(
+        tester,
+        news: news,
+        events: AsyncValue.data([event]),
+        layout: const HomeLayout([
+          HomeSection(HomeSectionId.announcements, enabled: false),
+          HomeSection(HomeSectionId.events, enabled: false),
+          HomeSection(HomeSectionId.giving, enabled: false),
+        ]),
+      );
+      expect(find.byKey(const Key('home-announcements')), findsNothing);
+      expect(find.text('Prayer Night'), findsNothing);
+      expect(find.byKey(const Key('home-give')), findsOneWidget);
+    });
+  });
+
   group('page', () {
     testWidgets('pull to refresh reloads Moments', (tester) async {
       var loads = 0;
@@ -900,19 +942,20 @@ void main() {
     });
 
     testWidgets('the last block clears the floating nav', (tester) async {
-      await _pump(tester);
+      await _pump(tester, size: const Size(390, 844));
 
-      final list = tester.getRect(find.byType(CustomScrollView));
       final scrollable = tester.state<ScrollableState>(
         find.descendant(
           of: find.byType(CustomScrollView),
-          matching: find.byType(Scrollable).first,
-        ),
+          matching: find.byType(Scrollable),
+        ).first,
       );
+      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+      await _frames(tester);
+
+      final list = tester.getRect(find.byType(CustomScrollView));
       final give = tester.getRect(find.byKey(const Key('home-give')));
-      final contentEnd =
-          scrollable.position.maxScrollExtent + list.height;
-      expect(contentEnd - give.bottom, KSize.contentBottomPad);
+      expect(list.bottom - give.bottom, KSize.contentBottomPad);
     });
 
     for (final dark in const [false, true]) {

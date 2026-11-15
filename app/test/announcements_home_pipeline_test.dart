@@ -4,10 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/home/data/news_repository.dart';
-import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_branch_news.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/fake_cache_service.dart';
 import 'support/fake_location_service.dart';
@@ -15,7 +16,7 @@ import 'support/supabase_stub.dart';
 
 /// The homepage announcements pipeline with only the network stubbed:
 /// Content Studio `news` rows → [NewsRepository] → [newsProvider] →
-/// [LatestAnnouncementCard].
+/// [HomeBranchNews], Home's carousel of the branch's announcements.
 
 final _past = DateTime.utc(2026, 8, 4).toIso8601String();
 const _future = '2036-01-01T00:00:00Z';
@@ -39,7 +40,10 @@ Widget _homeHarness(SupabaseStub stub, {String? branch}) {
       currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
       locationServiceProvider.overrideWithValue(FakeLocationService()),
     ],
-    child: const MaterialApp(home: Scaffold(body: LatestAnnouncementCard())),
+    child: MaterialApp(
+      theme: KharisTheme.light(),
+      home: const Scaffold(body: HomeBranchNews()),
+    ),
   );
 }
 
@@ -169,7 +173,7 @@ void main() {
     });
   });
 
-  testWidgets('the newest live Studio announcement leads the homepage', (
+  testWidgets('live Studio announcements reach the homepage, newest first', (
     tester,
   ) async {
     final stub = SupabaseStub({
@@ -191,7 +195,11 @@ void main() {
     await _settle(tester);
 
     expect(find.text('Listen to messages on the go'), findsOneWidget);
-    expect(find.text('Welcome to the new Kharis app'), findsNothing);
+    expect(find.text('Welcome to the new Kharis app'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Listen to messages on the go')).dx,
+      lessThan(tester.getTopLeft(find.text('Welcome to the new Kharis app')).dx),
+    );
     expect(find.text('Old expired notice'), findsNothing);
     expect(
       stub.requests.single.headers['apikey'],
@@ -230,6 +238,6 @@ void main() {
     await tester.pumpWidget(_homeHarness(SupabaseStub({'news': []})));
     await _settle(tester);
 
-    expect(find.byKey(const Key('home-announcement-latest')), findsNothing);
+    expect(find.byKey(const Key('home-announcements')), findsNothing);
   });
 }
