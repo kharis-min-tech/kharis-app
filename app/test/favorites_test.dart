@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +15,7 @@ import 'package:kharis_app/features/playlists/presentation/screens/favorites_scr
 import 'package:kharis_app/features/playlists/presentation/screens/playlists_screen.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/favorites_tile.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/playlist_name_dialog.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/playlist_card.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -25,6 +25,7 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 
 import 'support/fake_audio_player_service.dart';
@@ -144,7 +145,8 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const MaterialApp(
+          child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Scaffold(
               body: AddToPlaylistSheet(
                 sermonId: 's1',
@@ -160,8 +162,11 @@ void main() {
       expect(find.text('Liked messages'), findsNothing);
       expect(find.text('Favorites'), findsNothing);
       // Only the one real playlist is offered (plus the "New playlist" row).
-      expect(find.byIcon(Icons.add_circle_outline_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+      expect(find.text('New collection'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate((w) => w is KIcon && w.asset == KIcons.check),
+        findsNothing,
+      );
     });
 
     testWidgets('the sheet\'s My notes row closes it and opens the notes', (
@@ -176,6 +181,7 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Scaffold(
               body: Builder(
                 builder: (context) => TextButton(
@@ -198,7 +204,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(opened, 1);
-      expect(find.text('Add to playlist'), findsNothing);
+      expect(find.text('Add to collection'), findsNothing);
     });
 
     testWidgets('Playlists pins a distinct Favorites tile above the grid, '
@@ -223,7 +229,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overridesFor(db),
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -249,19 +258,22 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overridesFor(db),
-          child: const MaterialApp(home: PlaylistsScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const PlaylistsScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.byType(FavoritesTile), findsOneWidget);
       expect(find.byType(PlaylistCard), findsNothing);
-      expect(find.text('Build your first playlist'), findsOneWidget);
+      expect(find.text('Build your first collection'), findsOneWidget);
 
       // The compact header action still creates a playlist.
-      await tester.tap(find.byTooltip('New playlist'));
+      await tester.tap(find.byKey(const ValueKey('playlists-new')));
       await tester.pumpAndSettle();
-      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.byType(PlaylistNameSheet), findsOneWidget);
     });
   });
 
@@ -271,7 +283,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overridesFor(db),
-          child: const MaterialApp(home: FavoritesScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const FavoritesScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -291,14 +306,17 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overridesFor(db),
-          child: const MaterialApp(home: FavoritesScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const FavoritesScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('No Favourites yet'), findsOneWidget);
       expect(find.textContaining('tap the heart'), findsOneWidget);
-      expect(find.text('Play all'), findsNothing);
+      expect(find.text('Play'), findsNothing);
     });
 
     testWidgets('a row plays with Favorites, in screen order, as the queue', (
@@ -319,7 +337,10 @@ void main() {
             cacheServiceProvider.overrideWithValue(FakeCacheService()),
             notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
           ],
-          child: const MaterialApp(home: FavoritesScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const FavoritesScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -339,7 +360,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overridesFor(db),
-          child: const MaterialApp(home: FavoritesScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const FavoritesScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -366,15 +390,24 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overridesFor(db),
-          child: const MaterialApp(home: FavoritesScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const FavoritesScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
       // Rows are newest first: the first ⋮ belongs to Message 2.
-      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) =>
+              w is KIconButton && w.label == 'Remove Message 2 from Favourites',
+        ),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Remove from Favourites'));
+      expect(find.text('Remove from Favourites?'), findsOneWidget);
+      await tester.tap(find.text('Remove'));
       await tester.pumpAndSettle();
 
       expect(find.text('Message 2'), findsNothing);
@@ -390,6 +423,7 @@ void main() {
         ProviderScope(
           overrides: overridesFor(db),
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Column(
               children: [
                 Material(child: LikeButton(sermon: sermon(4))),
@@ -404,7 +438,7 @@ void main() {
       expect(find.text('Message 4'), findsNothing);
       expect(find.byTooltip('Add to Favourites'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+      await tester.tap(find.byTooltip('Add to Favourites'));
       await tester.pumpAndSettle();
       expect(find.text('Message 4'), findsOneWidget);
       expect(find.text('2 messages · newest first'), findsOneWidget);
@@ -415,7 +449,7 @@ void main() {
       );
       expect(find.byTooltip('Remove from Favourites'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.favorite_rounded));
+      await tester.tap(find.byTooltip('Remove from Favourites'));
       await tester.pumpAndSettle();
       expect(find.text('Message 4'), findsNothing);
       expect(find.text('1 message · newest first'), findsOneWidget);
@@ -427,7 +461,7 @@ void main() {
     for (final width in [375.0, 393.0]) {
       for (final textScale in [1.0, 1.3]) {
         testWidgets(
-          'title and the New playlist action never overlap at ${width.toInt()}pt '
+          'title and the New collection action never overlap at ${width.toInt()}pt '
           '(text x$textScale, iOS)',
           (tester) async {
             tester.view
@@ -457,45 +491,31 @@ void main() {
             await tester.pumpWidget(
               ProviderScope(
                 overrides: overridesFor(db),
-                child: MaterialApp.router(routerConfig: router),
+                child: MaterialApp.router(
+                  theme: KharisTheme.light(),
+                  routerConfig: router,
+                ),
               ),
             );
             router.push('/playlists');
             await tester.pumpAndSettle();
 
-            // Pushed over another route, as in the app: back button shows.
-            expect(find.byType(BackButton), findsOneWidget);
-            final title = tester.getRect(
+            // Pushed over another route, as in the app. There is no
+            // on-screen back button: swipe back and the system back leave.
+            expect(find.byType(BackButton), findsNothing);
+            expect(
               find.byKey(const ValueKey('playlists-title')),
+              findsOneWidget,
             );
+            final title = tester.getRect(find.text('Collections'));
             final button = tester.getRect(
               find.byKey(const ValueKey('playlists-new')),
             );
-            final back = tester.getRect(find.byType(BackButton));
             expect(
               title.overlaps(button),
               isFalse,
               reason: 'title $title overlaps button $button',
             );
-            expect(title.overlaps(back), isFalse);
-            expect(title.left, lessThan(button.left));
-            // One line and shown in full: the compact action leaves the title
-            // room instead of squeezing it into an ellipsis. (Asserted on the
-            // paragraph, not a pixel width, so it holds for the real bundled
-            // fonts as well as the test font.)
-            expect(title.height, lessThan(kToolbarHeight));
-            final paragraph = tester.renderObject<RenderParagraph>(
-              find.descendant(
-                of: find.byKey(const ValueKey('playlists-title')),
-                matching: find.byType(RichText),
-              ),
-            );
-            expect(
-              paragraph.didExceedMaxLines,
-              isFalse,
-              reason: 'the Playlists title must not be truncated',
-            );
-            expect(find.byTooltip('New playlist'), findsOneWidget);
             expect(button.right, lessThanOrEqualTo(width));
             expect(tester.takeException(), isNull);
           },

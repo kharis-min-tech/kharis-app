@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
@@ -130,8 +131,11 @@ void main() {
             ),
             branchesProvider.overrideWith((ref) => Stream.value([branch])),
           ],
-          child: const MaterialApp(
-            home: Scaffold(body: SingleChildScrollView(child: CampusCard())),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const Scaffold(
+              body: SingleChildScrollView(child: CampusCard()),
+            ),
           ),
         ),
       );

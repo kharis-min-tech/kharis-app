@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/branch_tile.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
@@ -9,7 +9,7 @@ import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
-/// Branch selection (design-handoff v3) — light screen. Search across cities,
+/// Branch selection. Search across cities,
 /// then tap a branch to set it as home and enter the app.
 class BranchSelectionScreen extends ConsumerStatefulWidget {
   const BranchSelectionScreen({super.key});
@@ -48,80 +48,110 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
                     b.subtitle.toLowerCase().contains(q),
               )
               .toList();
+    final current = ref.watch(currentBranchProvider).valueOrNull;
+    final canPop = context.canPop();
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 6, 22, 0),
+    return PopScope(
+      // With nothing beneath (first run), system back returns to the role
+      // step instead of leaving the app.
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go('/role-selection');
+      },
+      child: Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: KSize.maxContentWidth,
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _BackRow(
-                    onTap: () => context.canPop()
-                        ? context.pop()
-                        : context.go('/role-selection'),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Find your branch',
-                    style: AppTypography.display(
-                      size: 30,
-                      weight: FontWeight.w700,
-                    ).copyWith(color: context.kc.onBg),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Kharis is one family across many cities.',
-                    style: AppTypography.serif(
-                      size: 17,
-                      italic: true,
-                    ).copyWith(color: context.kc.muted),
-                  ),
-                  const SizedBox(height: 18),
-                  _SearchField(
-                    controller: _searchCtrl,
-                    onChanged: (v) => setState(() => _query = v),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
-                children: [
-                  if (branches.isEmpty)
-                    _BranchesStatus(
-                      failed: branchesAsync.hasError || branchesAsync.hasValue,
-                      onRetry: () => ref.invalidate(branchesProvider),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: UseMyLocationTile(
-                        contentPadding: EdgeInsets.zero,
-                        onNearest: (b) => _confirm(context, ref, b),
-                      ),
+                  const SizedBox(height: KSpace.gutter),
+                  const KScreenHeader(title: 'Find your branch'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      KSpace.gutter,
+                      KSpace.md,
+                      KSpace.gutter,
+                      KSpace.x3,
                     ),
-                  ..._section(
-                    context,
-                    ref,
-                    'BRANCHES',
-                    filtered.where((b) => b.group != Branch.phaseTwoGroup),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Kharis is one family across many cities.',
+                          style: KharisText.body.copyWith(
+                            color: context.k.muted,
+                          ),
+                        ),
+                        const SizedBox(height: KSpace.x3),
+                        KSearchField(
+                          hint: 'Search cities, KP2, Ghana, Sierra Leone',
+                          controller: _searchCtrl,
+                          onChanged: (v) => setState(() => _query = v),
+                        ),
+                      ],
+                    ),
                   ),
-                  ..._section(
-                    context,
-                    ref,
-                    'KHARIS PHASE TWO',
-                    filtered.where((b) => b.group == Branch.phaseTwoGroup),
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        KSpace.gutter,
+                        0,
+                        KSpace.gutter,
+                        KSpace.section + MediaQuery.paddingOf(context).bottom,
+                      ),
+                      children: [
+                        if (branches.isEmpty)
+                          _BranchesStatus(
+                            failed:
+                                branchesAsync.hasError ||
+                                branchesAsync.hasValue,
+                            onRetry: () => ref.invalidate(branchesProvider),
+                          )
+                        else ...[
+                          KListGroup(
+                            children: [
+                              UseMyLocationTile(
+                                onNearest: (b) => _confirm(context, ref, b),
+                              ),
+                            ],
+                          ),
+                          if (filtered.isEmpty)
+                            const KEmptyState(
+                              icon: KIcons.search,
+                              title: 'No branches match',
+                              hint: 'Try a city or a country.',
+                            ),
+                        ],
+                        ..._section(
+                          context,
+                          ref,
+                          'Branches',
+                          current,
+                          filtered.where(
+                            (b) => b.group != Branch.phaseTwoGroup,
+                          ),
+                        ),
+                        ..._section(
+                          context,
+                          ref,
+                          'Kharis Phase Two',
+                          current,
+                          filtered.where(
+                            (b) => b.group == Branch.phaseTwoGroup,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -166,134 +196,64 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
     }
   }
 
-  /// Section header + branch tiles; an empty group renders nothing.
+  /// Section header and its branches in one group; an empty group renders
+  /// nothing.
   List<Widget> _section(
     BuildContext context,
     WidgetRef ref,
     String label,
+    String? current,
     Iterable<Branch> branches,
   ) {
     final list = branches.toList();
     if (list.isEmpty) return const [];
     return [
-      Padding(
-        padding: const EdgeInsets.only(top: 6, bottom: 10),
-        child: Text(
-          label,
-          style: AppTypography.labelMd.copyWith(color: context.kc.muted),
-        ),
+      const SizedBox(height: KSpace.section),
+      KSectionHeader(title: label),
+      KListGroup(
+        children: [
+          for (final b in list)
+            BranchTile(
+              name: b.name.startsWith('KP2 ') ? b.name.substring(4) : b.name,
+              region: _region(b.subtitle),
+              isHq: _isHq(b.subtitle),
+              selected: b.name == current,
+              onTap: () => _confirm(context, ref, b),
+            ),
+        ],
       ),
-      for (final b in list)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: BranchTile(
-            name: b.name.startsWith('KP2 ') ? b.name.substring(4) : b.name,
-            region: _region(b.subtitle),
-            isHq: _isHq(b.subtitle),
-            onTap: () => _confirm(context, ref, b),
-          ),
-        ),
     ];
   }
 }
 
-/// Stands in for the list until branches arrive: a spinner while loading,
-/// a retry once loading has failed (no connection and nothing saved).
+/// Stands in for the list until branches arrive: row-shaped blocks while
+/// loading, a retry once loading has failed (no connection and nothing
+/// saved).
 class _BranchesStatus extends StatelessWidget {
   const _BranchesStatus({required this.failed, required this.onRetry});
 
   final bool failed;
   final VoidCallback onRetry;
 
+  static const int _placeholderRows = 5;
+
   @override
   Widget build(BuildContext context) {
-    if (!failed) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 40),
-        child: Center(child: CircularProgressIndicator()),
+    if (failed) {
+      return KErrorState(
+        message: 'Branches could not load. Check your connection.',
+        onRetry: onRetry,
       );
     }
-    return Padding(
-      padding: const EdgeInsets.only(top: 40),
+    return Semantics(
+      label: 'Loading branches',
       child: Column(
         children: [
-          Text(
-            'Branches could not load. Check your connection.',
-            textAlign: TextAlign.center,
-            style: AppTypography.bodySm.copyWith(color: context.kc.muted),
-          ),
-          const SizedBox(height: 8),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
-        ],
-      ),
-    );
-  }
-}
-
-class _BackRow extends StatelessWidget {
-  const _BackRow({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppRadius.pillBorder,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.chevron_left_rounded, size: 24, color: context.kc.onBg),
-            Text(
-              'Back',
-              style: AppTypography.ui(
-                size: 15,
-                weight: FontWeight.w600,
-              ).copyWith(color: context.kc.onBg),
-            ),
+          for (var i = 0; i < _placeholderRows; i++) ...[
+            if (i > 0) const SizedBox(height: KSpace.md),
+            const KSkeleton(height: KSize.listRow, radius: KRadius.card),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller, required this.onChanged});
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      style: AppTypography.ui(size: 15).copyWith(color: context.kc.onBg),
-      cursorColor: context.kc.accentInk,
-      decoration: InputDecoration(
-        hintText: 'Search cities, KP2, Ghana, Sierra Leone',
-        hintStyle: AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          size: 20,
-          color: context.kc.muted,
-        ),
-        filled: true,
-        fillColor: context.kc.surfaceAlt,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        // Same pill in both states — idle used to render square while focus
-        // rendered round (tester feedback).
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: BorderSide(color: context.kc.accentInk, width: 1.5),
-        ),
+        ],
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
@@ -95,7 +96,10 @@ Future<void> _pumpInbox(
   await tester.pumpWidget(
     ProviderScope(
       overrides: await _overrides(fcm, stored: stored),
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        theme: KharisTheme.light(),
+        routerConfig: router,
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -175,7 +179,7 @@ void main() {
         await _pumpInbox(tester, fcm);
 
         expect(_card, findsNothing);
-        await tester.tap(find.byTooltip('Notification settings'));
+        await tester.tap(find.bySemanticsLabel('Notification settings'));
         await tester.pumpAndSettle();
         expect(find.byType(NotificationsSettingsScreen), findsOneWidget);
         expect(find.text('Service reminders'), findsOneWidget);
@@ -212,7 +216,10 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await _pumpInbox(tester, fcm, stored: stored);
       expect(_card, findsNothing);
-      expect(find.byTooltip('Notification settings'), findsOneWidget);
+      expect(
+        find.byKey(const Key('notification-settings-button')),
+        findsOneWidget,
+      );
     });
   });
 
@@ -224,7 +231,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: await _overrides(fcm),
-          child: const MaterialApp(home: NotificationsSettingsScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const NotificationsSettingsScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();

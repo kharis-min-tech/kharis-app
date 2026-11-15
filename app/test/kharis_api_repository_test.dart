@@ -85,6 +85,25 @@ void main() {
     expect(s.duration, const Duration(seconds: 2046));
   });
 
+  test('maps the passages a message is preached from', () async {
+    final s = ((await repo().fetchPage()).sermons).first;
+    expect(s.passages, ['Acts 27:27-44']);
+
+    final record = Map<String, dynamic>.from(
+      (_fixture['results']! as List).first as Map,
+    );
+    expect(
+      mapApiSermon({
+        ...record,
+        'passages': ['Luke 24:27', ' Acts 2:41-42 ', '', 7, null],
+      }).passages,
+      ['Luke 24:27', 'Acts 2:41-42'],
+    );
+    expect(mapApiSermon({...record, 'passages': <String>[]}).passages, isEmpty);
+    expect(mapApiSermon({...record}..remove('passages')).passages, isEmpty);
+    expect(mapApiSermon({...record, 'passages': null}).passages, isEmpty);
+  });
+
   test('prepends https:// to the scheme-less audio download_url', () async {
     final s = ((await repo().fetchPage()).sermons).first;
     expect(

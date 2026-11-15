@@ -10,13 +10,13 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/constants/app_links.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/providers/event_reminders_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/shared/widgets/skeleton.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// One event, read fresh by document id. `null` when the doc does not exist
 /// (deleted, or a stale push) or could not be read. A branch service id
@@ -33,10 +33,11 @@ final eventByIdProvider = FutureProvider.autoDispose.family<Event?, String>((
   return ref.watch(eventRepositoryProvider).getEventById(id);
 });
 
-/// "Starts in 3 days" style status for [event] relative to [now].
+/// "In 3 days" style status for [event] relative to [now].
 ///
 /// A weekly event is dated at its next occurrence, so this is about that
-/// occurrence: the label says how far away it is, that it is on now, or that it has ended.
+/// occurrence: the label says how far away it is, that it is on now, or that
+/// it has ended.
 String eventStatusLabel(Event event, DateTime now) {
   if (event.isPastAt(now)) return 'This event has ended';
   if (!event.startTime.isAfter(now)) return 'Happening now';
@@ -58,39 +59,49 @@ String eventStatusLabel(Event event, DateTime now) {
   return weeks == 1 ? 'In 1 week' : 'In $weeks weeks';
 }
 
-/// "7:00 PM – 9:00 PM", or with both dates when the event spans days.
+bool _sameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+/// "19:00 – 21:00", or with the end date when the event spans days.
 String eventTimeRange(Event event) {
+  final time = DateFormat('HH:mm');
+  final start = time.format(event.startTime);
+  final end = event.endTime;
+  if (end == null || !end.isAfter(event.startTime)) return start;
+  return _sameDay(event.startTime, end)
+      ? '$start \u2013 ${time.format(end)}'
+      : '$start \u2013 ${DateFormat('EEE d MMM, HH:mm').format(end)}';
+}
+
+/// The time range as shared links have always written it.
+String _shareTimeRange(Event event) {
   final time = DateFormat('h:mm a');
   final start = time.format(event.startTime);
   final end = event.endTime;
   if (end == null || !end.isAfter(event.startTime)) return start;
-  final sameDay =
-      end.year == event.startTime.year &&
-      end.month == event.startTime.month &&
-      end.day == event.startTime.day;
-  return sameDay
+  return _sameDay(event.startTime, end)
       ? '$start \u2013 ${time.format(end)}'
       : '$start \u2013 ${DateFormat('EEE d MMM, h:mm a').format(end)}';
 }
 
-/// The text handed to the share sheet for [event]: title, day and time,
-/// where (venue and address, else the campus), then the Kharis link.
-String eventShareText(Event event) {
-  String? clean(String? raw) {
-    final value = raw?.trim();
-    return value == null || value.isEmpty ? null : value;
-  }
+String? _clean(String? raw) {
+  final value = raw?.trim();
+  return value == null || value.isEmpty ? null : value;
+}
 
+/// The text handed to the share sheet for [event]: title, day and time,
+/// where (venue and address, else the branch), then the Kharis link.
+String eventShareText(Event event) {
   final next =
       '${DateFormat('EEEE d MMMM yyyy').format(event.startTime)}, '
-      '${eventTimeRange(event)}';
+      '${_shareTimeRange(event)}';
   final repeats = event.recurrenceLabel;
   final when = repeats == null ? next : '$repeats (next: $next)';
   final place = [
-    clean(event.location),
-    clean(event.address),
+    _clean(event.location),
+    _clean(event.address),
   ].whereType<String>().join(', ');
-  final where = place.isNotEmpty ? place : clean(event.branch);
+  final where = place.isNotEmpty ? place : _clean(event.branch);
   return [
     event.title.trim(),
     when,
@@ -112,9 +123,8 @@ Uri directionsUri(String query, {required TargetPlatform platform}) {
         });
 }
 
-/// Full event page: banner, date and time with how soon it is, venue and
-/// address with directions, the description, and RSVP / add-to-calendar /
-/// share actions.
+/// Full event page: photo, when and where it is with directions, the
+/// description, "Remind me", and RSVP / add-to-calendar / share actions.
 ///
 /// Reached from event cards, Home, announcements that promote an event and
 /// event pushes (`/events/:id`). [initial] paints immediately when the caller
@@ -131,28 +141,24 @@ class EventDetailScreen extends ConsumerWidget {
     final async = ref.watch(eventByIdProvider(eventId));
     final event = async.valueOrNull ?? initial;
 
-    if (event == null) {
-      return Scaffold(
-        appBar: _plainBar(context),
-        body: async.isLoading
-            ? const _DetailSkeleton()
-            : _Unavailable(
-                onRetry: () => ref.invalidate(eventByIdProvider(eventId)),
-              ),
-      );
-    }
-    return Scaffold(body: _EventBody(event: event));
+    return Scaffold(
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: event != null
+                ? _EventBody(event: event)
+                : async.isLoading
+                ? const _DetailSkeleton()
+                : _Unavailable(
+                    onRetry: () => ref.invalidate(eventByIdProvider(eventId)),
+                  ),
+          ),
+        ),
+      ),
+    );
   }
-
-  PreferredSizeWidget _plainBar(BuildContext context) => AppBar(
-    backgroundColor: Colors.transparent,
-    elevation: 0,
-    leading: _BackButton(color: context.kc.onBg),
-    title: Text(
-      'Event',
-      style: AppTypography.titleMd.copyWith(color: context.kc.onBg),
-    ),
-  );
 }
 
 /// Returns to the events list: pops when it is the screen underneath,
@@ -166,193 +172,156 @@ void _backToEvents(BuildContext context) {
   onEvents ? router.pop() : router.push('/calendar');
 }
 
-/// Pops when there is somewhere to go back to; otherwise (a cold-start deep
-/// link) opens the events list instead of closing the app.
-class _BackButton extends StatelessWidget {
-  const _BackButton({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: 'Back',
-      icon: Icon(Icons.arrow_back_rounded, color: color),
-      onPressed: () {
-        final router = GoRouter.of(context);
-        router.canPop() ? router.pop() : router.push('/calendar');
-      },
-    );
-  }
-}
+const EdgeInsets _pagePadding = EdgeInsets.fromLTRB(
+  KSpace.gutter,
+  KSpace.md,
+  KSpace.gutter,
+  KSpace.section,
+);
 
 class _EventBody extends ConsumerWidget {
   const _EventBody({required this.event});
 
   final Event event;
 
-  String? get _venue => _clean(event.location);
-  String? get _address => _clean(event.address);
-
-  static String? _clean(String? raw) {
-    final value = raw?.trim();
-    return value == null || value.isEmpty ? null : value;
-  }
-
-  /// What maps should search for: venue and address together locate a hall
-  /// inside a larger building far better than either alone.
-  String? get _mapsQuery {
-    final parts = [_venue, _address].whereType<String>().toList();
-    return parts.isEmpty ? null : parts.join(', ');
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final k = context.k;
     final now = DateTime.now();
     final isPast = event.isPastAt(now);
     final isRsvped = ref.watch(isEventRsvpedProvider(event.id));
-    final campus = _clean(event.branch) ?? 'All branches';
+    final reminded = ref.watch(isEventRemindedProvider(event.id));
+    final canRemind =
+        !isPast && ref.watch(eventReminderServiceProvider).canRemind(event);
+    final imageUrl = _clean(event.imageUrl);
+    final venue = _clean(event.location);
+    final address = _clean(event.address);
+    final place = venue ?? address;
+    // Venue and address together locate a hall inside a larger building far
+    // better than either alone.
+    final mapsQuery = [venue, address].whereType<String>().join(', ');
     final description = _clean(event.description);
-    final mapsQuery = _mapsQuery;
+    final date = DateFormat('EEEE d MMMM yyyy').format(event.startTime);
 
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          pinned: true,
-          expandedHeight: 220,
-          backgroundColor: AppColors.primaryDeep,
-          leading: const _BackButton(color: Colors.white),
-          actions: [
-            IconButton(
-              tooltip: 'Share event',
-              icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
-              onPressed: () => _share(),
+    return SingleChildScrollView(
+      padding: _pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (imageUrl != null) ...[
+            ClipRRect(
+              borderRadius: const BorderRadius.all(
+                Radius.circular(KRadius.card),
+              ),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: KImageFill(image: CachedNetworkImageProvider(imageUrl)),
+              ),
             ),
+            const SizedBox(height: KSpace.x3),
           ],
-          flexibleSpace: FlexibleSpaceBar(background: _Banner(event: event)),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.marginMobile,
-              22,
-              AppSpacing.marginMobile,
-              40,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _StatusPill(label: eventStatusLabel(event, now), past: isPast),
-                const SizedBox(height: 12),
-                Text(
-                  event.title,
-                  style: AppTypography.display(
-                    size: 26,
-                    weight: FontWeight.w700,
-                  ).copyWith(color: context.kc.onBg, height: 1.15),
-                ),
-                const SizedBox(height: 20),
-                if (event.recurrenceLabel case final repeats?) ...[
-                  _InfoBlock(
-                    key: const Key('event-detail-recurrence'),
-                    icon: Icons.repeat_rounded,
-                    title: repeats,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                _InfoBlock(
-                  icon: Icons.calendar_today_rounded,
-                  title: [
-                    if (event.isWeekly) 'Next:',
-                    DateFormat('EEEE d MMMM yyyy').format(event.startTime),
-                  ].join(' '),
-                  subtitle: eventTimeRange(event),
-                ),
-                const SizedBox(height: 16),
-                _InfoBlock(
-                  key: const Key('event-detail-venue'),
-                  icon: Icons.place_outlined,
-                  title: _venue ?? _address ?? campus,
-                  subtitle: _venue != null ? _address : null,
-                  trailing: mapsQuery == null
-                      ? null
-                      : TextButton.icon(
-                          onPressed: () => _openDirections(context, mapsQuery),
-                          icon: const Icon(Icons.directions_rounded, size: 18),
-                          label: const Text('Get directions'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: context.kc.accentInk,
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 16),
-                _InfoBlock(
-                  icon: Icons.church_outlined,
-                  title: campus,
-                  subtitle: 'Branch',
-                ),
-                if (description != null) ...[
-                  const SizedBox(height: 26),
-                  Text(
-                    'About this event',
-                    style: AppTypography.ui(
-                      size: 15,
-                      weight: FontWeight.w700,
-                    ).copyWith(color: context.kc.onBg),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    description,
-                    style: AppTypography.bodyLg.copyWith(
-                      color: context.kc.onBg,
-                      height: 1.55,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 30),
-                Row(
-                  children: [
-                    if (!isPast) ...[
-                      Expanded(
-                        child: FilledButton(
-                          // DESIGN.md: one CTA style, gold with gold ink.
-                          style: FilledButton.styleFrom(
-                            backgroundColor: isRsvped
-                                ? context.kc.surfaceAlt
-                                : context.kc.accent,
-                            foregroundColor: isRsvped
-                                ? context.kc.onBg
-                                : context.kc.onAccent,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onPressed: () => toggleEventRsvp(context, ref, event),
-                          child: Text(isRsvped ? 'Going \u2713' : 'RSVP'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: context.kc.onBg,
-                          side: BorderSide(color: context.kc.outline),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        onPressed: () => addEventToCalendar(context, event),
-                        icon: const Icon(
-                          Icons.event_available_rounded,
-                          size: 18,
-                        ),
-                        label: const Text('Add to calendar'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          KOverline(
+            eventRepeatsLabel(event) ?? eventStatusLabel(event, now),
+            key: event.isWeekly ? const Key('event-detail-recurrence') : null,
+          ),
+          const SizedBox(height: KSpace.sm),
+          Semantics(
+            header: true,
+            child: Text(
+              event.title,
+              style: KharisText.pageTitle.copyWith(color: k.text),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: KSpace.x3),
+          _InfoRow(
+            icon: KIcons.calendar,
+            title: event.isWeekly ? 'Next: $date' : date,
+            meta: eventTimeRange(event),
+          ),
+          if (place != null) ...[
+            const SizedBox(height: KSpace.xl),
+            _InfoRow(
+              key: const Key('event-detail-venue'),
+              icon: KIcons.pin,
+              title: place,
+              meta: venue != null ? address : null,
+              action: KTextLink(
+                label: 'Get directions',
+                showChevron: true,
+                onTap: () => _openDirections(context, mapsQuery),
+              ),
+            ),
+          ],
+          const SizedBox(height: KSpace.xl),
+          _InfoRow(
+            icon: KIcons.users,
+            title: _clean(event.branch) ?? 'All branches',
+            meta: 'Branch',
+          ),
+          if (description != null) ...[
+            const SizedBox(height: KSpace.section),
+            Text(description, style: KharisText.body.copyWith(color: k.text)),
+          ],
+          const SizedBox(height: KSpace.section),
+          if (canRemind) ...[
+            MergeSemantics(
+              child: Semantics(
+                toggled: reminded,
+                child: KButton(
+                  key: const Key('event-detail-remind'),
+                  label: reminded ? 'Reminder on' : 'Remind me',
+                  icon: reminded ? KIcons.check : KIcons.bell,
+                  variant: reminded
+                      ? KButtonVariant.tonal
+                      : KButtonVariant.primary,
+                  size: KButtonSize.cta,
+                  expand: true,
+                  onPressed: () => toggleEventReminder(context, ref, event),
+                ),
+              ),
+            ),
+            const SizedBox(height: KSpace.md),
+          ],
+          if (!isPast) ...[
+            MergeSemantics(
+              child: Semantics(
+                toggled: isRsvped,
+                child: KButton(
+                  key: const Key('event-detail-rsvp'),
+                  label: isRsvped ? 'Going' : 'RSVP',
+                  icon: isRsvped ? KIcons.check : null,
+                  variant: KButtonVariant.outline,
+                  expand: true,
+                  onPressed: () => toggleEventRsvp(context, ref, event),
+                ),
+              ),
+            ),
+            const SizedBox(height: KSpace.md),
+          ],
+          KButton(
+            label: 'Add to calendar',
+            icon: KIcons.calendar,
+            variant: KButtonVariant.outline,
+            expand: true,
+            onPressed: () => addEventToCalendar(context, event),
+          ),
+          const SizedBox(height: KSpace.md),
+          KButton(
+            label: 'Share',
+            icon: KIcons.share,
+            variant: KButtonVariant.text,
+            expand: true,
+            onPressed: _share,
+          ),
+          Center(
+            child: KTextLink(
+              label: 'All events',
+              showChevron: true,
+              onTap: () => _backToEvents(context),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -366,9 +335,7 @@ class _EventBody extends ConsumerWidget {
     if (!opened) {
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Couldn\u2019t open maps.')),
-        );
+        ..showSnackBar(eventToast('Couldn\u2019t open maps.'));
     }
   }
 
@@ -379,132 +346,41 @@ class _EventBody extends ConsumerWidget {
   }
 }
 
-class _Banner extends StatelessWidget {
-  const _Banner({required this.event});
-
-  final Event event;
-
-  @override
-  Widget build(BuildContext context) {
-    // Solid brand fill when the event has no photo (or it fails).
-    const fallback = ColoredBox(color: AppColors.primaryDeep);
-    final url = event.imageUrl;
-    final image = (url == null || url.isEmpty)
-        ? fallback
-        : CachedNetworkImage(
-            imageUrl: url,
-            fit: BoxFit.cover,
-            placeholder: (_, _) => fallback,
-            errorWidget: (_, _, _) => fallback,
-          );
-    // Top scrim keeps the white back/share icons legible over any photo.
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        image,
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.center,
-              colors: [
-                Colors.black.withValues(alpha: 0.45),
-                Colors.transparent,
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label, required this.past});
-
-  final String label;
-  final bool past;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: past ? context.kc.surfaceMuted : context.kc.chipBg,
-        borderRadius: AppRadius.pillBorder,
-      ),
-      child: Text(
-        label,
-        style: AppTypography.ui(
-          size: 12,
-          weight: FontWeight.w700,
-        ).copyWith(color: past ? context.kc.muted : context.kc.onChip),
-      ),
-    );
-  }
-}
-
-class _InfoBlock extends StatelessWidget {
-  const _InfoBlock({
+/// One fact about the event: a small icon, the fact, and an optional second
+/// line and link under it.
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
     super.key,
     required this.icon,
     required this.title,
-    this.subtitle,
-    this.trailing,
+    this.meta,
+    this.action,
   });
 
-  final IconData icon;
+  final String icon;
   final String title;
-  final String? subtitle;
-  final Widget? trailing;
+  final String? meta;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = this.subtitle;
-    final trailing = this.trailing;
+    final k = context.k;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: context.kc.chipBg,
-            borderRadius: BorderRadius.circular(AppRadius.tile),
-          ),
-          child: Icon(icon, size: 20, color: context.kc.onChip),
+        Padding(
+          padding: const EdgeInsets.only(top: KSpace.xxs),
+          child: KIcon(icon, size: KSize.iconMd, color: k.muted),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: KSpace.xl),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 2),
-              Text(
-                title,
-                style: AppTypography.ui(
-                  size: 15,
-                  weight: FontWeight.w600,
-                ).copyWith(color: context.kc.onBg),
-              ),
-              if (subtitle != null && subtitle.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: AppTypography.ui(
-                    size: 13.5,
-                  ).copyWith(color: context.kc.muted),
-                ),
-              ],
-              if (trailing != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Transform.translate(
-                    // Optically align the button text with the lines above.
-                    offset: const Offset(-12, 0),
-                    child: trailing,
-                  ),
-                ),
+              Text(title, style: KharisText.body.copyWith(color: k.text)),
+              if (meta != null)
+                Text(meta!, style: KharisText.meta.copyWith(color: k.muted)),
+              ?action,
             ],
           ),
         ),
@@ -513,23 +389,39 @@ class _InfoBlock extends StatelessWidget {
   }
 }
 
+/// Blocks where the overline, title, facts and main button will be.
 class _DetailSkeleton extends StatelessWidget {
   const _DetailSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.all(AppSpacing.marginMobile),
+    return const SingleChildScrollView(
+      physics: NeverScrollableScrollPhysics(),
+      padding: _pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Skeleton(width: double.infinity, height: 180, radius: AppRadius.card),
-          SizedBox(height: 22),
-          SkeletonLine(width: 220, height: 24),
-          SizedBox(height: 16),
-          SkeletonLine(width: 180),
-          SizedBox(height: 10),
-          SkeletonLine(width: 140),
+          FractionallySizedBox(
+            widthFactor: 0.3,
+            child: KSkeleton(height: KSize.iconXs, radius: KRadius.xs),
+          ),
+          SizedBox(height: KSpace.sm),
+          FractionallySizedBox(
+            widthFactor: 0.7,
+            child: KSkeleton(height: KSize.iconLg),
+          ),
+          SizedBox(height: KSpace.x3),
+          FractionallySizedBox(
+            widthFactor: 0.6,
+            child: KSkeleton(height: KSize.icon, radius: KRadius.xs),
+          ),
+          SizedBox(height: KSpace.xl),
+          FractionallySizedBox(
+            widthFactor: 0.5,
+            child: KSkeleton(height: KSize.icon, radius: KRadius.xs),
+          ),
+          SizedBox(height: KSpace.section),
+          KSkeleton(height: KSize.cta, radius: KRadius.button),
         ],
       ),
     );
@@ -544,42 +436,29 @@ class _Unavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.event_busy_outlined, color: context.kc.muted, size: 44),
-            const SizedBox(height: 14),
-            Text(
-              'This event isn\u2019t available',
-              textAlign: TextAlign.center,
-              style: AppTypography.ui(
-                size: 15,
-                weight: FontWeight.w600,
-              ).copyWith(color: context.kc.onBg),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'It may have been removed, or we couldn\u2019t reach the '
-              'server. Check your connection and try again.',
-              textAlign: TextAlign.center,
-              style: AppTypography.ui(
-                size: 13,
-              ).copyWith(color: context.kc.muted),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              children: [
-                TextButton(onPressed: onRetry, child: const Text('Try again')),
-                TextButton(
-                  onPressed: () => _backToEvents(context),
-                  child: const Text('All events'),
-                ),
-              ],
-            ),
-          ],
+      child: SingleChildScrollView(
+        child: KEmptyState(
+          icon: KIcons.calendar,
+          title: 'This event isn\u2019t available',
+          hint:
+              'It may have been removed. Check your connection and try '
+              'again.',
+          action: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              KButton(
+                label: 'Try again',
+                variant: KButtonVariant.outline,
+                onPressed: onRetry,
+              ),
+              const SizedBox(height: KSpace.xs),
+              KTextLink(
+                label: 'All events',
+                showChevron: true,
+                onTap: () => _backToEvents(context),
+              ),
+            ],
+          ),
         ),
       ),
     );

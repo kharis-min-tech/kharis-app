@@ -25,6 +25,7 @@ class Sermon {
     this.transcriptUrl,
     this.relatedIds = const [],
     this.tags = const [],
+    this.passages = const [],
   });
 
   /// Rebuilds a sermon from the on-disk archive cache.
@@ -51,6 +52,7 @@ class Sermon {
     // Absent from caches written before these fields existed.
     relatedIds: _stringList(j['relatedIds']),
     tags: _stringList(j['tags']),
+    passages: _stringList(j['passages']),
   );
 
   /// Serialises for the archive cache and player snapshots. `Duration` and
@@ -73,6 +75,7 @@ class Sermon {
     'isFeatured': isFeatured,
     if (relatedIds.isNotEmpty) 'relatedIds': relatedIds,
     if (tags.isNotEmpty) 'tags': tags,
+    if (passages.isNotEmpty) 'passages': passages,
   };
 
   /// Whether this sermon has a streamable audio recording.
@@ -145,6 +148,10 @@ class Sermon {
   /// Free-form labels from the Kharis sermon site (e.g. `PDAK`).
   final List<String> tags;
 
+  /// Bible passages the message is preached from, as the sermon API writes
+  /// them (e.g. `Acts 20:17-38`), in its order. Empty when none are listed.
+  final List<String> passages;
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   String get formattedDuration {
@@ -176,6 +183,7 @@ class Sermon {
     String? transcriptUrl,
     List<String>? relatedIds,
     List<String>? tags,
+    List<String>? passages,
   }) {
     return Sermon(
       id: id ?? this.id,
@@ -196,6 +204,7 @@ class Sermon {
       transcriptUrl: transcriptUrl ?? this.transcriptUrl,
       relatedIds: relatedIds ?? this.relatedIds,
       tags: tags ?? this.tags,
+      passages: passages ?? this.passages,
     );
   }
 
@@ -219,7 +228,8 @@ class Sermon {
         other.source == source &&
         other.isFeatured == isFeatured &&
         listEquals(other.relatedIds, relatedIds) &&
-        listEquals(other.tags, tags);
+        listEquals(other.tags, tags) &&
+        listEquals(other.passages, passages);
   }
 
   @override
@@ -241,6 +251,7 @@ class Sermon {
     isFeatured,
     Object.hashAll(relatedIds),
     Object.hashAll(tags),
+    Object.hashAll(passages),
   );
 
   @override

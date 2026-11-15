@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
-import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart'
-    show authFieldDecoration;
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -21,8 +19,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -70,213 +66,135 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final k = context.k;
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 56),
-
-                // ── Heading ─────────────────────────────────────────────────
-                Text(
-                  'Create account',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.headlineLgMobile.copyWith(
-                    color: context.kc.onBg,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Join the Kharis family',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodyLg.copyWith(color: context.kc.muted),
-                ),
-                const SizedBox(height: 40),
-
-                // ── Display Name ────────────────────────────────────────────
-                TextFormField(
-                  controller: _nameController,
-                  textInputAction: TextInputAction.next,
-                  textCapitalization: TextCapitalization.words,
-                  style: _textStyle,
-                  decoration: _fieldDecoration(hint: 'Display name'),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Name is required';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // ── Email ───────────────────────────────────────────────────
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  style: _textStyle,
-                  decoration: _fieldDecoration(hint: 'Email address'),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Email is required';
-                    }
-                    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) {
-                      return 'Enter a valid email address';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // ── Password ────────────────────────────────────────────────
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  textInputAction: TextInputAction.next,
-                  style: _textStyle,
-                  decoration: _fieldDecoration(hint: 'Password').copyWith(
-                    suffixIcon: _eyeToggle(
-                      obscure: _obscurePassword,
-                      onTap: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Password is required';
-                    if (v.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // ── Confirm Password ────────────────────────────────────────
-                TextFormField(
-                  controller: _confirmController,
-                  obscureText: _obscureConfirm,
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _createAccount(),
-                  style: _textStyle,
-                  decoration: _fieldDecoration(hint: 'Confirm password')
-                      .copyWith(
-                        suffixIcon: _eyeToggle(
-                          obscure: _obscureConfirm,
-                          onTap: () => setState(
-                            () => _obscureConfirm = !_obscureConfirm,
-                          ),
-                        ),
-                      ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Please confirm your password';
-                    }
-                    if (v != _passwordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // ── Error message ───────────────────────────────────────────
-                if (_errorMessage != null) ...[
-                  Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.ui(size: 14, color: context.kc.danger),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // ── Create Account button ───────────────────────────────────
-                SizedBox(
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _createAccount,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.kc.accent,
-                      disabledBackgroundColor: context.kc.accent.withValues(
-                        alpha: 0.4,
-                      ),
-                      foregroundColor: context.kc.onAccent,
-                      elevation: 0,
-                      shadowColor: Colors.transparent,
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: context.kc.onAccent,
-                            ),
-                          )
-                        : Text(
-                            'Create account',
-                            style: AppTypography.ui(
-                              size: 15,
-                              weight: FontWeight.w700,
-                              color: context.kc.onAccent,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // ── Sign In link ────────────────────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: KSpace.gutter),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Already have an account?',
-                      style: AppTypography.ui(
-                        size: 14,
-                        color: context.kc.muted,
+                    const KScreenHeader(title: 'Create account'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: KSpace.gutter,
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () => context.pop(),
-                      child: Text(
-                        'Sign in',
-                        style: AppTypography.ui(
-                          size: 14,
-                          weight: FontWeight.w600,
-                          color: context.kc.accentInk,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: KSpace.md),
+                          Text(
+                            'Join the Kharis family',
+                            style: KharisText.body.copyWith(color: k.muted),
+                          ),
+                          const SizedBox(height: KSpace.section),
+                          KTextField(
+                            label: 'Display name',
+                            controller: _nameController,
+                            textInputAction: TextInputAction.next,
+                            textCapitalization: TextCapitalization.words,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Name is required';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: KSpace.x3),
+                          KTextField(
+                            label: 'Email address',
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Email is required';
+                              }
+                              if (!RegExp(
+                                r'^[^@]+@[^@]+\.[^@]+',
+                              ).hasMatch(v.trim())) {
+                                return 'Enter a valid email address';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: KSpace.x3),
+                          KTextField(
+                            label: 'Password',
+                            controller: _passwordController,
+                            password: true,
+                            textInputAction: TextInputAction.next,
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Password is required';
+                              }
+                              if (v.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: KSpace.x3),
+                          KTextField(
+                            label: 'Confirm password',
+                            controller: _confirmController,
+                            password: true,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _createAccount(),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Please confirm your password';
+                              }
+                              if (v != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: KSpace.section),
+                          if (_errorMessage != null) ...[
+                            KInlineError(_errorMessage!),
+                            const SizedBox(height: KSpace.xl),
+                          ],
+                          KButton(
+                            label: 'Create account',
+                            size: KButtonSize.cta,
+                            expand: true,
+                            loading: _isLoading,
+                            onPressed: _createAccount,
+                          ),
+                          const SizedBox(height: KSpace.x3),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: KSpace.md,
+                            children: [
+                              Text(
+                                'Already have an account?',
+                                style: KharisText.body.copyWith(color: k.muted),
+                              ),
+                              KTextLink(
+                                label: 'Sign in',
+                                onTap: () => context.pop(),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
-              ],
+              ),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  TextStyle get _textStyle =>
-      AppTypography.ui(size: 15, color: context.kc.onBg);
-
-  InputDecoration _fieldDecoration({required String hint}) =>
-      authFieldDecoration(context, hint: hint);
-
-  Widget _eyeToggle({required bool obscure, required VoidCallback onTap}) {
-    return IconButton(
-      icon: Icon(
-        obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-        color: context.kc.muted,
-        size: 20,
-      ),
-      onPressed: onTap,
     );
   }
 }

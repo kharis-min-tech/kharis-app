@@ -6,7 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/core/utils/playback_timestamp.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/data/notepad.dart';
@@ -214,81 +214,73 @@ class _NotepadEditorState extends ConsumerState<NotepadEditor>
   @override
   Widget build(BuildContext context) {
     _repo = ref.watch(notesRepositoryProvider);
-    final textStyle = AppTypography.ui(
-      size: 16,
-      color: context.kc.onBg,
-      height: 1.6,
-    );
+    final k = context.k;
+    final textStyle = KharisText.body.copyWith(color: k.text);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            // A tap on a stamp seeks; it is claimed before the field sees it,
-            // so the cursor stays put and the keyboard stays down.
-            child: RawGestureDetector(
-              gestures: {
-                _StampTapRecognizer:
-                    GestureRecognizerFactoryWithHandlers<_StampTapRecognizer>(
-                      () => _StampTapRecognizer(
-                        stampAt: _stampAt,
-                        onStamp: (position) => widget.onSeek(position),
-                      ),
-                      (_) {},
+          // A tap on a stamp seeks; it is claimed before the field sees it,
+          // so the cursor stays put and the keyboard stays down.
+          child: RawGestureDetector(
+            gestures: {
+              _StampTapRecognizer:
+                  GestureRecognizerFactoryWithHandlers<_StampTapRecognizer>(
+                    () => _StampTapRecognizer(
+                      stampAt: _stampAt,
+                      onStamp: (position) => widget.onSeek(position),
                     ),
-              },
-              child: KeyedSubtree(
-                key: _fieldKey,
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focus,
-                  maxLines: null,
-                  expands: true,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                  textAlignVertical: TextAlignVertical.top,
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(notepadMaxLength),
-                  ],
-                  style: textStyle,
-                  cursorColor: context.kc.accentInk,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    hintText:
-                        'Write as you listen. Insert stamps the moment, so you '
-                        'can tap back to it.',
-                    hintMaxLines: 3,
-                    hintStyle: AppTypography.ui(
-                      size: 16,
-                      height: 1.6,
-                      color: context.kc.muted,
-                    ),
+                    (_) {},
                   ),
+            },
+            child: KeyedSubtree(
+              key: _fieldKey,
+              child: TextField(
+                controller: _controller,
+                focusNode: _focus,
+                maxLines: null,
+                expands: true,
+                keyboardType: TextInputType.multiline,
+                textCapitalization: TextCapitalization.sentences,
+                textAlignVertical: TextAlignVertical.top,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(notepadMaxLength),
+                ],
+                style: textStyle,
+                cursorColor: k.primaryText,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText:
+                      'Write as you listen. Insert stamps the moment, so you '
+                      'can tap back to it.',
+                  hintMaxLines: 3,
+                  hintStyle: KharisText.body.copyWith(color: k.muted),
                 ),
               ),
             ),
           ),
         ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.md,
-          ),
+        DecoratedBox(
           decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: context.kc.divider)),
+            border: Border(top: BorderSide(color: k.line)),
           ),
-          child: Row(
-            children: [
-              // Inside the field's tap region: tapping Insert must not
-              // dismiss the keyboard mid-thought.
-              TextFieldTapRegion(child: _insertButton(context)),
-              const Spacer(),
-              _statusLabel(context),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.only(top: KSpace.md),
+            child: Row(
+              children: [
+                // Inside the field's tap region: tapping Insert must not
+                // dismiss the keyboard mid-thought.
+                TextFieldTapRegion(child: _insertButton(context)),
+                const SizedBox(width: KSpace.xl),
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: _statusLabel(context),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -323,38 +315,36 @@ class _NotepadEditorState extends ConsumerState<NotepadEditor>
   }
 
   Widget _insertBody(BuildContext context, Duration? position) {
-    return FilledButton.icon(
-      style: FilledButton.styleFrom(
-        backgroundColor: context.kc.accent,
-        foregroundColor: context.kc.onAccent,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: 12,
-        ),
-      ),
-      onPressed: position == null ? null : () => _insert(position),
-      icon: const Icon(Icons.more_time_rounded, size: 18),
-      label: Text(
-        position == null
+    return Opacity(
+      opacity: position == null ? KRatio.disabled : 1,
+      child: KChip(
+        label: position == null
             ? 'Insert time'
             : 'Insert ${formatPlaybackTimestamp(position)}',
-        style: AppTypography.ui(
-          size: 15,
-          weight: FontWeight.w600,
-        ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+        leading: KIcons.plus,
+        onTap: position == null ? null : () => _insert(position),
       ),
     );
   }
 
   Widget _statusLabel(BuildContext context) {
+    final k = context.k;
     final (label, color) = switch (_status) {
-      _SaveStatus.idle => (null, context.kc.muted),
-      _SaveStatus.saving => ('Saving\u2026', context.kc.muted),
-      _SaveStatus.saved => ('Saved', context.kc.muted),
-      _SaveStatus.failed => ('Couldn\u2019t save', context.kc.danger),
+      _SaveStatus.idle => (null, k.muted),
+      _SaveStatus.saving => ('Saving\u2026', k.muted),
+      _SaveStatus.saved => ('Saved', k.muted),
+      _SaveStatus.failed => ('Couldn\u2019t save', k.error),
     };
     if (label == null) return const SizedBox.shrink();
-    return Text(label, style: AppTypography.ui(size: 13, color: color));
+    return Semantics(
+      liveRegion: true,
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: KharisText.caption.copyWith(color: color),
+      ),
+    );
   }
 }
 

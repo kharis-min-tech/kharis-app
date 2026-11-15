@@ -26,10 +26,12 @@ import 'shared/providers/auth_provider.dart';
 import 'shared/providers/audio_provider.dart';
 import 'features/player/data/kharis_audio_handler.dart';
 import 'shared/providers/cache_provider.dart';
+import 'shared/providers/event_reminders_provider.dart';
 import 'shared/providers/sermon_provider.dart';
 import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
 import 'shared/providers/sound_focus_provider.dart';
+import 'shared/providers/text_size_provider.dart';
 
 Future<void> main() async {
   // Catch all errors in release mode
@@ -114,14 +116,24 @@ Future<void> main() async {
 const double kMinTextScale = 0.85;
 const double kMaxTextScale = 1.3;
 
-/// `MaterialApp.builder` that honours the system text size within
+/// `MaterialApp.builder` that honours the system text size, multiplied by the
+/// member's Text size choice ([factor]), within
 /// [kMinTextScale]..[kMaxTextScale] for every route, dialog and sheet.
-Widget clampTextScaling(BuildContext context, Widget? child) =>
-    MediaQuery.withClampedTextScaling(
-      minScaleFactor: kMinTextScale,
-      maxScaleFactor: kMaxTextScale,
-      child: child ?? const SizedBox.shrink(),
-    );
+Widget clampTextScaling(
+  BuildContext context,
+  Widget? child, {
+  double factor = 1.0,
+}) {
+  final media = MediaQuery.of(context);
+  final scale = (media.textScaler.scale(1) * factor).clamp(
+    kMinTextScale,
+    kMaxTextScale,
+  );
+  return MediaQuery(
+    data: media.copyWith(textScaler: TextScaler.linear(scale)),
+    child: child ?? const SizedBox.shrink(),
+  );
+}
 
 /// The app's theme for [brightness]: [KharisTheme] plus, during the redesign,
 /// the old theme's extension so screens that have not been converted yet can
@@ -169,6 +181,11 @@ class KharisApp extends ConsumerWidget {
     ref.watch(notificationInitProvider);
     // Keeps preference-gated topic subscriptions in step with saved prefs.
     ref.watch(notificationTopicSyncProvider);
+    // Re-arms weekly event reminders and opens the event when a reminder
+    // tap started the app.
+    ref.watch(eventReminderStartupProvider);
+    // The member's Text size choice, applied on top of the system text size.
+    final textSizeFactor = ref.watch(textSizeFactorProvider);
     // Guarantees a Firebase uid for every session (anonymous when the member
     // never signs in) so per-user data — playlists, notes — has somewhere to
     // live even on the login-free onboarding path.
@@ -195,6 +212,7 @@ class KharisApp extends ConsumerWidget {
             clampTextScaling(
               context,
               OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+              factor: textSizeFactor,
             ),
           ),
         ),

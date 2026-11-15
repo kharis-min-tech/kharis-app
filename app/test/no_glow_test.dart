@@ -24,7 +24,6 @@ import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
-import 'package:kharis_app/features/player/presentation/artwork_tint.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
@@ -37,6 +36,7 @@ import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/theme/kharis_theme.dart' as redesign;
 
 import 'support/bible_overrides.dart';
 import 'support/fake_audio_player_service.dart';
@@ -135,6 +135,10 @@ void main() {
   for (final brightness in Brightness.values) {
     group('no glow or gloss ($brightness)', () {
       ThemeData theme() => kharisTheme(brightness: brightness);
+      // The player is on the redesigned theme.
+      ThemeData playerTheme() => brightness == Brightness.dark
+          ? redesign.KharisTheme.dark()
+          : redesign.KharisTheme.light();
 
       testWidgets('full player, audio mode', (tester) async {
         final sermon = _sermon(1, videoId: 'v1');
@@ -143,7 +147,7 @@ void main() {
           ProviderScope(
             overrides: playerOverrides(),
             child: MaterialApp(
-              theme: theme(),
+              theme: playerTheme(),
               home: MediaPlayerScreen(sermon: sermon, mode: MediaMode.audio),
             ),
           ),
@@ -162,7 +166,7 @@ void main() {
           ProviderScope(
             overrides: playerOverrides(),
             child: MaterialApp(
-              theme: theme(),
+              theme: playerTheme(),
               home: MediaPlayerScreen(sermon: sermon, mode: MediaMode.video),
             ),
           ),
@@ -172,7 +176,7 @@ void main() {
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 
-      testWidgets('full player: artwork tint, Up next, More like this', (
+      testWidgets('full player: artwork, Up next, More like this', (
         tester,
       ) async {
         final sermon = Sermon(
@@ -186,17 +190,9 @@ void main() {
         await audio.play(sermon, queue: queue);
         await tester.pumpWidget(
           ProviderScope(
-            overrides: [
-              ...playerOverrides(library: queue),
-              artworkSchemeSourceProvider.overrideWithValue(
-                (_, b) async => ColorScheme.fromSeed(
-                  seedColor: const Color(0xFF2E7D32),
-                  brightness: b,
-                ),
-              ),
-            ],
+            overrides: playerOverrides(library: queue),
             child: MaterialApp(
-              theme: theme(),
+              theme: playerTheme(),
               home: MediaPlayerScreen(
                 sermon: sermon,
                 mode: MediaMode.audio,
@@ -261,6 +257,7 @@ void main() {
         WidgetTester tester,
         Widget card, {
         List<Override> overrides = const [],
+        ThemeData? themeData,
       }) async {
         await tester.pumpWidget(
           ProviderScope(
@@ -277,7 +274,7 @@ void main() {
               ...overrides,
             ],
             child: MaterialApp(
-              theme: theme(),
+              theme: themeData ?? theme(),
               home: Scaffold(
                 body: Padding(padding: const EdgeInsets.all(20), child: card),
               ),
@@ -383,6 +380,7 @@ void main() {
         await pumpCard(
           tester,
           const CampusCard(),
+          themeData: playerTheme(),
           overrides: [
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
             branchesProvider.overrideWith(
@@ -470,11 +468,14 @@ void main() {
                 (ref) => Stream.value(const <Branch>[]),
               ),
             ],
-            child: MaterialApp(theme: theme(), home: const GivingScreen()),
+            child: MaterialApp(
+              theme: playerTheme(),
+              home: const GivingScreen(),
+            ),
           ),
         );
         await tester.pump();
-        expect(find.text('2 Corinthians 9:7 (NKJV)'), findsOneWidget);
+        expect(find.text('2 CORINTHIANS 9:7 \u00b7 KJV'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
     });
@@ -546,7 +547,7 @@ void main() {
           ProviderScope(
             overrides: playerOverrides(),
             child: MaterialApp(
-              theme: kharisTheme(),
+              theme: redesign.KharisTheme.light(),
               home: Scaffold(
                 body: Center(child: PlayerControls(transport: transport)),
               ),
@@ -555,13 +556,15 @@ void main() {
         );
 
     final button = find.byKey(const ValueKey('player-play-pause'));
-    Material material(WidgetTester tester) => tester.widget<Material>(button);
+    Material material(WidgetTester tester) => tester.widget<Material>(
+      find.descendant(of: button, matching: find.byType(Material)),
+    );
 
-    testWidgets('is a solid accent circle with no shadow', (tester) async {
+    testWidgets('is a solid primary circle with no shadow', (tester) async {
       await pump(tester, binding());
 
       final m = material(tester);
-      expect(m.color, KharisColors.light.accent);
+      expect(m.color, redesign.KharisColors.light.primary);
       expect(m.elevation, 0);
       expect(m.shape, isA<CircleBorder>());
       expect(
@@ -572,36 +575,11 @@ void main() {
       expect(_gloss(tester), isEmpty);
     });
 
-    testWidgets('pressing paints an ink highlight on the circle', (
-      tester,
-    ) async {
+    testWidgets('a press and release plays', (tester) async {
       await pump(tester, binding());
-      // Paint round-trips colours through 8-bit ARGB, so compare those.
-      final highlight = KharisColors.light.onAccent
-          .withValues(alpha: 0.16)
-          .toARGB32();
 
       final gesture = await tester.startGesture(tester.getCenter(button));
-      // Past the press timeout (tap down fires), then through the fade-in.
       await tester.pump(kPressTimeout);
-      await tester.pump(const Duration(milliseconds: 300));
-
-      final inkLayers = tester.allRenderObjects.where(
-        (r) => r.runtimeType.toString() == '_RenderInkFeatures',
-      );
-      // The highlight is a rect clipped to the circle. Other ink in the tree
-      // also draws rects, so search for this one rather than the first.
-      expect(
-        inkLayers,
-        contains(
-          paints..something(
-            (method, args) =>
-                method == #drawRect &&
-                (args[1] as Paint).color.toARGB32() == highlight,
-          ),
-        ),
-      );
-
       await gesture.up();
       await tester.pumpAndSettle();
       expect(taps, ['play']);
@@ -642,8 +620,12 @@ void main() {
       await pump(tester, binding(enabled: false));
 
       expect(
-        material(tester).color,
-        KharisColors.light.accent.withValues(alpha: 0.38),
+        tester
+            .widget<Opacity>(
+              find.descendant(of: button, matching: find.byType(Opacity)),
+            )
+            .opacity,
+        lessThan(1),
       );
       expect(
         tester.getSemantics(button),

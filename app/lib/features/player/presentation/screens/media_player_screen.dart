@@ -10,7 +10,6 @@ import 'package:just_audio/just_audio.dart' show ProcessingState;
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/features/notes/data/notepad.dart' show noteMoments;
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart'
@@ -21,13 +20,14 @@ import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart'
     show startAudioPlayback;
-import 'package:kharis_app/features/player/presentation/artwork_tint.dart';
+import 'package:kharis_app/features/player/presentation/widgets/download_button.dart';
 import 'package:kharis_app/features/player/presentation/widgets/like_button.dart';
 import 'package:kharis_app/features/player/presentation/widgets/media_mode_toggle.dart';
 import 'package:kharis_app/features/player/presentation/widgets/playback_error_banner.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_actions.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_discovery.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_grab_handle.dart';
 import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
 import 'package:kharis_app/features/player/presentation/widgets/youtube_web_embed.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -36,6 +36,8 @@ import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/sound_focus_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/ui/components/components.dart';
+import 'package:kharis_app/ui/components/k_layout.dart' show kClear;
 
 export 'package:kharis_app/features/player/presentation/media_mode.dart';
 
@@ -175,11 +177,6 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   /// Position handed to the web iframe embed, which takes it as a URL
   /// parameter rather than a controller call.
   int _webStartSeconds = 0;
-
-  /// The artwork colour scheme the top of the player is tinted with. Kept
-  /// while the next message's colour is still being read, so a skip goes
-  /// straight from one tint to the next instead of flashing the page colour.
-  ColorScheme? _tintScheme;
 
   final ScrollController _scroll = ScrollController();
 
@@ -899,39 +896,11 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       unawaited(
         _scroll.animateTo(
           0,
-          duration: const Duration(milliseconds: 200),
+          duration: KMotion.fast,
           curve: Curves.easeOutCubic,
         ),
       );
     }
-  }
-
-  // ── Artwork tint ───────────────────────────────────────────────────────────
-
-  /// [base] with its palette re-pointed at the artwork's colour (see
-  /// [tintedPlayerColors]); [base] itself while there is no artwork or its
-  /// colour could not be read.
-  ThemeData _tintedTheme(ThemeData base) {
-    final url = _sermon.artworkUrl?.trim() ?? '';
-    if (url.isEmpty) {
-      _tintScheme = null;
-    } else {
-      final scheme = ref.watch(artworkSchemeProvider((url, base.brightness)));
-      if (!scheme.isLoading) _tintScheme = scheme.valueOrNull;
-    }
-    final tint = _tintScheme;
-    if (tint == null) return base;
-    return base.copyWith(
-      extensions: [
-        for (final e in base.extensions.values)
-          if (e is! KharisColors) e,
-        tintedPlayerColors(
-          base.extension<KharisColors>() ?? KharisColors.light,
-          tint,
-          base.brightness,
-        ),
-      ],
-    );
   }
 
   // ── Layout ─────────────────────────────────────────────────────────────────
@@ -959,61 +928,44 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       ref.watch(sermonsProvider);
       _videoOffset = _offsetFor(_sermon);
     }
-    final tinted = _tintedTheme(Theme.of(context));
-    // Reduced motion: the colour changes, it does not fade.
-    final tintDuration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 200);
-    // The tint is one solid colour from the status bar down to the controls,
-    // painted as two flat blocks (the pinned header, the top of the scroll)
-    // that always share a colour. No gradient, no glow.
-    Widget tintedBlock(WidgetBuilder builder) => AnimatedTheme(
-      data: tinted,
-      duration: tintDuration,
-      curve: Curves.easeOut,
-      child: Builder(builder: builder),
-    );
-    final lightIcons =
-        (tinted.extension<KharisColors>() ?? context.kc).onBg
-            .computeLuminance() >
-        0.5;
+    final k = context.k;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final upNext = _upNext();
     final related = ref.watch(relatedMessagesProvider(_sermon));
     final explore = _exploreTiles();
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: lightIcons
-            ? Brightness.light
-            : Brightness.dark,
-        statusBarBrightness: lightIcons ? Brightness.dark : Brightness.light,
+        statusBarColor: kClear(k.bg),
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: context.kc.bg,
+        backgroundColor: k.bg,
         body: Column(
           children: [
-            tintedBlock(
-              (context) => ColoredBox(
-                key: const Key('player-tint-header'),
-                color: context.kc.bg,
-                child: SafeArea(
-                  bottom: false,
-                  child: Column(
-                    children: [
-                      _buildHeader(context),
-                      // The video stays pinned outside the scrollable so a
-                      // swipe on the picture never scrolls the page out from
-                      // under playback (tester feedback); everything below
-                      // it still scrolls.
-                      if (isVideo)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
-                          child: _buildVideoSurface(context),
-                        ),
-                    ],
-                  ),
-                ),
+            SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  // No back button: the handle shows the player closes with
+                  // a swipe down, like a sheet.
+                  PlayerGrabHandle(onClose: () => Navigator.of(context).pop()),
+                  // The video stays pinned outside the scrollable so a
+                  // swipe on the picture never scrolls the page out from
+                  // under playback (tester feedback); everything below
+                  // it still scrolls.
+                  if (isVideo)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        KSpace.gutter,
+                        KSpace.md,
+                        KSpace.gutter,
+                        0,
+                      ),
+                      child: _buildVideoSurface(context),
+                    ),
+                ],
               ),
             ),
             Expanded(
@@ -1025,154 +977,146 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                   key: _viewportKey,
                   children: [
                     LayoutBuilder(
-                      builder: (context, viewport) => SingleChildScrollView(
-                        key: const Key('player-scroll'),
-                        controller: _scroll,
-                        physics: const ClampingScrollPhysics(),
-                        padding: const EdgeInsets.only(bottom: 32),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // The player stands alone on the first screen; the
-                            // suggestions start below it, never beside playback.
-                            ConstrainedBox(
-                              key: const Key('player-main'),
-                              constraints: BoxConstraints(
-                                minHeight: viewport.maxHeight,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  tintedBlock(
-                                    (context) => DecoratedBox(
-                                      key: const Key('player-tint-body'),
-                                      decoration: BoxDecoration(
-                                        color: context.kc.bg,
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                              bottom: Radius.circular(
-                                                AppRadius.xl,
-                                              ),
-                                            ),
+                      builder: (context, viewport) => NotificationListener<ScrollNotification>(
+                        onNotification: _onPageScroll,
+                        child: SingleChildScrollView(
+                          key: const Key('player-scroll'),
+                          controller: _scroll,
+                          physics: const ClampingScrollPhysics(),
+                          padding: const EdgeInsets.only(
+                            bottom: KSpace.section,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // The player stands alone on the first screen; the
+                              // suggestions start below it, never beside playback.
+                              ConstrainedBox(
+                                key: const Key('player-main'),
+                                constraints: BoxConstraints(
+                                  minHeight: viewport.maxHeight,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        KSpace.gutter,
+                                        KSpace.md,
+                                        KSpace.gutter,
+                                        KSpace.x3,
                                       ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                          24,
-                                          18,
-                                          24,
-                                          22,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            if (!isVideo) ...[
-                                              _buildArtwork(),
-                                              const SizedBox(height: 24),
-                                            ],
-                                            _buildInfoRow(context),
-                                            const SizedBox(height: 16),
-                                            MediaModeToggle(
-                                              sermon: isVideo
-                                                  ? _sermon.copyWith(
-                                                      audioUrl: _audioTwin()
-                                                          ?.audioUrl,
-                                                    )
-                                                  : _sermon,
-                                              activeMode: _mode,
-                                              onSelect: (mode) =>
-                                                  unawaited(_switchMode(mode)),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (!isVideo) ...[
+                                            _buildArtwork(),
+                                            const SizedBox(
+                                              height: KSpace.gutter,
                                             ),
-                                            const SizedBox(height: 22),
-                                            if (isVideo)
-                                              _buildVideoTransport()
-                                            else
-                                              KeyedSubtree(
-                                                key: _transportKey,
-                                                child: _buildAudioTransport(),
-                                              ),
                                           ],
-                                        ),
+                                          _buildInfo(context),
+                                          const SizedBox(height: KSpace.x3),
+                                          MediaModeToggle(
+                                            sermon: isVideo
+                                                ? _sermon.copyWith(
+                                                    audioUrl:
+                                                        _audioTwin()?.audioUrl,
+                                                  )
+                                                : _sermon,
+                                            activeMode: _mode,
+                                            onSelect: (mode) =>
+                                                unawaited(_switchMode(mode)),
+                                          ),
+                                          const SizedBox(height: KSpace.x3),
+                                          if (isVideo)
+                                            _buildVideoTransport()
+                                          else
+                                            KeyedSubtree(
+                                              key: _transportKey,
+                                              child: _buildAudioTransport(),
+                                            ),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      24,
-                                      18,
-                                      24,
-                                      0,
-                                    ),
-                                    child: PlayerActions(
+                                    // Full width: the chips scroll to the
+                                    // screen's edge.
+                                    PlayerActions(
                                       sermon: _sermon,
                                       timeline: _videoNoteBinding(),
                                       asVideo: isVideo,
                                       positionOf: _sharePosition,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Below the player, Spotify-style panels: about the
-                            // message, more like it, where to explore, up next.
-                            if ((_sermon.description?.trim() ?? '').isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: PlayerDiscoveryPanel(
-                                  child: AboutMessageCard(
-                                    sermon: _sermon,
-                                    onSeries:
-                                        (_sermon.series?.trim() ?? '').isEmpty
-                                        ? null
-                                        : () => _exploreMessages(
-                                            (ref) =>
-                                                ref
-                                                    .read(
-                                                      selectedSeriesProvider
-                                                          .notifier,
-                                                    )
-                                                    .state = _sermon.series!
-                                                    .trim(),
-                                          ),
-                                  ),
+                                    const SizedBox(height: KSpace.x3),
+                                  ],
                                 ),
                               ),
-                            if (related.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: PlayerDiscoveryPanel(
-                                  child: RelatedMessagesRail(
-                                    sermons: related,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
+                              // Below the player, Spotify-style panels: about the
+                              // message, more like it, where to explore, up next.
+                              if ((_sermon.description?.trim() ?? '')
+                                  .isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: KSpace.md,
+                                  ),
+                                  child: PlayerDiscoveryPanel(
+                                    child: AboutMessageCard(
+                                      sermon: _sermon,
+                                      onSeries:
+                                          (_sermon.series?.trim() ?? '').isEmpty
+                                          ? null
+                                          : () => _exploreMessages(
+                                              (ref) =>
+                                                  ref
+                                                      .read(
+                                                        selectedSeriesProvider
+                                                            .notifier,
+                                                      )
+                                                      .state = _sermon.series!
+                                                      .trim(),
+                                            ),
                                     ),
-                                    onOpen: (target) =>
-                                        _openRelated(target, related),
-                                    onSeeAll: () => _exploreMessages((_) {}),
                                   ),
                                 ),
-                              ),
-                            if (explore.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: PlayerDiscoveryPanel(
-                                  child: ExploreMessagesRow(
-                                    sermon: _sermon,
-                                    tiles: explore,
+                              if (related.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: KSpace.xl,
+                                  ),
+                                  child: PlayerDiscoveryPanel(
+                                    child: RelatedMessagesRail(
+                                      sermons: related,
+                                      onOpen: (target) =>
+                                          _openRelated(target, related),
+                                      onSeeAll: () => _exploreMessages((_) {}),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            if (upNext != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: PlayerDiscoveryPanel(
-                                  child: UpNextCard(
-                                    sermon: upNext,
-                                    onTap: () => _playUpNext(upNext),
+                              if (explore.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: KSpace.xl,
+                                  ),
+                                  child: PlayerDiscoveryPanel(
+                                    child: ExploreMessagesRow(tiles: explore),
                                   ),
                                 ),
-                              ),
-                          ],
+                              if (upNext != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: KSpace.xl,
+                                  ),
+                                  child: PlayerDiscoveryPanel(
+                                    child: UpNextCard(
+                                      sermon: upNext,
+                                      onTap: () => _playUpNext(upNext),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1191,7 +1135,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
                             opacity: _compact ? 1 : 0,
                             duration: MediaQuery.disableAnimationsOf(context)
                                 ? Duration.zero
-                                : const Duration(milliseconds: 160),
+                                : KMotion.fast,
                             child: _CompactPlayerBar(
                               sermon: _sermon,
                               onTap: _scrollToTop,
@@ -1227,7 +1171,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       );
     } else {
       // debugDisableVideoEngine: chrome renders, no engine runs.
-      player = const ColoredBox(color: Colors.black);
+      player = ColoredBox(color: context.k.ink);
     }
     // The embed is a NATIVE platform view (WebView). Android composites those
     // outside the Flutter layer, so neither ClipRRect nor
@@ -1235,9 +1179,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     // stayed hard, which is what made the video read as "slapped on" beside
     // the rounded artwork (tester feedback).
     // So the rounding is painted ON TOP instead: four corner slivers in the
-    // colour behind the video (the tinted header's kc.bg), over the video.
+    // page colour behind the video, over the video.
     // Flat, like _buildArtwork: no glow under the frame.
-    final pageColor = context.kc.bg;
+    final pageColor = context.k.bg;
     return Stack(
       children: [
         AspectRatio(aspectRatio: 16 / 9, child: player),
@@ -1245,10 +1189,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
         Positioned.fill(
           child: IgnorePointer(
             child: CustomPaint(
-              painter: _VideoCornerMask(
-                radius: AppRadius.card,
-                color: pageColor,
-              ),
+              painter: _VideoCornerMask(radius: KRadius.card, color: pageColor),
             ),
           ),
         ),
@@ -1271,7 +1212,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           onSeek: _audio.seek,
           pins: _notePins(),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: KSpace.x3),
         const PlayerControls(),
       ],
     );
@@ -1322,161 +1263,120 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  /// The series or topic as an overline (a tap opens its messages), the
+  /// title with the save actions beside it, then who preached it.
+  Widget _buildInfo(BuildContext context) {
+    final k = context.k;
     final label = (_sermon.series ?? _sermon.category ?? '').trim();
-    final series = (label.isEmpty ? 'Now playing' : label).toUpperCase();
+    final overline = (label.isEmpty ? 'Now playing' : label).toUpperCase();
     final open = _openCollection(label);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-      child: Row(
-        children: [
-          Semantics(
-            button: true,
-            label: 'Close player',
-            excludeSemantics: true,
-            child: _iconButton(
-              context,
-              Icons.keyboard_arrow_down_rounded,
-              28,
-              () => Navigator.of(context).pop(),
-            ),
-          ),
-          Expanded(
-            // Names the series (or topic): a tap opens its messages.
-            child: Semantics(
-              button: open != null,
-              label: open == null ? null : 'Open $label',
-              excludeSemantics: open != null,
-              child: GestureDetector(
-                key: const Key('player-header-collection'),
-                onTap: open,
-                behavior: HitTestBehavior.opaque,
-                child: SizedBox(
-                  height: 44,
-                  child: Center(
-                    child: Text(
-                      series,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.ui(
-                        size: 10,
-                        weight: FontWeight.w600,
-                        letterSpacing: 1.0,
-                        color: context.kc.muted,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Share lives in the actions row below (Notes · Playlist · Share).
-          // This header copy was the duplicate testers flagged (KA-013); the
-          // spacer keeps the series label optically centred.
-          const SizedBox(width: 44, height: 44),
-        ],
-      ),
-    );
-  }
-
-  Widget _iconButton(
-    BuildContext context,
-    IconData icon,
-    double size,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 44,
-        height: 44,
-        child: Icon(icon, color: context.kc.onBg, size: size),
-      ),
-    );
-  }
-
-  Widget _buildArtwork() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: ArtworkImage(
-          url: _sermon.artworkUrl,
-          gradientIndex: _sermon.artworkColor ?? 0,
-          radius: AppRadius.card,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(BuildContext context) {
     final speaker = _sermon.speaker.trim();
-    // The header already names the series, so the topic leads here.
+    // The overline already names the series, so the topic trails the speaker.
     final extra = (_sermon.category ?? _sermon.series ?? '').trim();
     final hasExtra = extra.isNotEmpty && extra != speaker;
 
-    // No extra inset: the title lines up with the mode toggle and seek bar
-    // below it (it used to sit 24 px further in than everything else).
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
+        Semantics(
+          button: open != null,
+          label: open == null ? null : 'Open $label',
+          excludeSemantics: open != null,
+          child: GestureDetector(
+            key: const Key('player-header-collection'),
+            onTap: open,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: KSpace.xs),
+              child: Text(
+                overline,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: KharisText.overline.copyWith(color: k.muted),
+              ),
+            ),
+          ),
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
                 _sermon.title,
-                style: AppTypography.display(
-                  size: 27,
-                  weight: FontWeight.w800,
-                  height: 1.04,
-                  color: context.kc.onBg,
-                ),
+                style: KharisText.headline.copyWith(color: k.text),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (speaker.isNotEmpty || hasExtra) ...[
-                const SizedBox(height: 4),
-                // One tight line: the speaker carries the weight, the
-                // series or topic trails it.
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      if (speaker.isNotEmpty)
-                        TextSpan(
-                          text: speaker,
-                          style: AppTypography.ui(
-                            size: 13.5,
-                            weight: FontWeight.w700,
-                            height: 1.2,
-                            color: context.kc.onBg,
-                          ),
-                        ),
-                      if (speaker.isNotEmpty && hasExtra)
-                        const TextSpan(text: ' · '),
-                      if (hasExtra)
-                        TextSpan(text: extra, recognizer: _extraTap(extra)),
-                    ],
-                  ),
-                  style: AppTypography.ui(
-                    size: 13.5,
-                    height: 1.2,
-                    color: context.kc.muted,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ],
-          ),
+            ),
+            const SizedBox(width: KSpace.md),
+            DownloadButton(sermon: _audioTwin() ?? _sermon),
+            LikeButton(sermon: _sermon),
+          ],
         ),
-        const SizedBox(width: 12),
-        LikeButton(sermon: _sermon),
+        if (speaker.isNotEmpty || hasExtra)
+          // One line: the speaker, then the series or topic.
+          Text.rich(
+            TextSpan(
+              children: [
+                if (speaker.isNotEmpty) TextSpan(text: speaker),
+                if (speaker.isNotEmpty && hasExtra) const TextSpan(text: ' · '),
+                if (hasExtra)
+                  TextSpan(text: extra, recognizer: _extraTap(extra)),
+              ],
+            ),
+            style: KharisText.meta.copyWith(color: k.muted),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
       ],
     );
+  }
+
+  /// Square, as wide as the page allows, but never so tall that it pushes
+  /// the transport off a short or wide screen.
+  Widget _buildArtwork() {
+    final side = MediaQuery.sizeOf(context).height * _artworkMaxHeightFraction;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: side),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: ArtworkImage(
+            url: _sermon.artworkUrl,
+            gradientIndex: _sermon.artworkColor ?? 0,
+            radius: KRadius.card,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The most of the screen's height the artwork may take.
+  static const double _artworkMaxHeightFraction = 0.45;
+
+  /// How far the page is pulled down past its top in the drag under way.
+  double _pullDown = 0;
+
+  /// Closes the player when the page is pulled down from its top and let go,
+  /// the swipe the grab handle advertises.
+  bool _onPageScroll(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    switch (notification) {
+      case OverscrollNotification(:final overscroll, :final dragDetails)
+          when dragDetails != null && overscroll < 0:
+        _pullDown -= overscroll;
+      case ScrollUpdateNotification(:final dragDetails)
+          when dragDetails != null:
+        _pullDown = 0;
+      case ScrollEndNotification():
+        final close = _pullDown >= KSize.cta;
+        _pullDown = 0;
+        if (close) unawaited(Navigator.of(context).maybePop());
+      default:
+        break;
+    }
+    return false;
   }
 }
 
@@ -1507,62 +1407,14 @@ class _VideoErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonStyle = TextButton.styleFrom(
-      foregroundColor: AppColors.secondary,
-      minimumSize: const Size(64, 40),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-    );
-    final labelStyle = AppTypography.ui(
-      size: 13,
-      weight: FontWeight.w700,
-      color: AppColors.secondary,
-    );
-    return Container(
-      margin: const EdgeInsets.only(bottom: 18),
-      padding: const EdgeInsets.fromLTRB(14, 12, 8, 4),
-      decoration: BoxDecoration(
-        color: AppColors.errorContainer,
-        borderRadius: BorderRadius.circular(AppRadius.tile),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                size: 20,
-                color: AppColors.error,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _message,
-                  style: AppTypography.ui(
-                    size: 12.5,
-                    height: 1.35,
-                    color: AppColors.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Wrap(
-            alignment: WrapAlignment.end,
-            children: [
-              if (onListen != null)
-                TextButton(
-                  onPressed: onListen,
-                  style: buttonStyle,
-                  child: Text('Listen instead', style: labelStyle),
-                ),
-              TextButton(
-                onPressed: onRetry,
-                style: buttonStyle,
-                child: Text('Try again', style: labelStyle),
-              ),
-            ],
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KSpace.x3),
+      child: KErrorBanner(
+        message: _message,
+        actions: [
+          if (onListen != null)
+            KBannerAction(label: 'Listen instead', onPressed: onListen),
+          KBannerAction(label: 'Try again', onPressed: onRetry),
         ],
       ),
     );
@@ -1640,7 +1492,7 @@ class _VideoTransport extends StatelessWidget {
                   onSeek: _seek,
                   pins: pins,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: KSpace.x3),
                 PlayerControls(
                   transport: TransportBinding(
                     isPlaying: state == PlayerState.playing,
@@ -1712,7 +1564,7 @@ class _CompactPlayerBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final kc = context.kc;
+    final k = context.k;
     final service = ref.read(audioPlayerServiceProvider);
     final state = ref.watch(playerStateProvider).valueOrNull;
     // Idle counts as stopped: see PlayerControls.
@@ -1727,7 +1579,7 @@ class _CompactPlayerBar extends ConsumerWidget {
         : (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
     return Material(
       key: const Key('player-compact-bar'),
-      color: kc.surface,
+      color: k.surface,
       child: InkWell(
         onTap: onTap,
         child: Column(
@@ -1735,7 +1587,12 @@ class _CompactPlayerBar extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
+              padding: const EdgeInsets.fromLTRB(
+                KSpace.gutter,
+                KSpace.md,
+                KSpace.md,
+                KSpace.md,
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -1747,41 +1604,40 @@ class _CompactPlayerBar extends ConsumerWidget {
                           sermon.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.ui(
-                            size: 15,
-                            weight: FontWeight.w700,
-                            color: kc.onBg,
-                          ),
+                          style: KharisText.itemTitle.copyWith(color: k.text),
                         ),
                         if (sermon.speaker.trim().isNotEmpty)
                           Text(
                             sermon.speaker,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTypography.ui(size: 13, color: kc.muted),
+                            style: KharisText.meta.copyWith(color: k.muted),
                           ),
                       ],
                     ),
                   ),
-                  IconButton(
+                  KIconButton(
                     key: const Key('player-compact-play'),
-                    tooltip: playing ? 'Pause' : 'Play',
-                    iconSize: 30,
-                    color: kc.onBg,
+                    icon: playing ? KIcons.pause : KIcons.play,
+                    label: playing ? 'Pause' : 'Play',
                     onPressed: () =>
                         unawaited(playing ? service.pause() : service.resume()),
-                    icon: Icon(
-                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    ),
                   ),
                 ],
               ),
             ),
-            LinearProgressIndicator(
-              value: progress,
-              minHeight: 2,
-              color: kc.onBg,
-              backgroundColor: kc.divider,
+            ColoredBox(
+              color: k.surface2,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: progress,
+                  child: ColoredBox(
+                    color: k.primary,
+                    child: const SizedBox(height: KSize.tabUnderline),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

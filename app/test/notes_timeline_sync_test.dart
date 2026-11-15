@@ -23,6 +23,7 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -179,6 +180,7 @@ void main() {
           favoritesProvider.overrideWith((ref) => Stream.value(null)),
         ],
         child: MaterialApp(
+          theme: KharisTheme.light(),
           home: MediaPlayerScreen(sermon: sermon, mode: mode),
         ),
       );
@@ -325,6 +327,7 @@ void main() {
             sermonsProvider.overrideWith((ref) async => [apiVariant]),
           ],
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Builder(
               builder: (context) => TextButton(
                 onPressed: () => SermonNotesSheet.show(context, apiVariant),

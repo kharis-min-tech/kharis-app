@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
@@ -15,17 +14,17 @@ import 'package:kharis_app/shared/providers/dismissed_notifications_provider.dar
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/widgets/notification_permission_card.dart';
-import 'package:kharis_app/shared/widgets/skeleton.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// What a feed row came from. Carries its own iconography and eyebrow label so
-/// a member can tell an announcement from an event at a glance.
+/// What a feed row came from. Carries its own icon and label so a member can
+/// tell an announcement from an event at a glance.
 enum _NotifKind {
-  announcement(Icons.campaign_rounded, 'Announcement'),
-  event(Icons.event_rounded, 'Event');
+  announcement(KIcons.bell, 'Announcement'),
+  event(KIcons.calendar, 'Event');
 
   const _NotifKind(this.icon, this.label);
 
-  final IconData icon;
+  final String icon;
   final String label;
 }
 
@@ -78,27 +77,19 @@ class _NotifItem {
   bool get opens => event != null || news != null;
 }
 
-/// Sign-aware relative label.
-///
-/// The feed mixes announcements (published in the past) with events (starting
-/// in the future), so a formatter that assumes the past renders a future
-/// instant as a negative magnitude — "-36225m ago" for an event three weeks
-/// out. Direction is read off the sign and the magnitude is always positive:
-/// past reads "3h ago", future reads "in 3h", and anything more than a week
-/// either way falls back to an absolute date, which is clearer than "in 25d".
-String _relativeLabel(DateTime dt, DateTime now) {
-  final diff = dt.difference(now);
-  final magnitude = diff.abs();
-  if (magnitude.inDays >= 7) {
-    return DateFormat(dt.year == now.year ? 'MMM d' : 'MMM d, y').format(dt);
-  }
-  if (magnitude.inMinutes < 1) return 'Now';
-  final amount = magnitude.inMinutes < 60
-      ? '${magnitude.inMinutes}m'
-      : magnitude.inHours < 24
-      ? '${magnitude.inHours}h'
-      : '${magnitude.inDays}d';
-  return diff.isNegative ? '$amount ago' : 'in $amount';
+/// The heading of a day's group: "Today", "Tomorrow", "Yesterday", else
+/// "Sun 15 Nov" (with the year when it is not this one).
+String _dayLabel(DateTime day, DateTime now) {
+  final today = DateTime(now.year, now.month, now.day);
+  final days = DateTime(day.year, day.month, day.day).difference(today).inDays;
+  return switch (days) {
+    0 => 'Today',
+    1 => 'Tomorrow',
+    -1 => 'Yesterday',
+    _ => DateFormat(
+      day.year == now.year ? 'EEE d MMM' : 'EEE d MMM y',
+    ).format(day),
+  };
 }
 
 /// Merges announcements and upcoming events into one
@@ -127,6 +118,17 @@ List<_NotifItem> _buildFeed({
         : b.date.compareTo(a.date); // newest announcement first
   });
   return items;
+}
+
+/// [items] grouped by calendar day, days in order of first appearance and
+/// rows in feed order within each day.
+List<(DateTime, List<_NotifItem>)> _groupByDay(List<_NotifItem> items) {
+  final groups = <DateTime, List<_NotifItem>>{};
+  for (final item in items) {
+    final d = item.date;
+    groups.putIfAbsent(DateTime(d.year, d.month, d.day), () => []).add(item);
+  }
+  return [for (final e in groups.entries) (e.key, e.value)];
 }
 
 /// The member's notification feed, or (via [NotificationsScreen.announcements])
@@ -161,6 +163,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final k = context.k;
     final newsAsync = ref.watch(campusNewsProvider);
     final eventsAsync = widget.announcementsOnly
         ? const AsyncData<List<Event>>([])
@@ -198,73 +201,89 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         !ref.watch(notificationPromptDeclinedProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: Icon(Icons.arrow_back_rounded, color: context.kc.onBg),
-          onPressed: () {
-            final router = GoRouter.of(context);
-            router.canPop() ? router.pop() : router.go('/home');
-          },
-        ),
-        title: Text(
-          widget.announcementsOnly ? 'Announcements' : 'Notifications',
-          style: AppTypography.titleMd.copyWith(color: context.kc.onBg),
-        ),
-        iconTheme: IconThemeData(color: context.kc.onBg),
-        actions: [
-          if (!widget.announcementsOnly && items.isNotEmpty)
-            TextButton(
-              onPressed: () => _clearAll(items),
-              child: Text(
-                'Clear all',
-                style: AppTypography.labelMd.copyWith(
-                  color: context.kc.accentInk,
+      body: SafeArea(
+        bottom: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Opened with nothing beneath it (a push or a deep link),
+                // system back goes Home rather than leaving the app.
+                PopScope(
+                  canPop: GoRouter.maybeOf(context)?.canPop() ?? true,
+                  onPopInvokedWithResult: (didPop, _) {
+                    if (!didPop) GoRouter.of(context).go('/home');
+                  },
+                  child: const SizedBox(height: KSpace.md),
                 ),
-              ),
-            ),
-          if (!widget.announcementsOnly)
-            IconButton(
-              tooltip: 'Notification settings',
-              icon: Icon(Icons.tune_rounded, color: context.kc.onBg),
-              onPressed: _openPreferences,
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (offerPermission)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: NotificationPermissionCard(
-                permission: permission!,
-                message:
-                    'Get a reminder before your branch\u2019s service, '
-                    'event updates, the daily Bible reading and church '
-                    'announcements. You choose which ones.',
-                onPreferences: _openPreferences,
-                onNotNow: () => ref
-                    .read(notificationPromptDeclinedProvider.notifier)
-                    .decline(),
-              ),
-            ),
-          Expanded(
-            child: loading
-                ? const _FeedSkeleton()
-                : RefreshIndicator(
-                    color: context.kc.accentInk,
-                    backgroundColor: context.kc.surface,
-                    onRefresh: () => refreshCampusContent(ref),
-                    child: _body(
-                      failed: failed,
-                      items: items,
-                      hasDismissed: dismissed.isNotEmpty,
+                KScreenHeader(
+                  title: widget.announcementsOnly
+                      ? 'Announcements'
+                      : 'Notifications',
+                  actions: [
+                    if (!widget.announcementsOnly)
+                      KIconButton(
+                        key: const Key('notification-settings-button'),
+                        icon: KIcons.gear,
+                        label: 'Notification settings',
+                        onPressed: _openPreferences,
+                      ),
+                  ],
+                ),
+                if (!widget.announcementsOnly && items.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: KSpace.gutter,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: KTextLink(
+                        label: 'Clear all',
+                        onTap: () => _clearAll(items),
+                      ),
                     ),
                   ),
+                if (offerPermission)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      KSpace.gutter,
+                      KSpace.md,
+                      KSpace.gutter,
+                      KSpace.md,
+                    ),
+                    child: NotificationPermissionCard(
+                      permission: permission!,
+                      message:
+                          'Get a reminder before your branch\u2019s service, '
+                          'event updates, the daily Bible reading and church '
+                          'announcements. You choose which ones.',
+                      onPreferences: _openPreferences,
+                      onNotNow: () => ref
+                          .read(notificationPromptDeclinedProvider.notifier)
+                          .decline(),
+                    ),
+                  ),
+                Expanded(
+                  child: loading
+                      ? _FeedSkeleton(cards: widget.announcementsOnly)
+                      : RefreshIndicator(
+                          color: k.primaryText,
+                          backgroundColor: k.surface,
+                          onRefresh: () => refreshCampusContent(ref),
+                          child: _body(
+                            failed: failed,
+                            items: items,
+                            hasDismissed: dismissed.isNotEmpty,
+                          ),
+                        ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -306,75 +325,126 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     required bool hasDismissed,
   }) {
     if (failed) {
-      return _Empty(
-        icon: Icons.wifi_off_rounded,
-        title: widget.announcementsOnly
-            ? 'Unable to load announcements'
-            : 'Unable to load notifications',
-        subtitle: 'Please check your connection and try again.',
-        action: _EmptyAction(
-          label: 'Retry',
-          onPressed: () => refreshCampusContent(ref),
+      return _Centered(
+        child: KErrorState(
+          message: widget.announcementsOnly
+              ? 'Announcements didn\u2019t load. Check your connection and '
+                    'retry.'
+              : 'Notifications didn\u2019t load. Check your connection and '
+                    'retry.',
+          onRetry: () => refreshCampusContent(ref),
         ),
       );
     }
     if (items.isEmpty) {
       if (widget.announcementsOnly) {
-        return const _Empty(
-          icon: Icons.campaign_outlined,
-          title: 'No announcements right now',
-          subtitle: 'News from your branch will show up here.',
+        return const _Centered(
+          child: KEmptyState(
+            icon: KIcons.bell,
+            title: 'No announcements right now',
+            hint: 'News from your branch will show up here.',
+          ),
         );
       }
-      return _Empty(
-        icon: hasDismissed
-            ? Icons.mark_email_read_outlined
-            : Icons.notifications_none_rounded,
-        title: hasDismissed
-            ? 'You\u2019re all caught up'
-            : 'No notifications yet',
-        subtitle: hasDismissed
-            ? 'Dismissed notifications stay hidden on this device.'
-            : 'Announcements, church notifications and upcoming events '
-                  'will show up here.',
-        action: hasDismissed
-            ? _EmptyAction(
-                label: 'Restore dismissed',
-                onPressed: () => ref
-                    .read(dismissedNotificationsProvider.notifier)
-                    .restoreAll(),
-              )
-            : null,
+      return _Centered(
+        child: KEmptyState(
+          icon: hasDismissed ? KIcons.check : KIcons.bell,
+          title: hasDismissed
+              ? 'You\u2019re all caught up'
+              : 'No notifications yet',
+          hint: hasDismissed
+              ? 'Dismissed notifications stay hidden on this device.'
+              : 'Announcements, church notifications and upcoming events '
+                    'will show up here.',
+          action: hasDismissed
+              ? KButton(
+                  label: 'Restore dismissed',
+                  variant: KButtonVariant.outline,
+                  onPressed: () => ref
+                      .read(dismissedNotificationsProvider.notifier)
+                      .restoreAll(),
+                )
+              : null,
+        ),
       );
     }
 
-    return ListView.separated(
+    final bottom = KSpace.section + MediaQuery.paddingOf(context).bottom;
+
+    if (widget.announcementsOnly) {
+      return ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          KSpace.gutter,
+          KSpace.xl,
+          KSpace.gutter,
+          bottom,
+        ),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(height: KSpace.xl),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final body = item.body?.trim();
+          final linked = item.news?.eventId?.trim();
+          return KAnnouncementCard(
+            month: DateFormat('MMM').format(item.date),
+            day: DateFormat('d').format(item.date),
+            dateSemanticLabel: DateFormat('EEE d MMM').format(item.date),
+            title: item.title,
+            snippet: body == null || body.isEmpty ? null : body,
+            actionLabel: linked != null && linked.isNotEmpty
+                ? 'View event'
+                : 'Read more',
+            onTap: item.opens ? () => _open(item) : null,
+          );
+        },
+      );
+    }
+
+    final now = DateTime.now();
+    final groups = _groupByDay(items);
+    return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => Divider(
-        color: context.kc.divider,
-        height: 1,
-        indent: 20,
-        endIndent: 20,
+      padding: EdgeInsets.fromLTRB(
+        KSpace.gutter,
+        KSpace.md,
+        KSpace.gutter,
+        bottom,
       ),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final row = _NotifRow(
-          item: item,
-          onTap: item.opens ? () => _open(item) : null,
-        );
-        if (widget.announcementsOnly) return row;
-        return Dismissible(
-          key: ValueKey(item.id),
-          background: const _SwipePlate(alignment: Alignment.centerLeft),
-          secondaryBackground: const _SwipePlate(
-            alignment: Alignment.centerRight,
+      children: [
+        for (final (i, (day, rows)) in groups.indexed) ...[
+          if (i > 0) const SizedBox(height: KSpace.gutter),
+          Padding(
+            padding: const EdgeInsets.only(bottom: KSpace.md),
+            child: Semantics(
+              header: true,
+              child: Text(
+                _dayLabel(day, now),
+                style: KharisText.caption.copyWith(color: context.k.muted),
+              ),
+            ),
           ),
-          onDismissed: (_) => _dismiss(item),
-          child: row,
-        );
-      },
+          KListGroup(
+            children: [
+              for (final item in rows)
+                Dismissible(
+                  key: ValueKey(item.id),
+                  background: const _SwipePlate(
+                    alignment: Alignment.centerLeft,
+                  ),
+                  secondaryBackground: const _SwipePlate(
+                    alignment: Alignment.centerRight,
+                  ),
+                  onDismissed: (_) => _dismiss(item),
+                  child: _NotifRow(
+                    item: item,
+                    onTap: item.opens ? () => _open(item) : null,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -408,8 +478,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
   }
 
-  /// Toast styling comes from `snackBarTheme`; this route overlays the shell,
-  /// so there is no tab bar to clear and the default margin is correct.
+  /// This route overlays the shell, so there is no tab bar to clear and the
+  /// default margin is correct.
   void _showUndo(String message, VoidCallback onUndo) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -433,113 +503,35 @@ class _NotifRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final body = item.body;
+    final body = item.body?.trim();
     final linkedId = item.news?.eventId;
     final event =
         item.event ??
         (linkedId == null ? null : ref.watch(linkedEventProvider(linkedId)));
     final venue = event == null ? null : eventVenueLine(event);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        // Opaque so the swipe plate stays behind the row rather than bleeding
-        // through it.
-        color: context.kc.bg,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: context.kc.chipBg,
-              ),
-              child: Icon(
-                item.kind.icon,
-                color: context.kc.accentInk,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${item.kind.label} \u00b7 '
-                    '${_relativeLabel(item.date, DateTime.now())}',
-                    style: AppTypography.labelMd.copyWith(
-                      color: context.kc.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.title,
-                    style: AppTypography.bodyLg.copyWith(
-                      color: context.kc.onBg,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (venue != null) ...[
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.place_outlined,
-                          size: 13,
-                          color: context.kc.muted,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            venue,
-                            style: AppTypography.bodySm.copyWith(
-                              color: context.kc.muted,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (body != null && body.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      body,
-                      style: AppTypography.bodySm.copyWith(
-                        color: context.kc.muted,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (onTap != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 10, left: 8),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: context.kc.faint,
-                ),
-              ),
-          ],
-        ),
+    final meta = [
+      item.kind.label,
+      if (item.kind == _NotifKind.event) DateFormat('HH:mm').format(item.date),
+      ?venue,
+      if (venue == null && body != null && body.isNotEmpty) body,
+    ].join(' \u00b7 ');
+    // Opaque so the swipe plate stays behind the row rather than showing
+    // through it.
+    return ColoredBox(
+      color: context.k.surface,
+      child: KListRow(
+        leading: KIconTile(item.kind.icon),
+        title: item.title,
+        meta: meta,
+        showChevron: onTap != null,
+        onTap: onTap,
       ),
     );
   }
 }
 
 /// The plate revealed behind a row mid-swipe. Swiping hides the row on this
-/// device; nothing is deleted, so the icon says "hide", not "trash".
+/// device; nothing is deleted, so it says "Hide", not "Delete".
 class _SwipePlate extends StatelessWidget {
   const _SwipePlate({required this.alignment});
 
@@ -547,16 +539,18 @@ class _SwipePlate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final k = context.k;
     return ColoredBox(
-      color: context.kc.surfaceMuted,
+      color: k.surface2,
       child: Align(
         alignment: alignment,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Icon(
-            Icons.visibility_off_outlined,
-            color: context.kc.muted,
-            size: 22,
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
+          child: ExcludeSemantics(
+            child: Text(
+              'Hide',
+              style: KharisText.link.copyWith(color: k.muted),
+            ),
           ),
         ),
       ),
@@ -566,112 +560,61 @@ class _SwipePlate extends StatelessWidget {
 
 // ── Loading / empty / error state ─────────────────────────────────────────────
 
+/// Blocks standing in for the feed while it loads: one grouped list of rows
+/// for the inbox, or cards for the announcements list.
 class _FeedSkeleton extends StatelessWidget {
-  const _FeedSkeleton();
+  const _FeedSkeleton({required this.cards});
+
+  final bool cards;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return ListView(
       key: const Key('notifications-skeleton'),
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: 5,
-      itemBuilder: (_, _) => const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Skeleton(width: 40, height: 40, radius: 20),
-            SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SkeletonLine(width: 110, height: 11),
-                  SizedBox(height: 8),
-                  SkeletonLine(width: 220),
-                  SizedBox(height: 6),
-                  SkeletonLine(width: 160, height: 12),
-                ],
-              ),
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.fromLTRB(
+        KSpace.gutter,
+        KSpace.xl,
+        KSpace.gutter,
+        0,
       ),
+      children: [
+        if (cards)
+          for (var i = 0; i < 4; i++) ...[
+            if (i > 0) const SizedBox(height: KSpace.xl),
+            const KSkeleton(height: KSize.dateBlockHeight + 2 * KSpace.xxl),
+          ]
+        else ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: KSkeleton(width: KSize.dateBlockWidth, height: KSpace.xxl),
+          ),
+          const SizedBox(height: KSpace.md),
+          for (var i = 0; i < 5; i++) ...[
+            if (i > 0) const SizedBox(height: KSpace.xxs),
+            const KSkeleton(height: KSize.listRow),
+          ],
+        ],
+      ],
     );
   }
 }
 
-@immutable
-class _EmptyAction {
-  const _EmptyAction({required this.label, required this.onPressed});
+/// Centres an empty or error message. Scrollable (always) so pull-to-refresh
+/// works on it.
+class _Centered extends StatelessWidget {
+  const _Centered({required this.child});
 
-  final String label;
-  final VoidCallback onPressed;
-}
-
-/// Empty/error message. Scrollable (always) so pull-to-refresh works on it.
-class _Empty extends StatelessWidget {
-  const _Empty({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.action,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final _EmptyAction? action;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final action = this.action;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, color: context.kc.muted, size: 44),
-                  const SizedBox(height: 14),
-                  Text(
-                    title,
-                    style: AppTypography.bodyLg.copyWith(
-                      color: context.kc.onBg,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: AppTypography.bodySm.copyWith(
-                      color: context.kc.muted,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (action != null) ...[
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: action.onPressed,
-                      child: Text(
-                        action.label,
-                        style: AppTypography.labelMd.copyWith(
-                          color: context.kc.accentInk,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
+          child: Center(child: child),
         ),
       ),
     );

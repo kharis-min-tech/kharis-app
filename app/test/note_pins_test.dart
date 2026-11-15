@@ -15,6 +15,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -89,6 +90,7 @@ void main() {
           favoritesProvider.overrideWith((ref) => Stream.value(null)),
         ],
         child: MaterialApp(
+          theme: KharisTheme.light(),
           home: MediaPlayerScreen(sermon: service, mode: mode),
         ),
       ),

@@ -14,6 +14,7 @@ import 'package:kharis_app/features/player/presentation/widgets/transcript_sheet
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/transcript_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 
@@ -92,6 +93,7 @@ Future<void> _openSheet(
         ),
       ],
       child: MaterialApp(
+        theme: KharisTheme.light(),
         home: Scaffold(
           body: TranscriptSheet(sermon: _sermon, timeline: timeline),
         ),
@@ -307,13 +309,13 @@ void main() {
       // Searching takes the view off "now".
       expect(find.text('Back to now'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Next match'));
+      await tester.tap(find.bySemanticsLabel('Next match'));
       await tester.pumpAndSettle();
       expect(find.text('2 of 3'), findsOneWidget);
       expect(_placement(tester, _line(10)), closeTo(1 / 3, 0.1));
 
-      await tester.tap(find.byTooltip('Previous match'));
-      await tester.tap(find.byTooltip('Previous match'));
+      await tester.tap(find.bySemanticsLabel('Previous match'));
+      await tester.tap(find.bySemanticsLabel('Previous match'));
       await tester.pumpAndSettle();
       expect(find.text('3 of 3'), findsOneWidget, reason: 'wraps around');
       expect(_placement(tester, _line(30)), closeTo(1 / 3, 0.1));
@@ -327,7 +329,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('No matches in this transcript'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Clear search'));
+      await tester.tap(find.bySemanticsLabel('Clear search'));
       await tester.pumpAndSettle();
       expect(find.text('No matches in this transcript'), findsNothing);
       expect(find.textContaining(' of 3'), findsNothing);

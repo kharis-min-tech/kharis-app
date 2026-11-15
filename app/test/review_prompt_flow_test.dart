@@ -20,6 +20,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 class _FakeStoreReview extends StoreReview {
   _FakeStoreReview({required this.available});
@@ -102,6 +103,7 @@ Future<_Harness> _pump(
         reviewClockProvider.overrideWithValue(() => _now),
       ],
       child: MaterialApp(
+        theme: KharisTheme.light(),
         home: ReviewPromptListener(
           canInterrupt: canInterrupt,
           child: Scaffold(
@@ -162,11 +164,26 @@ void main() {
     expect(h.state.sheetAutoShows, 1);
 
     // Nothing to send until a star is chosen.
-    final send = find.widgetWithText(ElevatedButton, 'Send feedback');
-    expect(tester.widget<ElevatedButton>(send).onPressed, isNull);
+    final send = find.widgetWithText(KButton, 'Send feedback');
+    expect(tester.widget<KButton>(send).onPressed, isNull);
 
     await tester.tap(find.byKey(const ValueKey('feedback-star-2')));
     await tester.pumpAndSettle();
+    // The chosen star is announced as selected, not only drawn differently.
+    final handle = tester.ensureSemantics();
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('feedback-star-2'))),
+      isSemantics(
+        label: '2 of 5 stars, Could be better',
+        isButton: true,
+        isSelected: true,
+      ),
+    );
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('feedback-star-1'))),
+      isSemantics(label: '1 of 5 stars, Not good', isSelected: false),
+    );
+    handle.dispose();
     expect(find.text('Could be better'), findsOneWidget);
     expect(find.text('What should we improve? (optional)'), findsOneWidget);
 
@@ -204,7 +221,7 @@ void main() {
     await h.finishListen(tester);
     await tester.tap(find.byKey(const ValueKey('feedback-star-5')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Send feedback'));
+    await tester.tap(find.widgetWithText(KButton, 'Send feedback'));
     await tester.pumpAndSettle();
 
     // Tap the barrier above the sheet.
@@ -350,7 +367,7 @@ void _settingsTests() {
     await tester.tap(find.byKey(const ValueKey('feedback-star-4')));
     await tester.pumpAndSettle();
     expect(find.text('What do you value most? (optional)'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Send feedback'));
+    await tester.tap(find.widgetWithText(KButton, 'Send feedback'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();

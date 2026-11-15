@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
 import 'package:kharis_app/features/settings/data/account_deletion.dart';
 import 'package:kharis_app/shared/models/user.dart';
@@ -100,27 +100,28 @@ void _showProgress(BuildContext context) {
     useRootNavigator: true,
     builder: (ctx) => PopScope(
       canPop: false,
-      child: AlertDialog(
-        backgroundColor: ctx.kc.surface,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
-        content: Row(
-          children: [
-            SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.4,
-                color: ctx.kc.danger,
+      child: Dialog(
+        backgroundColor: ctx.k.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(KRadius.card)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(KSpace.gutter),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: KSize.icon,
+                child: CircularProgressIndicator(color: ctx.k.primaryText),
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                'Deleting your account…',
-                style: AppTypography.ui(size: 14).copyWith(color: ctx.kc.onBg),
+              const SizedBox(width: KSpace.xl),
+              Expanded(
+                child: Text(
+                  'Deleting your account…',
+                  style: KharisText.body.copyWith(color: ctx.k.text),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
@@ -151,62 +152,40 @@ class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    final body = AppTypography.ui(size: 14).copyWith(color: kc.muted);
-    return AlertDialog(
-      backgroundColor: kc.surface,
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
-      title: _title(context, 'Delete account?'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('This permanently deletes:', style: body),
-            const SizedBox(height: AppSpacing.xs),
-            for (final item in const [
-              'Your profile and sign-in',
-              'Your notes',
-              'Your playlists and favourites',
-              'Your event RSVPs',
-            ])
-              Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.xs),
-                child: Text('•  $item', style: body),
-              ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'This cannot be undone.',
-              style: AppTypography.ui(
-                size: 14,
-                weight: FontWeight.w600,
-              ).copyWith(color: kc.onBg),
-            ),
-            if (widget.requirePassword) ...[
-              const SizedBox(height: AppSpacing.sm),
-              _PasswordField(
-                key: const ValueKey('delete-account-password'),
-                controller: _password,
-                onChanged: (_) => setState(() {}),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        _cancel(context),
-        TextButton(
-          onPressed: _canConfirm
-              ? () => Navigator.of(context).pop(_password.text)
-              : null,
-          child: Text(
-            'Delete account',
-            style: AppTypography.ui(
-              size: 14,
-              weight: FontWeight.w700,
-            ).copyWith(color: _canConfirm ? kc.danger : kc.faint),
+    final k = context.k;
+    final body = KharisText.body.copyWith(color: k.muted);
+    return _ConfirmDialog(
+      title: 'Delete account?',
+      canConfirm: _canConfirm,
+      onConfirm: () => Navigator.of(context).pop(_password.text),
+      children: [
+        Text('This permanently deletes:', style: body),
+        for (final item in const [
+          'Your profile and sign-in',
+          'Your notes',
+          'Your playlists and favourites',
+          'Your event RSVPs',
+        ])
+          Padding(
+            padding: const EdgeInsets.only(top: KSpace.xs),
+            child: Text('•  $item', style: body),
           ),
+        const SizedBox(height: KSpace.xl),
+        Text(
+          'This cannot be undone.',
+          style: KharisText.itemTitle.copyWith(color: k.text),
         ),
+        if (widget.requirePassword) ...[
+          const SizedBox(height: KSpace.x3),
+          KTextField(
+            key: const ValueKey('delete-account-password'),
+            label: 'Password',
+            controller: _password,
+            password: true,
+            autofillHints: const [AutofillHints.password],
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
       ],
     );
   }
@@ -232,104 +211,87 @@ class _ConfirmPasswordDialogState extends State<ConfirmPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    final canConfirm = _password.text.isNotEmpty;
-    return AlertDialog(
-      backgroundColor: kc.surface,
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
-      title: _title(context, 'Confirm your password'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'For your security, enter your password again to finish deleting '
-            'your account.',
-            style: AppTypography.ui(size: 14).copyWith(color: kc.muted),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _PasswordField(
-            key: const ValueKey('confirm-password'),
-            controller: _password,
-            onChanged: (_) => setState(() {}),
-          ),
-        ],
-      ),
-      actions: [
-        _cancel(context),
-        TextButton(
-          onPressed: canConfirm
-              ? () => Navigator.of(context).pop(_password.text)
-              : null,
-          child: Text(
-            'Delete account',
-            style: AppTypography.ui(
-              size: 14,
-              weight: FontWeight.w700,
-            ).copyWith(color: canConfirm ? kc.danger : kc.faint),
-          ),
+    return _ConfirmDialog(
+      title: 'Confirm your password',
+      canConfirm: _password.text.isNotEmpty,
+      onConfirm: () => Navigator.of(context).pop(_password.text),
+      children: [
+        Text(
+          'For your security, enter your password again to finish deleting '
+          'your account.',
+          style: KharisText.body.copyWith(color: context.k.muted),
+        ),
+        const SizedBox(height: KSpace.x3),
+        KTextField(
+          key: const ValueKey('confirm-password'),
+          label: 'Password',
+          controller: _password,
+          password: true,
+          autofillHints: const [AutofillHints.password],
+          onChanged: (_) => setState(() {}),
         ),
       ],
     );
   }
 }
 
-Widget _title(BuildContext context, String text) => Text(
-  text,
-  style: AppTypography.ui(
-    size: 16,
-    weight: FontWeight.w700,
-  ).copyWith(color: context.kc.onBg),
-);
-
-Widget _cancel(BuildContext context) => TextButton(
-  onPressed: () => Navigator.of(context).pop(),
-  child: Text(
-    'Cancel',
-    style: AppTypography.ui(
-      size: 14,
-      weight: FontWeight.w600,
-    ).copyWith(color: context.kc.muted),
-  ),
-);
-
-class _PasswordField extends StatelessWidget {
-  const _PasswordField({
-    super.key,
-    required this.controller,
-    required this.onChanged,
+/// The shared frame of both confirmations: a title, what will happen, then
+/// the destructive confirm ('Delete account', in the error role) above a
+/// plain 'Cancel'.
+class _ConfirmDialog extends StatelessWidget {
+  const _ConfirmDialog({
+    required this.title,
+    required this.children,
+    required this.canConfirm,
+    required this.onConfirm,
   });
 
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
+  final String title;
+  final List<Widget> children;
+  final bool canConfirm;
+  final VoidCallback onConfirm;
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      obscureText: true,
-      autocorrect: false,
-      enableSuggestions: false,
-      autofillHints: const [AutofillHints.password],
-      style: AppTypography.ui(size: 15).copyWith(color: kc.onBg),
-      decoration: InputDecoration(
-        hintText: 'Password',
-        hintStyle: AppTypography.ui(size: 15).copyWith(color: kc.muted),
-        filled: true,
-        fillColor: kc.surfaceAlt,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.gutter,
-          vertical: 14,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide(color: kc.outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide(color: kc.accentInk, width: 1.4),
+    final k = context.k;
+    return Dialog(
+      backgroundColor: k.surface,
+      insetPadding: const EdgeInsets.all(KSpace.gutter),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(KRadius.card)),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(KSpace.gutter),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: KharisText.section.copyWith(color: k.text),
+                ),
+              ),
+              const SizedBox(height: KSpace.xl),
+              ...children,
+              const SizedBox(height: KSpace.gutter),
+              KDestructiveButton(
+                label: 'Delete account',
+                expand: true,
+                onPressed: canConfirm ? onConfirm : null,
+              ),
+              const SizedBox(height: KSpace.md),
+              KButton(
+                label: 'Cancel',
+                variant: KButtonVariant.text,
+                expand: true,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
         ),
       ),
     );

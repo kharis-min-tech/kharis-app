@@ -26,6 +26,7 @@ import '../../features/home/presentation/screens/reading_screen.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
 import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
+import '../../features/settings/presentation/screens/notifications_settings_screen.dart';
 import '../../features/shared_links/presentation/shared_link_screens.dart';
 import '../../shared/providers/auth_provider.dart';
 import '../../ui/gallery/component_gallery_screen.dart';
@@ -215,6 +216,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile/edit',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+
+      // ── Notification settings (More's Notifications row) ──────────────────
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (context, state) => const NotificationsSettingsScreen(),
       ),
 
       // ── Design check (debug builds only; never ships in release) ──────────

@@ -18,6 +18,7 @@ import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_location_service.dart';
 
@@ -166,6 +167,7 @@ void main() {
         UncontrolledProviderScope(
           container: c,
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Scaffold(
               body: Consumer(
                 builder: (context, ref, _) => TextButton(

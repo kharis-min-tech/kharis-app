@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/widgets/media_mode_toggle.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 Sermon _sermon({String audioUrl = '', String? videoId}) => Sermon(
       id: 's1',
@@ -15,6 +16,7 @@ Sermon _sermon({String audioUrl = '', String? videoId}) => Sermon(
 
 Widget _host(Sermon sermon, MediaMode active, ValueChanged<MediaMode> onSelect) {
   return MaterialApp(
+    theme: KharisTheme.light(),
     home: Scaffold(
       body: MediaModeToggle(
         sermon: sermon,

@@ -8,7 +8,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
 import 'package:kharis_app/core/services/app_router.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
@@ -21,9 +20,8 @@ import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
-import 'package:kharis_app/features/home/presentation/widgets/continue_listening_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/home_bible_row.dart';
-import 'package:kharis_app/features/home/presentation/widgets/latest_announcement_card.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_branch_news.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_stats_strip.dart';
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/shared_links/presentation/shared_link_screens.dart';
@@ -40,6 +38,8 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:kharis_app/shared/providers/moments_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/fake_cache_service.dart';
 import 'support/fake_location_service.dart';
@@ -73,7 +73,7 @@ final _allCampusConference = Event(
   id: 'e-conf',
   title: 'Global Conference',
   location: 'ExCeL Centre',
-  startTime: _now.add(const Duration(days: 9)),
+  startTime: _now.add(const Duration(days: 6)),
 );
 
 final _manchesterPicnic = Event(
@@ -202,15 +202,14 @@ Future<void> _pump(
           (ref) => reading ?? Stream.value(_reading),
         ),
         dailyMessageProvider.overrideWith((ref) => Stream.value(null)),
-        // Nothing to resume: the card collapses (its engine is WP2's).
-        continueListeningProvider.overrideWith((ref) => null),
         latestSermonsProvider.overrideWith((ref) => const <Sermon>[]),
-        // The hero wall's videos as plain boxes: tests have no video plugin.
-        heroWallVideoProvider.overrideWithValue(
-          (asset, poster, playing) => const SizedBox.expand(),
-        ),
+        cacheServiceProvider.overrideWithValue(FakeCacheService()),
+        momentsProvider.overrideWith((ref) async => const <Moment>[]),
       ],
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        theme: KharisTheme.light(),
+        routerConfig: router,
+      ),
     ),
   );
   await _frames(tester);
@@ -229,29 +228,24 @@ void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('navigation', () {
-    testWidgets('Home "See all" opens the announcements feed; Back returns', (
+    testWidgets('Home "All events" opens the Events screen over Home', (
       tester,
     ) async {
       await _pump(
         tester,
         start: () => const HomeScreen(),
-        news: [_news('n1', 'Baptism sign-ups are open')],
+        events: [_prayerNight],
       );
 
-      await tester.tap(find.byKey(const Key('home-announcements-see-all')));
+      await tester.tap(find.byKey(const Key('home-events-see-all')));
       await _frames(tester);
-
-      // The announcements list, not the Events tab it used to jump to.
-      expect(find.byType(NotificationsScreen), findsOneWidget);
-      expect(find.widgetWithText(AppBar, 'Announcements'), findsOneWidget);
-      expect(find.text('Baptism sign-ups are open'), findsOneWidget);
-      expect(find.byType(CalendarScreen), findsNothing);
+      expect(find.byType(CalendarScreen), findsOneWidget);
 
       // Pushed, so Back lands on Home rather than an empty stack.
-      await tester.tap(find.byTooltip('Back'));
+      GoRouter.of(tester.element(find.byType(CalendarScreen))).pop();
       await _frames(tester);
       expect(find.byType(HomeScreen), findsOneWidget);
-      expect(find.byType(NotificationsScreen), findsNothing);
+      expect(find.byType(CalendarScreen), findsNothing);
     });
 
     testWidgets('tapping anywhere on an event card opens the event detail', (
@@ -430,7 +424,7 @@ void main() {
       );
 
       // Announcement card: the date of the event it promotes.
-      final card = find.byKey(const Key('home-announcement-latest'));
+      final card = find.byKey(const Key('home-announcement-n-linked'));
       expect(
         find.descendant(of: card, matching: find.text('Join us for prayer')),
         findsOneWidget,
@@ -438,16 +432,18 @@ void main() {
       expect(
         find.descendant(
           of: card,
-          matching: find.text(
-            DateFormat(
-              'EEE d MMM \u00b7 h:mm a',
-            ).format(_prayerNight.startTime),
-          ),
+          matching: find.text('${_prayerNight.startTime.day}'),
         ),
         findsOneWidget,
       );
-      // Upcoming events strip tile: the venue.
-      expect(find.text('Main Hall'), findsOneWidget);
+      // This week's event row: the time and the venue.
+      expect(
+        find.text(
+          '${DateFormat('HH:mm').format(_prayerNight.startTime)}'
+          ' \u00b7 Main Hall',
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('event cards on the Events tab show the venue', (tester) async {
@@ -602,71 +598,82 @@ void main() {
               (ref, b) => Stream.value(const <Event>[]),
             ),
           ],
-          child: const MaterialApp(
-            home: Scaffold(body: LatestAnnouncementCard()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const Scaffold(body: HomeBranchNews()),
           ),
         ),
       );
       await tester.pump();
       await tester.pump();
-      expect(find.byKey(const Key('home-announcement-latest')), findsNothing);
+      expect(find.byKey(const Key('home-announcements')), findsNothing);
       expect(find.textContaining('No announcements'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 150));
       await tester.pump();
-      expect(find.byKey(const Key('home-announcement-latest')), findsNothing);
+      expect(find.byKey(const Key('home-announcements')), findsNothing);
       expect(find.textContaining('No announcements'), findsNothing);
     });
 
-    testWidgets('Bible row: a failed load offers the Bible, never a made-up '
-        'reading', (tester) async {
+    testWidgets('reading cell: a failed load offers the Bible, never a '
+        'made-up reading', (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            cacheServiceProvider.overrideWithValue(FakeCacheService()),
             dailyContentProvider.overrideWith(
               (ref) => Stream<DailyContent?>.error(Exception('offline')),
             ),
           ],
-          child: const MaterialApp(home: Scaffold(body: HomeBibleRow())),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const Scaffold(body: HomeStatsStrip()),
+          ),
         ),
       );
       await tester.pump();
       await tester.pump();
 
-      expect(find.byKey(const Key('home-bible-row-loading')), findsNothing);
-      expect(find.text('Read the Bible'), findsOneWidget);
+      expect(find.byKey(const Key('home-stat-reading-loading')), findsNothing);
+      expect(find.byKey(const Key('home-stat-bible')), findsOneWidget);
+      expect(find.text('Bible'), findsOneWidget);
       expect(find.text('Retry'), findsNothing);
     });
 
-    testWidgets('Bible row: skeleton while loading, the reading once loaded', (
-      tester,
-    ) async {
+    testWidgets('reading cell: blocks while loading, the reading once '
+        'loaded', (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            cacheServiceProvider.overrideWithValue(FakeCacheService()),
             dailyContentProvider.overrideWith((ref) async* {
               await Future<void>.delayed(const Duration(milliseconds: 100));
               yield _reading;
             }),
           ],
-          child: const MaterialApp(home: Scaffold(body: HomeBibleRow())),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const Scaffold(body: HomeStatsStrip()),
+          ),
         ),
       );
       await tester.pump();
-      expect(find.byKey(const Key('home-bible-row-loading')), findsOneWidget);
-      expect(find.text('Loading...'), findsNothing);
-      expect(find.text('Read the Bible'), findsNothing);
+      expect(
+        find.byKey(const Key('home-stat-reading-loading')),
+        findsOneWidget,
+      );
+      expect(find.text('Bible'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 150));
-      expect(find.byKey(const Key('home-bible-row-loading')), findsNothing);
+      expect(find.byKey(const Key('home-stat-reading-loading')), findsNothing);
       expect(find.text('2 Corinthians 13'), findsOneWidget);
-      expect(find.text("Today's reading"), findsOneWidget);
+      expect(find.text('Not read'), findsOneWidget);
     });
   });
 

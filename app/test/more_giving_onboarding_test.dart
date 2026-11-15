@@ -11,7 +11,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
@@ -32,6 +31,7 @@ import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -305,7 +305,8 @@ void main() {
       await _pumpMore(tester, user: _member);
       await _tapRow(tester, "I'm new here");
       expect(find.byType(NewHereScreen), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.arrow_back_ios));
+      // No on-screen back button: leave the way a swipe or system back does.
+      Navigator.of(tester.element(find.byType(NewHereScreen))).pop();
       await tester.pumpAndSettle();
       await _tapRow(tester, 'Share a testimony');
       expect(find.byType(TestimonyScreen), findsOneWidget);
@@ -368,25 +369,47 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: _baseOverrides(prefs: prefs, db: FakeFirebaseFirestore()),
-          child: const MaterialApp(home: GivingScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const GivingScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
       return prefs;
     }
 
-    testWidgets('has no campaign card or invented progress', (tester) async {
+    testWidgets('has no campaign card or invented progress, and none of the '
+        'canvas extras', (tester) async {
       await pumpGiving(tester);
       expect(find.text('Build God a House'), findsNothing);
       expect(find.textContaining('raised'), findsNothing);
       expect(find.byType(LinearProgressIndicator), findsNothing);
-      expect(find.text('Give securely'), findsOneWidget);
+      for (final extra in ['Tithe', 'Offering', 'Gift Aid', 'Monthly']) {
+        expect(find.textContaining(extra), findsNothing);
+      }
+      expect(find.text('Give'), findsOneWidget);
+      expect(find.text('To London. Thank you for giving.'), findsOneWidget);
+      // One primary button, 56 tall.
+      final primary = find.byWidgetPredicate(
+        (w) => w is KButton && w.variant == KButtonVariant.primary,
+      );
+      expect(primary, findsOneWidget);
+      expect(find.widgetWithText(KButton, 'Give to London'), findsOneWidget);
+      expect(tester.getSize(primary).height, KSize.cta);
     });
 
-    testWidgets('scripture is 2 Corinthians 9:7 itself', (tester) async {
+    testWidgets('scripture is 2 Corinthians 9:7 itself (KJV)', (tester) async {
       await pumpGiving(tester);
-      expect(find.textContaining('God loves a cheerful giver'), findsOneWidget);
-      expect(find.text('2 Corinthians 9:7 (NKJV)'), findsOneWidget);
+      expect(
+        find.text(
+          '\u201cEvery man according as he purposeth in his heart, so let '
+          'him give; not grudgingly, or of necessity: for God loveth a '
+          'cheerful giver.\u201d',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('2 CORINTHIANS 9:7 \u00b7 KJV'), findsOneWidget);
     });
 
     testWidgets('Copy bank details copies exactly the displayed rows', (
@@ -412,14 +435,13 @@ void main() {
       expect(find.text('Bank details copied'), findsOneWidget);
     });
 
-    testWidgets('Give securely opens kharis.org inside the app (in-app '
+    testWidgets('Give to <branch> opens kharis.org inside the app (in-app '
         'browser, never another app); no branch picker', (tester) async {
       await pumpGiving(tester);
       expect(find.text('GIVING TO'), findsNothing);
       expect(find.text('Change'), findsNothing);
-      expect(find.text('London'), findsNothing);
 
-      await tester.tap(find.text('Give securely'));
+      await tester.tap(find.text('Give to London'));
       await tester.pumpAndSettle();
       expect(_launched, ['https://kharis.org/giving/']);
       // Safari View Controller / Custom Tabs: the page stays in the app.
@@ -455,7 +477,10 @@ void main() {
               ),
             ],
           ),
-          child: const MaterialApp(home: GivingScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const GivingScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -463,7 +488,7 @@ void main() {
       expect(find.text('To Kharis Church'), findsOneWidget);
       expect(find.text('Kharis Ministries'), findsOneWidget);
       expect(find.text('Kharis London'), findsNothing);
-      expect(find.text('Give securely'), findsOneWidget);
+      expect(find.text('Give to London'), findsOneWidget);
     });
   });
 
@@ -478,7 +503,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: _baseOverrides(prefs: prefs, db: db, user: user),
-          child: const MaterialApp(home: EditProfileScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const EditProfileScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -499,6 +527,16 @@ void main() {
     testWidgets('campus change goes through setActiveBranch', (tester) async {
       final (prefs, db) = await pumpEdit(tester, _member);
       expect(find.text('Save changes'), findsOneWidget);
+      // Every field has a visible label.
+      for (final label in [
+        'Display name',
+        'Home branch',
+        'Avatar image URL (optional)',
+        'Phone (optional)',
+        'Birthday (optional)',
+      ]) {
+        expect(find.text(label), findsOneWidget);
+      }
 
       await tester.tap(find.byKey(const ValueKey('profile-campus-row')));
       await tester.pumpAndSettle();
@@ -523,7 +561,10 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             authRepositoryProvider.overrideWithValue(auth),
           ],
-          child: const MaterialApp(home: LoginScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const LoginScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -553,7 +594,10 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             authRepositoryProvider.overrideWithValue(auth),
           ],
-          child: const MaterialApp(home: LoginScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const LoginScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -569,24 +613,24 @@ void main() {
       expect(find.text('Enter a valid email address'), findsOneWidget);
     });
 
-    testWidgets('the sign-in button text is gold ink, not white', (
-      tester,
-    ) async {
+    testWidgets('sign in is the one primary button, 56 high', (tester) async {
       final prefs = await _prefs();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-          child: const MaterialApp(home: LoginScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const LoginScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
-      final label = tester.widget<Text>(
-        find.descendant(
-          of: find.byType(ElevatedButton),
-          matching: find.text('Sign in'),
-        ),
+      final primary = find.byWidgetPredicate(
+        (w) => w is KButton && w.variant == KButtonVariant.primary,
       );
-      expect(label.style?.color, KharisColors.light.onAccent);
+      expect(primary, findsOneWidget);
+      expect(tester.widget<KButton>(primary).label, 'Sign in');
+      expect(tester.getSize(primary).height, greaterThanOrEqualTo(KSize.cta));
     });
 
     testWidgets('role selection: privacy link works, no dead links or '
@@ -595,7 +639,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-          child: const MaterialApp(home: RoleSelectionScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const RoleSelectionScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -617,7 +664,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-          child: const MaterialApp(home: RoleSelectionScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const RoleSelectionScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -654,7 +704,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: _baseOverrides(prefs: prefs, db: FakeFirebaseFirestore()),
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -689,7 +742,10 @@ void main() {
               sharedPreferencesProvider.overrideWithValue(prefs),
               authRepositoryProvider.overrideWithValue(auth),
             ],
-            child: MaterialApp.router(routerConfig: router),
+            child: MaterialApp.router(
+              theme: KharisTheme.light(),
+              routerConfig: router,
+            ),
           ),
         );
         await tester.pumpAndSettle();
@@ -697,7 +753,7 @@ void main() {
 
       Finder guestButton() => find.ancestor(
         of: find.text('Continue as guest'),
-        matching: find.byType(OutlinedButton),
+        matching: find.byType(KButton),
       );
 
       testWidgets('a tap anywhere on the button signs in and asks for a '
@@ -723,7 +779,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.textContaining('Could not continue as a guest'), findsOne);
         expect(find.text('Pick a branch'), findsNothing);
-        expect(tester.widget<OutlinedButton>(guestButton()).enabled, isTrue);
+        expect(tester.widget<KButton>(guestButton()).onPressed, isNotNull);
       });
     });
   });

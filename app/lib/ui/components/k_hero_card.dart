@@ -12,6 +12,10 @@ import 'k_thumbnail.dart';
 /// solid ink at 76%. It is tied to the text, not to the card: however long
 /// the title or large the text, the words start halfway down the fade and
 /// everything below them is solid ink.
+///
+/// [compact] is the short form (Bible's "Continue reading"): 170 tall, the
+/// overline at the top, the title at the bottom left and the button at the
+/// end of the title's row, over ink that fades out towards the right.
 class KHeroCard extends StatelessWidget {
   const KHeroCard({
     super.key,
@@ -23,11 +27,13 @@ class KHeroCard extends StatelessWidget {
     this.imageSemanticLabel,
     this.secondaryActions = const [],
     this.fullBleed = false,
+    this.compact = false,
   });
 
   final String title;
 
-  /// The screen's primary button. It takes the free width.
+  /// The screen's primary button. It takes the free width; in the compact
+  /// form it keeps its own width at the end of the title's row.
   final Widget primaryAction;
 
   /// Small eyebrow above the title, shown in uppercase.
@@ -47,9 +53,21 @@ class KHeroCard extends StatelessWidget {
   /// screen. Otherwise the card takes the card radius.
   final bool fullBleed;
 
+  /// The short form: see the class comment.
+  final bool compact;
+
   /// Height of the fade from clear to solid ink.
   static const double _fade =
       (KRatio.heroGradientEnd - KRatio.heroGradientStart) * KSize.hero;
+
+  /// Height of the compact form at the design text size.
+  static const double _compactHeight = 170;
+
+  /// The compact form's ink, left to right: nearly solid under the words,
+  /// thinner by the middle, clear at the far edge.
+  static const double _compactInkStart = 0.92;
+  static const double _compactInkMiddle = 0.55;
+  static const double _compactInkMiddleStop = 0.55;
 
   @override
   Widget build(BuildContext context) {
@@ -64,73 +82,150 @@ class KHeroCard extends StatelessWidget {
           Positioned.fill(
             child: KImageFill(image: image, semanticLabel: imageSemanticLabel),
           ),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              // The card grows with the text so the image keeps its share.
-              minHeight: MediaQuery.textScalerOf(context).scale(KSize.hero),
-              minWidth: double.infinity,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CustomPaint(
-                  painter: _InkFadePainter(ink: k.ink, fade: _fade),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      KSpace.gutter,
-                      _fade / 2,
-                      KSpace.gutter,
-                      KSpace.gutter,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (overline != null) ...[
-                          // On ink the eyebrow takes onInk: primaryText is
-                          // tuned for light surfaces and is too dim here.
-                          Text(
-                            overline!.toUpperCase(),
-                            semanticsLabel: overline,
-                            style: KharisText.overline.copyWith(color: k.onInk),
-                          ),
-                          const SizedBox(height: KSpace.sm),
-                        ],
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            title,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: KharisText.headline.copyWith(color: k.onInk),
-                          ),
-                        ),
-                        if (meta != null) ...[
-                          const SizedBox(height: KSpace.xs),
-                          Text(
-                            meta!,
-                            style: KharisText.meta.copyWith(color: k.onInk),
-                          ),
-                        ],
-                        const SizedBox(height: KSpace.x3),
-                        Row(
-                          children: [
-                            Expanded(child: primaryAction),
-                            for (final action in secondaryActions) ...[
-                              const SizedBox(width: KSpace.md),
-                              action,
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
+          if (compact) ...[
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      k.ink.withValues(alpha: _compactInkStart),
+                      k.ink.withValues(alpha: _compactInkMiddle),
+                      kClear(k.ink),
+                    ],
+                    stops: const [0, _compactInkMiddleStop, 1],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            _compactContent(context),
+          ] else
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                // The card grows with the text so the image keeps its share.
+                minHeight: MediaQuery.textScalerOf(context).scale(KSize.hero),
+                minWidth: double.infinity,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CustomPaint(
+                    painter: _InkFadePainter(ink: k.ink, fade: _fade),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        KSpace.gutter,
+                        _fade / 2,
+                        KSpace.gutter,
+                        KSpace.gutter,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (overline != null) ...[
+                            _overline(context),
+                            const SizedBox(height: KSpace.sm),
+                          ],
+                          _title(context, KharisText.headline),
+                          if (meta != null) ...[
+                            const SizedBox(height: KSpace.xs),
+                            _meta(context),
+                          ],
+                          const SizedBox(height: KSpace.x3),
+                          Row(
+                            children: [
+                              Expanded(child: primaryAction),
+                              for (final action in secondaryActions) ...[
+                                const SizedBox(width: KSpace.md),
+                                action,
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  // On ink the eyebrow takes onInk: primaryText is tuned for light surfaces
+  // and is too dim here.
+  Widget _overline(BuildContext context) => Text(
+    overline!.toUpperCase(),
+    semanticsLabel: overline,
+    style: KharisText.overline.copyWith(color: context.k.onInk),
+  );
+
+  Widget _title(BuildContext context, TextStyle style) => Semantics(
+    header: true,
+    child: Text(
+      title,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      style: style.copyWith(color: context.k.onInk),
+    ),
+  );
+
+  Widget _meta(BuildContext context) =>
+      Text(meta!, style: KharisText.meta.copyWith(color: context.k.onInk));
+
+  Widget _compactContent(BuildContext context) {
+    final words = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _title(context, KharisText.pageTitle),
+        if (meta != null) ...[const SizedBox(height: KSpace.xs), _meta(context)],
+      ],
+    );
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        primaryAction,
+        for (final action in secondaryActions) ...[
+          const SizedBox(width: KSpace.md),
+          action,
+        ],
+      ],
+    );
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: MediaQuery.textScalerOf(context).scale(_compactHeight),
+        minWidth: double.infinity,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(KSpace.x3),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (overline != null) _overline(context),
+            const SizedBox(height: KSpace.x3),
+            // At large text the button drops below the title, so neither
+            // is squeezed.
+            if (kIsLargeText(context))
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [words, const SizedBox(height: KSpace.xl), actions],
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(child: words),
+                  const SizedBox(width: KSpace.xl),
+                  actions,
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

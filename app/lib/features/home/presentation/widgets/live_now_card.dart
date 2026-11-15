@@ -1,22 +1,21 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// Home's "Live now" block: shown only while the Content Studio says a
-/// service is streaming and names the stream, so a tap always opens it.
-/// Opens the unified player in video mode on the live stream.
-///
-/// Renders nothing (not even [padding]) otherwise, so Home can place it
-/// unconditionally.
+/// "Live" on Home: shown only while the Studio's live stream is on, with
+/// the stream's picture and title; Watch (or a tap anywhere) opens it in
+/// the video player. Renders nothing, [padding] included, otherwise.
 class LiveNowCard extends ConsumerWidget {
   const LiveNowCard({super.key, this.padding = EdgeInsets.zero});
 
-  /// Space around the card, applied only when it shows.
   final EdgeInsetsGeometry padding;
 
   @override
@@ -30,152 +29,63 @@ class LiveNowCard extends ConsumerWidget {
         ? live.title!.trim()
         : 'Live stream';
 
-    void open() => startPlayback(
-      context,
-      ref,
-      Sermon(
-        id: PlaybackHistory.liveSermonId,
-        title: title,
-        speaker: 'Kharis Church',
-        audioUrl: '',
-        videoId: videoId,
-        source: 'youtube',
+    void open() => unawaited(
+      startPlayback(
+        context,
+        ref,
+        Sermon(
+          id: PlaybackHistory.liveSermonId,
+          title: title,
+          speaker: 'Kharis Church',
+          audioUrl: '',
+          videoId: videoId,
+          source: 'youtube',
+        ),
+        mode: MediaMode.video,
       ),
-      mode: MediaMode.video,
     );
 
-    final kc = context.kc;
+    final k = context.k;
     return Padding(
       padding: padding,
-      child: Semantics(
-        button: true,
-        label: 'Live now: $title. Watch',
-        excludeSemantics: true,
-        child: Material(
-          key: const Key('home-live-now'),
-          color: kc.surface,
-          borderRadius: AppRadius.cardBorder,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: open,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
+      child: KCard(
+        key: const Key('home-live-now'),
+        padding: const EdgeInsets.all(KSpace.xl),
+        onTap: open,
+        child: Row(
+          children: [
+            KThumbnail(
+              size: KSize.artwork,
+              image: CachedNetworkImageProvider(
+                'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+              ),
+            ),
+            const SizedBox(width: KSpace.xl),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    child: SizedBox(
-                      width: 104,
-                      height: 58,
-                      child: ColoredBox(
-                        color: AppColors.primaryDeep,
-                        child: Image.network(
-                          'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                          errorBuilder: (_, _, _) => const Icon(
-                            Icons.live_tv_rounded,
-                            color: AppColors.onPrimary,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const _LiveBadge(),
-                        const SizedBox(height: 6),
-                        Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.ui(
-                            size: 14.5,
-                            weight: FontWeight.w700,
-                          ).copyWith(color: kc.onBg, height: 1.25),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: kc.accent,
-                      borderRadius: AppRadius.pillBorder,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.play_arrow_rounded,
-                          size: 16,
-                          color: kc.onAccent,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Watch',
-                          style: AppTypography.ui(
-                            size: 13,
-                            weight: FontWeight.w800,
-                          ).copyWith(color: kc.onAccent, height: 1),
-                        ),
-                      ],
-                    ),
+                  const KBadge('Live now', variant: KBadgeVariant.live),
+                  const SizedBox(height: KSpace.sm),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: KharisText.itemTitle.copyWith(color: k.text),
                   ),
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// "LIVE NOW" badge. The dot marks a real state (the stream is on), so it
-/// stays, but still: an endless pulse adds motion without adding meaning.
-/// Ink on the pink live colour keeps 4.5:1.
-class _LiveBadge extends StatelessWidget {
-  const _LiveBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.accentPink,
-        borderRadius: AppRadius.pillBorder,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: AppColors.ink,
-              shape: BoxShape.circle,
+            const SizedBox(width: KSpace.md),
+            KButton(
+              key: const Key('home-live-watch'),
+              label: 'Watch',
+              variant: KButtonVariant.tonal,
+              onPressed: open,
             ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            'LIVE NOW',
-            style: AppTypography.ui(
-              size: 10.5,
-              weight: FontWeight.w800,
-              letterSpacing: 0.9,
-            ).copyWith(color: AppColors.ink, height: 1),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

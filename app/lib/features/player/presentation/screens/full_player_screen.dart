@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/features/player/presentation/widgets/player_grab_handle.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import 'media_player_screen.dart';
 
@@ -55,39 +56,24 @@ class _NothingPlaying extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Deep-linked here with nothing beneath: go home rather than pop into an
+    // empty stack.
+    void close() => Navigator.of(context).canPop()
+        ? Navigator.of(context).pop()
+        : context.go('/home');
+
     return Scaffold(
-      backgroundColor: context.kc.bg,
+      backgroundColor: context.k.bg,
       body: SafeArea(
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-                child: GestureDetector(
-                  // Deep-linked here with nothing beneath: go home rather
-                  // than pop into an empty stack.
-                  onTap: () => Navigator.of(context).canPop()
-                      ? Navigator.of(context).pop()
-                      : context.go('/home'),
-                  behavior: HitTestBehavior.opaque,
-                  child: SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: context.kc.onBg,
-                      size: 28,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            PlayerGrabHandle(onClose: close),
             Expanded(
               child: Center(
-                child: Text(
-                  'Nothing playing yet',
-                  style: AppTypography.ui(size: 14, color: context.kc.muted),
+                child: KEmptyState(
+                  icon: KIcons.soundwave,
+                  title: 'Nothing playing yet',
+                  hint: 'Choose a message to start listening.',
                 ),
               ),
             ),

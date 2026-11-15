@@ -7,10 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart' show PlayerState, ProcessingState;
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/player/data/related_messages.dart';
-import 'package:kharis_app/features/player/presentation/artwork_tint.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
@@ -146,50 +145,6 @@ void main() {
     });
   });
 
-  // ── Contrast ────────────────────────────────────────────────────────────────
-
-  group('tintedPlayerColors', () {
-    const seeds = [
-      Color(0xFFFFEB3B), // bright yellow
-      Color(0xFF0D47A1), // deep blue
-      Color(0xFFE53935), // red
-      Color(0xFF9E9E9E), // grey artwork
-      Color(0xFFFFFFFF),
-      Color(0xFF000000),
-    ];
-    for (final brightness in Brightness.values) {
-      test('text stays WCAG AA on every tint ($brightness)', () {
-        final base = brightness == Brightness.dark
-            ? KharisColors.dark
-            : KharisColors.light;
-        for (final seed in seeds) {
-          final kc = tintedPlayerColors(
-            base,
-            ColorScheme.fromSeed(seedColor: seed, brightness: brightness),
-            brightness,
-          );
-          expect(kc.bg.a, 1.0, reason: 'a solid surface');
-          if (brightness == Brightness.light) {
-            expect(kc.bg.computeLuminance(), greaterThan(0.6), reason: '$seed');
-          }
-          for (final surface in [kc.bg, kc.surfaceMuted]) {
-            for (final (name, fg) in [
-              ('onBg', kc.onBg),
-              ('muted', kc.muted),
-              ('accentInk', kc.accentInk),
-            ]) {
-              expect(
-                contrastRatio(fg, surface),
-                greaterThanOrEqualTo(kTextContrastAA),
-                reason: '$name on $surface (seed $seed)',
-              );
-            }
-          }
-        }
-      });
-    }
-  });
-
   // ── Player ──────────────────────────────────────────────────────────────────
 
   group('player', () {
@@ -203,7 +158,6 @@ void main() {
       List<Sermon> library = const [],
       List<Sermon>? queue,
       MediaMode mode = MediaMode.audio,
-      ArtworkSchemeSource? colours,
       Brightness brightness = Brightness.dark,
       bool reduceMotion = false,
     }) async {
@@ -218,12 +172,11 @@ void main() {
             ),
             favoritesProvider.overrideWith((ref) => Stream.value(null)),
             notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
-            artworkSchemeSourceProvider.overrideWithValue(
-              colours ?? (_, _) async => null,
-            ),
           ],
           child: MaterialApp(
-            theme: kharisTheme(brightness: brightness),
+            theme: brightness == Brightness.dark
+                ? KharisTheme.dark()
+                : KharisTheme.light(),
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(
                 context,
@@ -316,9 +269,10 @@ void main() {
           of: rail,
           matching: find.text('Message 2'),
         );
+        // Listed as rows, the closest match first.
         expect(
-          tester.getTopLeft(first).dx,
-          lessThan(tester.getTopLeft(second).dx),
+          tester.getTopLeft(first).dy,
+          lessThan(tester.getTopLeft(second).dy),
         );
 
         await tester.ensureVisible(first);
@@ -367,11 +321,11 @@ void main() {
               ),
               favoritesProvider.overrideWith((ref) => Stream.value(null)),
               notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
-              artworkSchemeSourceProvider.overrideWithValue(
-                (_, _) async => null,
-              ),
             ],
-            child: MaterialApp.router(routerConfig: router),
+            child: MaterialApp.router(
+              theme: KharisTheme.dark(),
+              routerConfig: router,
+            ),
           ),
         );
         await tester.pumpAndSettle();
@@ -440,11 +394,11 @@ void main() {
                 notesProvider.overrideWith(
                   (ref) => Stream.value(const <Note>[]),
                 ),
-                artworkSchemeSourceProvider.overrideWithValue(
-                  (_, _) async => null,
-                ),
               ],
-              child: MaterialApp.router(routerConfig: router),
+              child: MaterialApp.router(
+                theme: KharisTheme.dark(),
+                routerConfig: router,
+              ),
             ),
           );
           await tester.pumpAndSettle();
@@ -537,104 +491,27 @@ void main() {
       });
     });
 
-    group('artwork tint', () {
+    group('page colour', () {
       final art = _s('1', artworkUrl: 'https://cdn.example/1.jpg');
-      Color headerColour(WidgetTester tester) => tester
-          .widget<ColoredBox>(find.byKey(const Key('player-tint-header')))
-          .color;
-      Color bodyColour(WidgetTester tester) =>
-          (tester
-                      .widget<DecoratedBox>(
-                        find.byKey(const Key('player-tint-body')),
-                      )
-                      .decoration
-                  as BoxDecoration)
-              .color!;
 
       for (final brightness in Brightness.values) {
-        testWidgets('the top of the player takes the artwork colour '
-            '($brightness)', (tester) async {
-          final scheme = ColorScheme.fromSeed(
-            seedColor: const Color(0xFF1565C0),
-            brightness: brightness,
-          );
-          final requested = <(String, Brightness)>[];
+        testWidgets('the player sits on the page colour, whatever the '
+            'artwork ($brightness)', (tester) async {
           await audio.play(art);
-          await open(
-            tester,
-            art,
-            brightness: brightness,
-            colours: (url, b) async {
-              requested.add((url, b));
-              return scheme;
-            },
-          );
+          await open(tester, art, brightness: brightness);
           await tester.pumpAndSettle();
 
-          final base = brightness == Brightness.dark
+          final page = brightness == Brightness.dark
               ? KharisColors.dark
               : KharisColors.light;
-          final tint = tintedPlayerColors(base, scheme, brightness);
-          expect(requested, [('https://cdn.example/1.jpg', brightness)]);
-          expect(headerColour(tester), tint.bg);
-          expect(bodyColour(tester), tint.bg);
-          expect(tint.bg, isNot(base.bg));
-          final title = tester.widget<Text>(find.text('Message 1').first);
           expect(
-            contrastRatio(title.style!.color!, tint.bg),
-            greaterThanOrEqualTo(kTextContrastAA),
+            tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+            page.bg,
           );
+          final title = tester.widget<Text>(find.text('Message 1').first);
+          expect(title.style!.color, page.text);
         });
       }
-
-      testWidgets('falls back to the page colour when extraction fails', (
-        tester,
-      ) async {
-        for (final colours in <ArtworkSchemeSource>[
-          (_, _) async => null,
-          (_, _) async => throw StateError('decode failed'),
-        ]) {
-          await audio.play(art);
-          await open(tester, art, colours: colours);
-          await tester.pumpAndSettle();
-
-          expect(headerColour(tester), KharisColors.dark.bg);
-          expect(bodyColour(tester), KharisColors.dark.bg);
-          // Fresh scope for the next source.
-          await tester.pumpWidget(const SizedBox());
-        }
-      });
-
-      testWidgets('reduced motion: the colour changes without a fade', (
-        tester,
-      ) async {
-        final scheme = ColorScheme.fromSeed(
-          seedColor: const Color(0xFFC62828),
-          brightness: Brightness.dark,
-        );
-        final tint = tintedPlayerColors(
-          KharisColors.dark,
-          scheme,
-          Brightness.dark,
-        );
-
-        await audio.play(art);
-        await open(tester, art, colours: (_, _) async => scheme);
-        await tester.pump();
-        expect(headerColour(tester), isNot(tint.bg), reason: 'fading in');
-        await tester.pumpAndSettle();
-        expect(headerColour(tester), tint.bg);
-
-        await tester.pumpWidget(const SizedBox());
-        await open(
-          tester,
-          art,
-          colours: (_, _) async => scheme,
-          reduceMotion: true,
-        );
-        await tester.pump();
-        expect(headerColour(tester), tint.bg, reason: 'no animation frames');
-      });
     });
   });
 }

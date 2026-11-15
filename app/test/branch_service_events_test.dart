@@ -19,6 +19,7 @@ import 'package:kharis_app/shared/providers/content_api_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/supabase_stub.dart';
 
@@ -335,7 +336,10 @@ void main() {
             sharedPreferencesProvider.overrideWithValue(prefs),
             ...overrides(),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -360,7 +364,14 @@ void main() {
       expect(find.text('Get directions'), findsOneWidget);
       expect(find.text('Add to calendar'), findsOneWidget);
       expect(find.text('RSVP'), findsOneWidget);
-      expect(find.text('Every Wednesday \u00b7 7:00 PM'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('event-detail-recurrence')),
+          matching: find.text('EVERY WEDNESDAY'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('19:00'), findsOneWidget);
       expect(stub.requests, isEmpty);
     });
 

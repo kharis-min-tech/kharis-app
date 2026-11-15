@@ -135,6 +135,10 @@ Sermon mapApiSermon(Map<String, dynamic> j) {
     videoId: videoId,
     videoStart: youTubeStart(videoLink),
     source: 'kharis-api',
+    passages: [
+      for (final p in j['passages'] as List? ?? const [])
+        if (p is String && p.trim().isNotEmpty) p.trim(),
+    ],
   );
 }
 

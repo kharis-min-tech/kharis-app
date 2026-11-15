@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:kharis_app/core/constants/app_assets.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// The brand dove on the splash, drawn in two beats.
 ///
@@ -35,6 +36,7 @@ class SplashDove extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onInk = context.k.onInk;
     return SizedBox.fromSize(
       size: size,
       child: Stack(
@@ -47,11 +49,13 @@ class SplashDove extends StatelessWidget {
               width: size.width,
               height: size.height,
               fit: BoxFit.fill,
+              color: onInk,
+              colorBlendMode: BlendMode.srcIn,
               excludeFromSemantics: true,
             ),
           ),
           CustomPaint(
-            painter: _DoveTracePainter(trace: trace, fill: fill),
+            painter: _DoveTracePainter(trace: trace, fill: fill, color: onInk),
           ),
         ],
       ),
@@ -60,11 +64,17 @@ class SplashDove extends StatelessWidget {
 }
 
 class _DoveTracePainter extends CustomPainter {
-  _DoveTracePainter({required this.trace, required this.fill})
-    : super(repaint: Listenable.merge([trace, fill]));
+  _DoveTracePainter({
+    required this.trace,
+    required this.fill,
+    required this.color,
+  }) : super(repaint: Listenable.merge([trace, fill]));
 
   final Animation<double> trace;
   final Animation<double> fill;
+
+  /// Pen colour: the theme's on-ink role.
+  final Color color;
 
   /// Pen width in logical pixels, about half the logo's brush weight.
   static const double _penWidth = 1.6;
@@ -101,7 +111,7 @@ class _DoveTracePainter extends CustomPainter {
     final scale = size.width / _sourceWidth;
     canvas.scale(scale, size.height / _sourceHeight);
     final pen = Paint()
-      ..color = Colors.white.withValues(alpha: opacity)
+      ..color = color.withValues(alpha: opacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = _penWidth / scale
       ..strokeCap = StrokeCap.round
@@ -120,7 +130,7 @@ class _DoveTracePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DoveTracePainter old) =>
-      old.trace != trace || old.fill != fill;
+      old.trace != trace || old.fill != fill || old.color != color;
 }
 
 /// Pixel size of the source artwork the strokes are measured in.

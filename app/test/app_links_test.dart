@@ -33,6 +33,7 @@ import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -256,6 +257,7 @@ void main() {
           ProviderScope(
             overrides: _playerOverrides(audio, FakeCacheService()),
             child: MaterialApp(
+              theme: KharisTheme.light(),
               home: MediaPlayerScreen(sermon: service, mode: MediaMode.video),
             ),
           ),
@@ -334,7 +336,10 @@ void main() {
               (ref, branch) async => news[branch] ?? const [],
             ),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       for (var i = 0; i < 6; i++) {
@@ -410,7 +415,10 @@ void main() {
               (ref, id) => AsyncData<Sermon?>(id == '2700' ? _audioOnly : null),
             ),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pump();
@@ -489,7 +497,10 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await settle(tester);
@@ -540,7 +551,10 @@ void main() {
             ),
             sharedLinkArchiveFillingProvider.overrideWith((ref) => true),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await settle(tester);
@@ -590,7 +604,10 @@ void main() {
             ),
             sermonsProvider.overrideWith((ref) async => const <Sermon>[]),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pump();
@@ -690,6 +707,7 @@ void main() {
     }) async {
       await tester.pumpWidget(
         MaterialApp(
+          theme: KharisTheme.light(),
           builder: (context, child) => OpenInAppBanner(
             landed: Uri.parse('$_origin$landed'),
             isWeb: isWeb,

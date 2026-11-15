@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/playback_timestamp.dart';
 import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart'
@@ -13,6 +12,8 @@ import 'package:kharis_app/features/player/domain/transcript.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/transcript_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
+import 'package:kharis_app/ui/components/k_layout.dart' show kClear;
 
 /// The transcript of one message, following playback the way Apple Podcasts
 /// does: the stretch being spoken is highlighted and kept about a third of
@@ -34,15 +35,17 @@ class TranscriptSheet extends ConsumerWidget {
   /// timeline the transcript is stamped on. Null follows the audio service.
   final NoteTimelineBinding? timeline;
 
+  /// How much of the screen's height the sheet's content may take.
+  static const double _maxHeightFraction = 0.7;
+
   static Future<void> show(
     BuildContext context,
     Sermon sermon, {
     NoteTimelineBinding? timeline,
   }) {
-    return showModalBottomSheet<void>(
+    return showKBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      title: 'Transcript',
       builder: (_) => TranscriptSheet(sermon: sermon, timeline: timeline),
     );
   }
@@ -52,66 +55,39 @@ class TranscriptSheet extends ConsumerWidget {
     return Padding(
       // Lift the sheet over the keyboard while the member searches.
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SafeArea(
-        top: false,
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.8,
-          ),
-          decoration: BoxDecoration(
-            color: context.kc.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _grabber(context),
-              _header(context),
-              Flexible(child: _body(context, ref)),
-            ],
-          ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * _maxHeightFraction,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(context),
+            Flexible(child: _body(context, ref)),
+          ],
         ),
       ),
     );
   }
 
-  Widget _grabber(BuildContext context) => Container(
-    margin: const EdgeInsets.only(top: AppSpacing.sm),
-    height: 4,
-    width: 40,
-    decoration: BoxDecoration(
-      color: context.kc.divider,
-      borderRadius: BorderRadius.circular(2),
-    ),
-  );
-
-  Widget _header(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      AppSpacing.lg,
-      AppSpacing.lg,
-      AppSpacing.lg,
-      AppSpacing.sm,
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Transcript',
-          style: AppTypography.ui(
-            size: 18,
-            weight: FontWeight.w700,
-            color: context.kc.onBg,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
+  /// The message the transcript belongs to, and the close button.
+  Widget _header(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
           sermon.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppTypography.ui(size: 13, color: context.kc.muted),
+          style: KharisText.meta.copyWith(color: context.k.muted),
         ),
-      ],
-    ),
+      ),
+      KIconButton(
+        icon: KIcons.close,
+        label: 'Close transcript',
+        onPressed: () => Navigator.of(context).maybePop(),
+      ),
+    ],
   );
 
   Widget _body(BuildContext context, WidgetRef ref) {
@@ -123,14 +99,11 @@ class TranscriptSheet extends ConsumerWidget {
     return ref
         .watch(transcriptProvider(url))
         .when(
-          loading: () => const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, _) => _message(
-            context,
-            'Couldn’t load the transcript. Check your connection and try '
-            'again.',
+          loading: () => const _TranscriptSkeleton(),
+          error: (_, _) => KErrorState(
+            message:
+                'Couldn’t load the transcript. Check your connection and try '
+                'again.',
             onRetry: () => ref.invalidate(transcriptProvider(url)),
           ),
           data: (transcript) => transcript == null
@@ -146,29 +119,40 @@ class TranscriptSheet extends ConsumerWidget {
         );
   }
 
-  Widget _message(BuildContext context, String text, {VoidCallback? onRetry}) {
+  Widget _message(BuildContext context, String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.xl,
+      padding: const EdgeInsets.symmetric(vertical: KSpace.section),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: KharisText.body.copyWith(color: context.k.muted),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: AppTypography.ui(
-              size: 14,
-              height: 1.5,
-              color: context.kc.muted,
-            ),
-          ),
-          if (onRetry != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            TextButton(onPressed: onRetry, child: const Text('Retry')),
+    );
+  }
+}
+
+/// Lines of text standing in for the transcript while it loads.
+class _TranscriptSkeleton extends StatelessWidget {
+  const _TranscriptSkeleton();
+
+  static const int _lines = 6;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Loading transcript',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: KSpace.x3),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < _lines; i++) ...[
+              if (i > 0) const SizedBox(height: KSpace.xl),
+              const KSkeleton(height: KSpace.x3),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -327,9 +311,8 @@ class _TranscriptReaderState extends ConsumerState<_TranscriptReader> {
     );
     if (started || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Couldn’t play that message. Please try again.'),
-        backgroundColor: AppColors.errorContainer,
+      const SnackBar(
+        content: Text('Couldn’t play that message. Please try again.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -442,11 +425,9 @@ class _TranscriptReaderState extends ConsumerState<_TranscriptReader> {
                 onNotification: _onUserScroll,
                 child: SingleChildScrollView(
                   controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.gutter,
-                    AppSpacing.xs,
-                    AppSpacing.gutter,
-                    AppSpacing.lg,
+                  padding: const EdgeInsets.only(
+                    top: KSpace.xs,
+                    bottom: KSpace.x3,
                   ),
                   child: _segments(context, current, canSeek),
                 ),
@@ -455,8 +436,14 @@ class _TranscriptReaderState extends ConsumerState<_TranscriptReader> {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: AppSpacing.sm,
-                  child: Center(child: _BackToNowPill(onTap: _resumeFollowing)),
+                  bottom: KSpace.md,
+                  child: Center(
+                    child: KButton(
+                      label: 'Back to now',
+                      variant: KButtonVariant.inverse,
+                      onPressed: _resumeFollowing,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -498,8 +485,9 @@ class _TranscriptReaderState extends ConsumerState<_TranscriptReader> {
 // ── Pieces ────────────────────────────────────────────────────────────────────
 
 /// One timed stretch of text: its timestamp in a narrow gutter, the words
-/// beside it. The spoken stretch sits on a flat tint; search hits are marked
-/// inline, the one being stepped to in solid accent.
+/// beside it. The spoken stretch sits on a flat surface2 plate in a heavier
+/// weight; search hits are marked inline, the one being stepped to in solid
+/// primary.
 class _SegmentTile extends StatelessWidget {
   const _SegmentTile({
     required this.segment,
@@ -517,18 +505,15 @@ class _SegmentTile extends StatelessWidget {
   final TranscriptMatch? activeHit;
   final VoidCallback? onTap;
 
-  static const double _gutterWidth = 56;
-
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
+    final k = context.k;
     final start = segment.start;
-    final body = AppTypography.ui(
-      size: 15,
-      height: 1.6,
-      weight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-      color: kc.onBg,
+    final body = KharisText.body.copyWith(
+      fontWeight: isCurrent ? FontWeight.w600 : null,
+      color: k.text,
     );
+    const radius = BorderRadius.all(Radius.circular(KRadius.tile));
 
     return MergeSemantics(
       child: Semantics(
@@ -536,48 +521,42 @@ class _SegmentTile extends StatelessWidget {
         // plain text rather than reading out as "not selected".
         selected: isCurrent ? true : null,
         child: Material(
-          color: isCurrent ? kc.chipBg : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          color: isCurrent ? k.surface2 : kClear(k.surface2),
+          borderRadius: radius,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: radius,
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: 6,
+                horizontal: KSpace.md,
+                vertical: KSpace.sm,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (showGutter)
                     SizedBox(
-                      width: _gutterWidth,
+                      width: KSize.dateBlockWidth,
                       child: start == null
                           ? null
                           : Padding(
-                              padding: const EdgeInsets.only(top: 3),
+                              padding: const EdgeInsets.only(top: KSpace.xxs),
                               child: Text(
                                 formatPlaybackTimestamp(start),
                                 maxLines: 1,
                                 softWrap: false,
-                                style:
-                                    AppTypography.ui(
-                                      size: 12,
-                                      weight: FontWeight.w600,
-                                      color: isCurrent
-                                          ? kc.accentInk
-                                          : kc.muted,
-                                    ).copyWith(
-                                      fontFeatures: const [
-                                        FontFeature.tabularFigures(),
-                                      ],
-                                    ),
+                                style: KharisText.caption.copyWith(
+                                  color: isCurrent ? k.primaryText : k.muted,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
                               ),
                             ),
                     ),
                   Expanded(
                     child: Text.rich(
-                      TextSpan(style: body, children: _spans(kc)),
+                      TextSpan(style: body, children: _spans(k)),
                     ),
                   ),
                 ],
@@ -589,7 +568,7 @@ class _SegmentTile extends StatelessWidget {
     );
   }
 
-  List<TextSpan> _spans(KharisColors kc) {
+  List<TextSpan> _spans(KharisColors k) {
     final text = segment.text;
     if (hits.isEmpty) return [TextSpan(text: text)];
     final spans = <TextSpan>[];
@@ -603,10 +582,8 @@ class _SegmentTile extends StatelessWidget {
         TextSpan(
           text: text.substring(hit.start, hit.end),
           style: TextStyle(
-            backgroundColor: active
-                ? kc.accent
-                : kc.accent.withValues(alpha: 0.3),
-            color: active ? kc.onAccent : null,
+            backgroundColor: active ? k.primary : k.primaryTint,
+            color: active ? k.onPrimary : null,
           ),
         ),
       );
@@ -617,7 +594,7 @@ class _SegmentTile extends StatelessWidget {
   }
 }
 
-/// The search field, styled like the Messages search (pill, clear button).
+/// The search field, with a clear button once something is typed.
 class _SearchBar extends StatelessWidget {
   const _SearchBar({
     required this.controller,
@@ -633,45 +610,20 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    OutlineInputBorder pill(BorderSide side) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppRadius.pill),
-      borderSide: side,
-    );
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.gutter,
-        0,
-        AppSpacing.gutter,
-        AppSpacing.xs,
-      ),
-      child: TextField(
+      padding: const EdgeInsets.only(bottom: KSpace.xs),
+      child: KSearchField(
+        hint: 'Search the transcript',
         controller: controller,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
-        textInputAction: TextInputAction.search,
-        style: AppTypography.ui(size: 15, color: kc.onBg),
-        cursorColor: kc.accentInk,
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: 'Search the transcript',
-          hintStyle: AppTypography.ui(size: 14, color: kc.muted),
-          prefixIcon: Icon(Icons.search_rounded, size: 20, color: kc.muted),
-          suffixIcon: controller.text.isEmpty
-              ? null
-              : IconButton(
-                  tooltip: 'Clear search',
-                  onPressed: onCleared,
-                  icon: Icon(Icons.close_rounded, size: 18, color: kc.muted),
-                ),
-          border: pill(BorderSide.none),
-          enabledBorder: pill(BorderSide.none),
-          focusedBorder: pill(BorderSide(color: kc.accentInk, width: 1.5)),
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          filled: true,
-          fillColor: kc.surfaceAlt,
-        ),
+        trailing: controller.text.isEmpty
+            ? null
+            : KIconButton(
+                icon: KIcons.close,
+                label: 'Clear search',
+                onPressed: onCleared,
+              ),
       ),
     );
   }
@@ -693,77 +645,36 @@ class _SearchStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    final style = AppTypography.ui(size: 13, color: kc.muted);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
-      child: SizedBox(
-        height: 40,
-        child: count == 0
-            ? Align(
-                alignment: Alignment.centerLeft,
-                child: Text('No matches in this transcript', style: style),
-              )
-            : Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${index + 1} of $count',
-                      style: style.copyWith(
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
+    final style = KharisText.meta.copyWith(color: context.k.muted);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: KSize.touchMin),
+      child: count == 0
+          ? Align(
+              alignment: Alignment.centerLeft,
+              child: Text('No matches in this transcript', style: style),
+            )
+          : Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${index + 1} of $count',
+                    style: style.copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Previous match',
-                    onPressed: onPrevious,
-                    icon: Icon(Icons.keyboard_arrow_up_rounded, color: kc.onBg),
-                  ),
-                  IconButton(
-                    tooltip: 'Next match',
-                    onPressed: onNext,
-                    icon: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: kc.onBg,
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-/// Shown while follow-along is paused; brings the spoken segment back.
-class _BackToNowPill extends StatelessWidget {
-  const _BackToNowPill({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Material(
-      color: kc.onBg,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.gutter,
-            vertical: 10,
-          ),
-          child: Text(
-            'Back to now',
-            style: AppTypography.ui(
-              size: 13,
-              weight: FontWeight.w600,
-              color: kc.surface,
+                ),
+                KIconButton(
+                  icon: KIcons.chevronUp,
+                  label: 'Previous match',
+                  onPressed: onPrevious,
+                ),
+                KIconButton(
+                  icon: KIcons.chevronDown,
+                  label: 'Next match',
+                  onPressed: onNext,
+                ),
+              ],
             ),
-          ),
-        ),
-      ),
     );
   }
 }

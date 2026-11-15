@@ -32,6 +32,7 @@ import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/theme/kharis_theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -130,8 +131,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: overrides(),
-          child: const MaterialApp(
-            home: Scaffold(body: Center(child: PlayerControls())),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const Scaffold(body: Center(child: PlayerControls())),
           ),
         ),
       );
@@ -145,16 +147,16 @@ void main() {
       await pump(tester);
 
       // First message at 0:00: Previous is disabled.
-      await tester.tap(find.byIcon(Icons.skip_previous_rounded));
+      await tester.tap(find.byKey(const Key('player-previous')));
       expect(audio.previousCalls, 0);
 
-      await tester.tap(find.byIcon(Icons.skip_next_rounded));
+      await tester.tap(find.byKey(const Key('player-next')));
       await tester.pump();
       expect(audio.nextCalls, 1);
       expect(audio.current?.id, 's2');
 
       // Second message within 3 s: Previous steps back.
-      await tester.tap(find.byIcon(Icons.skip_previous_rounded));
+      await tester.tap(find.byKey(const Key('player-previous')));
       await tester.pump();
       expect(audio.current?.id, 's1');
     });
@@ -163,7 +165,7 @@ void main() {
       await audio.play(_library.last, queue: _library);
       await pump(tester);
 
-      await tester.tap(find.byIcon(Icons.skip_next_rounded));
+      await tester.tap(find.byKey(const Key('player-next')));
       expect(audio.nextCalls, 0);
     });
 
@@ -177,7 +179,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.skip_previous_rounded));
+      await tester.tap(find.byKey(const Key('player-previous')));
       await tester.pump();
       expect(audio.previousCalls, 1);
       expect(audio.seekCalls, [Duration.zero]);
@@ -260,6 +262,7 @@ void main() {
         ProviderScope(
           overrides: overrides(library: library),
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: MediaPlayerScreen(
               sermon: sermon ?? both,
               mode: mode,
@@ -660,6 +663,7 @@ void main() {
         ProviderScope(
           overrides: overrides(),
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: MediaPlayerScreen(sermon: both, mode: MediaMode.video),
           ),
         ),
@@ -803,14 +807,15 @@ void main() {
               ),
             ),
           ],
-          child: const MaterialApp(
-            home: PlaylistDetailScreen(playlistId: 'p1'),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const PlaylistDetailScreen(playlistId: 'p1'),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Play all'));
+      await tester.tap(find.text('Play'));
       await tester.pumpAndSettle();
 
       final call = audio.calls.single;
@@ -912,6 +917,7 @@ void main() {
               favoritesProvider.overrideWith((ref) => snapshots.stream),
             ],
             child: MaterialApp(
+              theme: KharisTheme.light(),
               home: Scaffold(
                 body: LikeButton(sermon: _sermon(2, videoId: 'v2')),
               ),
@@ -919,7 +925,7 @@ void main() {
           ),
         );
 
-        await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+        await tester.tap(find.byType(LikeButton));
         await tester.pump();
         await tester.runAsync(pumpEventQueue);
         expect(
@@ -933,7 +939,7 @@ void main() {
 
         snapshots.add(liked);
         await tester.pump();
-        await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+        await tester.tap(find.byType(LikeButton));
         await tester.runAsync(pumpEventQueue);
         final after = await tester.runAsync(doc.get);
         expect(after?.data()?['sermonIds'], ['s1', 'yt_v2']);
@@ -955,6 +961,7 @@ void main() {
         ProviderScope(
           overrides: overrides(favorites: liked),
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Scaffold(
               body: LikeButton(sermon: _sermon(2, videoId: 'v2')),
             ),
@@ -962,7 +969,10 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+      // Liked reads as "Remove from Favourites" on a filled plate.
+      final heart = tester.widget<KIconButton>(find.byType(KIconButton));
+      expect(heart.label, 'Remove from Favourites');
+      expect(heart.variant, KIconButtonVariant.filled);
     });
   });
 
@@ -980,6 +990,7 @@ void main() {
           ProviderScope(
             overrides: overrides(),
             child: MaterialApp(
+              theme: KharisTheme.light(),
               home: Consumer(
                 builder: (context, ref, _) {
                   captured = ref;

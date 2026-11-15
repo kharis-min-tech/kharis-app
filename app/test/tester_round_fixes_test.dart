@@ -25,6 +25,7 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/theme/kharis_theme.dart';
+import 'package:kharis_app/ui/components/k_button.dart';
 
 /// Regression guards for the tester-round fixes closed on 9 Sep
 /// (docs/BUG-TRACKER.md): each test pins one acceptance criterion so a later
@@ -243,6 +244,7 @@ void main() {
           favoritesProvider.overrideWith((ref) => Stream.value(null)),
         ],
         child: MaterialApp(
+          theme: KharisTheme.light(),
           home: MediaPlayerScreen(sermon: _sermon, mode: MediaMode.audio),
         ),
       ),
@@ -250,20 +252,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byIcon(Icons.ios_share_rounded),
+      find.byKey(const Key('player-action-share')),
       findsOneWidget,
       reason: 'KA-013: header duplicate removed; actions-row share stays',
     );
     expect(find.text('Share'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
     expect(find.text('Playlist'), findsOneWidget);
-    // KA-007: the player keeps its close chevron.
-    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+    // KA-007: the player can always be closed: the grab handle is a
+    // "Close player" button.
+    expect(find.bySemanticsLabel('Close player'), findsOneWidget);
     // KA-017: the transport controls (now Previous / Next message) are real
     // buttons with a ripple.
     expect(
-      find.ancestor(
-        of: find.byIcon(Icons.skip_previous_rounded),
+      find.descendant(
+        of: find.byKey(const Key('player-previous')),
         matching: find.byType(InkWell),
       ),
       findsWidgets,
@@ -285,7 +288,10 @@ void main() {
             currentUserProvider.overrideWith((ref) => Stream.value(_member)),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
           ],
-          child: const MaterialApp(home: SettingsScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const SettingsScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -321,20 +327,29 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
+    // A phone: on wider screens the form column is capped, not full width.
+    tester.view.physicalSize = const Size(KSize.designWidth, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-        child: const MaterialApp(home: LoginScreen()),
+        child: MaterialApp(
+          theme: KharisTheme.light(),
+          home: const LoginScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     final guest = find.text('Continue as guest');
     expect(guest, findsOneWidget);
-    final button = find.ancestor(
-      of: guest,
-      matching: find.byType(OutlinedButton),
+    final button = find.ancestor(of: guest, matching: find.byType(KButton));
+    expect(
+      tester.widget<KButton>(button).variant,
+      KButtonVariant.outline,
+      reason: 'KA-016: the guest path must read as a button, not a link',
     );
     expect(
       button,

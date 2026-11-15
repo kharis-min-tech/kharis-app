@@ -1,11 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:kharis_app/core/utils/artwork_fill.dart';
 
-/// Artwork tile that always has an on-brand fill: a flat brand colour with
-/// the network [url] drawn over it (cover). If the image is missing or fails,
-/// the fill shows through, so cards never flash empty. An optional [overlay]
-/// (play icon, equalizer) paints centred above, with an optional dark [scrim].
+import 'package:kharis_app/theme/kharis_theme.dart';
+
+/// Artwork tile: the network [url] drawn (cover) over the surface2
+/// placeholder. If the image is missing or fails, the placeholder shows
+/// through, so cards never flash empty. An optional [overlay] (play icon,
+/// equalizer) paints centred above, with an optional [scrim].
 ///
 /// Uses [CachedNetworkImage] for disk caching and decodes at the tile's display
 /// size (via `memCacheWidth`) so list thumbnails never decode full-resolution
@@ -15,47 +16,55 @@ class ArtworkImage extends StatelessWidget {
     super.key,
     required this.url,
     required this.gradientIndex,
-    this.radius = 12,
+    this.radius = KRadius.card,
     this.overlay,
     this.scrim = false,
   });
 
   final String? url;
+
+  /// The message's artwork colour index. Every placeholder is surface2 now,
+  /// so it no longer picks a fill; kept for the callers that pass it.
   final int gradientIndex;
   final double radius;
   final Widget? overlay;
   final bool scrim;
 
+  /// Decode-width bounds, in physical pixels.
+  static const int _minCacheWidth = 64;
+  static const int _maxCacheWidth = 1080;
+
   @override
   Widget build(BuildContext context) {
+    final k = context.k;
     final dpr = MediaQuery.of(context).devicePixelRatio;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          ColoredBox(color: artworkFill(gradientIndex)),
+          ColoredBox(color: k.surface2),
           if (url != null && url!.isNotEmpty)
             LayoutBuilder(
               builder: (context, constraints) {
                 final w = constraints.maxWidth.isFinite
                     ? constraints.maxWidth
-                    : 400.0;
-                final cacheW = (w * dpr).round().clamp(64, 1080);
+                    : KSize.designWidth;
+                final cacheW = (w * dpr).round().clamp(
+                  _minCacheWidth,
+                  _maxCacheWidth,
+                );
                 return CachedNetworkImage(
                   imageUrl: url!,
                   fit: BoxFit.cover,
                   memCacheWidth: cacheW,
-                  fadeInDuration: const Duration(milliseconds: 120),
+                  fadeInDuration: KMotion.fast,
                   placeholder: (_, _) => const SizedBox.shrink(),
                   errorWidget: (_, _, _) => const SizedBox.shrink(),
                 );
               },
             ),
-          if (scrim)
-            const DecoratedBox(
-              decoration: BoxDecoration(color: Color(0x33000000)),
-            ),
+          if (scrim) ColoredBox(color: k.scrim),
           if (overlay != null) Center(child: overlay),
         ],
       ),

@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/event_detail_screen.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
@@ -95,15 +95,14 @@ Uri? announcementLink(NewsItem item) {
       : null;
 }
 
+/// Share of the screen height the announcement sheet's content may take
+/// before it scrolls.
+const double _sheetMaxHeight = 0.75;
+
 /// Bottom sheet with an announcement's untruncated body, image and CTA.
 Future<void> showAnnouncementDetail(BuildContext context, NewsItem item) {
-  return showModalBottomSheet<void>(
+  return showKBottomSheet<void>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: context.kc.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-    ),
     builder: (_) => AnnouncementDetailSheet(item: item),
   );
 }
@@ -117,6 +116,7 @@ class AnnouncementDetailSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final k = context.k;
     final body = item.body?.trim();
     final image = item.imageUrl?.trim();
     final uri = announcementLink(item);
@@ -124,54 +124,39 @@ class AnnouncementDetailSheet extends ConsumerWidget {
     final event = (eventId == null || eventId.isEmpty)
         ? null
         : ref.watch(linkedEventProvider(eventId));
+    final published = item.publishedAt;
+    final date = DateFormat(
+      published.year == DateTime.now().year ? 'EEEE d MMMM' : 'EEEE d MMMM y',
+    ).format(published);
 
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.kc.divider,
-                    borderRadius: AppRadius.pillBorder,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                item.type.toUpperCase(),
-                style: AppTypography.labelMd.copyWith(
-                  color: context.kc.muted,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * _sheetMaxHeight,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            KOverline(item.type),
+            const SizedBox(height: KSpace.sm),
+            Semantics(
+              header: true,
+              child: Text(
                 item.title,
-                style: AppTypography.ui(
-                  size: 19,
-                  weight: FontWeight.w700,
-                  color: context.kc.onBg,
+                style: KharisText.pageTitle.copyWith(color: k.text),
+              ),
+            ),
+            const SizedBox(height: KSpace.sm),
+            Text(date, style: KharisText.meta.copyWith(color: k.muted)),
+            if (image != null && image.isNotEmpty) ...[
+              const SizedBox(height: KSpace.x3),
+              ClipRRect(
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(KRadius.tile),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                DateFormat('EEEE d MMMM yyyy').format(item.publishedAt),
-                style: AppTypography.bodySm.copyWith(color: context.kc.muted),
-              ),
-              if (image != null && image.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.md),
+                child: ColoredBox(
+                  color: k.surface2,
                   child: CachedNetworkImage(
                     imageUrl: image,
                     fit: BoxFit.cover,
@@ -179,71 +164,57 @@ class AnnouncementDetailSheet extends ConsumerWidget {
                     errorWidget: (_, _, _) => const SizedBox.shrink(),
                   ),
                 ),
-              ],
-              if (body != null && body.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  body,
-                  style: AppTypography.bodyLg.copyWith(
-                    color: context.kc.onBg,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-              if (event != null) ...[
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    key: const Key('announcement-event'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: context.kc.onBg,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: () {
-                      final router = GoRouter.of(context);
-                      Navigator.of(context).pop();
-                      unawaited(
-                        router.push(
-                          '/events/${Uri.encodeComponent(event.id)}',
-                          extra: event,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.event_rounded, size: 18),
-                    label: const Text('View event'),
-                  ),
-                ),
-              ],
-              if (uri != null) ...[
-                SizedBox(height: event != null ? 10 : 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    key: const Key('announcement-cta'),
-                    // DESIGN.md: one CTA style, gold with gold ink.
-                    style: FilledButton.styleFrom(
-                      backgroundColor: context.kc.accent,
-                      foregroundColor: context.kc.onAccent,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: () => unawaited(
-                      launchUrl(
-                        uri,
-                        mode: LaunchMode.inAppBrowserView,
-                      ).catchError((Object _) => false),
-                    ),
-                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                    label: Text(
-                      item.ctaLabel?.trim().isNotEmpty == true
-                          ? item.ctaLabel!.trim()
-                          : 'Open link',
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ],
-          ),
+            if (body != null && body.isNotEmpty) ...[
+              const SizedBox(height: KSpace.x3),
+              Text(body, style: KharisText.body.copyWith(color: k.text)),
+            ],
+            const SizedBox(height: KSpace.gutter),
+            if (uri != null) ...[
+              KButton(
+                key: const Key('announcement-cta'),
+                label: item.ctaLabel?.trim().isNotEmpty == true
+                    ? item.ctaLabel!.trim()
+                    : 'Open link',
+                expand: true,
+                onPressed: () => unawaited(
+                  launchUrl(
+                    uri,
+                    mode: LaunchMode.inAppBrowserView,
+                  ).catchError((Object _) => false),
+                ),
+              ),
+              const SizedBox(height: KSpace.md),
+            ],
+            if (event != null) ...[
+              KButton(
+                key: const Key('announcement-event'),
+                label: 'View event',
+                icon: KIcons.calendar,
+                variant: KButtonVariant.outline,
+                expand: true,
+                onPressed: () {
+                  final router = GoRouter.of(context);
+                  Navigator.of(context).pop();
+                  unawaited(
+                    router.push(
+                      '/events/${Uri.encodeComponent(event.id)}',
+                      extra: event,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: KSpace.md),
+            ],
+            KButton(
+              key: const Key('announcement-close'),
+              label: 'Close',
+              variant: KButtonVariant.text,
+              expand: true,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
       ),
     );

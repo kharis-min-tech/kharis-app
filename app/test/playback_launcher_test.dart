@@ -9,6 +9,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -39,6 +40,7 @@ Widget _harness(
       favoritesProvider.overrideWith((ref) => Stream.value(null)),
     ],
     child: MaterialApp(
+      theme: KharisTheme.light(),
       home: Scaffold(
         body: Consumer(
           builder: (context, ref, _) => TextButton(

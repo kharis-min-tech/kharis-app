@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/constants/app_assets.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/splash_screen.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/splash_dove.dart';
 
@@ -34,7 +34,7 @@ Future<void> _pumpSplash(
   addTearDown(router.dispose);
   await tester.pumpWidget(
     MaterialApp.router(
-      theme: kharisTheme(),
+      theme: KharisTheme.light(),
       routerConfig: router,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(disableAnimations: reduceMotion),
@@ -132,7 +132,7 @@ void main() {
     await _pumpSplash(tester, reduceMotion: true, size: const Size(320, 568));
 
     final taglineBottom = tester.getBottomLeft(find.text(_tagline)).dy;
-    final ctaTop = tester.getTopLeft(find.byType(ElevatedButton)).dy;
+    final ctaTop = tester.getTopLeft(find.byType(KButton)).dy;
     expect(taglineBottom, lessThan(ctaTop));
     expect(tester.takeException(), isNull);
   });

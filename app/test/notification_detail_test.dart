@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/data/rsvp_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/event_detail_screen.dart';
@@ -68,7 +69,10 @@ void main() {
           myRsvpsProvider.overrideWith((ref) => Stream.value(const <Rsvp>[])),
           eventByIdProvider.overrideWith((ref, id) async => event),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          theme: KharisTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pumpAndSettle();

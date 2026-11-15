@@ -6,19 +6,31 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/core/services/notification_service.dart'
+    show NotificationPermission;
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
+import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
+import 'package:kharis_app/features/onboarding/data/branch_repository.dart'
+    show weekdayIndex;
+import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/settings/presentation/widgets/delete_account_flow.dart';
+import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart';
+import 'package:kharis_app/shared/providers/clock_provider.dart';
+import 'package:kharis_app/shared/providers/downloads_provider.dart';
+import 'package:kharis_app/shared/providers/notes_provider.dart';
+import 'package:kharis_app/shared/providers/notification_provider.dart';
+import 'package:kharis_app/shared/providers/streaks_provider.dart';
+import 'package:kharis_app/shared/providers/text_size_provider.dart';
 import 'package:kharis_app/shared/providers/theme_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
-
-import 'notifications_settings_screen.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// Church contact page (verified 200). The old `/help` path is a 404.
 const String kHelpUrl = 'https://kharis.org/contact-us/';
@@ -34,7 +46,6 @@ final appVersionProvider = FutureProvider<String>((ref) async {
   return '${info.version} (${info.buildNumber})';
 });
 
-/// Opens [url] in the system browser.
 /// Opens a web page inside the app (in-app browser), never in another app.
 Future<void> _openWebPage(String url) =>
     launchUrl(Uri.parse(url), mode: LaunchMode.inAppBrowserView);
@@ -49,734 +60,217 @@ void _pushPage(BuildContext context, Widget page) {
   );
 }
 
-/// The profile hub ("More"): identity card, grouped app list, sign in or
-/// out, and the installed version.
+/// Minutes after midnight a service starts, from "19:00", "19:00:00" or the
+/// older "7:00 PM"; null when the Studio set no clock time.
+int? _startMinutes(CampusService service) {
+  final m = RegExp(
+    r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$',
+  ).firstMatch(service.startTime?.trim() ?? '');
+  if (m == null) return null;
+  var hour = int.parse(m.group(1)!);
+  final minute = int.parse(m.group(2)!);
+  final half = m.group(3)?.toLowerCase();
+  if (half != null) {
+    if (hour < 1 || hour > 12) return null;
+    hour = hour % 12 + (half == 'pm' ? 12 : 0);
+  }
+  if (hour > 23 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+const _dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/// The next of [services] to start after [now], as the Events tile says it:
+/// "Midweek · Wed 19:00". Today counts while a service has yet to start (one
+/// with no time counts all day). Null when no service names a weekday.
+@visibleForTesting
+String? nextServiceLabel(List<CampusService> services, DateTime now) {
+  const endOfDay = 24 * 60;
+  final nowMinutes = now.hour * 60 + now.minute;
+  for (var offset = 0; offset <= 7; offset++) {
+    final weekday = DateTime(now.year, now.month, now.day + offset).weekday % 7;
+    CampusService? next;
+    for (final s in services) {
+      if (weekdayIndex(s.day) != weekday) continue;
+      final start = _startMinutes(s) ?? endOfDay;
+      if (offset == 0 && start <= nowMinutes) continue;
+      if (next == null || start < (_startMinutes(next) ?? endOfDay)) next = s;
+    }
+    if (next == null) continue;
+
+    final name = next.name.trim().replaceFirst(
+      RegExp(r'\s+service$', caseSensitive: false),
+      '',
+    );
+    final start = _startMinutes(next);
+    final when = [
+      _dayNames[weekday],
+      if (start != null)
+        '${(start ~/ 60).toString().padLeft(2, '0')}:'
+            '${(start % 60).toString().padLeft(2, '0')}',
+    ].join(' ');
+    return [if (name.isNotEmpty) name, when].join(' \u00b7 ');
+  }
+  return null;
+}
+
+/// "None yet", "1 note", "62 notes"; null while [count] is not known.
+String? _countLabel(
+  int? count, {
+  required String one,
+  required String many,
+  required String none,
+}) => switch (count) {
+  null => null,
+  0 => none,
+  1 => '1 $one',
+  _ => '$count $many',
+};
+
+/// The More tab: the member's card, shortcuts to their own things, their
+/// branch, settings, and the installed version.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
-    final branch = ref.watch(currentBranchProvider).valueOrNull;
     final version = ref.watch(appVersionProvider).valueOrNull;
     final signedIn =
         user != null && user.role != 'guest' && user.email.isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 150),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'More',
-                style: AppTypography.display(
-                  size: 30,
-                  weight: FontWeight.w700,
-                ).copyWith(color: context.kc.onBg),
+        bottom: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(
+                top: KSpace.md,
+                bottom: KSize.contentBottomPad,
               ),
-              const SizedBox(height: 18),
-
-              if (signedIn)
-                _ProfileCard(
-                  user: user,
-                  onEdit: () => context.push('/profile/edit'),
-                )
-              else
-                const _SignedOutCard(),
-
-              const SizedBox(height: 22),
-
-              const _SectionLabel('Appearance'),
-              const SizedBox(height: 8),
-              const _ThemeCard(),
-
-              const SizedBox(height: 22),
-
-              const _SectionLabel('App'),
-              const SizedBox(height: 8),
-              _MenuCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _MoreMenuItem(
-                    icon: Icons.auto_stories,
-                    label: 'Daily reading',
-                    onTap: () => context.push('/reading'),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.menu_book_rounded,
-                    label: 'Bible',
-                    onTap: () => context.go('/bible'),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.edit_note_rounded,
-                    label: 'My notes',
-                    onTap: () => context.push('/notes'),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.favorite_border_rounded,
-                    label: 'Favourites',
-                    onTap: () => context.push('/favorites'),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.queue_music_rounded,
-                    label: 'My playlists',
-                    onTap: () => context.push('/playlists'),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.sync_alt,
-                    label: 'Switch branch',
-                    value: branch ?? kChooseBranchLabel,
-                    onTap: () => context.push('/branch-selection'),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.notifications_none,
-                    label: 'Notifications',
-                    accent: AppColors.accentPink,
-                    onTap: () =>
-                        _pushPage(context, const NotificationsSettingsScreen()),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.volunteer_activism,
-                    label: 'Give',
-                    accent: context.kc.accentInk,
-                    isLast: true,
-                    onTap: () => context.push('/give'),
+                  const KScreenHeader(title: 'More'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      KSpace.gutter,
+                      KSpace.x3,
+                      KSpace.gutter,
+                      0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (signedIn)
+                          _ProfileCard(user: user)
+                        else
+                          const _SignInCard(),
+                        const SizedBox(height: KSpace.xxl),
+                        const _Tiles(),
+                        const SizedBox(height: KSpace.xxl),
+                        const _BranchBlock(),
+                        const SizedBox(height: KSpace.xxl),
+                        _SettingsRows(signedIn: signedIn),
+                        const SizedBox(height: KSpace.xxl),
+                        _AboutRows(member: signedIn ? user : null),
+                        const SizedBox(height: KSpace.gutter),
+                        Text(
+                          version == null
+                              ? 'Kharis Church'
+                              : 'Kharis Church $version',
+                          key: const ValueKey('app-version'),
+                          textAlign: TextAlign.center,
+                          style: KharisText.caption.copyWith(
+                            color: context.k.muted,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-
-              const SizedBox(height: 22),
-
-              const _SectionLabel('Connect'),
-              const SizedBox(height: 8),
-              _MenuCard(
-                children: [
-                  _MoreMenuItem(
-                    icon: Icons.waving_hand_outlined,
-                    label: "I'm new here",
-                    onTap: () => _pushPage(context, const NewHereScreen()),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.record_voice_over_outlined,
-                    label: 'Share a testimony',
-                    isLast: true,
-                    onTap: () => _pushPage(context, const TestimonyScreen()),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 22),
-
-              const _SectionLabel('Support'),
-              const SizedBox(height: 8),
-              _MenuCard(
-                children: [
-                  _MoreMenuItem(
-                    icon: Icons.star_border_rounded,
-                    label: 'Rate & feedback',
-                    accent: context.kc.accentInk,
-                    onTap: () => unawaited(
-                      showFeedbackSheet(
-                        context,
-                        ref,
-                        source: FeedbackSource.settings,
-                      ),
-                    ),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.help_outline,
-                    label: 'Help & support',
-                    external: true,
-                    onTap: () => unawaited(_openWebPage(kHelpUrl)),
-                  ),
-                  _MoreMenuItem(
-                    icon: Icons.privacy_tip_outlined,
-                    label: 'Privacy policy',
-                    external: true,
-                    isLast: true,
-                    onTap: () => unawaited(_openWebPage(kPrivacyPolicyUrl)),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 22),
-
-              if (signedIn)
-                _MenuCard(
-                  children: [
-                    _MoreMenuItem(
-                      icon: Icons.logout,
-                      label: 'Sign out',
-                      accent: context.kc.danger,
-                      danger: true,
-                      onTap: () => _confirmSignOut(context, ref),
-                    ),
-                    _MoreMenuItem(
-                      icon: Icons.person_remove_outlined,
-                      label: 'Delete account',
-                      accent: context.kc.danger,
-                      danger: true,
-                      isLast: true,
-                      onTap: () =>
-                          unawaited(confirmDeleteAccount(context, user)),
-                    ),
-                  ],
-                )
-              else
-                _MenuCard(
-                  children: [
-                    _MoreMenuItem(
-                      icon: Icons.login,
-                      label: 'Sign in',
-                      accent: context.kc.accentInk,
-                      isLast: true,
-                      onTap: () => context.push('/login'),
-                    ),
-                  ],
-                ),
-
-              const SizedBox(height: 22),
-              Center(
-                child: Text(
-                  version == null ? 'Kharis Church' : 'Kharis Church $version',
-                  key: const ValueKey('app-version'),
-                  style: AppTypography.ui(
-                    size: 11,
-                  ).copyWith(color: context.kc.muted),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
-
-  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.kc.surface,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
-        title: Text(
-          'Sign out',
-          style: AppTypography.ui(
-            size: 16,
-            weight: FontWeight.w700,
-          ).copyWith(color: context.kc.onBg),
-        ),
-        content: Text(
-          'Are you sure you want to sign out?',
-          style: AppTypography.ui(size: 14).copyWith(color: context.kc.muted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancel',
-              style: AppTypography.ui(
-                size: 14,
-                weight: FontWeight.w600,
-              ).copyWith(color: context.kc.muted),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Sign out',
-              style: AppTypography.ui(
-                size: 14,
-                weight: FontWeight.w700,
-              ).copyWith(color: context.kc.danger),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await ref.read(authRepositoryProvider).logout();
-      // currentUserProvider emits null, so the hub rebuilds to the signed-out
-      // state automatically. No navigation needed (browsing stays open).
-    }
-  }
 }
 
-// ── Signed-in profile card ────────────────────────────────────────────────────
+// ── Profile ─────────────────────────────────────────────────────────────────
 
-String _roleLabel(String role) {
-  switch (role) {
-    case 'admin':
-      return 'Admin';
-    case 'guest':
-      return 'Guest';
-    case 'new_here':
-      return 'New here';
-    default:
-      return 'Member';
-  }
-}
-
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.user, required this.onEdit});
+/// The signed-in member: who they are, their branch, the year they joined
+/// and their streaks. Opens Edit profile.
+class _ProfileCard extends ConsumerWidget {
+  const _ProfileCard({required this.user});
 
   final User user;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = user.displayName.trim().isNotEmpty
-        ? user.displayName.trim()[0].toUpperCase()
-        : 'K';
-    final subtitle = [
-      _roleLabel(user.role),
-      if (user.branch != null && user.branch!.isNotEmpty) user.branch!,
-    ].join(' \u00b7 ');
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      child: Row(
-        children: [
-          _Avatar(initial: initial, photoUrl: user.photoUrl),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.ui(
-                    size: 17,
-                    weight: FontWeight.w700,
-                  ).copyWith(color: context.kc.onBg),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.ui(
-                    size: 13,
-                  ).copyWith(color: context.kc.muted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          _EditButton(onTap: onEdit),
-        ],
-      ),
-    );
-  }
-}
-
-class _EditButton extends StatelessWidget {
-  const _EditButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    // 44 px tall hit area around the 34 px pill.
-    return Semantics(
-      button: true,
-      label: 'Edit profile',
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: context.kc.chipBg,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-            child: Text(
-              'Edit',
-              style: AppTypography.ui(
-                size: 13,
-                weight: FontWeight.w700,
-              ).copyWith(color: context.kc.onChip),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initial, this.photoUrl});
-
-  final String initial;
-  final String? photoUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 54,
-      height: 54,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.primary,
-      ),
-      clipBehavior: Clip.antiAlias,
-      alignment: Alignment.center,
-      child: photoUrl != null && photoUrl!.isNotEmpty
-          ? Image.network(
-              photoUrl!,
-              fit: BoxFit.cover,
-              width: 54,
-              height: 54,
-              gaplessPlayback: true,
-              errorBuilder: (_, _, _) => _initialText(),
-            )
-          : _initialText(),
-    );
-  }
-
-  Widget _initialText() => Center(
-    child: Text(
-      initial,
-      style: AppTypography.display(
-        size: 22,
-        weight: FontWeight.w700,
-      ).copyWith(color: AppColors.onPrimary),
-    ),
-  );
-}
-
-// ── Signed-out card ───────────────────────────────────────────────────────────
-
-class _SignedOutCard extends StatelessWidget {
-  const _SignedOutCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: context.kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Join the Kharis family',
-            style: AppTypography.display(
-              size: 18,
-              weight: FontWeight.w700,
-            ).copyWith(color: context.kc.onBg),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Sign in to keep your notes, playlists and branch on every device.',
-            style: AppTypography.ui(
-              size: 13,
-              height: 1.5,
-            ).copyWith(color: context.kc.muted),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _PillButton(
-                  label: 'Sign in',
-                  filled: true,
-                  onTap: () => context.push('/login'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _PillButton(
-                  label: 'Create account',
-                  filled: false,
-                  onTap: () => context.push('/register'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PillButton extends StatelessWidget {
-  const _PillButton({
-    required this.label,
-    required this.filled,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool filled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 46,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: filled ? context.kc.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            border: filled
-                ? null
-                : Border.all(color: context.kc.outline, width: 1.5),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.ui(
-              size: 14,
-              weight: FontWeight.w700,
-            ).copyWith(color: filled ? context.kc.onAccent : context.kc.onBg),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Section label ─────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        label.toUpperCase(),
-        style: AppTypography.ui(
-          size: 11,
-          weight: FontWeight.w700,
-          letterSpacing: 1.2,
-        ).copyWith(color: context.kc.muted),
-      ),
-    );
-  }
-}
-
-// ── Menu card + rows ───────────────────────────────────────────────────────────
-
-/// A grouped white card that wraps a set of [_MoreMenuItem] rows.
-class _MenuCard extends StatelessWidget {
-  const _MenuCard({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
-    );
-  }
-}
-
-class _MoreMenuItem extends StatelessWidget {
-  const _MoreMenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.accent,
-    this.value,
-    this.external = false,
-    this.danger = false,
-    this.isLast = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? accent;
-
-  /// Current setting shown before the chevron (e.g. the active campus).
-  final String? value;
-
-  /// Opens outside the app; shows an external-link glyph instead of a
-  /// chevron so the hand-off is not a surprise.
-  final bool external;
-  final bool danger;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    final tint = accent ?? kc.onChip;
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: isLast
-              ? null
-              : BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: kc.divider, width: 1),
-                  ),
-                ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: tint.withValues(alpha: 0.12),
-                  borderRadius: AppRadius.tileBorder,
-                ),
-                alignment: Alignment.center,
-                child: Icon(icon, color: tint, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  label,
-                  style: AppTypography.ui(
-                    size: 15,
-                    weight: FontWeight.w600,
-                  ).copyWith(color: danger ? kc.danger : kc.onBg),
-                ),
-              ),
-              if (value != null) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    value!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: AppTypography.ui(size: 13).copyWith(color: kc.muted),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 4),
-              Icon(
-                external
-                    ? Icons.open_in_new_rounded
-                    : Icons.chevron_right_rounded,
-                color: kc.muted,
-                size: external ? 18 : 22,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Appearance / theme mode ───────────────────────────────────────────────────
-
-/// Light / Dark / System selector. The whole app follows one brightness — this
-/// is the single place a member changes it, and the choice is persisted by
-/// [themeModeProvider].
-class _ThemeCard extends ConsumerWidget {
-  const _ThemeCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final kc = context.kc;
-    final mode = ref.watch(themeModeProvider);
+    final branch = ref.watch(currentBranchProvider).valueOrNull;
+    final streaks = ref.watch(streaksProvider);
+    final photoUrl = user.photoUrl;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      clipBehavior: Clip.antiAlias,
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: kc.onChip.withValues(alpha: 0.12),
-                  borderRadius: AppRadius.tileBorder,
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.brightness_6_outlined,
-                  color: kc.onChip,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'Theme',
-                  style: AppTypography.ui(
-                    size: 15,
-                    weight: FontWeight.w600,
-                  ).copyWith(color: kc.onBg),
-                ),
-              ),
-            ],
+    return KMoreProfileCard(
+      key: const Key('more-profile-card'),
+      name: user.displayName,
+      photo: photoUrl == null || photoUrl.isEmpty
+          ? null
+          : NetworkImage(photoUrl),
+      subtitle: [
+        ?branch,
+        'member since ${user.createdAt.year}',
+      ].join(' \u00b7 '),
+      streaks: [
+        if (streaks.readingStreak > 0)
+          KMoreStreakBadge(
+            '${streaks.readingStreak}-day reading',
+            tone: KMoreStreakTone.highlight,
+            icon: KIcons.flame,
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _ThemeOption(
-                  icon: Icons.light_mode_outlined,
-                  label: 'Light',
-                  selected: mode == ThemeMode.light,
-                  onTap: () =>
-                      ref.read(themeModeProvider.notifier).set(ThemeMode.light),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _ThemeOption(
-                  icon: Icons.dark_mode_outlined,
-                  label: 'Dark',
-                  selected: mode == ThemeMode.dark,
-                  onTap: () =>
-                      ref.read(themeModeProvider.notifier).set(ThemeMode.dark),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _ThemeOption(
-                  icon: Icons.phone_iphone_rounded,
-                  label: 'System',
-                  selected: mode == ThemeMode.system,
-                  onTap: () => ref
-                      .read(themeModeProvider.notifier)
-                      .set(ThemeMode.system),
-                ),
-              ),
-            ],
+        if (streaks.messagesStreak > 0)
+          KMoreStreakBadge('${streaks.messagesStreak}-day messages'),
+      ],
+      onTap: () => context.push('/profile/edit'),
+    );
+  }
+}
+
+/// What a guest sees in place of the profile card.
+class _SignInCard extends StatelessWidget {
+  const _SignInCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return KCard(
+      key: const Key('more-sign-in-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Sign in to keep your notes, collections and branch on every '
+            'device.',
+            style: KharisText.body.copyWith(color: context.k.text),
+          ),
+          const SizedBox(height: KSpace.x3),
+          KButton(
+            key: const Key('more-sign-in'),
+            label: 'Sign in',
+            expand: true,
+            onPressed: () => context.push('/login'),
+          ),
+          const SizedBox(height: KSpace.xs),
+          Center(
+            child: KTextLink(
+              key: const Key('more-create-account'),
+              label: 'Create an account',
+              onTap: () => context.push('/register'),
+            ),
           ),
         ],
       ),
@@ -784,57 +278,363 @@ class _ThemeCard extends ConsumerWidget {
   }
 }
 
-class _ThemeOption extends StatelessWidget {
-  const _ThemeOption({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+// ── Shortcuts ───────────────────────────────────────────────────────────────
 
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+/// The member's own things, each with what is in it right now.
+class _Tiles extends ConsumerWidget {
+  const _Tiles();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notes = ref.watch(notebookProvider).valueOrNull?.length;
+    final downloads = ref.watch(downloadsProvider).length;
+    final collections = ref.watch(playlistsProvider).valueOrNull?.length;
+    final favourites = ref
+        .watch(favoritesProvider)
+        .whenOrNull(data: (playlist) => playlist?.sermonIds.length ?? 0);
+    final services =
+        ref.watch(currentCampusProvider)?.services ?? const <CampusService>[];
+    final nextService = nextServiceLabel(services, ref.watch(clockProvider)());
+
+    return KMoreTileGrid(
+      children: [
+        KMoreTile(
+          key: const Key('more-tile-notes'),
+          icon: KIcons.pen,
+          title: 'My notes',
+          meta: _countLabel(
+            notes,
+            one: 'note',
+            many: 'notes',
+            none: 'No notes yet',
+          ),
+          onTap: () => context.push('/notes'),
+        ),
+        KMoreTile(
+          key: const Key('more-tile-downloads'),
+          icon: KIcons.download,
+          title: 'Downloads',
+          meta: downloads == 0 ? 'None saved' : '$downloads saved',
+          onTap: () => context.push('/downloads'),
+        ),
+        KMoreTile(
+          key: const Key('more-tile-collections'),
+          icon: KIcons.collection,
+          title: 'Collections',
+          meta: _countLabel(
+            collections,
+            one: 'collection',
+            many: 'collections',
+            none: 'None yet',
+          ),
+          onTap: () => context.push('/playlists'),
+        ),
+        KMoreTile(
+          key: const Key('more-tile-favourites'),
+          icon: KIcons.heart,
+          title: 'Favourites',
+          meta: _countLabel(
+            favourites,
+            one: 'message',
+            many: 'messages',
+            none: 'None yet',
+          ),
+          onTap: () => context.push('/favorites'),
+        ),
+        KMoreTile(
+          key: const Key('more-tile-give'),
+          icon: KIcons.gift,
+          title: 'Give',
+          meta: 'Tithes and offerings',
+          onTap: () => context.push('/give'),
+        ),
+        KMoreTile(
+          key: const Key('more-tile-events'),
+          icon: KIcons.calendar,
+          title: 'Events',
+          meta: nextService ?? 'Services and events',
+          onTap: () => context.push('/calendar'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Your branch ─────────────────────────────────────────────────────────────
+
+/// The member's branch: where and when it meets, directions and a way to
+/// change it. Opens the branch page. Until a branch is chosen (or while its
+/// details load) it offers the choice alone.
+class _BranchBlock extends ConsumerWidget {
+  const _BranchBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(currentCampusProvider) != null) {
+      return CampusCard(summary: true, onTap: () => context.push('/branch'));
+    }
+
+    final branch = ref.watch(currentBranchProvider).valueOrNull;
+    return KCard(
+      key: const Key('more-choose-branch-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const KOverline('Your branch'),
+          const SizedBox(height: KSpace.sm),
+          Text(
+            branch ?? kChooseBranchLabel,
+            style: KharisText.title.copyWith(color: context.k.text),
+          ),
+          const SizedBox(height: KSpace.xl),
+          KButton(
+            key: const Key('more-choose-branch'),
+            label: branch == null ? 'Choose branch' : 'Change branch',
+            variant: KButtonVariant.outline,
+            expand: true,
+            onPressed: () => pickActiveBranch(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Rows ────────────────────────────────────────────────────────────────────
+
+/// A settings row's current value, at the end of the row.
+class _RowValue extends StatelessWidget {
+  const _RowValue(this.value);
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) =>
+      Text(value, style: KharisText.meta.copyWith(color: context.k.muted));
+}
+
+String _themeLabel(ThemeMode mode) => switch (mode) {
+  ThemeMode.system => 'System',
+  ThemeMode.light => 'Light',
+  ThemeMode.dark => 'Dark',
+};
+
+/// "On" while the phone allows notifications and at least one kind is
+/// switched on; "Off" otherwise; null while it is not known.
+String? _notificationsLabel(
+  NotificationPermission? permission,
+  Map<String, bool>? prefs,
+) => switch (permission) {
+  null || NotificationPermission.unavailable => null,
+  NotificationPermission.granted =>
+    prefs != null && prefs.isNotEmpty && !prefs.containsValue(true)
+        ? 'Off'
+        : 'On',
+  NotificationPermission.askable || NotificationPermission.blocked => 'Off',
+};
+
+/// Notifications, appearance, text size, the two forms, feedback and, for a
+/// member, Sign out.
+class _SettingsRows extends ConsumerWidget {
+  const _SettingsRows({required this.signedIn});
+
+  final bool signedIn;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = ref.watch(themeModeProvider);
+    final textSize = ref.watch(textSizeProvider);
+    final notifications = _notificationsLabel(
+      ref.watch(notificationPermissionProvider).valueOrNull,
+      ref.watch(notificationPrefsProvider).valueOrNull,
+    );
+
+    return KListGroup(
+      children: [
+        KListRow(
+          key: const Key('more-row-notifications'),
+          leading: const KIcon(KIcons.bell),
+          title: 'Notifications',
+          trailing: notifications == null ? null : _RowValue(notifications),
+          onTap: () => context.push('/settings/notifications'),
+        ),
+        KListRow(
+          key: const Key('more-row-appearance'),
+          leading: const KIcon(KIcons.moon),
+          title: 'Appearance',
+          trailing: _RowValue(_themeLabel(theme)),
+          onTap: () => _chooseAppearance(context, ref),
+        ),
+        KListRow(
+          key: const Key('more-row-text-size'),
+          leading: const KIcon(KIcons.textSize),
+          title: 'Text size',
+          trailing: _RowValue(textSize.label),
+          onTap: () => _chooseTextSize(context, ref),
+        ),
+        KListRow(
+          key: const Key('more-row-new-here'),
+          leading: const KIcon(KIcons.users),
+          title: "I'm new here",
+          onTap: () => _pushPage(context, const NewHereScreen()),
+        ),
+        KListRow(
+          key: const Key('more-row-testimony'),
+          leading: const KIcon(KIcons.mic),
+          title: 'Share a testimony',
+          onTap: () => _pushPage(context, const TestimonyScreen()),
+        ),
+        KListRow(
+          key: const Key('more-row-feedback'),
+          leading: const KIcon(KIcons.help),
+          title: 'Help & feedback',
+          onTap: () => unawaited(
+            showFeedbackSheet(context, ref, source: FeedbackSource.settings),
+          ),
+        ),
+        if (signedIn)
+          KListRow(
+            key: const Key('more-row-sign-out'),
+            leading: const KIcon(KIcons.signOut),
+            title: 'Sign out',
+            onTap: () => _confirmSignOut(context, ref),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _chooseAppearance(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(themeModeProvider.notifier);
+    final mode = await showKSortSheet<ThemeMode>(
+      context: context,
+      title: 'Appearance',
+      options: [
+        for (final mode in const [
+          ThemeMode.system,
+          ThemeMode.light,
+          ThemeMode.dark,
+        ])
+          KSortOption(value: mode, label: _themeLabel(mode)),
+      ],
+      selected: ref.read(themeModeProvider),
+    );
+    if (mode != null) await controller.set(mode);
+  }
+
+  Future<void> _chooseTextSize(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(textSizeProvider.notifier);
+    final choice = await showKSortSheet<TextSizeChoice>(
+      context: context,
+      title: 'Text size',
+      options: [
+        for (final choice in TextSizeChoice.values)
+          KSortOption(value: choice, label: choice.label),
+      ],
+      selected: ref.read(textSizeProvider),
+    );
+    if (choice != null) await controller.set(choice);
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    final auth = ref.read(authRepositoryProvider);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _SignOutDialog(),
+    );
+    // currentUserProvider then emits null and More rebuilds to its guest
+    // state; browsing stays open, so there is nowhere to navigate to.
+    if (confirmed == true) await auth.logout();
+  }
+}
+
+/// Asks before signing out: 'Sign out' above a plain 'Cancel'.
+class _SignOutDialog extends StatelessWidget {
+  const _SignOutDialog();
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    final fg = selected ? kc.onAccent : kc.muted;
-    // Selection is announced, not only coloured; 44 px meets the tap target.
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          height: 44,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? kc.accent : kc.surfaceMuted,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+    final k = context.k;
+    return Dialog(
+      backgroundColor: k.surface,
+      insetPadding: const EdgeInsets.all(KSpace.gutter),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(KRadius.card)),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(KSpace.gutter),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(icon, size: 16, color: fg),
-              const SizedBox(width: 6),
-              Flexible(
+              Semantics(
+                header: true,
                 child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.ui(
-                    size: 13,
-                    weight: FontWeight.w700,
-                  ).copyWith(color: fg),
+                  'Sign out?',
+                  style: KharisText.section.copyWith(color: k.text),
                 ),
+              ),
+              const SizedBox(height: KSpace.xl),
+              Text(
+                'Are you sure you want to sign out?',
+                style: KharisText.body.copyWith(color: k.muted),
+              ),
+              const SizedBox(height: KSpace.gutter),
+              KButton(
+                key: const Key('sign-out-confirm'),
+                label: 'Sign out',
+                variant: KButtonVariant.inverse,
+                expand: true,
+                onPressed: () => Navigator.of(context).pop(true),
+              ),
+              const SizedBox(height: KSpace.md),
+              KButton(
+                label: 'Cancel',
+                variant: KButtonVariant.text,
+                expand: true,
+                onPressed: () => Navigator.of(context).pop(false),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The church's contact and privacy pages and, for a [member], deleting
+/// their account.
+class _AboutRows extends StatelessWidget {
+  const _AboutRows({required this.member});
+
+  /// The signed-in member; null for a guest.
+  final User? member;
+
+  @override
+  Widget build(BuildContext context) {
+    return KListGroup(
+      children: [
+        KListRow(
+          key: const Key('more-row-contact'),
+          leading: const KIcon(KIcons.send),
+          title: 'Contact us',
+          onTap: () => unawaited(_openWebPage(kHelpUrl)),
+        ),
+        KListRow(
+          key: const Key('more-row-privacy'),
+          leading: const KIcon(KIcons.lock),
+          title: 'Privacy policy',
+          onTap: () => unawaited(_openWebPage(kPrivacyPolicyUrl)),
+        ),
+        if (member case final member?)
+          KListRow(
+            key: const Key('more-row-delete-account'),
+            leading: const KIcon(KIcons.close),
+            title: 'Delete account',
+            onTap: () => unawaited(confirmDeleteAccount(context, member)),
+          ),
+      ],
     );
   }
 }

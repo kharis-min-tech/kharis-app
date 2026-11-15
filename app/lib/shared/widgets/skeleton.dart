@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
-/// Animated skeleton placeholder — surfaceAlt base with a slow opacity
+/// Animated skeleton placeholder: a surface2 block with a slow opacity
 /// pulse (1.1 s, 0.45 → 0.95). Drop-in replacement for loading spinners.
 class Skeleton extends StatefulWidget {
   const Skeleton({
     super.key,
     required this.width,
     required this.height,
-    this.radius = 8,
+    this.radius = KRadius.tile,
   });
 
   final double width;
@@ -43,13 +43,19 @@ class _SkeletonState extends State<Skeleton>
 
   @override
   Widget build(BuildContext context) {
+    // surface2; under a theme without the Kharis roles (screens not yet on
+    // the redesign), Material's nearest role.
+    final theme = Theme.of(context);
+    final color =
+        theme.extension<KharisColors>()?.surface2 ??
+        theme.colorScheme.surfaceContainerHighest;
     return FadeTransition(
       opacity: _opacity,
       child: Container(
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
-          color: context.kc.surfaceAlt,
+          color: color,
           borderRadius: BorderRadius.circular(widget.radius),
         ),
       ),
