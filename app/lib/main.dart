@@ -18,8 +18,6 @@ import 'core/constants/api_config.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
 import 'shared/providers/theme_provider.dart';
-// REDESIGN-MIGRATION: remove when lib/core/theme is deleted
-import 'core/theme/kharis_colors.dart' as legacy;
 import 'theme/kharis_theme.dart';
 import 'ui/components/k_layout.dart';
 import 'shared/providers/auth_provider.dart';
@@ -44,16 +42,13 @@ Future<void> main() async {
       // https://<AppLinks.host>/m/<id> routes in the web app exactly as it
       // does in the native apps. No-op off the web.
       usePathUrlStrategy();
-      // Fonts ship in assets/google_fonts (google_fonts prefers bundled files
-      // over fetching), so first launch renders the same offline as online.
-      // Their SIL Open Font Licenses appear in the licences page.
+      // Plus Jakarta Sans is bundled (assets/fonts), so first launch renders
+      // the same offline as online. Its SIL Open Font License appears in the
+      // licences page.
       LicenseRegistry.addLicense(() async* {
-        for (final family in const ['plusjakartasans', 'newsreader']) {
-          yield LicenseEntryWithLineBreaks(
-            ['google_fonts'],
-            await rootBundle.loadString('assets/google_fonts/OFL-$family.txt'),
-          );
-        }
+        yield LicenseEntryWithLineBreaks([
+          'PlusJakartaSans',
+        ], await rootBundle.loadString('assets/fonts/OFL.txt'));
       });
 
       // Lock-screen / notification / CarPlay media controls (Now Playing):
@@ -111,10 +106,10 @@ Future<void> main() async {
   );
 }
 
-/// Bounds for the member's system text size. Beyond 1.3x the fixed-height
-/// cards and the mini player clip; below 0.85x text is no longer legible.
+/// Bounds for the member's system text size: up to 200% (the spec's
+/// accessibility floor); below 0.85x text is no longer legible.
 const double kMinTextScale = 0.85;
-const double kMaxTextScale = 1.3;
+const double kMaxTextScale = 2.0;
 
 /// `MaterialApp.builder` that honours the system text size, multiplied by the
 /// member's Text size choice ([factor]), within
@@ -135,21 +130,9 @@ Widget clampTextScaling(
   );
 }
 
-/// The app's theme for [brightness]: [KharisTheme] plus, during the redesign,
-/// the old theme's extension so screens that have not been converted yet can
-/// still read `context.kc`.
-ThemeData kharisAppTheme(Brightness brightness) {
-  final dark = brightness == Brightness.dark;
-  final theme = dark ? KharisTheme.dark() : KharisTheme.light();
-  // REDESIGN-MIGRATION: remove when lib/core/theme is deleted. This is the
-  // only place the old theme is registered; return `theme` as is afterwards.
-  return theme.copyWith(
-    extensions: [
-      ...theme.extensions.values,
-      dark ? legacy.KharisColors.dark : legacy.KharisColors.light,
-    ],
-  );
-}
+/// The app's theme for [brightness]: purely [KharisTheme].
+ThemeData kharisAppTheme(Brightness brightness) =>
+    brightness == Brightness.dark ? KharisTheme.dark() : KharisTheme.light();
 
 /// `MaterialApp.builder` step that keeps the status bar and the system
 /// navigation bar in step with the active theme.

@@ -37,8 +37,6 @@ const _london = Branch(
   id: 'london',
   name: 'Kharis London',
   subtitle: 'England · Headquarters',
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
   contact: CampusContact(
     phone: '020 7000 0000',
     email: 'london@kharis.org',
@@ -185,7 +183,7 @@ void _forEachMode(
   Future<void> Function(WidgetTester tester, bool dark, double scale) body,
 ) {
   for (final dark in const [false, true]) {
-    for (final scale in const [1.0, 1.3]) {
+    for (final scale in const [1.0, 1.3, 2.0]) {
       testWidgets(
         '$name · ${dark ? 'dark' : 'light'} · ${(scale * 100).round()}%',
         (tester) async {

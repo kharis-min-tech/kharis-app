@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/constants/app_links.dart';
 import 'package:kharis_app/core/services/app_router.dart';
@@ -100,7 +99,6 @@ void _expectOnlyKharisLinks(String text) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   // ── Link format ─────────────────────────────────────────────────────────────
 

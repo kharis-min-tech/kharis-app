@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
@@ -60,7 +59,6 @@ Widget _harness(
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   setUp(() => MediaPlayerScreen.debugDisableVideoEngine = true);
   tearDown(() => MediaPlayerScreen.debugDisableVideoEngine = false);

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
@@ -69,7 +68,6 @@ final _member = User(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets(
     'KA-001: the mini-player is out of the way on Give and back on Home '

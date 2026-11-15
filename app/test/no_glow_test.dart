@@ -5,9 +5,7 @@ import 'package:flutter/gestures.dart' show kPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
@@ -40,10 +38,8 @@ import 'support/fake_cache_service.dart';
 import 'support/fake_sermon_repository.dart';
 
 /// DESIGN.md: "No glows", "No glassmorphism", restrained flat surfaces.
-/// The only shadows allowed are the design tokens ([redesign.KShadow]);
-/// [AppShadows.card] stays only while the old theme still exists.
+/// The only shadows allowed are the design tokens ([redesign.KShadow]).
 final _tokenShadows = <BoxShadow>{
-  ...AppShadows.card,
   ...redesign.KShadow.cardLight,
   ...redesign.KShadow.cardDark,
   ...redesign.KShadow.floatingLight,
@@ -113,15 +109,6 @@ List<String> _gloss(WidgetTester tester, {bool flatFills = false}) {
   return found;
 }
 
-/// WCAG contrast ratio of [fg] composited over the opaque [bg].
-double _contrast(Color fg, Color bg) {
-  final a = Color.alphaBlend(fg, bg).computeLuminance();
-  final b = bg.computeLuminance();
-  final hi = a > b ? a : b;
-  final lo = a > b ? b : a;
-  return (hi + 0.05) / (lo + 0.05);
-}
-
 Sermon _sermon(int n, {String? videoId}) => Sermon(
   id: 's$n',
   title: 'Message $n',
@@ -132,7 +119,6 @@ Sermon _sermon(int n, {String? videoId}) => Sermon(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   late FakeAudioPlayerService audio;
 
@@ -155,9 +141,7 @@ void main() {
         textDirection: TextDirection.ltr,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(color: Color(0x667C3AED), blurRadius: 24),
-            ],
+            boxShadow: [BoxShadow(color: Color(0x667C3AED), blurRadius: 24)],
           ),
           child: SizedBox(width: 40, height: 40),
         ),
@@ -179,9 +163,7 @@ void main() {
 
   for (final brightness in Brightness.values) {
     group('no glow or gloss ($brightness)', () {
-      ThemeData theme() => kharisTheme(brightness: brightness);
-      // The player is on the redesigned theme.
-      ThemeData playerTheme() => brightness == Brightness.dark
+      ThemeData theme() => brightness == Brightness.dark
           ? redesign.KharisTheme.dark()
           : redesign.KharisTheme.light();
 
@@ -192,7 +174,7 @@ void main() {
           ProviderScope(
             overrides: playerOverrides(),
             child: MaterialApp(
-              theme: playerTheme(),
+              theme: theme(),
               home: MediaPlayerScreen(sermon: sermon, mode: MediaMode.audio),
             ),
           ),
@@ -211,7 +193,7 @@ void main() {
           ProviderScope(
             overrides: playerOverrides(),
             child: MaterialApp(
-              theme: playerTheme(),
+              theme: theme(),
               home: MediaPlayerScreen(sermon: sermon, mode: MediaMode.video),
             ),
           ),
@@ -237,7 +219,7 @@ void main() {
           ProviderScope(
             overrides: playerOverrides(library: queue),
             child: MaterialApp(
-              theme: playerTheme(),
+              theme: theme(),
               home: MediaPlayerScreen(
                 sermon: sermon,
                 mode: MediaMode.audio,
@@ -281,10 +263,7 @@ void main() {
                 (ref) => [testSermon('r1', title: 'Recent one')],
               ),
             ],
-            child: MaterialApp(
-              theme: playerTheme(),
-              home: const MessagesScreen(),
-            ),
+            child: MaterialApp(theme: theme(), home: const MessagesScreen()),
           ),
         );
         await tester.pumpAndSettle();
@@ -336,7 +315,7 @@ void main() {
         await pumpCard(
           tester,
           const DailyMessageCard(),
-          themeData: playerTheme(),
+          themeData: theme(),
           overrides: [
             dailyMessageProvider.overrideWith(
               (ref) => Stream.value(
@@ -367,7 +346,7 @@ void main() {
         await pumpCard(
           tester,
           const LiveNowCard(),
-          themeData: playerTheme(),
+          themeData: theme(),
           overrides: [
             liveStatusProvider.overrideWith(
               (ref) => Stream.value(
@@ -390,7 +369,7 @@ void main() {
         await pumpCard(
           tester,
           const CampusCard(),
-          themeData: playerTheme(),
+          themeData: theme(),
           overrides: [
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
             branchesProvider.overrideWith(
@@ -399,8 +378,6 @@ void main() {
                   id: 'london',
                   name: 'London',
                   subtitle: '',
-                  gradientStart: AppColors.primary,
-                  gradientEnd: AppColors.primaryDeep,
                   contact: CampusContact(phone: '020 0000 0000'),
                   venues: [
                     CampusVenue(id: 'v1', name: 'Town Hall', city: 'London'),
@@ -428,7 +405,7 @@ void main() {
         await pumpCard(
           tester,
           const HomeBranchNews(),
-          themeData: playerTheme(),
+          themeData: theme(),
           overrides: [
             campusNewsProvider.overrideWithValue(
               AsyncValue.data([
@@ -458,10 +435,7 @@ void main() {
                 (ref) => Stream.value(const <Branch>[]),
               ),
             ],
-            child: MaterialApp(
-              theme: playerTheme(),
-              home: const GivingScreen(),
-            ),
+            child: MaterialApp(theme: theme(), home: const GivingScreen()),
           ),
         );
         await tester.pump();
@@ -470,47 +444,6 @@ void main() {
       });
     });
   }
-
-  test('text on the solid fills and page colours keeps 4.5:1 contrast', () {
-    const deep = AppColors.primaryDeep;
-    final pairs = <String, (Color, Color)>{
-      'reading/giving: white on primaryDeep': (Colors.white, deep),
-      'reading: prayer white 88% on primaryDeep': (
-        Colors.white.withValues(alpha: .88),
-        deep,
-      ),
-      'reading: gold eyebrow on primaryDeep': (AppColors.secondary, deep),
-      'reading: date and prayer label white 85% on primaryDeep': (
-        Colors.white.withValues(alpha: .85),
-        deep,
-      ),
-      'live: ink badge on accentPink': (AppColors.ink, AppColors.accentPink),
-      'giving: reference darkMuted2 on primaryDeep': (
-        AppColors.darkMuted2,
-        deep,
-      ),
-      'settings: avatar initial on primary': (
-        AppColors.onPrimary,
-        AppColors.primary,
-      ),
-      for (final (name, kc) in [
-        ('light', KharisColors.light),
-        ('dark', KharisColors.dark),
-      ]) ...{
-        'player ($name): onBg on bg': (kc.onBg, kc.bg),
-        'player ($name): muted on bg': (kc.muted, kc.bg),
-        'cards ($name): muted on surface': (kc.muted, kc.surface),
-        'cards ($name): onChip on surface': (kc.onChip, kc.surface),
-        'cards ($name): onChip on chipBg': (kc.onChip, kc.chipBg),
-        'player ($name): speed pill accentInk on bg': (kc.accentInk, kc.bg),
-      },
-    };
-    for (final MapEntry(key: name, value: (fg, bg)) in pairs.entries) {
-      final ratio = _contrast(fg, bg);
-      debugPrint('contrast ${ratio.toStringAsFixed(2)}:1  $name');
-      expect(ratio, greaterThanOrEqualTo(4.5), reason: name);
-    }
-  });
 
   group('play / pause button', () {
     late List<String> taps;

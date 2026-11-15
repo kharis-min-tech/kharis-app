@@ -2,7 +2,6 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
@@ -37,8 +36,6 @@ Branch _branch(String name, double lat, double lng) => Branch(
   id: name.toLowerCase(),
   name: name,
   subtitle: '$name branch',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
   venues: [CampusVenue(id: '$name-hall', latitude: lat, longitude: lng)],
 );
 
@@ -50,8 +47,6 @@ const _online = Branch(
   id: 'online',
   name: 'Online',
   subtitle: '',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
 );
 
 /// About a mile from the Bristol venue.
@@ -61,7 +56,6 @@ const _nearBristol = GeoPoint(51.47, -2.6);
 const _nearLondon = GeoPoint(51.51, -0.13);
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('nearestBranch', () {
     test('picks the branch whose venue is closest, skipping venue-less '

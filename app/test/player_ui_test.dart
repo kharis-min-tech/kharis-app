@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:youtube_player_iframe/youtube_player_iframe.dart'
     show PlayerState, YoutubeError, YoutubePlayerValue;
@@ -49,7 +48,6 @@ final _library = [for (var n = 1; n <= 4; n++) _sermon(n)];
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   late FakeAudioPlayerService audio;
   late FakeCacheService cache;

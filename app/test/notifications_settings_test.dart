@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/theme/kharis_theme.dart';
@@ -29,7 +28,6 @@ class _PendingPrompt extends NotificationService {
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets('leaving the screen while the OS prompt is up neither throws '
       'nor skips the follow-up', (tester) async {

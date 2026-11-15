@@ -172,6 +172,45 @@ void main() {
         }
       });
     }
+    // 200% system text: built at a phone size and scrolled to the end; no
+    // golden, only the layout (an overflow throws).
+    for (final dark in const [false, true]) {
+      final mode = dark ? 'dark' : 'light';
+      testWidgets('$id · $mode · 200% lays out', (tester) async {
+        tester.view.physicalSize = const Size(KSize.designWidth, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = await _container();
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: KharisTheme.light(),
+              darkTheme: KharisTheme.dark(),
+              themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: const TextScaler.linear(2)),
+                child: child!,
+              ),
+              home: build(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final scrollables = find.byWidgetPredicate(
+          (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+        );
+        for (var i = 0; i < 6; i++) {
+          await tester.drag(scrollables.first, const Offset(0, -400));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+      });
+    }
   }
 
   testWidgets('the landing screen reads out its tiles', (tester) async {

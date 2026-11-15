@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/features/player/presentation/media_mode.dart';
 import 'package:kharis_app/features/player/presentation/widgets/media_mode_toggle.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -28,7 +27,6 @@ Widget _host(Sermon sermon, MediaMode active, ValueChanged<MediaMode> onSelect) 
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets('both media: both chips enabled, tapping the inactive one fires',
       (tester) async {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
 
@@ -36,7 +35,6 @@ Finder get _track => find.descendant(
 );
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets('shows elapsed on the left and time remaining on the right', (
     tester,

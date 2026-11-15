@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -47,8 +46,6 @@ const _london = Branch(
   id: 'london',
   name: 'London',
   subtitle: '',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
   address: '4-18 Harrington Gardens',
   services: [
     CampusService(

@@ -7,7 +7,6 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:kharis_app/features/notes/data/note_repository.dart';
@@ -38,7 +37,6 @@ import 'support/fake_note_repository.dart';
 ///  - tapping a stamp seeks whichever engine is active, never the other one.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   // The same physical message as each source surfaces it.
   final apiVariant = Sermon(

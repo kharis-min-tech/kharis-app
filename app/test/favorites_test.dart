@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart' show PlayerState;
 
 import 'package:kharis_app/features/notes/data/note_repository.dart';
@@ -37,7 +36,6 @@ import 'support/fake_cache_service.dart';
 /// their own screen, and play as their own queue.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   const uid = 'member-1';
   final member = User(

@@ -94,8 +94,6 @@ const _london = Branch(
   id: 'london',
   name: 'London',
   subtitle: 'England',
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
 );
 
 DateTime _at(int daysAhead, int hour, [int minute = 0]) {
@@ -321,7 +319,7 @@ void _forEachMode(
   Future<void> Function(WidgetTester tester, bool dark, double scale) body,
 ) {
   for (final dark in const [false, true]) {
-    for (final scale in const [1.0, 1.3]) {
+    for (final scale in const [1.0, 1.3, 2.0]) {
       testWidgets('$name \u00b7 ${dark ? 'dark' : 'light'} \u00b7 '
           '${(scale * 100).round()}%', (tester) async {
         await body(tester, dark, scale);

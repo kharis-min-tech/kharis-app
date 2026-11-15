@@ -185,7 +185,6 @@ void main() {
       expect(branches.first.giving, isNull);
       expect(london.contact.email, 'london@kharis.org');
       expect(london.contact.instagram, 'https://instagram.com/london');
-      expect(london.gradientStart.toARGB32(), 0xFF112233);
       expect(london.home, isNull);
 
       expect(london.services.map((s) => s.id), ['am', 'pm']);

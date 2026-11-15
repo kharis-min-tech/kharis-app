@@ -88,6 +88,47 @@ void main() {
   }
 
   group('Messages', () {
+    testWidgets('lays out at 200% text on a phone, on every tab', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        app(
+          Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: const MessagesScreen(),
+            ),
+          ),
+          sermons: library,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      final vertical = find.byWidgetPredicate(
+        (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+      );
+      for (final tab in ['For you', 'Books', 'Themes', 'Series', 'Downloads']) {
+        await tester.ensureVisible(find.text(tab));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(tab));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: tab);
+        for (var i = 0; i < 4; i++) {
+          await tester.drag(vertical.first, const Offset(0, -400));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: tab);
+        }
+        await tester.drag(vertical.first, const Offset(0, 4000));
+        await tester.pumpAndSettle();
+      }
+    });
+
     testWidgets('leads with the newest series part; Books shows only once a '
         'message names a passage', (tester) async {
       await pump(tester, app(const MessagesScreen(), sermons: library));

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:kharis_app/core/theme/kharis_colors.dart' as legacy;
 import 'package:kharis_app/main.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/theme_provider.dart';
@@ -21,8 +20,7 @@ Future<ProviderContainer> _container(Map<String, Object> saved) async {
 }
 
 void main() {
-  test('the app theme is the new theme, and still carries the old colours '
-      'for screens that have not been converted', () {
+  test('the app theme is purely the new theme', () {
     for (final brightness in Brightness.values) {
       final dark = brightness == Brightness.dark;
       final theme = kharisAppTheme(brightness);
@@ -30,10 +28,7 @@ void main() {
       expect(theme.brightness, brightness);
       expect(theme.colorScheme, base.colorScheme);
       expect(theme.extension<KharisColors>(), base.extension<KharisColors>());
-      expect(
-        theme.extension<legacy.KharisColors>(),
-        dark ? legacy.KharisColors.dark : legacy.KharisColors.light,
-      );
+      expect(theme.extensions.keys, unorderedEquals(base.extensions.keys));
     }
   });
 

@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
@@ -110,15 +109,11 @@ const _branches = [
     id: 'london',
     name: 'London',
     subtitle: 'England · Main campus',
-    gradientStart: Color(0xFF5D3FD3),
-    gradientEnd: Color(0xFF451EBB),
   ),
   Branch(
     id: 'manchester',
     name: 'Manchester',
     subtitle: 'England',
-    gradientStart: Color(0xFF5D3FD3),
-    gradientEnd: Color(0xFF451EBB),
   ),
 ];
 
@@ -181,7 +176,6 @@ List<Override> _baseOverrides({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   setUp(() {
     _launched.clear();
@@ -295,8 +289,6 @@ void main() {
                 id: 'london',
                 name: 'London',
                 subtitle: 'England · Main campus',
-                gradientStart: Color(0xFF5D3FD3),
-                gradientEnd: Color(0xFF451EBB),
                 giving: GivingDetails(
                   accountName: 'Kharis London',
                   accountNumber: '12345678',

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_branch_news.dart';
@@ -54,7 +53,6 @@ Future<void> _settle(WidgetTester tester) async {
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('NewsRepository mapping', () {
     test('only Mobile App and General announcements reach the app', () {

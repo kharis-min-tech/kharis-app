@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
@@ -207,8 +206,6 @@ Future<_Home> _pump(
               id: 'london',
               name: 'London',
               subtitle: 'United Kingdom',
-              gradientStart: Color(0xFF3B2A6B),
-              gradientEnd: Color(0xFF7C3AED),
               home: layout,
             ),
           ]),
@@ -283,7 +280,6 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('hero', () {
     testWidgets('greets a member by first name, with their branch, the bell '
@@ -960,7 +956,7 @@ void main() {
     });
 
     for (final dark in const [false, true]) {
-      for (final scale in const [1.0, 1.3]) {
+      for (final scale in const [1.0, 1.3, 2.0]) {
         testWidgets('nothing overflows at 390 wide · '
             '${dark ? 'dark' : 'light'} · ${(scale * 100).round()}%', (
           tester,

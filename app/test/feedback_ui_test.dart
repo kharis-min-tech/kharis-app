@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
@@ -23,8 +22,6 @@ const _london = Branch(
   id: 'london',
   name: 'London',
   subtitle: '',
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
 );
 
 const _barking = Branch(
@@ -32,8 +29,6 @@ const _barking = Branch(
   name: 'KP2 Barking',
   subtitle: '',
   group: Branch.phaseTwoGroup,
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
 );
 
 Sermon _sermon(String id, {String? art}) => Sermon(
@@ -45,7 +40,6 @@ Sermon _sermon(String id, {String? art}) => Sermon(
 );
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   // ── Playlist artwork ───────────────────────────────────────────────────────
 

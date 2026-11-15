@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/utils/playback_timestamp.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart'
@@ -137,7 +136,6 @@ Future<void> _play(
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('states', () {
     // The R2 catalogue lists transcript links whose files were never

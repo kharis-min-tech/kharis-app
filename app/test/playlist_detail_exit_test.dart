@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/features/playlists/presentation/screens/playlist_detail_screen.dart';
@@ -25,7 +24,6 @@ import 'support/fake_cache_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   final member = User(
     id: 'member-1',

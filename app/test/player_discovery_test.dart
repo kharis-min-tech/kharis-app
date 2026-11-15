@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart' show PlayerState, ProcessingState;
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
@@ -47,7 +46,6 @@ Sermon _s(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   // ── Model ───────────────────────────────────────────────────────────────────
 

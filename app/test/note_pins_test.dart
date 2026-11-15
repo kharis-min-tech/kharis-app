@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
@@ -26,7 +25,6 @@ import 'support/fake_note_repository.dart';
 /// notes — on the timeline of the engine playing it, live as notes change.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   // Like API sermon 101897: the mp3 starts 487 s into the service video.
   const service = Sermon(

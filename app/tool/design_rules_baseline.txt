@@ -1,14 +1,4 @@
 # Files written before the redesign that still use raw colours or font sizes
 # (Color(0x, Colors., fontSize:). tool/check_design_rules.sh skips them.
 # This list only shrinks: remove a line when its file is migrated or deleted.
-# Never add one.
-lib/core/theme/app_colors.dart
-lib/core/theme/app_shadows.dart
-lib/core/theme/app_theme.dart
-lib/core/theme/app_typography.dart
-lib/core/theme/kharis_colors.dart
-lib/features/home/presentation/screens/home_screen.dart
-lib/features/home/presentation/screens/reading_screen.dart
-lib/features/home/presentation/widgets/home_bible_row.dart
-lib/features/home/presentation/widgets/home_hero.dart
-lib/features/onboarding/data/branch_repository.dart
+# Never add one. Empty since the old theme was removed.

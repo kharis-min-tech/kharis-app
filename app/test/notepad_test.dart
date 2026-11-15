@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/data/notepad.dart';
@@ -22,7 +21,6 @@ import 'support/fake_note_repository.dart';
 /// per message whose stamps play the message from there.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   const message = Sermon(
     id: '2611',

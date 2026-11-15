@@ -76,8 +76,6 @@ const _london = Branch(
   id: 'london',
   name: 'London',
   subtitle: 'England · Main campus',
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
   venues: [
     CampusVenue(
       id: 'lighthouse',
@@ -109,8 +107,6 @@ const _manchester = Branch(
   id: 'manchester',
   name: 'Manchester',
   subtitle: 'England',
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
 );
 
 /// Monday 16 November 2026, mid-morning: the midweek service is next.
@@ -813,7 +809,7 @@ void main() {
 
   group('nothing overflows at 390 wide', () {
     for (final dark in const [false, true]) {
-      for (final scale in const [1.0, 1.3]) {
+      for (final scale in const [1.0, 1.3, 2.0]) {
         final mode = dark ? 'dark' : 'light';
         final percent = (scale * 100).round();
 

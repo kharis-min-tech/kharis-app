@@ -38,8 +38,6 @@ Branch _branch(
   name: name,
   subtitle: subtitle,
   group: group,
-  gradientStart: const Color(0xFF5D3FD3),
-  gradientEnd: const Color(0xFF451EBB),
 );
 
 final _branches = [
@@ -113,7 +111,7 @@ void _forEachMode(
   Future<void> Function(WidgetTester tester, bool dark, double scale) body,
 ) {
   for (final dark in const [false, true]) {
-    for (final scale in const [1.0, 1.3]) {
+    for (final scale in const [1.0, 1.3, 2.0]) {
       testWidgets(
         '$name · ${dark ? 'dark' : 'light'} · ${(scale * 100).round()}%',
         (tester) async {
@@ -165,7 +163,18 @@ void main() {
     );
     expect(find.text('Find your branch'), findsOneWidget);
     expect(find.byKey(const ValueKey('branch-use-location')), findsOneWidget);
-    expect(find.byType(BranchTile), findsNWidgets(_branches.length));
+    // At large text the list outgrows the screen: scroll to reach them all.
+    final seen = <String>{};
+    for (var i = 0; i < 8; i++) {
+      seen.addAll(
+        tester
+            .widgetList<BranchTile>(find.byType(BranchTile))
+            .map((t) => t.name),
+      );
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pump();
+    }
+    expect(seen, hasLength(_branches.length));
   });
 
   _forEachMode('branch selection, loading', (tester, dark, scale) async {

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -178,13 +177,7 @@ Future<void> _pump(
         currentUserProvider.overrideWith((ref) => Stream.value(null)),
         branchesProvider.overrideWith(
           (ref) => Stream.value(const [
-            Branch(
-              id: 'london',
-              name: 'London',
-              subtitle: 'United Kingdom',
-              gradientStart: Color(0xFF3B2A6B),
-              gradientEnd: Color(0xFF7C3AED),
-            ),
+            Branch(id: 'london', name: 'London', subtitle: 'United Kingdom'),
           ]),
         ),
         newsProvider.overrideWith(
@@ -225,8 +218,6 @@ Future<void> _frames(WidgetTester tester) async {
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
-
   group('navigation', () {
     testWidgets('Home "All events" opens the Events screen over Home', (
       tester,
@@ -356,7 +347,14 @@ void main() {
           events: [_sundayService],
         );
         expect(find.text('Sunday Service'), findsWidgets);
-        expect(find.text('Every Sunday \u00b7 9:00 AM'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('event-detail-recurrence')),
+            matching: find.text('EVERY SUNDAY'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('09:00'), findsOneWidget);
       });
     }
 
@@ -454,7 +452,8 @@ void main() {
         events: [_prayerNight],
       );
 
-      expect(find.text('Main Hall'), findsOneWidget);
+      // The card's meta: when, then the venue on its own line.
+      expect(find.textContaining('\nMain Hall'), findsOneWidget);
     });
   });
 
@@ -862,7 +861,7 @@ void main() {
       );
       expect(
         notificationTargetFor({'type': 'reading'}),
-        const NotificationTarget('/reading', overlay: true),
+        const NotificationTarget('/bible/reading'),
       );
       expect(
         notificationTargetFor({'type': 'birthday'}),
@@ -887,7 +886,10 @@ void main() {
       );
       await _frames(tester);
 
-      expect(find.widgetWithText(AppBar, 'Announcements'), findsOneWidget);
+      expect(
+        find.widgetWithText(KScreenHeader, 'Announcements'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('announcement-cta')), findsOneWidget);
     });
 
@@ -946,7 +948,10 @@ void main() {
 
       router.pop();
       await _frames(tester);
-      expect(find.widgetWithText(AppBar, 'Announcements'), findsOneWidget);
+      expect(
+        find.widgetWithText(KScreenHeader, 'Announcements'),
+        findsOneWidget,
+      );
     });
   });
 

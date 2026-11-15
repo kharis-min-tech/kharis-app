@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
@@ -25,8 +24,6 @@ Branch _branch(
   id: name.toLowerCase(),
   name: name,
   subtitle: '',
-  gradientStart: const Color(0xFF5D3FD3),
-  gradientEnd: const Color(0xFF451EBB),
   home: home,
   giving: giving,
   contact: contact,
@@ -63,7 +60,6 @@ Future<ProviderContainer> _resolve({
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('Home layout resolution', () {
     test('the campus layout wins over the built-in one', () async {

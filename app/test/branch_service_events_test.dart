@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
@@ -36,8 +35,6 @@ const _bristol = Branch(
   id: 'bristol',
   name: 'Bristol',
   subtitle: '',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
   venues: [_hall],
   services: [
     CampusService(
@@ -71,8 +68,6 @@ const _london = Branch(
   id: 'london',
   name: 'London',
   subtitle: '',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
   services: [
     CampusService(
       id: 'sun',
@@ -88,7 +83,6 @@ DateTime _sun(int hour, [int minute = 0]) =>
     DateTime(2026, 10, 25, hour, minute);
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('branchServiceEvents', () {
     test('today before a service starts lists today', () {
@@ -142,8 +136,6 @@ void main() {
         id: 'late',
         name: 'Late',
         subtitle: '',
-        gradientStart: Colors.black,
-        gradientEnd: Colors.black,
         address: '1 Night St',
         services: [
           CampusService(
@@ -234,8 +226,6 @@ void main() {
         id: 'bristol',
         name: 'Bristol',
         subtitle: '',
-        gradientStart: Colors.black,
-        gradientEnd: Colors.black,
         services: [
           CampusService(
             id: 'early',

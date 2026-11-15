@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/daily_message_card.dart';
@@ -83,7 +82,6 @@ Future<DailyMessage?> _message(List<Map<String, dynamic>> rows) =>
     _repo(SupabaseStub({'daily_messages': rows})).watchTodaysMessage().last;
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('reading and prayer', () {
     test('today\u2019s reading and prayer, app workspace first', () async {

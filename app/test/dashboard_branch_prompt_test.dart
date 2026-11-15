@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
@@ -25,7 +24,6 @@ import 'support/fake_cache_service.dart';
 /// after the first frame; it can be dismissed. A member with a branch is
 /// never asked.
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   final guest = User(
     id: 'guest-1',
@@ -39,8 +37,6 @@ void main() {
     id: 'london',
     name: 'London',
     subtitle: 'Main branch',
-    gradientStart: Colors.black,
-    gradientEnd: Colors.black,
   );
 
   /// One launch: a fresh [ProviderScope] unless [container] is reused.

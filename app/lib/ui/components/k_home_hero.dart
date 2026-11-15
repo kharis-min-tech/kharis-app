@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../theme/kharis_theme.dart';
 import 'k_icon.dart';
 import 'k_thumbnail.dart';
+import 'k_layout.dart';
 
 // Home's hero is the one place that sits on ink in both modes, so its
 // fills are the ink roles at fixed strengths rather than surface roles.
@@ -385,14 +386,21 @@ class KHeroMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            art,
-            const SizedBox(width: KSpace.x3),
-            Expanded(child: text),
-          ],
-        ),
+        // At large text the title gets the full width, so long words are
+        // not broken across lines beside the artwork.
+        if (kIsLargeText(context)) ...[
+          art,
+          const SizedBox(height: KSpace.x3),
+          text,
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              art,
+              const SizedBox(width: KSpace.x3),
+              Expanded(child: text),
+            ],
+          ),
         const SizedBox(height: KSpace.x3),
         Wrap(
           spacing: KSpace.lg,

@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/constants/bible_books.dart';
+import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
@@ -303,8 +303,6 @@ Future<void> _tapVerse(WidgetTester tester, int verse) async {
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
-
   group('reference parser', () {
     test('book names, abbreviations, chapters and verses', () {
       expect(
@@ -924,6 +922,20 @@ void main() {
         router.routerDelegate.currentConfiguration.uri.path,
         kTodayReadingPath,
       );
+      expect(_title('John 3'), findsOneWidget);
+    });
+
+    testWidgets('a daily reading push lands on today\u2019s reading in the '
+        'Bible tab, not over Home', (tester) async {
+      final (router, _) = await _pumpRoutes(tester, open: '/bible');
+      openNotificationTarget(
+        router,
+        notificationTargetFor({'type': 'reading'}),
+      );
+      await tester.pumpAndSettle();
+      final config = router.routerDelegate.currentConfiguration;
+      expect(config.uri.path, kTodayReadingPath);
+      expect(config.matches.first.matchedLocation, '/bible');
       expect(_title('John 3'), findsOneWidget);
     });
 

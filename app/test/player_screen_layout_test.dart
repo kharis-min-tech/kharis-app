@@ -132,7 +132,7 @@ void main() {
   }
 
   for (final dark in const [false, true]) {
-    for (final scale in const [1.0, KRatio.largeTextScale]) {
+    for (final scale in const [1.0, KRatio.largeTextScale, 2.0]) {
       final name = '${dark ? 'dark' : 'light'}, ${(scale * 100).round()}%';
 
       testWidgets('audio player lays out ($name)', (tester) async {

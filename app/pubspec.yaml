@@ -42,7 +42,6 @@ dependencies:
   go_router: ^14.8.1
   dio: ^5.7.0
   intl: ^0.19.0
-  google_fonts: ^6.2.1
   just_audio: ^0.10.6
   audio_service: ^0.18.17
   cached_network_image: ^3.4.1
@@ -116,10 +115,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/figma/
     - assets/icon/
     - assets/design/
-    - assets/google_fonts/
+    - assets/fonts/OFL.txt
     - assets/hero/
     - assets/icons/
     - assets/brand/
@@ -175,7 +173,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 # Native splash: what shows before the first Flutter frame. It is the opening
-# frame of SplashScreen: solid ink (AppColors.ink) with the dove centred at
+# frame of SplashScreen: solid ink (the `ink` brand token) with the dove centred at
 # 117x110 pt, drawn faint (SplashDove.launchOpacity). Flutter then draws the
 # outline over that same faint dove and fills it, so the handover shows no
 # change. The launch images are assets/design/splash-dove.png with alpha

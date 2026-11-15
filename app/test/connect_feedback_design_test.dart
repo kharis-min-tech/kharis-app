@@ -36,8 +36,6 @@ final _branch = Branch(
   id: 'london',
   name: 'London',
   subtitle: '',
-  gradientStart: KBrand.purple,
-  gradientEnd: KBrand.purple,
 );
 
 /// [home] in the new theme on a 390-wide phone.

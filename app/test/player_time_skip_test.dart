@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('TimeSkip.target', () {
     const len = Duration(minutes: 50);
