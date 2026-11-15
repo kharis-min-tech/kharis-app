@@ -14,6 +14,7 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/content_api_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
@@ -22,6 +23,7 @@ import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/supabase_stub.dart';
+import 'support/fake_cache_service.dart';
 
 const _hall = CampusVenue(
   id: 'v1',
@@ -334,6 +336,7 @@ void main() {
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            cacheServiceProvider.overrideWithValue(FakeCacheService()),
             ...overrides(),
           ],
           child: MaterialApp.router(

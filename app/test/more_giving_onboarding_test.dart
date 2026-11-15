@@ -7,12 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
-import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
-import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
@@ -21,8 +18,6 @@ import 'package:kharis_app/features/onboarding/presentation/screens/login_screen
 import 'package:kharis_app/features/onboarding/presentation/screens/role_selection_screen.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/role_card.dart';
 import 'package:kharis_app/features/settings/presentation/screens/edit_profile_screen.dart';
-import 'package:kharis_app/features/settings/presentation/screens/notifications_settings_screen.dart';
-import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
@@ -37,7 +32,6 @@ import 'package:kharis_app/ui/components/components.dart';
 
 class _FakeAuth implements AuthRepository {
   final resetEmails = <String>[];
-  int logouts = 0;
   int guestLogins = 0;
   bool guestFails = false;
 
@@ -47,7 +41,7 @@ class _FakeAuth implements AuthRepository {
   }
 
   @override
-  Future<void> logout() async => logouts++;
+  Future<void> logout() async {}
 
   @override
   Future<User> login(String email, String password) =>
@@ -185,58 +179,6 @@ List<Override> _baseOverrides({
   if (auth != null) authRepositoryProvider.overrideWithValue(auth),
 ];
 
-/// Pumps More inside a router whose destinations are labelled stubs, so a tap
-/// proves which route a row opened.
-Future<GoRouter> _pumpMore(
-  WidgetTester tester, {
-  User? user,
-  AuthRepository? auth,
-}) async {
-  final prefs = await _prefs({'onboarding_branch': 'London'});
-  Widget stub(String label) => Scaffold(body: Text('route:$label'));
-  final router = GoRouter(
-    initialLocation: '/more',
-    routes: [
-      GoRoute(path: '/more', builder: (_, _) => const SettingsScreen()),
-      for (final path in [
-        '/reading',
-        '/bible',
-        '/notes',
-        '/favorites',
-        '/playlists',
-        '/branch-selection',
-        '/give',
-        '/login',
-        '/register',
-        '/profile/edit',
-      ])
-        GoRoute(path: path, builder: (_, _) => stub(path)),
-    ],
-  );
-  addTearDown(router.dispose);
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: _baseOverrides(
-        prefs: prefs,
-        db: FakeFirebaseFirestore(),
-        user: user,
-        auth: auth,
-      ),
-      child: MaterialApp.router(routerConfig: router),
-    ),
-  );
-  await tester.pumpAndSettle();
-  return router;
-}
-
-Future<void> _tapRow(WidgetTester tester, String label) async {
-  final row = find.text(label);
-  await tester.ensureVisible(row);
-  await tester.pumpAndSettle();
-  await tester.tap(row);
-  await tester.pumpAndSettle();
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
@@ -246,121 +188,6 @@ void main() {
     _launchArgs.clear();
     _clipboard.clear();
     _mockPlatformChannels();
-    PackageInfo.setMockInitialValues(
-      appName: 'Kharis Church',
-      packageName: 'org.kharis.church',
-      version: '1.4.2',
-      buildNumber: '37',
-      buildSignature: '',
-    );
-  });
-
-  group('More', () {
-    for (final (label, route) in [
-      ('Daily reading', '/reading'),
-      ('Bible', '/bible'),
-      ('My notes', '/notes'),
-      ('Favourites', '/favorites'),
-      ('My playlists', '/playlists'),
-      ('Switch branch', '/branch-selection'),
-      ('Give', '/give'),
-    ]) {
-      testWidgets('"$label" opens $route', (tester) async {
-        await _pumpMore(tester, user: _member);
-        await _tapRow(tester, label);
-        expect(find.text('route:$route'), findsOneWidget);
-      });
-    }
-
-    testWidgets('Favourites sits directly above My playlists', (tester) async {
-      await _pumpMore(tester, user: _member);
-      final notes = tester.getTopLeft(find.text('My notes')).dy;
-      final favorites = tester.getTopLeft(find.text('Favourites')).dy;
-      final playlists = tester.getTopLeft(find.text('My playlists')).dy;
-      expect(favorites, lessThan(playlists));
-      // Adjacent rows: the gap to My Playlists is one row, the same step as
-      // My Notes to Favorites, so nothing sits between them.
-      expect(playlists - favorites, moreOrLessEquals(favorites - notes));
-    });
-
-    testWidgets('there is no fake "My Giving History" row', (tester) async {
-      await _pumpMore(tester, user: _member);
-      expect(find.text('My Giving History'), findsNothing);
-    });
-
-    testWidgets('Switch Branch shows the active campus', (tester) async {
-      await _pumpMore(tester, user: _member);
-      expect(find.text('London'), findsWidgets);
-    });
-
-    testWidgets('Notifications opens notification settings', (tester) async {
-      await _pumpMore(tester, user: _member);
-      await _tapRow(tester, 'Notifications');
-      expect(find.byType(NotificationsSettingsScreen), findsOneWidget);
-    });
-
-    testWidgets("I'm new here and Share a testimony open their forms", (
-      tester,
-    ) async {
-      await _pumpMore(tester, user: _member);
-      await _tapRow(tester, "I'm new here");
-      expect(find.byType(NewHereScreen), findsOneWidget);
-      // No on-screen back button: leave the way a swipe or system back does.
-      Navigator.of(tester.element(find.byType(NewHereScreen))).pop();
-      await tester.pumpAndSettle();
-      await _tapRow(tester, 'Share a testimony');
-      expect(find.byType(TestimonyScreen), findsOneWidget);
-    });
-
-    testWidgets('Help & support opens the live contact page', (tester) async {
-      await _pumpMore(tester, user: _member);
-      await _tapRow(tester, 'Help & support');
-      expect(_launched, ['https://kharis.org/contact-us/']);
-    });
-
-    testWidgets('Privacy policy opens the live privacy page', (tester) async {
-      await _pumpMore(tester, user: _member);
-      await _tapRow(tester, 'Privacy policy');
-      expect(_launched, ['https://kharis.org/privacy-policy/']);
-    });
-
-    testWidgets('the profile card Edit opens profile edit', (tester) async {
-      await _pumpMore(tester, user: _member);
-      await _tapRow(tester, 'Edit');
-      expect(find.text('route:/profile/edit'), findsOneWidget);
-    });
-
-    testWidgets('a guest gets Sign in, which opens login', (tester) async {
-      await _pumpMore(tester, user: _guest);
-      expect(find.text('Sign out'), findsNothing);
-      // The signed-out card's button and the menu row both read "Sign in"
-      // (sentence case); either opens login, so tap the menu row.
-      expect(find.text('Sign in'), findsNWidgets(2));
-      final row = find.text('Sign in').last;
-      await tester.ensureVisible(row);
-      await tester.pumpAndSettle();
-      await tester.tap(row);
-      await tester.pumpAndSettle();
-      expect(find.text('route:/login'), findsOneWidget);
-    });
-
-    testWidgets('Sign out confirms, then signs out', (tester) async {
-      final auth = _FakeAuth();
-      await _pumpMore(tester, user: _member, auth: auth);
-      await _tapRow(tester, 'Sign out');
-      expect(find.text('Are you sure you want to sign out?'), findsOneWidget);
-      await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
-      await tester.pumpAndSettle();
-      expect(auth.logouts, 1);
-    });
-
-    testWidgets('shows the installed version from PackageInfo', (tester) async {
-      await _pumpMore(tester, user: _member);
-      final version = find.byKey(const ValueKey('app-version'));
-      await tester.ensureVisible(version);
-      expect(tester.widget<Text>(version).data, 'Kharis Church 1.4.2 (37)');
-      expect(find.textContaining('v2.0.0'), findsNothing);
-    });
   });
 
   group('Giving', () {

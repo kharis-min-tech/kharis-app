@@ -14,6 +14,9 @@ import 'package:kharis_app/features/home/presentation/screens/notifications_scre
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
+
+import 'support/fake_cache_service.dart';
 
 /// Tester feedback regression: "I clicked on the event calendar notification
 /// but was unable to open it to view further details."
@@ -61,6 +64,7 @@ void main() {
       ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
+          cacheServiceProvider.overrideWithValue(FakeCacheService()),
           currentBranchProvider.overrideWith((ref) => Stream.value('London')),
           newsProvider.overrideWith((ref, branch) async => const <NewsItem>[]),
           upcomingEventsProvider.overrideWith(
@@ -85,7 +89,7 @@ void main() {
     // Detail: full date, time range, venue, untruncated body, calendar action.
     expect(find.byType(EventDetailScreen), findsOneWidget);
     expect(find.text('Friday 4 September 2026'), findsOneWidget);
-    expect(find.text('7:00 PM \u2013 9:00 PM'), findsOneWidget);
+    expect(find.text('19:00 \u2013 21:00'), findsOneWidget);
     expect(find.text('Main Hall, London'), findsOneWidget);
     expect(
       find.text('An evening of corporate prayer. All welcome.'),

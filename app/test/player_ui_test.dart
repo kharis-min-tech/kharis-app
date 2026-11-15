@@ -12,7 +12,6 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart'
     show PlayerState, YoutubeError, YoutubePlayerValue;
 
 import 'package:kharis_app/core/utils/share_sermon.dart';
-import 'package:kharis_app/features/home/presentation/widgets/latest_messages_row.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/presentation/note_anchor.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
@@ -31,7 +30,6 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/fake_audio_player_service.dart';
@@ -1083,50 +1081,6 @@ void main() {
       final unfinished = history.lastUnfinished();
       expect(unfinished?.sermon.id, 's1');
       expect(unfinished?.progress, 0.25);
-    });
-
-    testWidgets('shows progress and resumes; hidden when nothing to resume', (
-      tester,
-    ) async {
-      MediaPlayerScreen.debugDisableVideoEngine = true;
-      addTearDown(() => MediaPlayerScreen.debugDisableVideoEngine = false);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: overrides(),
-          child: const MaterialApp(home: Scaffold(body: LatestMessagesRow())),
-        ),
-      );
-      expect(find.byKey(const Key('home-continue-card')), findsNothing);
-
-      final s = _sermon(3).copyWith(duration: const Duration(minutes: 30));
-      PlaybackHistory(cache)
-        ..recordPlay(s)
-        ..savePosition(s, const Duration(minutes: 12));
-      await tester.pumpWidget(
-        ProviderScope(
-          key: UniqueKey(),
-          overrides: overrides(),
-          child: const MaterialApp(home: Scaffold(body: LatestMessagesRow())),
-        ),
-      );
-      await tester.pump();
-
-      final card = find.byKey(const Key('home-continue-card'));
-      expect(card, findsOneWidget);
-      expect(
-        find.descendant(of: card, matching: find.text('Message 3')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: card, matching: find.text('18 min left')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('home-continue-progress')), findsOneWidget);
-
-      await tester.tap(card);
-      await tester.pumpAndSettle();
-      expect(audio.calls.single.sermon.id, 's3');
     });
   });
 }

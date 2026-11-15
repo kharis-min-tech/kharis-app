@@ -10,7 +10,6 @@ import 'package:kharis_app/features/messages/data/downloads_repository.dart';
 import 'package:kharis_app/features/player/presentation/widgets/download_button.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/downloads_provider.dart';
-import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/design_harness.dart';

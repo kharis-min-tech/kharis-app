@@ -11,6 +11,4 @@ lib/features/home/presentation/screens/home_screen.dart
 lib/features/home/presentation/screens/reading_screen.dart
 lib/features/home/presentation/widgets/home_bible_row.dart
 lib/features/home/presentation/widgets/home_hero.dart
-lib/features/messages/presentation/screens/messages_screen.dart
-lib/features/messages/presentation/widgets/message_filters_sheet.dart
 lib/features/onboarding/data/branch_repository.dart

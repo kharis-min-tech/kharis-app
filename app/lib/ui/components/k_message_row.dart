@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../../theme/kharis_theme.dart';
 import 'k_badge.dart';

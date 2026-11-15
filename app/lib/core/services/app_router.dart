@@ -12,6 +12,9 @@ import '../../features/home/presentation/screens/branch_screen.dart';
 import '../../features/home/presentation/screens/dashboard_shell.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/messages/presentation/screens/messages_screen.dart';
+import '../../features/messages/presentation/screens/downloads_screen.dart';
+import '../../features/messages/presentation/screens/listening_history_screen.dart';
+import '../../features/messages/presentation/screens/message_search_screen.dart';
 import '../../features/onboarding/presentation/screens/branch_selection_screen.dart';
 import '../../features/onboarding/presentation/screens/login_screen.dart';
 import '../../features/onboarding/presentation/screens/register_screen.dart';
@@ -100,7 +103,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const MessagesScreen(),
                 // Shared message links (/m/:id redirects here) open inside
                 // the Messages tab so the shell is never torn down.
-                routes: [sharedMessageRoute],
+                routes: [
+                  GoRoute(
+                    path: 'search',
+                    builder: (context, state) => const MessageSearchScreen(),
+                  ),
+                  sharedMessageRoute,
+                ],
               ),
             ],
           ),
@@ -133,6 +142,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ── Give (pushed). /giving is the old tab path, kept for saved links ──
       GoRoute(path: '/give', builder: (context, state) => const GivingScreen()),
       GoRoute(path: '/giving', redirect: (context, state) => '/give'),
+
+      // ── Listening history and downloads (pushed) ──────────────────────────
+      GoRoute(
+        path: '/history',
+        builder: (context, state) => const ListeningHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/downloads',
+        builder: (context, state) => const DownloadsScreen(),
+      ),
 
       // ── Full player (overlays shell) ──────────────────────────────────────
       GoRoute(

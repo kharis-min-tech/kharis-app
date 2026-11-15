@@ -12,6 +12,7 @@ import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.da
 import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart';
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
+import 'support/more_screen_overrides.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
@@ -274,8 +275,8 @@ void main() {
   });
 
   testWidgets(
-    'KA-003 / KA-012: More lists My Notes, My Playlists and Rate & Feedback, '
-    'and the row opens the sheet',
+    'KA-003 / KA-012: More shows My notes, Collections and Help & feedback, '
+    'and Help & feedback opens the feedback sheet',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
@@ -287,6 +288,7 @@ void main() {
             firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
             currentUserProvider.overrideWith((ref) => Stream.value(_member)),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
+            ...moreScreenOverrides(),
           ],
           child: MaterialApp(
             theme: KharisTheme.light(),
@@ -296,18 +298,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      for (final label in [
-        'Daily reading',
-        'My notes',
-        'My playlists',
-        'Rate & feedback',
-      ]) {
-        expect(find.text(label), findsOneWidget, reason: 'More row "$label"');
+      for (final label in ['My notes', 'Collections', 'Help & feedback']) {
+        expect(find.text(label), findsOneWidget, reason: 'More shows "$label"');
       }
 
-      await tester.ensureVisible(find.text('Rate & feedback'));
+      await tester.ensureVisible(find.text('Help & feedback'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Rate & feedback'));
+      await tester.tap(find.text('Help & feedback'));
       await tester.pumpAndSettle();
 
       // KA-012 now opens the in-app feedback sheet (stars + comment saved to

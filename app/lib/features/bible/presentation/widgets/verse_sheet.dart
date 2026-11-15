@@ -50,9 +50,7 @@ Future<void> showVerseSheet(
   );
   if (played == null || !context.mounted) return;
   final queue = ProviderScope.containerOf(context)
-      .read(
-        relatedMessagesProvider((book: verse.book, chapter: verse.chapter)),
-      )
+      .read(relatedMessagesProvider((book: verse.book, chapter: verse.chapter)))
       .forVerse(verse.verse);
   onPlayMessage(played, queue);
 }
@@ -90,9 +88,9 @@ class _VerseSheetState extends ConsumerState<VerseSheet> {
   @override
   void initState() {
     super.initState();
-    final saved = ref.read(chapterMarksProvider(_chapter)).notes[widget
-        .verse
-        .verse];
+    final saved = ref
+        .read(chapterMarksProvider(_chapter))
+        .notes[widget.verse.verse];
     if (saved != null) {
       _note.text = saved.body;
       _noteOpen = true;

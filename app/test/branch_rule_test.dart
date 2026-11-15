@@ -21,6 +21,7 @@ import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_location_service.dart';
+import 'support/more_screen_overrides.dart';
 
 /// Every member has a branch: "All branches" is no longer a member's
 /// choice, "Use my location" picks the nearest branch, and Home follows the
@@ -293,14 +294,18 @@ void main() {
           firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
           currentUserProvider.overrideWith((ref) => Stream.value(member)),
           currentBranchProvider.overrideWith((ref) => Stream.value(null)),
+          ...moreScreenOverrides(),
         ],
-        child: const MaterialApp(home: SettingsScreen()),
+        child: MaterialApp(
+          theme: KharisTheme.light(),
+          home: const SettingsScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Switch branch'), findsOneWidget);
     expect(find.text('Choose your branch'), findsOneWidget);
+    expect(find.text('Choose branch'), findsOneWidget);
     expect(find.text('All branches'), findsNothing);
   });
 }

@@ -24,7 +24,6 @@ import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/providers/transcript_provider.dart';
-import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/design_harness.dart';
