@@ -122,103 +122,108 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 controller: _scroll,
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // Full-bleed from the very top, under the status bar.
+                  // One box, so the strip riding up over the hero paints and
+                  // takes taps after it. As separate slivers the viewport
+                  // paints the first (the hero) last, over the strip's top.
                   SliverToBoxAdapter(
-                    child: HomeHero(
-                      key: _heroKey,
-                      bottomInset: _stripOverlap,
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    // Everything under the hero rides up with the strip.
-                    child: Transform.translate(
-                      offset: const Offset(0, -_stripOverlap),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: KSize.maxContentWidth,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: KSpace.x3,
-                                ),
-                                child: HomeStatsStrip(
-                                  key: const Key('home-stats'),
-                                  showReading: shows(HomeSectionId.reading),
-                                ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Full-bleed from the very top, under the status bar.
+                        HomeHero(key: _heroKey, bottomInset: _stripOverlap),
+                        // Everything under the hero rides up with the strip.
+                        Transform.translate(
+                          offset: const Offset(0, -_stripOverlap),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: KSize.maxContentWidth,
                               ),
-                              if (shows(HomeSectionId.live))
-                                const LiveNowCard(
-                                  padding: EdgeInsets.fromLTRB(
-                                    KSpace.gutter,
-                                    KSpace.x3,
-                                    KSpace.gutter,
-                                    0,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: KSpace.x3,
+                                    ),
+                                    child: HomeStatsStrip(
+                                      key: const Key('home-stats'),
+                                      showReading: shows(HomeSectionId.reading),
+                                    ),
                                   ),
-                                ),
-                              if (shows(HomeSectionId.reading))
-                                const DailyMessageCard(
-                                  padding: EdgeInsets.fromLTRB(
-                                    KSpace.gutter,
-                                    KSpace.x3,
-                                    KSpace.gutter,
-                                    0,
+                                  if (shows(HomeSectionId.live))
+                                    const LiveNowCard(
+                                      padding: EdgeInsets.fromLTRB(
+                                        KSpace.gutter,
+                                        KSpace.x3,
+                                        KSpace.gutter,
+                                        0,
+                                      ),
+                                    ),
+                                  if (shows(HomeSectionId.reading))
+                                    const DailyMessageCard(
+                                      padding: EdgeInsets.fromLTRB(
+                                        KSpace.gutter,
+                                        KSpace.x3,
+                                        KSpace.gutter,
+                                        0,
+                                      ),
+                                    ),
+                                  if (hasNews || showEvents) ...[
+                                    const SizedBox(height: KSpace.sectionTop),
+                                    const Padding(
+                                      padding: _gutter,
+                                      child: _BranchHeader(),
+                                    ),
+                                    if (hasNews) ...[
+                                      const SizedBox(height: KSpace.xl),
+                                      const HomeBranchNews(),
+                                    ],
+                                    if (showEvents) ...[
+                                      const SizedBox(height: KSpace.x3),
+                                      const Padding(
+                                        padding: _gutter,
+                                        child: HomeThisWeek(),
+                                      ),
+                                    ],
+                                  ],
+                                  if (shows(HomeSectionId.continueListening))
+                                    const HomeContinueListening(
+                                      padding: EdgeInsets.fromLTRB(
+                                        KSpace.gutter,
+                                        KSpace.sectionTop,
+                                        KSpace.gutter,
+                                        0,
+                                      ),
+                                    ),
+                                  const HomeMoments(
+                                    padding: EdgeInsets.only(
+                                      top: KSpace.sectionTop,
+                                    ),
                                   ),
-                                ),
-                              if (hasNews || showEvents) ...[
-                                const SizedBox(height: KSpace.sectionTop),
-                                const Padding(
-                                  padding: _gutter,
-                                  child: _BranchHeader(),
-                                ),
-                                if (hasNews) ...[
-                                  const SizedBox(height: KSpace.xl),
-                                  const HomeBranchNews(),
-                                ],
-                                if (showEvents) ...[
-                                  const SizedBox(height: KSpace.x3),
                                   const Padding(
-                                    padding: _gutter,
-                                    child: HomeThisWeek(),
+                                    padding: EdgeInsets.fromLTRB(
+                                      KSpace.gutter,
+                                      KSpace.sectionTop,
+                                      KSpace.gutter,
+                                      0,
+                                    ),
+                                    child: HomeGiveCard(),
+                                  ),
+                                  // Clears the mini player and the floating
+                                  // nav, less the ride up over the hero.
+                                  const SizedBox(
+                                    height:
+                                        KSize.contentBottomPad - _stripOverlap,
                                   ),
                                 ],
-                              ],
-                              if (shows(HomeSectionId.continueListening))
-                                const HomeContinueListening(
-                                  padding: EdgeInsets.fromLTRB(
-                                    KSpace.gutter,
-                                    KSpace.sectionTop,
-                                    KSpace.gutter,
-                                    0,
-                                  ),
-                                ),
-                              const HomeMoments(
-                                padding: EdgeInsets.only(
-                                  top: KSpace.sectionTop,
-                                ),
                               ),
-                              const Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                  KSpace.gutter,
-                                  KSpace.sectionTop,
-                                  KSpace.gutter,
-                                  0,
-                                ),
-                                child: HomeGiveCard(),
-                              ),
-                              // Clears the mini player and the floating
-                              // nav, less the ride up over the hero.
-                              const SizedBox(
-                                height: KSize.contentBottomPad - _stripOverlap,
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],

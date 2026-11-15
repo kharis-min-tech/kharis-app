@@ -297,7 +297,7 @@ class EventReminderService {
     DateTime start,
     _Record record,
   ) {
-    final time = DateFormat('h:mm a').format(start);
+    final time = DateFormat('HH:mm').format(start);
     final place = [event.location, event.address]
         .map((value) => value?.trim() ?? '')
         .where((value) => value.isNotEmpty)

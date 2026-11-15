@@ -231,7 +231,7 @@ void main() {
       final reminder = notifications.scheduled.values.single;
       expect(reminder.at, DateTime(2026, 11, 22, 9));
       expect(reminder.title, 'Sunday Service');
-      expect(reminder.body, 'Starts at 10:00 AM · 4-18 Harrington Gardens');
+      expect(reminder.body, 'Starts at 10:00 · 4-18 Harrington Gardens');
     });
 
     test(

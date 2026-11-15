@@ -60,7 +60,6 @@ Future<ProviderContainer> _resolve({
 }
 
 void main() {
-
   group('Home layout resolution', () {
     test('the campus layout wins over the built-in one', () async {
       final c = await _resolve(
@@ -175,11 +174,8 @@ void main() {
 
       expect(find.text('London'), findsOneWidget);
       expect(find.text('Sunday Service'), findsOneWidget);
-      expect(
-        find.text('Sundays \u00b7 10:00 AM \u2013 12:00 PM'),
-        findsOneWidget,
-      );
-      expect(find.text('Wednesdays \u00b7 7:00 PM'), findsOneWidget);
+      expect(find.text('Sundays \u00b7 10:00 \u2013 12:00'), findsOneWidget);
+      expect(find.text('Wednesdays \u00b7 19:00'), findsOneWidget);
       expect(find.textContaining('Saturdays'), findsNothing);
       expect(
         tester.getTopLeft(find.text('Sunday Service')).dy,
@@ -292,7 +288,7 @@ void main() {
           meetingTime: '13:00',
         ),
       );
-      expect(find.text('Sundays \u00b7 1:00 PM'), findsOneWidget);
+      expect(find.text('Sundays \u00b7 13:00'), findsOneWidget);
       expect(find.text('Marshalls Park Academy, Romford'), findsOneWidget);
       expect(find.byKey(const Key('campus-directions')), findsOneWidget);
       expect(find.byKey(const Key('campus-call')), findsNothing);

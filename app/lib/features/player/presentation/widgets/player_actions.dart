@@ -65,7 +65,7 @@ class PlayerActions extends ConsumerWidget {
         ),
         KChip(
           key: const Key('player-action-playlist'),
-          label: 'Playlist',
+          label: 'Add to collection',
           leading: KIcons.plus,
           onTap: () => showAddToPlaylistSheet(
             context,

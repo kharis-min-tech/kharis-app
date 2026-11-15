@@ -216,9 +216,7 @@ Future<_Home> _pump(
               ? Completer<List<Sermon>>().future
               : Future.value(sermons),
         ),
-        sermonByIdProvider.overrideWith(
-          (ref, id) => AsyncValue.data(byId[id]),
-        ),
+        sermonByIdProvider.overrideWith((ref, id) => AsyncValue.data(byId[id])),
         playlistsProvider.overrideWith((ref) => Stream.value(const [])),
         favoritesProvider.overrideWith((ref) => Stream.value(null)),
         notesProvider.overrideWith((ref) => Stream.value(const <Note>[])),
@@ -280,7 +278,6 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-
   group('hero', () {
     testWidgets('greets a member by first name, with their branch, the bell '
         'and their initial', (tester) async {
@@ -348,10 +345,7 @@ void main() {
       final home = await _pump(tester, unread: true);
 
       expect(find.byKey(const Key('home-bell-unread-dot')), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('Notifications, new items'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('Notifications, new items'), findsOneWidget);
       await _tap(tester, find.byKey(const Key('home-bell')));
       expect(home.routes.opened, ['/notifications']);
     });
@@ -360,7 +354,10 @@ void main() {
       await _pump(tester);
 
       await _tap(tester, find.byKey(const Key('home-branch-change')));
-      expect(find.byKey(const ValueKey('branch-choice-London')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('branch-choice-London')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a message from the last 7 days is "New from Sunday", with '
@@ -524,6 +521,44 @@ void main() {
       );
       expect(find.text('day streak'), findsNWidgets(2));
     });
+
+    for (final scale in [1.0, 1.3, 2.0]) {
+      testWidgets('sits on top of the hero at ${(scale * 100).round()}% text: '
+          'every label is hit and a tap on it opens its cell', (tester) async {
+        const cells = {
+          'home-stat-reading': '/reading',
+          'home-stat-reading-streak': '/bible',
+          'home-stat-messages-streak': '/messages',
+        };
+        for (final MapEntry(key: key, value: route) in cells.entries) {
+          // Fresh each time: a tap leaves Home.
+          final home = await _pump(
+            tester,
+            sermons: [_sermon()],
+            textScale: scale,
+            size: const Size(390, 844),
+          );
+          final label = find.descendant(
+            of: find.byKey(Key(key)),
+            matching: find.byType(KOverline),
+          );
+          final paragraph = tester.renderObject(
+            find.descendant(of: label, matching: find.byType(RichText)),
+          );
+          final centre = tester.getCenter(label);
+          expect(centre.dy, inExclusiveRange(0, 844), reason: 'on screen');
+          final hits = tester
+              .hitTestOnBinding(centre)
+              .path
+              .map((e) => e.target);
+          expect(hits, contains(paragraph), reason: '$key label is covered');
+
+          await tester.tapAt(centre);
+          await _frames(tester);
+          expect(home.routes.opened, [route], reason: '$key label tap');
+        }
+      });
+    }
   });
 
   group('live and daily message', () {
@@ -942,10 +977,12 @@ void main() {
       await _pump(tester, size: const Size(390, 844));
 
       final scrollable = tester.state<ScrollableState>(
-        find.descendant(
-          of: find.byType(CustomScrollView),
-          matching: find.byType(Scrollable),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
       await _frames(tester);

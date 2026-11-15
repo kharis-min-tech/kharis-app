@@ -157,6 +157,14 @@ Future<BranchSwitchResult> setActiveBranch(WidgetRef ref, String branch) async {
   }
 
   ref.invalidate(currentBranchProvider);
+  // Wait for the fresh value, so the screen the member lands on (Home, right
+  // after onboarding) opens on the new branch. Until then the reload still
+  // carries the old value, which right after onboarding is "no branch".
+  try {
+    await ref.read(currentBranchProvider.future).timeout(profileSyncTimeout);
+  } on Object catch (_) {
+    // Settles on its own; the choice is already stored.
+  }
   return BranchSwitchResult(syncFailed: syncFailed);
 }
 

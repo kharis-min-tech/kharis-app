@@ -199,7 +199,7 @@ void main() {
       expect(
         text,
         'Prayer Night\n'
-        'Friday 16 October 2026, 7:00 PM \u2013 9:00 PM\n'
+        'Friday 16 October 2026, 19:00 \u2013 21:00\n'
         'Main Hall, 12 High Street, London\n'
         'Open in the Kharis app: $_origin/e/e-prayer',
       );

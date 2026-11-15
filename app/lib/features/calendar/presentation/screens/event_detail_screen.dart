@@ -73,17 +73,6 @@ String eventTimeRange(Event event) {
       : '$start \u2013 ${DateFormat('EEE d MMM, HH:mm').format(end)}';
 }
 
-/// The time range as shared links have always written it.
-String _shareTimeRange(Event event) {
-  final time = DateFormat('h:mm a');
-  final start = time.format(event.startTime);
-  final end = event.endTime;
-  if (end == null || !end.isAfter(event.startTime)) return start;
-  return _sameDay(event.startTime, end)
-      ? '$start \u2013 ${time.format(end)}'
-      : '$start \u2013 ${DateFormat('EEE d MMM, h:mm a').format(end)}';
-}
-
 String? _clean(String? raw) {
   final value = raw?.trim();
   return value == null || value.isEmpty ? null : value;
@@ -94,7 +83,7 @@ String? _clean(String? raw) {
 String eventShareText(Event event) {
   final next =
       '${DateFormat('EEEE d MMMM yyyy').format(event.startTime)}, '
-      '${_shareTimeRange(event)}';
+      '${eventTimeRange(event)}';
   final repeats = event.recurrenceLabel;
   final when = repeats == null ? next : '$repeats (next: $next)';
   final place = [

@@ -131,15 +131,17 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   void _promptBranchOnce() {
     if (ref.read(branchPromptShownProvider)) return;
     // Decide once the branch has resolved, so a member whose profile has yet
-    // to answer is not asked by mistake. Closed with the shell if it never
-    // does.
+    // to answer is not asked by mistake. A reload (the branch just picked in
+    // onboarding, or the anonymous session landing) carries the value from
+    // before it as a stale "no branch", so it waits for the fresh one too.
+    // Closed with the shell if it never resolves.
     ProviderSubscription<AsyncValue<String?>>? sub;
     var resolved = false;
     sub = ref.listenManual<AsyncValue<String?>>(currentBranchProvider, (
       _,
       next,
     ) {
-      if (resolved || (!next.hasValue && !next.hasError)) return;
+      if (resolved || next.isLoading) return;
       resolved = true;
       // Null while this fires immediately; closed just below instead.
       sub?.close();

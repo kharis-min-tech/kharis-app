@@ -92,7 +92,7 @@ void main() {
       final reminder = only();
       expect(reminder.at, DateTime(2026, 11, 14, 17, 30));
       expect(reminder.title, 'Worship Night');
-      expect(reminder.body, 'Starts at 6:30 PM · Kharis Centre');
+      expect(reminder.body, 'Starts at 18:30 · Kharis Centre');
       expect(reminder.eventId, 'evt-conf');
       expect(reminders.isReminded('evt-conf'), isTrue);
       expect(reminders.remindedIds, {'evt-conf'});
@@ -101,7 +101,7 @@ void main() {
     test('with no venue name the body gives the address', () async {
       await service().enable(conference(location: null));
 
-      expect(only().body, 'Starts at 6:30 PM · 1 Grace Road, London');
+      expect(only().body, 'Starts at 18:30 · 1 Grace Road, London');
     });
 
     test('with no place at all the body gives the time', () async {
@@ -113,7 +113,7 @@ void main() {
         ),
       );
 
-      expect(only().body, 'Starts at 6:00 AM');
+      expect(only().body, 'Starts at 06:00');
     });
 
     test('asks for permission, and stays off when it is refused', () async {
@@ -237,7 +237,7 @@ void main() {
       await service().enable(sundayService());
 
       expect(only().at, DateTime(2026, 11, 15, 9));
-      expect(only().body, 'Starts at 10:00 AM · Millennium Gloucester Hotel');
+      expect(only().body, 'Starts at 10:00 · Millennium Gloucester Hotel');
     });
 
     test(
@@ -322,7 +322,7 @@ void main() {
       await service().sync();
 
       expect(only().at, DateTime(2026, 11, 15, 10, 30));
-      expect(only().body, 'Starts at 11:30 AM · Cedar Mountain Chapel');
+      expect(only().body, 'Starts at 11:30 · Cedar Mountain Chapel');
     });
 
     test('offline at launch: the reminder is kept as it is', () async {

@@ -268,7 +268,7 @@ class BranchRepository {
   }
 
   /// Postgres `time` ("14:00:00") as "14:00", which the service-time
-  /// formatter shows as "2:00 PM". Anything else passes through.
+  /// formatter shows as is. Anything else passes through.
   static String? _clock(Object? raw) {
     final t = _text(raw);
     if (t == null) return null;

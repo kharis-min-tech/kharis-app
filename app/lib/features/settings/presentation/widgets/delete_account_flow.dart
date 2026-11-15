@@ -163,7 +163,7 @@ class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
         for (final item in const [
           'Your profile and sign-in',
           'Your notes',
-          'Your playlists and favourites',
+          'Your collections and favourites',
           'Your event RSVPs',
         ])
           Padding(

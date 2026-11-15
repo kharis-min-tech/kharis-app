@@ -12,7 +12,7 @@ import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 import 'package:kharis_app/ui/components/components.dart';
 
-/// When [service] meets, e.g. `Sundays · 10:00 AM – 12:00 PM`; null when the
+/// When [service] meets, e.g. `Sundays · 10:00 – 12:00`; null when the
 /// Studio set neither a day nor a time.
 @visibleForTesting
 String? campusServiceWhen(CampusService service) {

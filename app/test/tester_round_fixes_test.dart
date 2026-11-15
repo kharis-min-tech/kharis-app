@@ -257,7 +257,8 @@ void main() {
     );
     expect(find.text('Share'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
-    expect(find.text('Playlist'), findsOneWidget);
+    expect(find.text('Playlist'), findsNothing);
+    expect(find.bySemanticsLabel('Add to collection'), findsOneWidget);
     // KA-007: the player can always be closed: the grab handle is a
     // "Close player" button.
     expect(find.bySemanticsLabel('Close player'), findsOneWidget);

@@ -227,7 +227,7 @@ void main() {
       for (final line in [
         'Your profile and sign-in',
         'Your notes',
-        'Your playlists and favourites',
+        'Your collections and favourites',
         'Your event RSVPs',
       ]) {
         expect(find.textContaining(line), findsOneWidget);
