@@ -37,18 +37,22 @@ import '../../ui/gallery/component_gallery_screen.dart';
 ///   - `/` (welcome) routes straight to the last tab once onboarding is
 ///     complete or the member is signed in.
 ///
-/// Overlay routes (`/reading`, `/notifications`, `/announcements`,
-/// `/branch`, `/events/:id`, ...) sit on the root navigator above the tab
-/// shell and are meant to be PUSHED, so the AppBar back button always
-/// returns to the tab underneath.
+/// Pushed routes (`/give`, `/calendar`, `/reading`, `/notifications`,
+/// `/announcements`, `/branch`, `/events/:id`, ...) sit on the root navigator
+/// above the tab shell and are meant to be PUSHED, so swipe back and the
+/// system back button always return to the tab underneath. Every route uses
+/// the default page, whose transition supports the iOS swipe-back gesture.
 final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
+  // The shell hides the nav while a sheet is open on any navigator.
+  final openSheets = ref.read(openSheetsProvider);
 
   final router = GoRouter(
     initialLocation: '/',
     refreshListenable: notifier,
     redirect: notifier.redirect,
     observers: [
+      SheetObserver(openSheets),
       // Screen-view analytics; no-op when Firebase isn't initialized.
       if (Firebase.apps.isNotEmpty)
         FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
@@ -72,12 +76,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // ── Main app (shell with bottom nav) ──────────────────────────────────
+      // ── Main app (shell with the floating nav): Home, Messages, Bible, More
+      // Branch order matches kTabPaths and the nav's items.
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             DashboardShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
               GoRoute(
                 path: '/home',
@@ -86,6 +92,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
               GoRoute(
                 path: '/messages',
@@ -97,22 +104,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
+              // The book list, until the Bible stage replaces it.
               GoRoute(
-                path: '/calendar',
-                builder: (context, state) => const CalendarScreen(),
+                path: '/bible',
+                builder: (context, state) => const ReadingScreen(browse: true),
               ),
             ],
           ),
           StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/giving',
-                builder: (context, state) => const GivingScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
               GoRoute(
                 path: '/more',
@@ -123,22 +125,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
+      // ── Events list (pushed; event pushes and Home's "See all") ───────────
+      GoRoute(
+        path: '/calendar',
+        builder: (context, state) => const CalendarScreen(),
+      ),
+
+      // ── Give (pushed). /giving is the old tab path, kept for saved links ──
+      GoRoute(path: '/give', builder: (context, state) => const GivingScreen()),
+      GoRoute(path: '/giving', redirect: (context, state) => '/give'),
+
       // ── Full player (overlays shell) ──────────────────────────────────────
       GoRoute(
         path: '/player',
         builder: (context, state) => const FullPlayerScreen(),
       ),
 
-      // ── Today's reading / Bible (overlays shell) ──────────────────────────
+      // ── Today's reading (overlays shell) ──────────────────────────────────
       // /reading (Home card, More's "Daily reading", reading pushes) opens the
-      // reader on today's reading; /bible (More's "Bible") on the book list.
+      // reader on today's reading.
       GoRoute(
         path: '/reading',
         builder: (context, state) => const ReadingScreen(),
-      ),
-      GoRoute(
-        path: '/bible',
-        builder: (context, state) => const ReadingScreen(browse: true),
       ),
 
       // ── Playlists (overlays shell) ────────────────────────────────────────

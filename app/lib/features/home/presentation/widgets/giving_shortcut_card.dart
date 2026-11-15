@@ -31,8 +31,8 @@ class GivingShortcutCard extends ConsumerWidget {
           borderRadius: AppRadius.cardBorder,
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            // Giving is a tab: switch to it rather than stacking it.
-            onTap: () => context.go('/giving'),
+            // Give is a pushed route: swipe back returns here.
+            onTap: () => context.push('/give'),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
               child: Row(

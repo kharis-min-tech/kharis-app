@@ -155,8 +155,19 @@ class EventDetailScreen extends ConsumerWidget {
   );
 }
 
+/// Returns to the events list: pops when it is the screen underneath,
+/// otherwise (a deep link or push tap opened this event directly) pushes it.
+void _backToEvents(BuildContext context) {
+  final router = GoRouter.of(context);
+  final stack = router.routerDelegate.currentConfiguration.matches;
+  final onEvents =
+      stack.length > 1 &&
+      Uri.parse(stack[stack.length - 2].matchedLocation).path == '/calendar';
+  onEvents ? router.pop() : router.push('/calendar');
+}
+
 /// Pops when there is somewhere to go back to; otherwise (a cold-start deep
-/// link) lands on the Events tab instead of closing the app.
+/// link) opens the events list instead of closing the app.
 class _BackButton extends StatelessWidget {
   const _BackButton({required this.color});
 
@@ -169,7 +180,7 @@ class _BackButton extends StatelessWidget {
       icon: Icon(Icons.arrow_back_rounded, color: color),
       onPressed: () {
         final router = GoRouter.of(context);
-        router.canPop() ? router.pop() : router.go('/calendar');
+        router.canPop() ? router.pop() : router.push('/calendar');
       },
     );
   }
@@ -563,7 +574,7 @@ class _Unavailable extends StatelessWidget {
               children: [
                 TextButton(onPressed: onRetry, child: const Text('Try again')),
                 TextButton(
-                  onPressed: () => context.go('/calendar'),
+                  onPressed: () => _backToEvents(context),
                   child: const Text('All events'),
                 ),
               ],

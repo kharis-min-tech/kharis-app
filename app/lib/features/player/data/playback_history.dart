@@ -71,9 +71,14 @@ class Finished extends ListeningProgress {
 /// that can be resumed or replayed, and its fixed id would hand one stream's
 /// position to the next.
 class PlaybackHistory {
-  PlaybackHistory(this._cache);
+  /// [onListened] hears every position saved for a message: the position
+  /// saved before it and the new one (the messages streak counts the stretch
+  /// between them as listening).
+  PlaybackHistory(this._cache, {this.onListened});
 
   final CacheService _cache;
+
+  final void Function(Duration previous, Duration position)? onListened;
 
   /// Preference key of the snapshot list (read by `sermonByIdProvider`).
   static const String snapshotsKey = 'recent_sermon_snapshots';
@@ -109,6 +114,7 @@ class PlaybackHistory {
   /// finished message being played again is no longer "finished".
   void savePosition(Sermon sermon, Duration position) {
     if (position <= resumeFloor) return;
+    if (!_isLive(sermon)) onListened?.call(savedPosition(sermon), position);
     _setFinished(sermon, finished: false, notify: false);
     _write(sermon, position.inMilliseconds);
   }

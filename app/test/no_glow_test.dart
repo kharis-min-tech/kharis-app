@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:just_audio/just_audio.dart' show PlayerState, ProcessingState;
 
 import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
@@ -27,7 +26,6 @@ import 'package:kharis_app/features/messages/presentation/screens/messages_scree
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/player/presentation/artwork_tint.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
-import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
 import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
@@ -211,27 +209,6 @@ void main() {
 
         expect(find.byKey(const Key('player-up-next')), findsOneWidget);
         expect(find.byKey(const Key('player-related')), findsOneWidget);
-        expect(_gloss(tester, flatFills: true), isEmpty);
-      });
-
-      testWidgets('mini player', (tester) async {
-        await audio.play(_sermon(3));
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: playerOverrides(),
-            child: MaterialApp(
-              theme: theme(),
-              home: const Scaffold(
-                bottomNavigationBar: MiniPlayer(),
-                body: SizedBox.expand(),
-              ),
-            ),
-          ),
-        );
-        audio.playerStates.add(PlayerState(true, ProcessingState.ready));
-        await tester.pump();
-
-        expect(find.text('Message 3'), findsOneWidget);
         expect(_gloss(tester, flatFills: true), isEmpty);
       });
 

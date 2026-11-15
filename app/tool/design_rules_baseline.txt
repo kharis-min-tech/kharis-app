@@ -11,7 +11,6 @@ lib/features/calendar/presentation/screens/event_detail_screen.dart
 lib/features/calendar/presentation/widgets/event_card.dart
 lib/features/feedback/presentation/feedback_sheet.dart
 lib/features/giving/presentation/screens/giving_screen.dart
-lib/features/home/presentation/screens/dashboard_shell.dart
 lib/features/home/presentation/screens/home_screen.dart
 lib/features/home/presentation/screens/notifications_screen.dart
 lib/features/home/presentation/screens/reading_screen.dart

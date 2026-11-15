@@ -53,7 +53,7 @@ class HomeBibleRow extends ConsumerWidget {
         title: title,
         semanticsLabel: "Today's reading: $title. Read now",
         onTap: () => context.push('/reading'),
-        wholeBible: () => context.push('/bible'),
+        wholeBible: () => context.go('/bible'),
       );
     } else if (loading) {
       row = const Skeleton(
@@ -67,7 +67,7 @@ class HomeBibleRow extends ConsumerWidget {
         title: 'Read the Bible',
         subtitle: 'Every book and chapter, in your translation.',
         semanticsLabel: 'Read the Bible',
-        onTap: () => context.push('/bible'),
+        onTap: () => context.go('/bible'),
       );
     }
 

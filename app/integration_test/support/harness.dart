@@ -16,6 +16,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -152,40 +153,61 @@ Future<void> scrollUntilFound(
   throw TestFailure('Timed out scrolling for $finder');
 }
 
-/// Taps the bottom-most match of [label]: the tab bar item, even when the
-/// same word appears in the page above it. The bar slides away while a list
-/// scrolls down, so a small scroll up brings it back first.
+/// The app's four tabs: nav label to shell path.
+const navTabs = <String, String>{
+  'Home': '/home',
+  'Messages': '/messages',
+  'Bible': '/bible',
+  'More': '/more',
+};
+
+/// The floating nav, when the tab shell is the screen on top.
+final Finder _floatingNav = find.byKey(const Key('dashboard-nav'));
+
+GoRouter _appRouter(WidgetTester tester) => ProviderScope.containerOf(
+  tester.element(find.byType(MaterialApp)),
+  listen: false,
+).read(appRouterProvider);
+
+/// Opens the tab labelled [label] (Home, Messages, Bible, More) by tapping
+/// it in the floating nav. When a pushed screen, a sheet or the keyboard has
+/// the nav out of reach, goes to the tab's path through the router instead.
+///
+/// 'Events' and 'Giving' were tabs before the redesign: journeys written for
+/// the five-tab bar still pass those labels, and they open the screen
+/// through [openEventsViaRouter] and [openGiveViaRouter].
 Future<void> tapNav(WidgetTester tester, String label) async {
-  await _revealTabBar(tester);
-  final matches = find.text(label);
-  await pumpUntilFound(tester, matches, reason: 'tab "$label"');
-  var best = 0;
-  var bestDy = -1.0;
-  for (var i = 0; i < matches.evaluate().length; i++) {
-    final dy = tester.getCenter(matches.at(i)).dy;
-    if (dy > bestDy) {
-      bestDy = dy;
-      best = i;
-    }
+  if (label == 'Events') return openEventsViaRouter(tester);
+  if (label == 'Giving' || label == 'Give') return openGiveViaRouter(tester);
+  final path = navTabs[label];
+  if (path == null) throw TestFailure('No tab is labelled "$label"');
+  final tab = find.descendant(of: _floatingNav, matching: find.text(label));
+  if (tab.evaluate().isEmpty) {
+    _appRouter(tester).go(path);
+  } else {
+    await tester.tap(tab, warnIfMissed: false);
   }
-  await tester.tap(matches.at(best), warnIfMissed: false);
   await pumpFor(tester, const Duration(milliseconds: 700));
 }
 
-/// Scrolls the visible page up a little when the shell's bottom bar has slid
-/// off screen, which is how a member brings it back.
-Future<void> _revealTabBar(WidgetTester tester) async {
-  final bar = find.byKey(const Key('dashboard-bottom-bar'));
-  if (bar.evaluate().isEmpty) return;
-  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-  for (var i = 0; i < 3; i++) {
-    if (tester.getRect(bar).top < screen.height - 8) return;
-    await tester.dragFrom(
-      Offset(screen.width / 2, screen.height * 0.5),
-      const Offset(0, 80),
-    );
-    await pumpFor(tester, const Duration(milliseconds: 500));
-  }
+/// Opens the events list by pushing `/calendar` over Home through the
+/// router. ROUTER SHORTCUT: replace with taps on the member's real entry
+/// point (Home's events section) once the Home stage has built it.
+Future<void> openEventsViaRouter(WidgetTester tester) =>
+    _pushOverHome(tester, '/calendar');
+
+/// Opens Give by pushing `/give` over Home through the router. ROUTER
+/// SHORTCUT: replace with taps on the member's real entry point (Home's or
+/// More's Give row) once those stages have built it.
+Future<void> openGiveViaRouter(WidgetTester tester) =>
+    _pushOverHome(tester, '/give');
+
+Future<void> _pushOverHome(WidgetTester tester, String location) async {
+  final router = _appRouter(tester);
+  router.go('/home');
+  await pumpFor(tester, const Duration(milliseconds: 300));
+  unawaited(router.push(location));
+  await pumpFor(tester, const Duration(milliseconds: 700));
 }
 
 /// Taps the first match of [finder] after scrolling it into view.

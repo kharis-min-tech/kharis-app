@@ -106,7 +106,7 @@ class SettingsScreen extends ConsumerWidget {
                   _MoreMenuItem(
                     icon: Icons.menu_book_rounded,
                     label: 'Bible',
-                    onTap: () => context.push('/bible'),
+                    onTap: () => context.go('/bible'),
                   ),
                   _MoreMenuItem(
                     icon: Icons.edit_note_rounded,
@@ -141,7 +141,7 @@ class SettingsScreen extends ConsumerWidget {
                     label: 'Give',
                     accent: context.kc.accentInk,
                     isLast: true,
-                    onTap: () => context.go('/giving'),
+                    onTap: () => context.push('/give'),
                   ),
                 ],
               ),

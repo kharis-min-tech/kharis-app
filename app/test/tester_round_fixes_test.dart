@@ -24,6 +24,7 @@ import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 /// Regression guards for the tester-round fixes closed on 9 Sep
 /// (docs/BUG-TRACKER.md): each test pins one acceptance criterion so a later
@@ -69,8 +70,8 @@ void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets(
-    'KA-001: the mini-player hides on Giving and returns on Home without '
-    'stopping the message',
+    'KA-001: the mini-player is out of the way on Give and back on Home '
+    'without stopping the message',
     (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
@@ -84,13 +85,7 @@ void main() {
             builder: (context, state, shell) =>
                 DashboardShell(navigationShell: shell),
             branches: [
-              for (final path in [
-                '/home',
-                '/messages',
-                '/calendar',
-                '/giving',
-                '/more',
-              ])
+              for (final path in ['/home', '/messages', '/bible', '/more'])
                 StatefulShellBranch(
                   routes: [
                     GoRoute(
@@ -100,6 +95,11 @@ void main() {
                   ],
                 ),
             ],
+          ),
+          // Give is a screen pushed over the tabs: it covers the mini player.
+          GoRoute(
+            path: '/give',
+            builder: (_, _) => const Scaffold(body: Text('page /give')),
           ),
         ],
       );
@@ -114,7 +114,10 @@ void main() {
             currentUserProvider.overrideWith((ref) => Stream.value(_member)),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       // Flush the shell's launch work (branch prompt delay, nudge decision).
@@ -122,10 +125,9 @@ void main() {
 
       expect(find.byType(MiniPlayer), findsOneWidget, reason: 'docked on Home');
 
-      router.go('/giving');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('page /giving'), findsOneWidget);
+      unawaited(router.push('/give'));
+      await tester.pumpAndSettle();
+      expect(find.text('page /give'), findsOneWidget);
       expect(
         find.byType(MiniPlayer),
         findsNothing,
@@ -138,18 +140,17 @@ void main() {
       );
       expect(audio.stopCalls, 0);
 
-      router.go('/messages');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('page /home'), findsOneWidget);
       expect(
         find.byType(MiniPlayer),
         findsOneWidget,
-        reason: 'the bar is back on any other tab',
+        reason: 'the bar is back once Give is closed',
       );
 
-      router.go('/home');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      router.go('/messages');
+      await tester.pumpAndSettle();
       expect(find.byType(MiniPlayer), findsOneWidget);
     },
   );
@@ -172,8 +173,9 @@ void main() {
             audioPlayerServiceProvider.overrideWithValue(audio),
             currentSermonProvider.overrideWith((ref) => ref.watch(live)),
           ],
-          child: const MaterialApp(
-            home: Scaffold(body: Column(children: [MiniPlayer()])),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const Scaffold(body: Column(children: [MiniPlayer()])),
           ),
         ),
       );

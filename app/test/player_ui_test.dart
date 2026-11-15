@@ -31,6 +31,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -198,8 +199,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: overrides(),
-        child: const MaterialApp(
-          home: Scaffold(bottomNavigationBar: MiniPlayer()),
+        child: MaterialApp(
+          theme: KharisTheme.light(),
+          home: const Scaffold(bottomNavigationBar: MiniPlayer()),
         ),
       ),
     );
@@ -209,7 +211,7 @@ void main() {
     // One pump delivers the event, the next rebuilds the bar.
     await tester.pump();
     await tester.pump();
-    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+    expect(find.bySemanticsLabel('Pause'), findsOneWidget);
 
     // Android's fatal error: ExoPlayer idles, the playing flag stays set.
     audio.playerStates.add(
@@ -217,10 +219,10 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
-    expect(find.byIcon(Icons.pause_rounded), findsNothing);
-    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    expect(find.bySemanticsLabel('Pause'), findsNothing);
+    expect(find.bySemanticsLabel('Play'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+    await tester.tap(find.bySemanticsLabel('Play'));
     expect(audio.resumeCalls, 1);
     expect(audio.pauseCalls, 0);
   });

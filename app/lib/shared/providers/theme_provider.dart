@@ -7,10 +7,9 @@ const _kThemeModeKey = 'settings_theme_mode';
 
 /// The member's theme choice, persisted across launches.
 ///
-/// The app is all-light or all-dark — there is no per-screen mix. Media
-/// players are conventionally dark, so [ThemeMode.dark] is the default; a
-/// member who prefers light can switch in Settings, and [ThemeMode.system]
-/// follows the OS.
+/// The app is all-light or all-dark: there is no per-screen mix. It follows
+/// the system setting ([ThemeMode.system]) until the member picks Light or
+/// Dark in Settings.
 class ThemeModeController extends StateNotifier<ThemeMode> {
   ThemeModeController(this._ref) : super(_read(_ref));
 
@@ -20,8 +19,8 @@ class ThemeModeController extends StateNotifier<ThemeMode> {
     final raw = ref.read(sharedPreferencesProvider).getString(_kThemeModeKey);
     return switch (raw) {
       'light' => ThemeMode.light,
-      'system' => ThemeMode.system,
-      _ => ThemeMode.dark,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
     };
   }
 

@@ -155,7 +155,7 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
     case KharisTopics.events:
       return eventId != null
           ? eventDetail(eventId)
-          : const NotificationTarget('/calendar');
+          : const NotificationTarget('/calendar', overlay: true);
     case 'service_reminder':
     case KharisTopics.serviceReminders:
     case 'venue':

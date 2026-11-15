@@ -257,8 +257,8 @@ class _EventsBlock extends ConsumerWidget {
           eyebrow: 'What\u2019s on',
           title: 'Upcoming events',
           actionKey: const Key('home-events-see-all'),
-          // Events is a tab: switch to it rather than stacking it.
-          onSeeAll: () => context.go('/calendar'),
+          // Events is a pushed route: swipe back returns to Home.
+          onSeeAll: () => context.push('/calendar'),
         ),
         const Padding(
           padding: EdgeInsets.only(left: 20, bottom: 28),

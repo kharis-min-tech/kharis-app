@@ -18,7 +18,10 @@ import 'core/constants/api_config.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
 import 'shared/providers/theme_provider.dart';
-import 'core/theme/theme.dart';
+// REDESIGN-MIGRATION: remove when lib/core/theme is deleted
+import 'core/theme/kharis_colors.dart' as legacy;
+import 'theme/kharis_theme.dart';
+import 'ui/components/k_layout.dart';
 import 'shared/providers/auth_provider.dart';
 import 'shared/providers/audio_provider.dart';
 import 'features/player/data/kharis_audio_handler.dart';
@@ -120,6 +123,42 @@ Widget clampTextScaling(BuildContext context, Widget? child) =>
       child: child ?? const SizedBox.shrink(),
     );
 
+/// The app's theme for [brightness]: [KharisTheme] plus, during the redesign,
+/// the old theme's extension so screens that have not been converted yet can
+/// still read `context.kc`.
+ThemeData kharisAppTheme(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  final theme = dark ? KharisTheme.dark() : KharisTheme.light();
+  // REDESIGN-MIGRATION: remove when lib/core/theme is deleted. This is the
+  // only place the old theme is registered; return `theme` as is afterwards.
+  return theme.copyWith(
+    extensions: [
+      ...theme.extensions.values,
+      dark ? legacy.KharisColors.dark : legacy.KharisColors.light,
+    ],
+  );
+}
+
+/// `MaterialApp.builder` step that keeps the status bar and the system
+/// navigation bar in step with the active theme.
+Widget themedSystemUi(BuildContext context, Widget child) {
+  final k = context.k;
+  final dark = context.isDarkTheme;
+  final icons = dark ? Brightness.light : Brightness.dark;
+  return AnnotatedRegion<SystemUiOverlayStyle>(
+    value: SystemUiOverlayStyle(
+      statusBarColor: kClear(k.bg),
+      statusBarIconBrightness: icons,
+      // iOS: the brightness of the bar itself, so its text contrasts.
+      statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: k.bg,
+      systemNavigationBarDividerColor: kClear(k.bg),
+      systemNavigationBarIconBrightness: icons,
+    ),
+    child: child,
+  );
+}
+
 class KharisApp extends ConsumerWidget {
   const KharisApp({super.key});
 
@@ -142,8 +181,8 @@ class KharisApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         title: 'Kharis Church',
         themeMode: ref.watch(themeModeProvider),
-        theme: kharisTheme(brightness: Brightness.light),
-        darkTheme: kharisTheme(brightness: Brightness.dark),
+        theme: kharisAppTheme(Brightness.light),
+        darkTheme: kharisAppTheme(Brightness.dark),
         scaffoldMessengerKey: kharisMessengerKey,
         routerConfig: ref.watch(appRouterProvider),
         // On web, a shared link opened in the browser gets the "Open in the
@@ -151,9 +190,12 @@ class KharisApp extends ConsumerWidget {
         // iOS Reduce Motion reaches every reduced-motion check, as Android's
         // Remove animations already does.
         builder: (context, child) => ReduceMotionScope(
-          child: clampTextScaling(
+          child: themedSystemUi(
             context,
-            OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+            clampTextScaling(
+              context,
+              OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         ),
       ),

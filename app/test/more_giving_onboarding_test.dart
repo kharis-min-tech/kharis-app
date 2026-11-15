@@ -205,7 +205,7 @@ Future<GoRouter> _pumpMore(
         '/favorites',
         '/playlists',
         '/branch-selection',
-        '/giving',
+        '/give',
         '/login',
         '/register',
         '/profile/edit',
@@ -263,7 +263,7 @@ void main() {
       ('Favourites', '/favorites'),
       ('My playlists', '/playlists'),
       ('Switch branch', '/branch-selection'),
-      ('Give', '/giving'),
+      ('Give', '/give'),
     ]) {
       testWidgets('"$label" opens $route', (tester) async {
         await _pumpMore(tester, user: _member);

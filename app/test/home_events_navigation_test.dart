@@ -866,7 +866,7 @@ void main() {
       );
       expect(
         notificationTargetFor({'type': 'event'}),
-        const NotificationTarget('/calendar'),
+        const NotificationTarget('/calendar', overlay: true),
       );
       expect(
         notificationTargetFor({'type': 'service_reminder'}),

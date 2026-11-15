@@ -15,6 +15,7 @@ import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -70,13 +71,7 @@ void main() {
           builder: (context, state, shell) =>
               DashboardShell(navigationShell: shell),
           branches: [
-            for (final path in [
-              '/home',
-              '/messages',
-              '/calendar',
-              '/giving',
-              '/more',
-            ])
+            for (final path in ['/home', '/messages', '/bible', '/more'])
               StatefulShellBranch(
                 routes: [
                   GoRoute(
@@ -101,7 +96,10 @@ void main() {
           currentUserProvider.overrideWith((ref) => Stream.value(member)),
           currentBranchProvider.overrideWith((ref) => Stream.value('London')),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          theme: KharisTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     return audio;
