@@ -9,7 +9,6 @@ import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
-import 'package:kharis_app/features/settings/presentation/screens/notifications_settings_screen.dart';
 import 'package:kharis_app/shared/providers/dismissed_notifications_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
@@ -289,15 +288,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   /// Notification preferences: what this member can choose to receive.
-  void _openPreferences() {
-    unawaited(
-      Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const NotificationsSettingsScreen(),
-        ),
-      ),
-    );
-  }
+  void _openPreferences() => unawaited(context.push('/settings/notifications'));
 
   /// Opens the pushed announcement once, after the feed that contains it has
   /// loaded. An id the feed does not hold (expired, other campus) just leaves
@@ -369,7 +360,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       );
     }
 
-    final bottom = KSpace.section + MediaQuery.paddingOf(context).bottom;
+    final bottom =
+        KSize.contentBottomPad + MediaQuery.paddingOf(context).bottom;
 
     if (widget.announcementsOnly) {
       return ListView.separated(

@@ -12,6 +12,7 @@ import 'package:kharis_app/features/connect/presentation/screens/new_here_screen
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
+import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
 import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart'
     show weekdayIndex;
@@ -50,13 +51,13 @@ final appVersionProvider = FutureProvider<String>((ref) async {
 Future<void> _openWebPage(String url) =>
     launchUrl(Uri.parse(url), mode: LaunchMode.inAppBrowserView);
 
-/// Pushes a full-screen page above the tab shell.
+/// Pushes a full-screen page above the tab shell, keeping the shell's nav.
 void _pushPage(BuildContext context, Widget page) {
   unawaited(
     Navigator.of(
       context,
       rootNavigator: true,
-    ).push(MaterialPageRoute<void>(builder: (_) => page)),
+    ).push(MaterialPageRoute<void>(builder: (_) => WithTabNav(child: page))),
   );
 }
 

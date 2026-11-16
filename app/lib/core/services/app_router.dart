@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -41,11 +42,14 @@ import '../../ui/gallery/component_gallery_screen.dart';
 ///   - `/` (welcome) routes straight to the last tab once onboarding is
 ///     complete or the member is signed in.
 ///
-/// Pushed routes (`/give`, `/calendar`, `/reading`, `/notifications`,
-/// `/announcements`, `/branch`, `/events/:id`, ...) sit on the root navigator
-/// above the tab shell and are meant to be PUSHED, so swipe back and the
-/// system back button always return to the tab underneath. Every route uses
-/// the default page, whose transition supports the iOS swipe-back gesture.
+/// Pushed routes (`/give`, `/calendar`, `/notifications`, `/announcements`,
+/// `/branch`, `/events/:id`, ...) sit on the root navigator above the tab
+/// shell and are meant to be PUSHED, so swipe back and the system back button
+/// always return to the tab underneath. Each keeps the tab shell's nav
+/// ([WithTabNav]) with the tab the member came from highlighted; only the
+/// full player, onboarding, auth and the design check have none. Every route
+/// uses the default page, whose transition supports the iOS swipe-back
+/// gesture.
 final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
   // The shell hides the nav while a sheet is open on any navigator.
@@ -134,26 +138,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Events list (pushed; event pushes and Home's "See all") ───────────
-      GoRoute(
-        path: '/calendar',
-        builder: (context, state) => const CalendarScreen(),
-      ),
+      _navPage('/calendar', (state) => const CalendarScreen()),
 
       // ── Give (pushed). /giving is the old tab path, kept for saved links ──
-      GoRoute(path: '/give', builder: (context, state) => const GivingScreen()),
+      _navPage('/give', (state) => const GivingScreen()),
       GoRoute(path: '/giving', redirect: (context, state) => '/give'),
 
       // ── Listening history and downloads (pushed) ──────────────────────────
-      GoRoute(
-        path: '/history',
-        builder: (context, state) => const ListeningHistoryScreen(),
-      ),
-      GoRoute(
-        path: '/downloads',
-        builder: (context, state) => const DownloadsScreen(),
-      ),
+      _navPage('/history', (state) => const ListeningHistoryScreen()),
+      _navPage('/downloads', (state) => const DownloadsScreen()),
 
-      // ── Full player (overlays shell) ──────────────────────────────────────
+      // ── Full player (a full-screen sheet over the shell, no nav) ──────────
       GoRoute(
         path: '/player',
         builder: (context, state) => const FullPlayerScreen(),
@@ -162,60 +157,51 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ── /reading and /highlights land in the Bible tab ────────────────────
       ...bibleRedirectRoutes,
 
-      // ── Playlists (overlays shell) ────────────────────────────────────────
+      // ── Playlists (pushed) ────────────────────────────────────────────────
       // The member's own playlists. Home and detail are both pushed routes on
-      // the root navigator, so the shell tab underneath stays intact and the
-      // AppBar back button always exits — never replacing tab content.
-      GoRoute(
-        path: '/playlists',
-        builder: (context, state) => const PlaylistsScreen(),
+      // the root navigator, so the shell tab underneath stays intact and back
+      // always exits, never replacing tab content.
+      _navPage(
+        '/playlists',
+        (state) => const PlaylistsScreen(),
         routes: [
-          GoRoute(
-            path: ':id',
-            builder: (context, state) =>
+          _navPage(
+            ':id',
+            (state) =>
                 PlaylistDetailScreen(playlistId: state.pathParameters['id']!),
           ),
         ],
       ),
 
-      // ── Favorites (overlays shell) ────────────────────────────────────────
+      // ── Favorites (pushed) ────────────────────────────────────────────────
       // Hearted messages: the quick go-to, separate from playlists. Pushed
       // from More and the top of Playlists, so back always exits.
-      GoRoute(
-        path: '/favorites',
-        builder: (context, state) => const FavoritesScreen(),
-      ),
+      _navPage('/favorites', (state) => const FavoritesScreen()),
 
-      // ── Notes (overlays shell) ────────────────────────────────────────────
-      GoRoute(path: '/notes', builder: (context, state) => const NotesScreen()),
+      // ── Notes (pushed) ────────────────────────────────────────────────────
+      _navPage('/notes', (state) => const NotesScreen()),
 
-      // ── Notifications feed (overlays shell; push deep-link target) ────────
-      GoRoute(
-        path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
-      ),
+      // ── Notifications feed (pushed; push deep-link target) ────────────────
+      _navPage('/notifications', (state) => const NotificationsScreen()),
 
       // ── Announcements feed (Home "See all"; announcement push target) ─────
       // `?id=` opens that announcement's detail as soon as it is loaded.
-      GoRoute(
-        path: '/announcements',
-        builder: (context, state) => NotificationsScreen.announcements(
+      _navPage(
+        '/announcements',
+        (state) => NotificationsScreen.announcements(
           focusId: state.uri.queryParameters['id'],
         ),
       ),
 
       // ── Branch (Home "Next service" card): full timetable ─────────────────
-      GoRoute(
-        path: '/branch',
-        builder: (context, state) => const BranchScreen(),
-      ),
+      _navPage('/branch', (state) => const BranchScreen()),
 
       // ── Event detail (cards, linked announcements, event pushes) ──────────
       // `extra` may carry the already-loaded [Event] so the screen paints
       // instantly; the screen still re-reads the doc by id.
-      GoRoute(
-        path: '/events/:id',
-        builder: (context, state) => EventDetailScreen(
+      _navPage(
+        '/events/:id',
+        (state) => EventDetailScreen(
           eventId: state.pathParameters['id']!,
           initial: state.extra is Event ? state.extra as Event : null,
         ),
@@ -224,16 +210,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ── Shared links: /m/:id, /e/:id, /a/:id (see AppLinks) ───────────────
       ...sharedLinkRoutes,
 
-      // ── Profile (overlays shell) ──────────────────────────────────────────
-      GoRoute(
-        path: '/profile/edit',
-        builder: (context, state) => const EditProfileScreen(),
-      ),
+      // ── Profile (pushed) ──────────────────────────────────────────────────
+      _navPage('/profile/edit', (state) => const EditProfileScreen()),
 
       // ── Notification settings (More's Notifications row) ──────────────────
-      GoRoute(
-        path: '/settings/notifications',
-        builder: (context, state) => const NotificationsSettingsScreen(),
+      _navPage(
+        '/settings/notifications',
+        (state) => const NotificationsSettingsScreen(),
       ),
 
       // ── Design check (debug builds only; never ships in release) ──────────
@@ -248,3 +231,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(router.dispose);
   return router;
 });
+
+/// A page pushed above the tab shell that keeps the shell's nav.
+GoRoute _navPage(
+  String path,
+  Widget Function(GoRouterState state) page, {
+  List<RouteBase> routes = const [],
+}) => GoRoute(
+  path: path,
+  builder: (context, state) => WithTabNav(child: page(state)),
+  routes: routes,
+);

@@ -49,7 +49,8 @@ class LibraryScaffold extends StatelessWidget {
                 SliverToBoxAdapter(
                   child: SizedBox(
                     height:
-                        MediaQuery.paddingOf(context).bottom + KSpace.section,
+                        MediaQuery.paddingOf(context).bottom +
+                        KSize.contentBottomPad,
                   ),
                 ),
               ],

@@ -271,7 +271,7 @@ const EdgeInsets _listPadding = EdgeInsets.fromLTRB(
   KSpace.gutter,
   KSpace.x3,
   KSpace.gutter,
-  KSpace.section,
+  KSize.contentBottomPad,
 );
 
 /// Event cards (and the headers and notes between them), [KSpace.lg] apart.

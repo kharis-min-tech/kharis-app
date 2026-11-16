@@ -161,7 +161,7 @@ const navTabs = <String, String>{
   'More': '/more',
 };
 
-/// The floating nav, when the tab shell is the screen on top.
+/// The floating nav: on the tab shell and on every page pushed above it.
 final Finder _floatingNav = find.byKey(const Key('dashboard-nav'));
 
 GoRouter appRouter(WidgetTester tester) => ProviderScope.containerOf(
@@ -170,18 +170,22 @@ GoRouter appRouter(WidgetTester tester) => ProviderScope.containerOf(
 ).read(appRouterProvider);
 
 /// Opens the tab labelled [label] (Home, Messages, Bible, More) by tapping
-/// it in the floating nav. When a pushed screen, a sheet or the keyboard has
+/// it in the floating nav on top (the tab shell's, or a pushed page's; the
+/// highlighted tab returns to its root). When a sheet or the keyboard has
 /// the nav out of reach, goes to the tab's path through the router instead.
 /// Events and Give are not tabs: open them from their real entry points
 /// (`openEvents` / `openGive` in actions.dart).
 Future<void> tapNav(WidgetTester tester, String label) async {
   final path = navTabs[label];
   if (path == null) throw TestFailure('No tab is labelled "$label"');
-  final tab = find.descendant(of: _floatingNav, matching: find.text(label));
+  // The page on top paints last; a page underneath keeps its own nav.
+  final tab = find
+      .descendant(of: _floatingNav, matching: find.text(label))
+      .hitTestable();
   if (tab.evaluate().isEmpty) {
     appRouter(tester).go(path);
   } else {
-    await tester.tap(tab, warnIfMissed: false);
+    await tester.tap(tab.last, warnIfMissed: false);
   }
   await pumpFor(tester, const Duration(milliseconds: 700));
 }

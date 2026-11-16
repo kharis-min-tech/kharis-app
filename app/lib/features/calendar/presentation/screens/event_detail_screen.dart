@@ -165,7 +165,7 @@ const EdgeInsets _pagePadding = EdgeInsets.fromLTRB(
   KSpace.gutter,
   KSpace.md,
   KSpace.gutter,
-  KSpace.section,
+  KSize.contentBottomPad,
 );
 
 class _EventBody extends ConsumerWidget {
