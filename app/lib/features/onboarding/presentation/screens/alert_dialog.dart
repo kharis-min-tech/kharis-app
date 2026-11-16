@@ -20,7 +20,7 @@ void showPlatformAlertDialogAdaptive(
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: Colors.black,
           ),
         ),
         content: Text(
@@ -28,7 +28,7 @@ void showPlatformAlertDialogAdaptive(
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             fontSize: 10.sp,
             fontWeight: FontWeight.w400,
-            color: Colors.white,
+            color: Colors.black.withValues(alpha: 0.6),
           ),
         ),
         actions: <Widget>[
