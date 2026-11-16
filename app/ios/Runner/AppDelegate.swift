@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -13,6 +14,11 @@ import UIKit
     // apns-token-not-set). Register here; FlutterAppDelegate forwards the
     // token callback to the plugin once it is registered.
     application.registerForRemoteNotifications()
+    // Event reminders (flutter_local_notifications) hear about a tapped
+    // reminder through this delegate. Set before any plugin registers:
+    // firebase_messaging then leaves it in place and receives its own
+    // callbacks through FlutterAppDelegate, as the reminders plugin does.
+    UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/widgets/notification_permission_card.dart';
+import 'package:kharis_app/ui/components/components.dart';
+
+/// The notification choices, in display order: preference key, title and
+/// what the member gets.
+const List<(String, String, String)> _choices = [
+  ('announcements', 'Announcements', 'News and notices from your branch'),
+  (
+    'serviceReminders',
+    'Service reminders',
+    'An hour before your branch\u2019s service, and if it changes',
+  ),
+  ('events', 'Events', 'Updates on upcoming events'),
+  ('dailyReading', 'Daily reading', 'Today\u2019s Bible reading at 07:00 (UK)'),
+];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -51,163 +64,94 @@ class _NotificationsSettingsScreenState
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Back button
-            Padding(
-              padding: const EdgeInsets.only(left: 4, top: 8),
-              child: IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: Icon(
-                  Icons.arrow_back_ios_new,
-                  color: context.kc.onBg,
-                  size: 20,
-                ),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(
+                top: KSpace.md,
+                bottom: KSpace.section,
               ),
-            ),
-            // Title
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-              child: Text(
-                'Notifications',
-                style: AppTypography.display(
-                  size: 26,
-                  weight: FontWeight.w700,
-                ).copyWith(color: context.kc.onBg),
-              ),
-            ),
-            // Content area
-            Expanded(
-              child: prefsAsync.when(
-                loading: () => Center(
-                  child: CircularProgressIndicator(
-                    color: context.kc.accentInk,
-                    strokeWidth: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const KScreenHeader(title: 'Notifications'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      KSpace.gutter,
+                      KSpace.x3,
+                      KSpace.gutter,
+                      0,
+                    ),
+                    child: prefsAsync.when(
+                      loading: () => const _TogglesSkeleton(),
+                      // The prefs stream falls back to defaults for guests; a
+                      // read failure for a member still shows working
+                      // switches (they apply to this device's topics) rather
+                      // than a blank page.
+                      error: (_, _) => _toggles(_prefs ?? const {}, permission),
+                      data: (_) => _toggles(_prefs ?? const {}, permission),
+                    ),
                   ),
-                ),
-                // The prefs stream falls back to defaults for guests; a read
-                // failure for a member still shows working switches (they
-                // apply to this device's topics) rather than a blank page.
-                error: (_, _) => _toggles(_prefs ?? const {}, permission),
-                data: (_) => _toggles(_prefs ?? const {}, permission),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _toggles(Map<String, bool> prefs, NotificationPermission? permission) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          // Toggles can't deliver anything while the OS blocks
-          // us, so say so rather than lying with four switches.
-          if (permission == NotificationPermission.askable ||
-              permission == NotificationPermission.blocked) ...[
-            NotificationPermissionCard(
-              permission: permission!,
-              message:
-                  'Your device is blocking Kharis notifications. Turn them on '
-                  'to get the alerts you pick below.',
-            ),
-            const SizedBox(height: 14),
-          ],
-          _ToggleRow(
-            label: 'Announcements',
-            subtitle: 'News and notices from your branch',
-            value: prefs['announcements'] ?? true,
-            onChanged: (v) => _onToggle('announcements', v),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Toggles can't deliver anything while the OS blocks
+        // us, so say so rather than lying with four switches.
+        if (permission == NotificationPermission.askable ||
+            permission == NotificationPermission.blocked) ...[
+          NotificationPermissionCard(
+            permission: permission!,
+            message:
+                'Your device is blocking Kharis notifications. Turn them on '
+                'to get the alerts you pick below.',
           ),
-          const SizedBox(height: 14),
-          _ToggleRow(
-            label: 'Service reminders',
-            subtitle:
-                'An hour before your branch\u2019s service, and when its '
-                'time or place changes',
-            value: prefs['serviceReminders'] ?? true,
-            onChanged: (v) => _onToggle('serviceReminders', v),
-          ),
-          const SizedBox(height: 14),
-          _ToggleRow(
-            label: 'Events',
-            subtitle: 'Updates on upcoming events',
-            value: prefs['events'] ?? true,
-            onChanged: (v) => _onToggle('events', v),
-          ),
-          const SizedBox(height: 14),
-          _ToggleRow(
-            label: 'Daily reading',
-            subtitle: 'Today\u2019s Bible reading at 7am (UK time)',
-            value: prefs['dailyReading'] ?? true,
-            onChanged: (v) => _onToggle('dailyReading', v),
-          ),
+          const SizedBox(height: KSpace.x3),
         ],
-      ),
+        KListGroup(
+          children: [
+            for (final (key, title, hint) in _choices)
+              KListRow(
+                key: Key('notification-pref-$key'),
+                title: title,
+                meta: hint,
+                onTap: () => _onToggle(key, !(prefs[key] ?? true)),
+                trailing: KSwitch(
+                  value: prefs[key] ?? true,
+                  onChanged: (v) => _onToggle(key, v),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
 
-// ── Toggle row widget ─────────────────────────────────────────────────────────
-
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.label,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+/// Four row-sized blocks while the choices load.
+class _TogglesSkeleton extends StatelessWidget {
+  const _TogglesSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: AppTypography.ui(
-                    size: 15,
-                    weight: FontWeight.w600,
-                  ).copyWith(color: context.kc.onBg),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: AppTypography.ui(
-                    size: 12,
-                  ).copyWith(color: context.kc.muted),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: Colors.white,
-            activeTrackColor: context.kc.accent,
-            inactiveThumbColor: context.kc.surface,
-            inactiveTrackColor: context.kc.surfaceMuted,
-          ),
+    return Column(
+      children: [
+        for (var i = 0; i < _choices.length; i++) ...[
+          if (i > 0) const SizedBox(height: KSpace.xxs),
+          const KSkeleton(height: KSize.listRow),
         ],
-      ),
+      ],
     );
   }
 }

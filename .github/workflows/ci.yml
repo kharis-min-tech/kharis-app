@@ -24,6 +24,13 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      # Redesign guardrails: the generated design tokens are up to date, and no
+      # raw colours or font sizes outside lib/theme/ and lib/ui/components/
+      # (legacy screens are baselined in tool/design_rules_baseline.txt).
+      - name: Design rules
+        working-directory: app
+        run: ./tool/check_design_rules.sh
+
       - name: Flutter analyze
         working-directory: app
         run: flutter analyze

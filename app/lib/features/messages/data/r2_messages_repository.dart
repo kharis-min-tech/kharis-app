@@ -167,6 +167,11 @@ Sermon? mapR2Message(Map<String, dynamic> m) {
       for (final t in m['tags'] as List? ?? const [])
         if (t is String && t.trim().isNotEmpty) t.trim(),
     ],
+    // The Worker's copy of the API's `passages`.
+    passages: [
+      for (final p in m['scripture_refs'] as List? ?? const [])
+        if (p is String && p.trim().isNotEmpty) p.trim(),
+    ],
   );
 }
 

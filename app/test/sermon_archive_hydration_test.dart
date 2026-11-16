@@ -308,6 +308,66 @@ void main() {
     expect(lib.sermons.any((s) => s.title == 'Retitled 2013 message'), isTrue);
   });
 
+  test('an archive saved before messages carried passages is shown at once, '
+      're-walked once, and saved in the current format', () async {
+    final records = _archive();
+    // What the previous version of the app left on the phone five minutes
+    // ago: fresh by age, but without passages.
+    final saved = jsonEncode({
+      'v': 2,
+      'fetchedAt': DateTime.now()
+          .subtract(const Duration(minutes: 5))
+          .toIso8601String(),
+      'sermons': [for (final r in records) mapApiSermon(r).toJson()],
+    });
+    final live = [
+      for (final r in records)
+        {
+          ...r,
+          'passages': ['Acts 20:17-38'],
+        },
+    ];
+
+    final store = _MemoryStore(decodeSermonArchive(saved));
+    final (container, adapter) = harness(store: store, records: live);
+    final notifier = container.read(sermonLibraryProvider.notifier);
+
+    // The saved list is on screen before any request has answered.
+    await notifier.ready;
+    final shown = container.read(sermonLibraryProvider);
+    expect(shown.sermons, hasLength(1489));
+    expect(shown.sermons.last.passages, isEmpty);
+
+    final before = DateTime.now();
+    await settle(
+      container,
+      () =>
+          complete(container) &&
+          container.read(sermonLibraryProvider).fetchedAt!.isAfter(before),
+    );
+    expect(adapter.requestedPages, hasLength(30), reason: 'full re-walk');
+    final lib = container.read(sermonLibraryProvider);
+    expect(lib.sermons, hasLength(1489));
+    expect(
+      lib.sermons.every((s) => s.passages.single == 'Acts 20:17-38'),
+      isTrue,
+    );
+
+    // The next launch reads what this one saved and only checks page 1.
+    await settle(container, () => store.writes > 0);
+    final next = _MemoryStore(
+      decodeSermonArchive(encodeSermonArchive(store.snapshot!)),
+    );
+    expect(next.snapshot!.fetchedAt, store.snapshot!.fetchedAt);
+    final (second, secondAdapter) = harness(store: next, records: live);
+    await second.read(sermonLibraryProvider.notifier).firstLoad;
+    await settle(second, () => complete(second));
+    expect(secondAdapter.requestedPages, [1]);
+    expect(second.read(sermonLibraryProvider).sermons.last.passages, [
+      'Acts 20:17-38',
+    ]);
+  });
+
   test('a refresh while the drain waits to retry resumes where it stopped, '
       'not from page 2', () async {
     // A long backoff keeps the failed walk parked until the refresh.

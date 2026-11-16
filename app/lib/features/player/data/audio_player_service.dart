@@ -64,7 +64,10 @@ class PlaybackFailure {
 class AudioPlayerService {
   /// [history] is the app's shared [PlaybackHistory] so list rows hear about
   /// positions this engine saves; a private one is made when omitted.
-  AudioPlayerService(this._cache, {PlaybackHistory? history})
+  /// [localAudio] names the file a message's audio was downloaded to, or null
+  /// when it was not: a downloaded message plays from that file, the rest
+  /// stream.
+  AudioPlayerService(this._cache, {PlaybackHistory? history, this._localAudio})
     : _history = history ?? PlaybackHistory(_cache),
       _player = AudioPlayer(
         // Send the Cloudflare-passing browser UA natively — ExoPlayer's
@@ -93,6 +96,7 @@ class AudioPlayerService {
   final AudioPlayer _player;
   final CacheService _cache;
   final PlaybackHistory _history;
+  final Uri? Function(Sermon sermon)? _localAudio;
   Sermon? _currentSermon;
 
   /// The list playback was launched from, positioned on [_currentSermon].
@@ -397,12 +401,15 @@ class AudioPlayerService {
 
   // ── Source management ──────────────────────────────────────────────────────
 
-  /// One queue entry as a native source, tagged with its [Sermon.id].
+  /// One queue entry as a native source, tagged with its [Sermon.id]: the
+  /// downloaded file when there is one, else the stream.
   ///
   /// The browser User-Agent the host demands is set once on the [AudioPlayer],
   /// so no per-source headers are needed (and no header proxy is engaged).
-  static AudioSource _child(Sermon sermon) =>
-      AudioSource.uri(Uri.parse(sermon.audioUrl), tag: sermon.id);
+  AudioSource _child(Sermon sermon) => AudioSource.uri(
+    _localAudio?.call(sermon) ?? Uri.parse(sermon.audioUrl),
+    tag: sermon.id,
+  );
 
   /// The queue entry behind native index [nativeIndex], matched by tag id so
   /// a window that shifted under an insert still resolves correctly.

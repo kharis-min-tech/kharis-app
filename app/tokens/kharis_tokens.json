@@ -1,0 +1,1044 @@
+{
+  "$description": "Kharis App design tokens. Source of truth for colour, type, spacing, radius, size and elevation. Edit here, then run tool/generate_tokens.py to regenerate lib/theme/kharis_tokens.g.dart.",
+  "brand": {
+    "purple": {
+      "$type": "color",
+      "$value": "#630ed4",
+      "$description": "Kharis Purple. Primary in dark mode, highlight in light mode"
+    },
+    "purpleLight": {
+      "$type": "color",
+      "$value": "#a97ae7",
+      "$description": "Purple mixed 45% with white. Purple text and icons on dark surfaces"
+    },
+    "purpleDeep": {
+      "$type": "color",
+      "$value": "#540cb4",
+      "$description": "Purple mixed 15% with black. Pressed purple fills"
+    },
+    "yellow": {
+      "$type": "color",
+      "$value": "#f7be1d",
+      "$description": "Kharis Yellow. Primary in light mode, highlight in dark mode"
+    },
+    "yellowLight": {
+      "$type": "color",
+      "$value": "#fbdb83",
+      "$description": "Yellow mixed 45% with white"
+    },
+    "yellowDeep": {
+      "$type": "color",
+      "$value": "#d2a219",
+      "$description": "Yellow mixed 15% with black. Pressed yellow fills"
+    },
+    "yellowText": {
+      "$type": "color",
+      "$value": "#886910",
+      "$description": "Yellow mixed 45% with black. Yellow-family text on light surfaces"
+    },
+    "ink": {
+      "$type": "color",
+      "$value": "#141416",
+      "$description": "Ink. Inverse surfaces and ink cards"
+    },
+    "inkRaised": {
+      "$type": "color",
+      "$value": "#272729",
+      "$description": "Ink lifted 8% towards white, for ink cards in dark mode"
+    }
+  },
+  "color": {
+    "$description": "Colour roles. Light mode: yellow primary, purple highlight. Dark mode: purple primary, yellow highlight.",
+    "light": {
+      "bg": {
+        "$type": "color",
+        "$value": "#f5f5f3",
+        "$description": "Screen background"
+      },
+      "surface": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Cards, list rows, inputs"
+      },
+      "surface2": {
+        "$type": "color",
+        "$value": "#ededeb",
+        "$description": "Chips, tracks, inset fields, image placeholders"
+      },
+      "sheet": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Bottom sheets and modals"
+      },
+      "text": {
+        "$type": "color",
+        "$value": "#111113",
+        "$description": "Body and headings"
+      },
+      "muted": {
+        "$type": "color",
+        "$value": "#5f5f67",
+        "$description": "Meta, captions, placeholders"
+      },
+      "line": {
+        "$type": "color",
+        "$value": "#1111131a",
+        "$description": "Dividers, outline borders"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "#11111312",
+        "$description": "Card outline (1px)"
+      },
+      "primary": {
+        "$type": "color",
+        "$value": "{brand.yellow}",
+        "$description": "Main buttons, active chip underline, progress, play"
+      },
+      "onPrimary": {
+        "$type": "color",
+        "$value": "#111113",
+        "$description": "Text and icons on primary"
+      },
+      "primaryText": {
+        "$type": "color",
+        "$value": "{brand.yellowText}",
+        "$description": "Primary-family text and links on surfaces"
+      },
+      "primaryTint": {
+        "$type": "color",
+        "$value": "#f7be1d33",
+        "$description": "Selected backgrounds, tonal buttons"
+      },
+      "primaryPressed": {
+        "$type": "color",
+        "$value": "{brand.yellowDeep}",
+        "$description": "Pressed primary fill"
+      },
+      "highlight": {
+        "$type": "color",
+        "$value": "{brand.purple}",
+        "$description": "Accent: Grace button, live badge, key stats, streak dots"
+      },
+      "onHighlight": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Text and icons on highlight"
+      },
+      "highlightText": {
+        "$type": "color",
+        "$value": "{brand.purple}",
+        "$description": "Highlight-family text and icons on surfaces"
+      },
+      "highlightTint": {
+        "$type": "color",
+        "$value": "#630ed433",
+        "$description": "Soft highlight backgrounds"
+      },
+      "highlightLight": {
+        "$type": "color",
+        "$value": "{brand.purpleLight}",
+        "$description": "Grace orb gradient start"
+      },
+      "highlightDeep": {
+        "$type": "color",
+        "$value": "{brand.purpleDeep}",
+        "$description": "Grace orb gradient end, pressed highlight"
+      },
+      "verseHighlight1": {
+        "$type": "color",
+        "$value": "#630ed452",
+        "$description": "Bible highlight colour 1"
+      },
+      "verseHighlight2": {
+        "$type": "color",
+        "$value": "#f7be1d24",
+        "$description": "Bible highlight colour 2"
+      },
+      "inverse": {
+        "$type": "color",
+        "$value": "{brand.ink}",
+        "$description": "Strong secondary buttons, selected chips, toasts"
+      },
+      "onInverse": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Text on inverse"
+      },
+      "ink": {
+        "$type": "color",
+        "$value": "{brand.ink}",
+        "$description": "Ink cards and hero gradients"
+      },
+      "onInk": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Text on ink"
+      },
+      "navBg": {
+        "$type": "color",
+        "$value": "#ffffffe6",
+        "$description": "Floating nav background (with 24px blur)"
+      },
+      "navBorder": {
+        "$type": "color",
+        "$value": "#1111130f",
+        "$description": "Floating nav 1px outline"
+      },
+      "navActive": {
+        "$type": "color",
+        "$value": "{brand.yellowText}",
+        "$description": "Active nav icon and label"
+      },
+      "navActiveBg": {
+        "$type": "color",
+        "$value": "#f7be1d17",
+        "$description": "Active nav pill"
+      },
+      "scrim": {
+        "$type": "color",
+        "$value": "#0c0c0e73",
+        "$description": "Behind bottom sheets and modals"
+      },
+      "error": {
+        "$type": "color",
+        "$value": "#c62828",
+        "$description": "PROPOSED, not on the canvas yet. Error text and icons"
+      },
+      "onError": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "PROPOSED. Text and icons on an error fill"
+      },
+      "success": {
+        "$type": "color",
+        "$value": "#1b7f45",
+        "$description": "PROPOSED, not on the canvas yet. Success text and icons"
+      }
+    },
+    "dark": {
+      "bg": {
+        "$type": "color",
+        "$value": "#0c0c0e",
+        "$description": "Screen background"
+      },
+      "surface": {
+        "$type": "color",
+        "$value": "#161618",
+        "$description": "Cards, list rows, inputs"
+      },
+      "surface2": {
+        "$type": "color",
+        "$value": "#232326",
+        "$description": "Chips, tracks, inset fields, image placeholders"
+      },
+      "sheet": {
+        "$type": "color",
+        "$value": "#18181b",
+        "$description": "Bottom sheets and modals"
+      },
+      "text": {
+        "$type": "color",
+        "$value": "#f4f4f5",
+        "$description": "Body and headings"
+      },
+      "muted": {
+        "$type": "color",
+        "$value": "#a3a3ab",
+        "$description": "Meta, captions, placeholders"
+      },
+      "line": {
+        "$type": "color",
+        "$value": "#ffffff1a",
+        "$description": "Dividers, outline borders"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "#ffffff14",
+        "$description": "Card outline (1px)"
+      },
+      "primary": {
+        "$type": "color",
+        "$value": "{brand.purple}",
+        "$description": "Main buttons, active chip underline, progress, play"
+      },
+      "onPrimary": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Text and icons on primary"
+      },
+      "primaryText": {
+        "$type": "color",
+        "$value": "{brand.purpleLight}",
+        "$description": "Primary-family text and links on surfaces"
+      },
+      "primaryTint": {
+        "$type": "color",
+        "$value": "#630ed433",
+        "$description": "Selected backgrounds, tonal buttons"
+      },
+      "primaryPressed": {
+        "$type": "color",
+        "$value": "{brand.purpleDeep}",
+        "$description": "Pressed primary fill"
+      },
+      "highlight": {
+        "$type": "color",
+        "$value": "{brand.yellow}",
+        "$description": "Accent: Grace button, live badge, key stats, streak dots"
+      },
+      "onHighlight": {
+        "$type": "color",
+        "$value": "#111113",
+        "$description": "Text and icons on highlight"
+      },
+      "highlightText": {
+        "$type": "color",
+        "$value": "{brand.yellow}",
+        "$description": "Highlight-family text and icons on surfaces"
+      },
+      "highlightTint": {
+        "$type": "color",
+        "$value": "#f7be1d33",
+        "$description": "Soft highlight backgrounds"
+      },
+      "highlightLight": {
+        "$type": "color",
+        "$value": "{brand.yellowLight}",
+        "$description": "Grace orb gradient start"
+      },
+      "highlightDeep": {
+        "$type": "color",
+        "$value": "{brand.yellowDeep}",
+        "$description": "Grace orb gradient end, pressed highlight"
+      },
+      "verseHighlight1": {
+        "$type": "color",
+        "$value": "#f7be1d47",
+        "$description": "Bible highlight colour 1"
+      },
+      "verseHighlight2": {
+        "$type": "color",
+        "$value": "#630ed44c",
+        "$description": "Bible highlight colour 2"
+      },
+      "inverse": {
+        "$type": "color",
+        "$value": "#f4f4f5",
+        "$description": "Strong secondary buttons, selected chips, toasts"
+      },
+      "onInverse": {
+        "$type": "color",
+        "$value": "#111113",
+        "$description": "Text on inverse"
+      },
+      "ink": {
+        "$type": "color",
+        "$value": "{brand.inkRaised}",
+        "$description": "Ink cards and hero gradients"
+      },
+      "onInk": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Text on ink"
+      },
+      "navBg": {
+        "$type": "color",
+        "$value": "#161618db",
+        "$description": "Floating nav background (with 24px blur)"
+      },
+      "navBorder": {
+        "$type": "color",
+        "$value": "#ffffff1a",
+        "$description": "Floating nav 1px outline"
+      },
+      "navActive": {
+        "$type": "color",
+        "$value": "#b187ea",
+        "$description": "Active nav icon and label"
+      },
+      "navActiveBg": {
+        "$type": "color",
+        "$value": "#630ed438",
+        "$description": "Active nav pill"
+      },
+      "scrim": {
+        "$type": "color",
+        "$value": "#0c0c0e73",
+        "$description": "Behind bottom sheets and modals"
+      },
+      "error": {
+        "$type": "color",
+        "$value": "#ff6b6b",
+        "$description": "PROPOSED, not on the canvas yet. Error text and icons"
+      },
+      "onError": {
+        "$type": "color",
+        "$value": "#111113",
+        "$description": "PROPOSED. Text and icons on an error fill"
+      },
+      "success": {
+        "$type": "color",
+        "$value": "#4ade80",
+        "$description": "PROPOSED, not on the canvas yet. Success text and icons"
+      }
+    }
+  },
+  "font": {
+    "family": {
+      "$type": "fontFamily",
+      "$value": "Plus Jakarta Sans",
+      "$description": "Bundled as asset family 'PlusJakartaSans' at weights 400, 600, 700, 800"
+    }
+  },
+  "typography": {
+    "display": {
+      "$type": "typography",
+      "$description": "One hero number per screen (Give amount)",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "64px",
+        "fontWeight": 800,
+        "lineHeight": 1.0,
+        "letterSpacing": "-0.03em"
+      }
+    },
+    "screenTitle": {
+      "$type": "typography",
+      "$description": "Top-level screen titles",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "38px",
+        "fontWeight": 800,
+        "lineHeight": 1.04,
+        "letterSpacing": "-0.03em"
+      }
+    },
+    "pageTitle": {
+      "$type": "typography",
+      "$description": "Sub-page and sheet titles",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "30px",
+        "fontWeight": 800,
+        "lineHeight": 1.04,
+        "letterSpacing": "-0.03em"
+      }
+    },
+    "headline": {
+      "$type": "typography",
+      "$description": "Hero card titles",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "24px",
+        "fontWeight": 800,
+        "lineHeight": 1.12,
+        "letterSpacing": "-0.01em"
+      }
+    },
+    "section": {
+      "$type": "typography",
+      "$description": "Section headings",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "20px",
+        "fontWeight": 800,
+        "lineHeight": 1.2,
+        "letterSpacing": "-0.01em"
+      }
+    },
+    "title": {
+      "$type": "typography",
+      "$description": "Large card and sheet item titles",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "16px",
+        "fontWeight": 800,
+        "lineHeight": 1.25,
+        "letterSpacing": "0em"
+      }
+    },
+    "reading": {
+      "$type": "typography",
+      "$description": "Bible text and long-form reading",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "17px",
+        "fontWeight": 400,
+        "lineHeight": 1.65,
+        "letterSpacing": "0em"
+      }
+    },
+    "body": {
+      "$type": "typography",
+      "$description": "Paragraphs and descriptions",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "15px",
+        "fontWeight": 400,
+        "lineHeight": 1.5,
+        "letterSpacing": "0em"
+      }
+    },
+    "button": {
+      "$type": "typography",
+      "$description": "Buttons and primary labels",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "15px",
+        "fontWeight": 800,
+        "lineHeight": 1.0,
+        "letterSpacing": "0em"
+      }
+    },
+    "link": {
+      "$type": "typography",
+      "$description": "Text actions such as See all",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "14px",
+        "fontWeight": 800,
+        "lineHeight": 1.4,
+        "letterSpacing": "0em"
+      }
+    },
+    "itemTitle": {
+      "$type": "typography",
+      "$description": "List row and small card titles",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "13px",
+        "fontWeight": 800,
+        "lineHeight": 1.3,
+        "letterSpacing": "0em"
+      }
+    },
+    "meta": {
+      "$type": "typography",
+      "$description": "Secondary lines, in muted",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "13px",
+        "fontWeight": 400,
+        "lineHeight": 1.45,
+        "letterSpacing": "0em"
+      }
+    },
+    "caption": {
+      "$type": "typography",
+      "$description": "Durations, dates, counts, in muted",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "12px",
+        "fontWeight": 600,
+        "lineHeight": 1.4,
+        "letterSpacing": "0em"
+      }
+    },
+    "small": {
+      "$type": "typography",
+      "$description": "Nav labels, tags, tiny meta",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "11px",
+        "fontWeight": 700,
+        "lineHeight": 1.3,
+        "letterSpacing": "0em"
+      }
+    },
+    "overline": {
+      "$type": "typography",
+      "$description": "Eyebrows above titles, in primaryText",
+      "$value": {
+        "fontFamily": "{font.family}",
+        "fontSize": "10px",
+        "fontWeight": 700,
+        "lineHeight": 1.2,
+        "letterSpacing": "0.06em",
+        "textCase": "uppercase"
+      }
+    }
+  },
+  "space": {
+    "xxs": {
+      "$type": "dimension",
+      "$value": "2px"
+    },
+    "xs": {
+      "$type": "dimension",
+      "$value": "4px"
+    },
+    "sm": {
+      "$type": "dimension",
+      "$value": "6px"
+    },
+    "md": {
+      "$type": "dimension",
+      "$value": "8px"
+    },
+    "lg": {
+      "$type": "dimension",
+      "$value": "10px"
+    },
+    "xl": {
+      "$type": "dimension",
+      "$value": "12px"
+    },
+    "xxl": {
+      "$type": "dimension",
+      "$value": "14px"
+    },
+    "x3": {
+      "$type": "dimension",
+      "$value": "16px"
+    },
+    "gutter": {
+      "$type": "dimension",
+      "$value": "20px",
+      "$description": "Screen side padding"
+    },
+    "readerGutter": {
+      "$type": "dimension",
+      "$value": "22px",
+      "$description": "Bible reader text column side padding"
+    },
+    "section": {
+      "$type": "dimension",
+      "$value": "28px",
+      "$description": "Between sections"
+    },
+    "sectionTop": {
+      "$type": "dimension",
+      "$value": "30px",
+      "$description": "Above the first section under a header"
+    }
+  },
+  "radius": {
+    "xs": {
+      "$type": "dimension",
+      "$value": "5px",
+      "$description": "Badges, progress tracks"
+    },
+    "chip": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Chips, tags, reader tool group"
+    },
+    "button": {
+      "$type": "dimension",
+      "$value": "7px",
+      "$description": "Buttons, inputs, segmented controls"
+    },
+    "tile": {
+      "$type": "dimension",
+      "$value": "9px",
+      "$description": "Thumbnails, image tiles, search field"
+    },
+    "card": {
+      "$type": "dimension",
+      "$value": "12px",
+      "$description": "Cards, list groups, banners"
+    },
+    "nav": {
+      "$type": "dimension",
+      "$value": "14px",
+      "$description": "Floating nav"
+    },
+    "sheet": {
+      "$type": "dimension",
+      "$value": "16px",
+      "$description": "Bottom sheets, top corners only"
+    },
+    "bubble": {
+      "$type": "dimension",
+      "$value": "10px",
+      "$description": "Chat bubbles"
+    },
+    "bubbleTail": {
+      "$type": "dimension",
+      "$value": "6px",
+      "$description": "Chat bubble tail corner"
+    }
+  },
+  "size": {
+    "touchMin": {
+      "$type": "dimension",
+      "$value": "44px",
+      "$description": "Minimum touch target"
+    },
+    "toolbar": {
+      "$type": "dimension",
+      "$value": "38px",
+      "$description": "Compact header tools (reader toolbar)"
+    },
+    "toggle": {
+      "$type": "dimension",
+      "$value": "36px",
+      "$description": "Toggle buttons such as Remind me"
+    },
+    "chip": {
+      "$type": "dimension",
+      "$value": "40px",
+      "$description": "Filter chips, icon buttons"
+    },
+    "row": {
+      "$type": "dimension",
+      "$value": "44px",
+      "$description": "Inputs, minimum list row"
+    },
+    "listRow": {
+      "$type": "dimension",
+      "$value": "56px",
+      "$description": "Standard list row"
+    },
+    "button": {
+      "$type": "dimension",
+      "$value": "48px",
+      "$description": "Standard button"
+    },
+    "cta": {
+      "$type": "dimension",
+      "$value": "56px",
+      "$description": "Main call-to-action button"
+    },
+    "searchField": {
+      "$type": "dimension",
+      "$value": "52px"
+    },
+    "icon": {
+      "$type": "dimension",
+      "$value": "20px"
+    },
+    "navIcon": {
+      "$type": "dimension",
+      "$value": "22px",
+      "$description": "Nav icons, 1.9 stroke"
+    },
+    "navItem": {
+      "$type": "dimension",
+      "$value": "54px",
+      "$description": "Nav tab height inside the bar"
+    },
+    "navHeight": {
+      "$type": "dimension",
+      "$value": "68px"
+    },
+    "navInsetX": {
+      "$type": "dimension",
+      "$value": "14px"
+    },
+    "navInsetBottom": {
+      "$type": "dimension",
+      "$value": "18px"
+    },
+    "navZone": {
+      "$type": "dimension",
+      "$value": "86px",
+      "$description": "Height reserved at the bottom for the floating nav"
+    },
+    "graceSize": {
+      "$type": "dimension",
+      "$value": "56px"
+    },
+    "graceRight": {
+      "$type": "dimension",
+      "$value": "14px"
+    },
+    "graceBottom": {
+      "$type": "dimension",
+      "$value": "98px"
+    },
+    "graceBottomReader": {
+      "$type": "dimension",
+      "$value": "176px",
+      "$description": "Above the reader audio bar"
+    },
+    "contentBottomPad": {
+      "$type": "dimension",
+      "$value": "174px",
+      "$description": "Bottom padding of scrolling content so it clears the nav and Grace button"
+    },
+    "readerBottomPad": {
+      "$type": "dimension",
+      "$value": "248px"
+    },
+    "sheetHandleWidth": {
+      "$type": "dimension",
+      "$value": "36px"
+    },
+    "sheetHandleHeight": {
+      "$type": "dimension",
+      "$value": "4px"
+    },
+    "designWidth": {
+      "$type": "dimension",
+      "$value": "390px"
+    },
+    "maxContentWidth": {
+      "$type": "dimension",
+      "$value": "560px",
+      "$description": "Centre content above 600pt wide"
+    },
+    "navBlur": {
+      "$type": "dimension",
+      "$value": "24px",
+      "$description": "Background blur behind the floating nav"
+    },
+    "iconXs": {
+      "$type": "dimension",
+      "$value": "14px",
+      "$description": "Chevron in a text link, inline markers"
+    },
+    "iconSm": {
+      "$type": "dimension",
+      "$value": "16px",
+      "$description": "Chevrons and leading icons in chips and toggles"
+    },
+    "iconMd": {
+      "$type": "dimension",
+      "$value": "18px",
+      "$description": "Leading icon in a button, send icon"
+    },
+    "iconLg": {
+      "$type": "dimension",
+      "$value": "32px",
+      "$description": "Empty and error state icon"
+    },
+    "badge": {
+      "$type": "dimension",
+      "$value": "20px",
+      "$description": "Badge height"
+    },
+    "streakDot": {
+      "$type": "dimension",
+      "$value": "28px",
+      "$description": "Streak dot diameter"
+    },
+    "thumb": {
+      "$type": "dimension",
+      "$value": "40px",
+      "$description": "List row leading thumbnail or icon tile, mini player artwork"
+    },
+    "artwork": {
+      "$type": "dimension",
+      "$value": "64px",
+      "$description": "Continue listening artwork"
+    },
+    "radio": {
+      "$type": "dimension",
+      "$value": "22px",
+      "$description": "Radio diameter in option cards and sort rows"
+    },
+    "radioMark": {
+      "$type": "dimension",
+      "$value": "12px",
+      "$description": "Check inside a selected radio"
+    },
+    "outline": {
+      "$type": "dimension",
+      "$value": "1.5px",
+      "$description": "Outline border width: outline buttons, unselected chips, radios"
+    },
+    "tabGap": {
+      "$type": "dimension",
+      "$value": "18px",
+      "$description": "Gap between text tabs"
+    },
+    "tabUnderline": {
+      "$type": "dimension",
+      "$value": "2px",
+      "$description": "Selected tab underline"
+    },
+    "progress": {
+      "$type": "dimension",
+      "$value": "4px",
+      "$description": "Progress bar height"
+    },
+    "dateBlockWidth": {
+      "$type": "dimension",
+      "$value": "52px",
+      "$description": "Event card date block"
+    },
+    "dateBlockHeight": {
+      "$type": "dimension",
+      "$value": "56px"
+    },
+    "hero": {
+      "$type": "dimension",
+      "$value": "360px",
+      "$description": "Minimum hero card height"
+    },
+    "typingDot": {
+      "$type": "dimension",
+      "$value": "8px",
+      "$description": "Typing indicator dot"
+    },
+    "graceOrb": {
+      "$type": "dimension",
+      "$value": "40px",
+      "$description": "Grace orb diameter inside the 56 button (canvas: r 23 of 64)"
+    },
+    "graceHalo": {
+      "$type": "dimension",
+      "$value": "51px",
+      "$description": "Grace halo diameter (canvas: r 29 of 64)"
+    },
+    "graceMark": {
+      "$type": "dimension",
+      "$value": "26px",
+      "$description": "Dove mark on the Grace orb"
+    },
+    "graceBobTravel": {
+      "$type": "dimension",
+      "$value": "5px",
+      "$description": "How far the Grace button rises in one bob"
+    },
+    "edgeFade": {
+      "$type": "dimension",
+      "$value": "24px",
+      "$description": "Width of the fade at the scrolling edge of chip rows and tabs"
+    }
+  },
+  "ratio": {
+    "$description": "Unitless numbers: opacities, gradient stops, width shares and scale factors.",
+    "disabled": {
+      "$type": "number",
+      "$value": 0.4,
+      "$description": "Opacity of a disabled control"
+    },
+    "graceHalo": {
+      "$type": "number",
+      "$value": 0.28,
+      "$description": "Grace halo opacity at rest and at the peak of its pulse"
+    },
+    "graceHaloLow": {
+      "$type": "number",
+      "$value": 0.05,
+      "$description": "Grace halo opacity at the bottom of its pulse"
+    },
+    "badgeScrim": {
+      "$type": "number",
+      "$value": 0.92,
+      "$description": "Opacity of the inverse fill behind a duration badge on an image"
+    },
+    "heroGradientStart": {
+      "$type": "number",
+      "$value": 0.42,
+      "$description": "Hero card: where the ink gradient starts (transparent)"
+    },
+    "heroGradientEnd": {
+      "$type": "number",
+      "$value": 0.76,
+      "$description": "Hero card: where the gradient reaches solid ink"
+    },
+    "bubbleMaxWidth": {
+      "$type": "number",
+      "$value": 0.82,
+      "$description": "Chat bubble maximum share of the thread width"
+    },
+    "typingDim": {
+      "$type": "number",
+      "$value": 0.25,
+      "$description": "Typing indicator dot opacity at its dimmest"
+    },
+    "largeTextScale": {
+      "$type": "number",
+      "$value": 1.3,
+      "$description": "System text scale above which rows stack instead of sitting side by side"
+    }
+  },
+  "shadow": {
+    "card": {
+      "light": {
+        "$type": "shadow",
+        "$value": [
+          {
+            "color": "#1111130a",
+            "offsetX": "0px",
+            "offsetY": "1px",
+            "blur": "2px",
+            "spread": "0px"
+          },
+          {
+            "color": "#11111312",
+            "offsetX": "0px",
+            "offsetY": "10px",
+            "blur": "28px",
+            "spread": "0px"
+          }
+        ]
+      },
+      "dark": {
+        "$type": "shadow",
+        "$value": []
+      }
+    },
+    "floating": {
+      "light": {
+        "$type": "shadow",
+        "$value": [
+          {
+            "color": "#11111324",
+            "offsetX": "0px",
+            "offsetY": "14px",
+            "blur": "36px",
+            "spread": "0px"
+          }
+        ]
+      },
+      "dark": {
+        "$type": "shadow",
+        "$value": [
+          {
+            "color": "#00000080",
+            "offsetX": "0px",
+            "offsetY": "14px",
+            "blur": "36px",
+            "spread": "0px"
+          }
+        ]
+      }
+    },
+    "sheet": {
+      "$type": "shadow",
+      "$value": [
+        {
+          "color": "#00000040",
+          "offsetX": "0px",
+          "offsetY": "-20px",
+          "blur": "50px",
+          "spread": "0px"
+        }
+      ]
+    },
+    "grace": {
+      "$type": "shadow",
+      "$value": [
+        {
+          "color": "#1111134c",
+          "offsetX": "0px",
+          "offsetY": "8px",
+          "blur": "14px",
+          "spread": "0px"
+        }
+      ]
+    }
+  },
+  "motion": {
+    "graceBob": {
+      "$type": "duration",
+      "$value": "2800ms",
+      "$description": "Grace button bob cycle (5pt travel). Off when reduce motion is on"
+    },
+    "fast": {
+      "$type": "duration",
+      "$value": "150ms",
+      "$description": "Selection and press changes"
+    },
+    "typing": {
+      "$type": "duration",
+      "$value": "1200ms",
+      "$description": "Typing indicator cycle. Off when reduce motion is on"
+    }
+  }
+}

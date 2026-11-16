@@ -1,23 +1,77 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
-import 'package:kharis_app/features/messages/data/curation_repository.dart';
-import 'package:kharis_app/shared/models/sermon.dart';
-import 'package:kharis_app/shared/providers/audio_provider.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/features/home/presentation/widgets/home_continue_listening.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
-import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
+import 'package:kharis_app/features/player/presentation/widgets/download_button.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
-import 'package:kharis_app/shared/widgets/press_effect.dart';
-import '../widgets/sermon_list_item.dart';
-import '../widgets/message_filters_sheet.dart';
-import 'package:kharis_app/features/player/presentation/widgets/player_discovery.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/playlist_name_dialog.dart';
+import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
+import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/downloads_provider.dart';
+import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
+
+import '../message_list.dart';
+import 'downloads_screen.dart';
+
+/// The landing page's tabs. Books shows only once a message carries a
+/// passage.
+enum MessagesTab {
+  forYou('For you'),
+  books('Books'),
+  themes('Themes'),
+  series('Series'),
+  downloads('Downloads');
+
+  const MessagesTab(this.label);
+
+  final String label;
+}
+
+/// Recommendations shown under "Recommended for you".
+const _recommendedCount = 5;
+
+/// The newest series' latest message with its part number, or, when no
+/// message is in a series, the newest message. Null for an empty library.
+({Sermon sermon, int? part})? featuredMessage(List<Sermon> sermons) {
+  if (sermons.isEmpty) return null;
+  final newest = newestFirst(sermons);
+  for (final s in newest) {
+    final series = s.series;
+    if (series == null || series.isEmpty) continue;
+    final parts = seriesParts(sermons, series);
+    return (sermon: s, part: parts.indexOf(s) + 1);
+  }
+  return (sermon: newest.first, part: null);
+}
+
+/// Up to [_recommendedCount] messages like [played]: the rest of its series
+/// first (in order), then its theme, newest first. Never [played] itself or
+/// anything in [exclude].
+List<Sermon> recommendedFor(
+  Sermon played,
+  List<Sermon> sermons, {
+  Set<String> exclude = const {},
+}) {
+  final skip = {played.id, ...exclude};
+  final out = <Sermon>[];
+  final series = played.series;
+  if (series != null && series.isNotEmpty) {
+    out.addAll(seriesParts(sermons, series).where((s) => skip.add(s.id)));
+  }
+  final topic = sermonTopic(played);
+  out.addAll(
+    newestFirst(
+      sermons.where((s) => sermonTopic(s) == topic),
+    ).where((s) => skip.add(s.id)),
+  );
+  return out.take(_recommendedCount).toList();
+}
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -27,2049 +81,412 @@ class MessagesScreen extends ConsumerStatefulWidget {
 }
 
 class _MessagesScreenState extends ConsumerState<MessagesScreen> {
-  final _listHeaderKey = GlobalKey();
-  final _scrollCtrl = ScrollController();
-  final _searchCtrl = TextEditingController();
-  final _searchFocus = FocusNode();
-  bool _showBackToTop = false;
-
-  static final _count = NumberFormat.decimalPattern();
-
-  /// "Back to top" appears once the member is well down the archive and
-  /// hides again near the top; the gap between the two stops it flickering.
-  static const _backToTopShowAt = 1400.0;
-  static const _backToTopHideAt = 700.0;
-
-  @override
-  void initState() {
-    super.initState();
-    // Recent searches show while the empty field is focused.
-    _searchFocus.addListener(() => setState(() {}));
-    _scrollCtrl.addListener(_updateBackToTop);
-    // A restored scroll offset (tab switch) fires no scroll event.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateBackToTop());
-  }
-
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    _searchCtrl.dispose();
-    _searchFocus.dispose();
-    super.dispose();
-  }
-
-  void _updateBackToTop() {
-    if (!mounted || !_scrollCtrl.hasClients) return;
-    final offset = _scrollCtrl.offset;
-    final show = _showBackToTop
-        ? offset > _backToTopHideAt
-        : offset > _backToTopShowAt;
-    if (show != _showBackToTop) setState(() => _showBackToTop = show);
-  }
-
-  void _scrollToTop() {
-    if (!_scrollCtrl.hasClients) return;
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _scrollCtrl.jumpTo(0);
-    } else {
-      _scrollCtrl.animateTo(
-        0,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
-      );
-    }
-  }
-
-  void _scrollToList() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = _listHeaderKey.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  /// Shows [page] of a paged list and brings its first row into view. The
-  /// list's heading is usually far above by now (and no longer built), so
-  /// jump to the top first, then down to the heading; search results have
-  /// no heading and simply start at the top.
-  void _goToPage(StateProvider<int> pageProvider, int page) {
-    ref.read(pageProvider.notifier).state = page;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollCtrl.hasClients) return;
-      _scrollCtrl.jumpTo(0);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ctx = _listHeaderKey.currentContext;
-        if (ctx != null && mounted) Scrollable.ensureVisible(ctx);
-      });
-    });
-  }
-
-  void _setQuery(String value) {
-    _searchCtrl.value = TextEditingValue(
-      text: value,
-      selection: TextSelection.collapsed(offset: value.length),
-    );
-    ref.read(sermonSearchProvider.notifier).state = value;
-  }
-
-  /// Plays [sermon] from a search result, remembering the query.
-  void _playFromSearch(Sermon sermon, List<Sermon> results) {
-    ref.read(recentSearchesProvider.notifier).add(_searchCtrl.text);
-    startPlayback(context, ref, sermon, queue: results);
-  }
-
-  /// The range of a list of [total] rows that [page] shows, clamped to the
-  /// last page when the list has shrunk (a filter or a refreshed archive).
-  static ({int page, int pages, int start, int end}) _pageRange(
-    int page,
-    int total,
-  ) {
-    final pages = messagesPageCount(total);
-    final p = page.clamp(0, pages - 1);
-    final start = math.min(p * kMessagesPageSize, total);
-    return (
-      page: p,
-      pages: pages,
-      start: start,
-      end: math.min(start + kMessagesPageSize, total),
-    );
-  }
-
-  Future<void> _openFilters() async {
-    final applied = await showMessageFiltersSheet(context);
-    if (applied && mounted) _scrollToList();
-  }
-
-  /// Clears every filter (topic included); the sort stays.
-  void _clearFilters() {
-    ref.read(selectedCategoryProvider.notifier).state = 'All';
-    ref.read(selectedSeriesProvider.notifier).state = null;
-    ref.read(selectedSpeakerProvider.notifier).state = null;
-    ref.read(selectedArchiveYearProvider.notifier).state = null;
-  }
-
-  Widget _sermonRow(
-    Sermon sermon,
-    int index, {
-    required String? currentId,
-    required bool playing,
-    required VoidCallback onTap,
-  }) {
-    final isPlaying = currentId == sermon.id && playing;
-    return SermonListItem(
-      key: ValueKey(sermon.id),
-      title: sermon.title,
-      speaker: sermon.speaker,
-      category: sermon.series ?? sermonTopic(sermon),
-      durationLabel: sermon.formattedDuration,
-      dateLabel: sermon.publishedAt != null
-          ? DateFormat('MMM yyyy').format(sermon.publishedAt!)
-          : '',
-      artworkColor: sermon.artworkColor,
-      artworkUrl: sermon.artworkUrl,
-      listIndex: index,
-      isPlaying: isPlaying,
-      listening: ref.watch(listeningProgressProvider(sermon)),
-      onTap: onTap,
-      onMoreTap: () => showAddToPlaylistSheet(
-        context,
-        sermonId: sermon.id,
-        sermonTitle: sermon.title,
-        onOpenNotes: () => SermonNotesSheet.show(context, sermon),
-      ),
-    );
-  }
+  MessagesTab _tab = MessagesTab.forYou;
 
   @override
   Widget build(BuildContext context) {
-    // Filtered + sorted sermon list.
-    final sermons = ref.watch(librarySermonsProvider);
-
-    // Raw async for loading detection.
-    final sermonsAsync = ref.watch(sermonsProvider);
-
-    // Playback state.
-    final currentSermon = ref.watch(currentSermonProvider);
-    final playerState = ref.watch(playerStateProvider).valueOrNull;
-    final playing = playerState?.playing ?? false;
-
-    // Active sort and filters, all chosen in the filter sheet.
-    final sort = ref.watch(sermonSortProvider);
-    final selectedCategory = ref.watch(selectedCategoryProvider);
-    final isFiltered = selectedCategory != 'All';
-    final selectedSeries = ref.watch(selectedSeriesProvider);
-    final selectedSpeaker = ref.watch(selectedSpeakerProvider);
-    final selectedYear = ref.watch(selectedArchiveYearProvider);
-    final filterCount = activeSheetFilterCount(ref);
-    final sortLabel = switch (sort) {
-      SermonSort.newest => 'Newest first',
-      SermonSort.oldest => 'Oldest first',
-      _ => sort.label,
-    };
-    final filterChips = <Widget>[
-      if (isFiltered)
-        _FilterChip(
-          label: selectedCategory,
-          onClear: () =>
-              ref.read(selectedCategoryProvider.notifier).state = 'All',
-        ),
-      if (selectedSeries != null)
-        _FilterChip(
-          label: selectedSeries,
-          onClear: () => ref.read(selectedSeriesProvider.notifier).state = null,
-        ),
-      if (selectedSpeaker != null)
-        _FilterChip(
-          label: selectedSpeaker,
-          onClear: () =>
-              ref.read(selectedSpeakerProvider.notifier).state = null,
-        ),
-      if (selectedYear != null)
-        _FilterChip(
-          label: '$selectedYear',
-          onClear: () =>
-              ref.read(selectedArchiveYearProvider.notifier).state = null,
-        ),
+    final hasBooks = ref.watch(
+      messageBooksProvider.select((b) => b.isNotEmpty),
+    );
+    final tabs = [
+      for (final t in MessagesTab.values)
+        if (t != MessagesTab.books || hasBooks) t,
     ];
-
-    // Paging: the lists show one numbered page of rows at a time.
-    final libraryPage = _pageRange(
-      ref.watch(libraryPageProvider),
-      sermons.length,
-    );
-
-    // Featured (or, with featured off, the latest) + recently played.
-    final featured = ref.watch(featuredSermonsProvider);
-    final featuredOff =
-        ref.watch(featuredModeProvider).valueOrNull == FeaturedMode.off;
-    final latest = featuredOff
-        ? ref.watch(latestSermonsProvider)
-        : const <Sermon>[];
-    final recentlyPlayed = ref.watch(recentlyPlayedProvider);
-
-    // Search.
-    final searchQuery = ref.watch(sermonSearchProvider);
-    final searchResults = ref.watch(searchResultsProvider);
-    final searchLoading = ref.watch(searchLoadingProvider);
-    final remoteSearch = ref.watch(remoteSearchProvider);
-    final recentSearches = ref.watch(recentSearchesProvider);
-    final isSearching = searchQuery.trim().isNotEmpty;
-    final showRecents =
-        !isSearching && _searchFocus.hasFocus && recentSearches.isNotEmpty;
-
+    final tab = tabs.contains(_tab) ? _tab : MessagesTab.forYou;
     final library = ref.watch(sermonLibraryProvider);
-    final libraryNotifier = ref.read(sermonLibraryProvider.notifier);
-    final searchPage = _pageRange(
-      ref.watch(searchPageProvider),
-      searchResults.length,
-    );
-    // Room under the list for the docked bars, and for the Back to top pill
-    // above them, so the pill never covers the footer's Load more.
-    final bottomPad = math.max(
-      150.0,
-      MediaQuery.paddingOf(context).bottom + 72,
-    );
+    final bottom =
+        KSize.contentBottomPad + MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: NotificationListener<ScrollNotification>(
-              // On the last page, near the bottom: prefetch the next archive
-              // page or the next page of server search hits, so the page
-              // count grows as more arrive. Both self-guard against repeats.
-              onNotification: (n) {
-                if (n.metrics.axis != Axis.vertical) return false;
-                final toEnd = n.metrics.maxScrollExtent - n.metrics.pixels;
-                final range = isSearching ? searchPage : libraryPage;
-                if (range.page == range.pages - 1 && toEnd <= 600) {
-                  if (isSearching) {
-                    ref.read(remoteSearchProvider.notifier).loadMore();
-                  } else {
-                    libraryNotifier.loadMore();
-                  }
-                }
-                return false;
-              },
-              child: RefreshIndicator(
-                color: context.kc.accentInk,
-                onRefresh: libraryNotifier.refresh,
-                child: CustomScrollView(
-                  controller: _scrollCtrl,
-                  // Retain scroll offset across tab switches and rebuilds.
-                  key: const PageStorageKey<String>('messages-scroll'),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    // ── 1. Header + Search ─────────────────────────────────────
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Messages',
-                              style: AppTypography.display(
-                                size: 30,
-                                weight: FontWeight.w700,
-                                height: 1.0,
-                                color: context.kc.onBg,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Sermons and teaching from Kharis Church',
-                              style: AppTypography.bodySm.copyWith(
-                                fontSize: 13,
-                                color: context.kc.muted,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _SearchBar(
-                              controller: _searchCtrl,
-                              focusNode: _searchFocus,
-                              onChanged: (v) =>
-                                  ref
-                                          .read(sermonSearchProvider.notifier)
-                                          .state =
-                                      v,
-                              onSubmitted: (v) => ref
-                                  .read(recentSearchesProvider.notifier)
-                                  .add(v),
-                              onCleared: () => _setQuery(''),
-                            ),
-                            if (library.offline) ...[
-                              const SizedBox(height: 12),
-                              _OfflineBanner(
-                                empty: library.sermons.isEmpty,
-                                onRetry: libraryNotifier.refresh,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // ── Recent searches (focused, empty field) ─────────────────
-                    if (showRecents)
-                      SliverToBoxAdapter(
-                        child: _RecentSearches(
-                          searches: recentSearches,
-                          onSelect: _setQuery,
-                          onRemove: (q) => ref
-                              .read(recentSearchesProvider.notifier)
-                              .remove(q),
-                          onClear: () =>
-                              ref.read(recentSearchesProvider.notifier).clear(),
-                        ),
-                      ),
-
-                    // ── Search results (when searching) ────────────────────────
-                    if (isSearching) ...[
-                      const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                      // The count line is dropped for zero results: the empty
-                      // state below already says "No messages match".
-                      if (searchLoading || searchResults.isNotEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    searchLoading && searchResults.isEmpty
-                                        ? 'Searching the archive for "${searchQuery.trim()}"'
-                                        : '${_count.format(searchResults.length)} result${searchResults.length == 1 ? '' : 's'} for "${searchQuery.trim()}"',
-                                    style: AppTypography.bodySm.copyWith(
-                                      color: context.kc.muted,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                if (searchLoading && searchResults.isNotEmpty)
-                                  const _SmallSpinner(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      if (searchResults.isEmpty && searchLoading)
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.only(top: 48),
-                            child: Center(child: _SmallSpinner(size: 26)),
-                          ),
-                        )
-                      else if (searchResults.isEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(32, 60, 32, 0),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.search_off_rounded,
-                                  size: 32,
-                                  color: context.kc.muted,
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  'No messages match "${searchQuery.trim()}"',
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.bodyLg.copyWith(
-                                    color: context.kc.onBg,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Try a title, a speaker or a series name.',
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.bodySm.copyWith(
-                                    color: context.kc.muted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else ...[
-                        SliverList.builder(
-                          itemCount: searchPage.end - searchPage.start,
-                          itemBuilder: (context, i) {
-                            final index = searchPage.start + i;
-                            final sermon = searchResults[index];
-                            return _sermonRow(
-                              sermon,
-                              index,
-                              currentId: currentSermon?.id,
-                              playing: playing,
-                              onTap: () =>
-                                  _playFromSearch(sermon, searchResults),
-                            );
-                          },
-                        ),
-                        if (searchPage.pages > 1)
-                          SliverToBoxAdapter(
-                            child: _Pager(
-                              page: searchPage.page,
-                              pages: searchPage.pages,
-                              status:
-                                  '${_count.format(searchPage.start + 1)}–'
-                                  '${_count.format(searchPage.end)} of '
-                                  '${_count.format(searchResults.length)} results',
-                              onPage: (p) => _goToPage(searchPageProvider, p),
-                            ),
-                          ),
-                        if (searchPage.page < searchPage.pages - 1)
-                          const SliverToBoxAdapter(child: SizedBox.shrink())
-                        else if (remoteSearch.isLoadingMore)
-                          const SliverToBoxAdapter(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24),
-                              child: Center(child: _SmallSpinner()),
-                            ),
-                          )
-                        else if (remoteSearch.hasMore)
-                          SliverToBoxAdapter(
-                            child: _LoadMoreButton(
-                              label: 'Find more results',
-                              onPressed: ref
-                                  .read(remoteSearchProvider.notifier)
-                                  .loadMore,
-                            ),
-                          )
-                        else
-                          SliverToBoxAdapter(
-                            child: _EndMarker(
-                              searchResults.length == 1
-                                  ? 'That\'s the only result'
-                                  : 'That\'s all '
-                                        '${_count.format(searchResults.length)} '
-                                        'results',
-                            ),
-                          ),
-                      ],
-                    ]
-                    // ── Normal browse mode ─────────────────────────────────────
-                    else ...[
-                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-                      // ── 2. Featured hero carousel, or the latest messages ────
-                      if (featured.isNotEmpty)
-                        SliverToBoxAdapter(
-                          child: _FeaturedCarousel(
-                            sermons: featured,
-                            currentSermonId: currentSermon?.id,
-                            isPlaying: playing,
-                            onPlay: (sermon) => startPlayback(
-                              context,
-                              ref,
-                              sermon,
-                              queue: featured,
-                            ),
-                          ),
-                        ),
-                      // Studio turned the carousel off: lead with what is new.
-                      if (latest.isNotEmpty) ...[
-                        SliverToBoxAdapter(
-                          key: const ValueKey('messages-latest'),
-                          child: _SectionTitle('Latest messages'),
-                        ),
-                        SliverList.builder(
-                          itemCount: latest.length,
-                          itemBuilder: (context, index) {
-                            final sermon = latest[index];
-                            return _sermonRow(
-                              sermon,
-                              index,
-                              currentId: currentSermon?.id,
-                              playing: playing,
-                              onTap: () => startPlayback(
-                                context,
-                                ref,
-                                sermon,
-                                queue: latest,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-
-                      // ── 3. Recently played ───────────────────────────────────
-                      if (recentlyPlayed.isNotEmpty) ...[
-                        const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                        SliverToBoxAdapter(
-                          child: _SectionTitle('Recently played'),
-                        ),
-                        SliverToBoxAdapter(
-                          child: SizedBox(
-                            height: 160,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.marginMobile,
-                              ),
-                              scrollDirection: Axis.horizontal,
-                              itemCount: recentlyPlayed.length,
-                              itemBuilder: (context, index) {
-                                final sermon = recentlyPlayed[index];
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    right: index < recentlyPlayed.length - 1
-                                        ? 12
-                                        : 0,
-                                  ),
-                                  child: _RecentlyPlayedCard(
-                                    sermon: sermon,
-                                    isPlaying:
-                                        currentSermon?.id == sermon.id &&
-                                        playing,
-                                    onTap: () => startPlayback(
-                                      context,
-                                      ref,
-                                      sermon,
-                                      queue: recentlyPlayed,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      // ── 4. "All messages" + filters ──────────────────────────
-                      const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          key: _listHeaderKey,
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      [
-                                        if (selectedSeries != null)
-                                          selectedSeries
-                                        else if (isFiltered)
-                                          selectedCategory
-                                        else
-                                          'All messages',
-                                        if (selectedYear != null)
-                                          '$selectedYear',
-                                      ].join(' \u00b7 '),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: AppTypography.bodyLg.copyWith(
-                                        fontSize: 19,
-                                        fontWeight: FontWeight.w800,
-                                        color: context.kc.onBg,
-                                        letterSpacing: -0.18,
-                                      ),
-                                    ),
-                                  ),
-                                  _HeaderLink(
-                                    label: 'Playlists',
-                                    color: context.kc.accentInk,
-                                    weight: FontWeight.w700,
-                                    // Root-navigator route: overlays the
-                                    // shell with its own back affordance.
-                                    onTap: () => context.push('/playlists'),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  _FiltersButton(
-                                    count: filterCount,
-                                    onTap: _openFilters,
-                                  ),
-                                  const Spacer(),
-                                  _SortButton(
-                                    label: sortLabel,
-                                    onTap: _openFilters,
-                                  ),
-                                ],
-                              ),
-                              if (filterChips.isNotEmpty)
-                                Wrap(
-                                  spacing: 8,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    ...filterChips,
-                                    if (filterChips.length > 1)
-                                      _HeaderLink(
-                                        label: 'Clear all',
-                                        color: context.kc.accentInk,
-                                        weight: FontWeight.w700,
-                                        onTap: _clearFilters,
-                                      ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // ── 5. Sermon list, one page at a time ───────────────────
-                      if (sermons.isEmpty && !sermonsAsync.hasValue)
-                        SliverList.builder(
-                          itemCount: 6,
-                          itemBuilder: (_, _) => const _SermonRowSkeleton(),
-                        )
-                      else if (sermons.isEmpty && !library.isFilling)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 40,
-                            ),
-                            child: Text(
-                              library.offline && library.sermons.isEmpty
-                                  ? 'Messages will appear here once you are '
-                                        'back online.'
-                                  : 'No messages for this filter.',
-                              textAlign: TextAlign.center,
-                              style: AppTypography.bodySm.copyWith(
-                                color: context.kc.muted,
-                              ),
-                            ),
-                          ),
-                        )
-                      else
-                        SliverList.builder(
-                          itemCount: libraryPage.end - libraryPage.start,
-                          itemBuilder: (context, i) {
-                            final index = libraryPage.start + i;
-                            final sermon = sermons[index];
-                            return _sermonRow(
-                              sermon,
-                              index,
-                              currentId: currentSermon?.id,
-                              playing: playing,
-                              onTap: () => startPlayback(
-                                context,
-                                ref,
-                                sermon,
-                                queue: sermons,
-                              ),
-                            );
-                          },
-                        ),
-
-                      // ── 7. Pages + archive footer ────────────────────────────
-                      if (libraryPage.pages > 1)
-                        SliverToBoxAdapter(
-                          child: _Pager(
-                            page: libraryPage.page,
-                            pages: libraryPage.pages,
-                            status:
-                                '${_count.format(libraryPage.start + 1)}–'
-                                '${_count.format(libraryPage.end)} of '
-                                '${_count.format(sermons.length)} messages',
-                            onPage: (p) => _goToPage(libraryPageProvider, p),
-                          ),
-                        ),
-                      if (libraryPage.page == libraryPage.pages - 1)
-                        SliverToBoxAdapter(
-                          child: _ArchiveFooter(
-                            library: library,
-                            total: sermons.length,
-                            onRetry: libraryNotifier.retryHydration,
-                          ),
-                        ),
-                      // ── 8. Related to what's playing ─────────────────────────
-                      // Below the page numbers only, and only while a
-                      // message is playing (or paused) in the background.
-                      if (currentSermon != null)
-                        SliverToBoxAdapter(
-                          child: _NowPlayingRelated(sermon: currentSermon),
-                        ),
-                    ],
-
-                    // ── Bottom pad ─────────────────────────────────────────────
-                    SliverPadding(padding: EdgeInsets.only(bottom: bottomPad)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Floats above the docked mini player and tab bar: the shell's
-          // extendBody reports their height as bottom padding.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: MediaQuery.paddingOf(context).bottom + 16,
-            child: Center(
-              child: _BackToTopPill(
-                visible: _showBackToTop,
-                onTap: _scrollToTop,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Floating "Back to top" pill ───────────────────────────────────────────────
-
-class _BackToTopPill extends StatelessWidget {
-  const _BackToTopPill({required this.visible, required this.onTap});
-
-  final bool visible;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 200);
-    return IgnorePointer(
-      ignoring: !visible,
-      child: ExcludeSemantics(
-        excluding: !visible,
-        child: AnimatedSlide(
-          offset: visible ? Offset.zero : const Offset(0, 0.4),
-          duration: duration,
-          curve: Curves.easeOut,
-          child: AnimatedOpacity(
-            opacity: visible ? 1 : 0,
-            duration: duration,
-            child: Semantics(
-              button: true,
-              label: 'Back to top',
-              excludeSemantics: true,
-              child: GestureDetector(
-                key: const Key('messages-back-to-top'),
-                onTap: onTap,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  decoration: BoxDecoration(
-                    color: kc.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(color: kc.outline),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.arrow_upward_rounded,
-                        size: 18,
-                        color: kc.onBg,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Back to top',
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kc.onBg,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Section title ──────────────────────────────────────────────────────────────
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-      child: Text(
-        text,
-        style: AppTypography.bodyLg.copyWith(
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: context.kc.onBg,
-          letterSpacing: -0.18,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Small spinner ──────────────────────────────────────────────────────────────
-
-/// A small text link in a section header ("Playlists", "See all"). The
-/// label stays 12 px but the hit area is 44 px tall.
-class _HeaderLink extends StatelessWidget {
-  const _HeaderLink({
-    required this.label,
-    required this.color,
-    required this.weight,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final FontWeight weight;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Center(
-              widthFactor: 1,
-              child: Text(
-                label,
-                style: AppTypography.labelMd.copyWith(
-                  fontSize: 12,
-                  fontWeight: weight,
-                  color: color,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SmallSpinner extends StatelessWidget {
-  const _SmallSpinner({this.size = 18});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CircularProgressIndicator(
-        strokeWidth: 2.2,
-        color: context.kc.muted,
-      ),
-    );
-  }
-}
-
-// ── Offline banner ─────────────────────────────────────────────────────────────
-
-/// Shown when the live library could not be reached: either last session's
-/// saved copy is on screen, or ([empty]) nothing could be loaded at all.
-class _OfflineBanner extends StatelessWidget {
-  const _OfflineBanner({required this.empty, required this.onRetry});
-
-  final bool empty;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-      decoration: BoxDecoration(
-        color: context.kc.surfaceAlt,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: context.kc.outline),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.cloud_off_rounded, size: 18, color: context.kc.muted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  empty ? 'You are offline' : 'Offline archive',
-                  style: AppTypography.labelMd.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: context.kc.onBg,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  empty
-                      ? 'Messages could not load. Check your connection.'
-                      : 'Showing messages saved on this device.',
-                  style: AppTypography.bodySm.copyWith(
-                    fontSize: 12,
-                    color: context.kc.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onRetry,
-            child: Text(
-              'Retry',
-              style: AppTypography.labelMd.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.kc.accentInk,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Archive footer ─────────────────────────────────────────────────────────────
-
-/// Under the last page of the library list: the archive walk's progress
-/// ("Loading archive n/total" while older pages stream in, or a gap fill
-/// re-walks them), a retry when the walk gave up, the honest "n of total"
-/// with a retry when the library came up short, and the end marker only
-/// once the list holds every message the server lists.
-class _ArchiveFooter extends StatelessWidget {
-  const _ArchiveFooter({
-    required this.library,
-    required this.total,
-    required this.onRetry,
-  });
-
-  final SermonLibrary library;
-
-  /// Rows the filtered list holds.
-  final int total;
-  final Future<void> Function() onRetry;
-
-  static final _count = NumberFormat.decimalPattern();
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = AppTypography.bodySm.copyWith(color: context.kc.muted);
-    final retry = TextButton(
-      onPressed: onRetry,
-      child: Text(
-        'Retry',
-        style: AppTypography.labelMd.copyWith(
-          fontWeight: FontWeight.w700,
-          color: context.kc.accentInk,
-        ),
-      ),
-    );
-    final held = _count.format(library.sermons.length);
-    final serverTotal = _count.format(library.totalCount);
-    final walked = library.loaded && !library.hasMore;
-    final short = walked && library.countMismatch;
-    final Widget child;
-    if (library.hydrationFailed) {
-      child = Column(
-        children: [
-          Text('Older messages could not be loaded.', style: muted),
-          retry,
-        ],
-      );
-    } else if ((library.hasMore &&
-            (library.hydrating || library.isLoadingMore)) ||
-        (short && (library.hydrating || !library.incomplete))) {
-      child = Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const _SmallSpinner(),
-          const SizedBox(width: 10),
-          Text(
-            library.totalCount > 0
-                ? 'Loading archive $held/$serverTotal'
-                : 'Loading archive',
-            style: muted,
-          ),
-        ],
-      );
-    } else if (short) {
-      child = Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('$held of $serverTotal messages \u2022', style: muted),
-          retry,
-        ],
-      );
-    } else if (walked && total > 0) {
-      return _EndMarker(
-        total == 1
-            ? 'That\'s the only message'
-            : 'That\'s all ${_count.format(total)} messages',
-      );
-    } else {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-      child: Center(child: child),
-    );
-  }
-}
-
-/// Numbered pages under a paged list: "31–60 of 1,491 messages", the page
-/// numbers (first, last and the ones around the current page, with gaps
-/// shown as "…"), and Previous / Next. Every target is at least 44 pt.
-class _Pager extends StatelessWidget {
-  const _Pager({
-    required this.page,
-    required this.pages,
-    required this.status,
-    required this.onPage,
-  });
-
-  /// 0-based page on screen, and how many there are.
-  final int page;
-  final int pages;
-  final String status;
-  final ValueChanged<int> onPage;
-
-  /// Page numbers to show (0-based), with null for a gap.
-  @visibleForTesting
-  static List<int?> visiblePages(int page, int pages) {
-    final keep = <int>{0, pages - 1, page - 1, page, page + 1}
-      ..removeWhere((p) => p < 0 || p >= pages);
-    // Near either end, show a few more so the row doesn't shrink to three.
-    if (page <= 2) keep.addAll([0, 1, 2, 3].where((p) => p < pages));
-    if (page >= pages - 3) {
-      keep.addAll([pages - 4, pages - 3, pages - 2].where((p) => p >= 0));
-    }
-    final sorted = keep.toList()..sort();
-    final out = <int?>[];
-    for (final p in sorted) {
-      if (out.isNotEmpty && out.last != null && p - out.last! > 1) {
-        out.add(null);
-      }
-      out.add(p);
-    }
-    return out;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    final hasPrev = page > 0;
-    final hasNext = page < pages - 1;
-    Widget step(
-      String label,
-      IconData icon,
-      bool enabled,
-      int to,
-      Key key, {
-      required bool iconFirst,
-    }) {
-      final text = Text(
-        label,
-        style: AppTypography.labelMd.copyWith(
-          fontWeight: FontWeight.w700,
-          color: enabled ? kc.onBg : kc.muted,
-        ),
-      );
-      final glyph = Icon(icon, size: 20, color: enabled ? kc.onBg : kc.muted);
-      return OutlinedButton(
-        key: key,
-        onPressed: enabled ? () => onPage(to) : null,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: enabled ? kc.outline : kc.surfaceAlt),
-          shape: const StadiumBorder(),
-          minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: iconFirst
-              ? [glyph, const SizedBox(width: 4), text]
-              : [text, const SizedBox(width: 4), glyph],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Column(
-        children: [
-          Text(
-            status,
-            key: const Key('messages-page-status'),
-            style: AppTypography.bodySm.copyWith(color: kc.muted),
-          ),
-          const SizedBox(height: 12),
-          Semantics(
-            container: true,
-            label: 'Page ${page + 1} of $pages',
-            child: Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final p in visiblePages(page, pages))
-                  if (p == null)
-                    SizedBox(
-                      width: 28,
-                      height: 44,
-                      child: Center(
-                        child: Text(
-                          '…',
-                          style: AppTypography.labelMd.copyWith(
-                            color: kc.muted,
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    _PageNumber(
-                      number: p + 1,
-                      current: p == page,
-                      onTap: () => onPage(p),
-                    ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              step(
-                'Previous',
-                Icons.chevron_left_rounded,
-                hasPrev,
-                page - 1,
-                const Key('messages-page-prev'),
-                iconFirst: true,
-              ),
-              step(
-                'Next',
-                Icons.chevron_right_rounded,
-                hasNext,
-                page + 1,
-                const Key('messages-page-next'),
-                iconFirst: false,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One page number in [_Pager]; the current page is filled.
-class _PageNumber extends StatelessWidget {
-  const _PageNumber({
-    required this.number,
-    required this.current,
-    required this.onTap,
-  });
-
-  final int number;
-  final bool current;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Semantics(
-      button: true,
-      selected: current,
-      label: current ? 'Page $number, current' : 'Page $number',
-      excludeSemantics: true,
-      child: Material(
-        key: Key('messages-page-$number'),
-        color: current ? kc.accent : kc.surfaceAlt,
-        shape: const StadiumBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: current ? null : onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Center(
-                widthFactor: 1,
-                child: Text(
-                  '$number',
-                  style: AppTypography.labelMd.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: current ? kc.onAccent : kc.onBg,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A single quiet button under a list, e.g. "Find more results".
-class _LoadMoreButton extends StatelessWidget {
-  const _LoadMoreButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-      child: Center(
-        child: OutlinedButton(
-          key: const Key('messages-load-more'),
-          onPressed: onPressed,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: kc.onBg,
-            side: BorderSide(color: kc.outline),
-            shape: const StadiumBorder(),
-            minimumSize: const Size(0, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 22),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.labelMd.copyWith(
-              fontWeight: FontWeight.w700,
-              color: kc.onBg,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The quiet line under a list that holds everything there is.
-class _EndMarker extends StatelessWidget {
-  const _EndMarker(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-      child: Center(
-        child: Text(
-          text,
-          key: const Key('messages-end'),
-          textAlign: TextAlign.center,
-          style: AppTypography.bodySm.copyWith(color: context.kc.muted),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Recent searches ────────────────────────────────────────────────────────────
-
-class _RecentSearches extends StatelessWidget {
-  const _RecentSearches({
-    required this.searches,
-    required this.onSelect,
-    required this.onRemove,
-    required this.onClear,
-  });
-
-  final List<String> searches;
-  final ValueChanged<String> onSelect;
-  final ValueChanged<String> onRemove;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Recent searches',
-                  style: AppTypography.labelMd.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: context.kc.muted,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: onClear,
-                child: Text(
-                  'Clear',
-                  style: AppTypography.labelMd.copyWith(
-                    color: context.kc.accentInk,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          for (final q in searches)
-            InkWell(
-              onTap: () => onSelect(q),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.history_rounded,
-                      size: 18,
-                      color: context.kc.muted,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        q,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodyLg.copyWith(
-                          color: context.kc.onBg,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Remove',
-                      onPressed: () => onRemove(q),
-                      icon: Icon(
-                        Icons.close_rounded,
-                        size: 16,
-                        color: context.kc.muted,
-                      ),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: ref.read(sermonLibraryProvider.notifier).refresh,
+          child: CustomScrollView(
+            key: const PageStorageKey('messages-scroll'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: KScreenHeader(
+                  title: 'Messages',
+                  actions: [
+                    KIconButton(
+                      key: const Key('messages-search'),
+                      icon: KIcons.search,
+                      label: 'Search messages',
+                      onPressed: () => context.push('/messages/search'),
                     ),
                   ],
                 ),
               ),
-            ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: KSpace.gutter,
+                  ),
+                  child: KTabs(
+                    key: const Key('messages-tabs'),
+                    tabs: [for (final t in tabs) t.label],
+                    currentIndex: tabs.indexOf(tab),
+                    onChanged: (i) => setState(() => _tab = tabs[i]),
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: KSpace.section)),
+              if (library.sermons.isEmpty &&
+                  !library.loaded &&
+                  tab != MessagesTab.downloads)
+                const _Skeleton()
+              else if (library.sermons.isEmpty &&
+                  library.offline &&
+                  tab != MessagesTab.downloads)
+                SliverToBoxAdapter(
+                  child: KErrorState(
+                    message:
+                        'Couldn\u2019t load messages. Check your '
+                        'connection and try again.',
+                    onRetry: ref.read(sermonLibraryProvider.notifier).refresh,
+                  ),
+                )
+              else
+                ...switch (tab) {
+                  MessagesTab.forYou => const [_ForYou()],
+                  MessagesTab.books => const [_Books()],
+                  MessagesTab.themes => const [_Themes()],
+                  MessagesTab.series => const [_Series()],
+                  MessagesTab.downloads => const [DownloadsList()],
+                },
+              if (library.hydrationFailed && tab != MessagesTab.downloads)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: KSpace.section),
+                    child: KErrorState(
+                      key: const Key('messages-hydration-failed'),
+                      message: 'Some older messages haven\u2019t loaded.',
+                      onRetry: ref
+                          .read(sermonLibraryProvider.notifier)
+                          .retryHydration,
+                    ),
+                  ),
+                ),
+              SliverPadding(padding: EdgeInsets.only(bottom: bottom)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Skeleton extends StatelessWidget {
+  const _Skeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
+      sliver: SliverList.list(
+        children: [
+          const KSkeleton(height: KSize.hero, radius: KRadius.card),
+          for (var i = 0; i < 4; i++) ...[
+            const SizedBox(height: KSpace.lg),
+            const KSkeleton(height: KSize.listRow),
+          ],
         ],
       ),
     );
   }
 }
 
-// ── Search bar ─────────────────────────────────────────────────────────────────
+/// Wraps [children] as gutter-padded box slivers stacked with section gaps.
+class _Sections extends StatelessWidget {
+  const _Sections(this.children);
 
-class _SearchBar extends StatelessWidget {
-  const _SearchBar({
-    required this.controller,
-    required this.focusNode,
-    required this.onChanged,
-    required this.onSubmitted,
-    required this.onCleared,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final ValueChanged<String> onChanged;
-  final ValueChanged<String> onSubmitted;
-  final VoidCallback onCleared;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: controller,
-      builder: (context, value, _) {
-        final hasText = value.text.isNotEmpty;
-        return Container(
-          decoration: BoxDecoration(
-            color: context.kc.surfaceAlt,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          child: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            onChanged: onChanged,
-            onSubmitted: onSubmitted,
-            textInputAction: TextInputAction.search,
-            style: AppTypography.bodyLg.copyWith(color: context.kc.onBg),
-            cursorColor: context.kc.accentInk,
-            decoration: InputDecoration(
-              hintText: 'Search titles, speakers, series...',
-              hintStyle: AppTypography.bodySm.copyWith(color: context.kc.muted),
-              prefixIcon: Icon(
-                Icons.search_rounded,
-                size: 20,
-                color: context.kc.muted,
-              ),
-              suffixIcon: hasText
-                  ? IconButton(
-                      tooltip: 'Clear search',
-                      onPressed: onCleared,
-                      icon: Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: context.kc.muted,
-                      ),
-                    )
-                  : null,
-              // The fill takes the border's shape, so every state uses a
-              // pill outline (invisible unless focused) instead of
-              // InputBorder.none, which fills a rectangle (KA-014).
-              border: _pillBorder(BorderSide.none),
-              enabledBorder: _pillBorder(BorderSide.none),
-              focusedBorder: _pillBorder(
-                BorderSide(color: context.kc.accentInk, width: 1.5),
-              ),
-              focusedErrorBorder: _pillBorder(BorderSide.none),
-              errorBorder: _pillBorder(BorderSide.none),
-              disabledBorder: _pillBorder(BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              filled: true,
-              fillColor: context.kc.surfaceAlt,
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
+      sliver: SliverList.list(
+        children: [
+          for (final (i, child) in children.indexed) ...[
+            if (i > 0) const SizedBox(height: KSpace.section),
+            child,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ForYou extends ConsumerWidget {
+  const _ForYou();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+    final featured = featuredMessage(sermons);
+    final recent = ref.watch(recentlyPlayedProvider);
+    final lastPlayed = recent.isEmpty ? null : recent.first;
+    final recommended = lastPlayed == null
+        ? const <Sermon>[]
+        : recommendedFor(
+            lastPlayed,
+            sermons,
+            exclude: {for (final s in recent) s.id},
+          );
+
+    return _Sections([
+      if (featured != null) _Hero(featured.sermon, part: featured.part),
+      const HomeContinueListening(),
+      if (lastPlayed != null && recommended.isNotEmpty)
+        Column(
+          key: const Key('messages-recommended'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const KSectionHeader(title: 'Recommended for you'),
+            Text(
+              'Because you listened to ${lastPlayed.title}',
+              style: KharisText.meta.copyWith(color: context.k.muted),
             ),
-          ),
-        );
+            const SizedBox(height: KSpace.lg),
+            KListGroup(
+              children: [
+                for (final s in recommended)
+                  MessageRow(
+                    key: ValueKey(s.id),
+                    sermon: s,
+                    queue: recommended,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      const _Collections(),
+    ]);
+  }
+}
+
+class _Hero extends ConsumerWidget {
+  const _Hero(this.sermon, {this.part});
+
+  final Sermon sermon;
+  final int? part;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = sermon.hasAudio
+        ? ref.watch(downloadStatusProvider(sermon.id))
+        : null;
+    final repository = ref.read(downloadsRepositoryProvider);
+    ref.listen<DownloadStatus>(downloadStatusProvider(sermon.id), (_, next) {
+      if (next is! DownloadFailed) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(DownloadButton.failureMessage(next.reason))),
+      );
+      repository.clearFailure(sermon.id);
+    });
+    final meta = [
+      if (sermon.speaker.trim().isNotEmpty) sermon.speaker.trim(),
+      ?messageLength(sermon.duration),
+    ].join(' \u00b7 ');
+
+    return KMessageHero(
+      key: const Key('messages-hero'),
+      title: sermon.title,
+      badge: part == null ? null : 'New \u00b7 Part $part',
+      meta: meta.isEmpty ? null : meta,
+      image: messageArtwork(sermon, size: 3 * 390),
+      listenKey: const Key('messages-hero-listen'),
+      onListen: () => unawaited(startPlayback(context, ref, sermon)),
+      downloadKey: const Key('messages-hero-download'),
+      onDownload: switch (status) {
+        null => null,
+        Downloading() => () => repository.cancel(sermon.id),
+        Downloaded() => () => context.push('/downloads'),
+        _ => () => unawaited(repository.download(sermon)),
       },
+      downloadState: switch (status) {
+        Downloading() => KMessageDownloadState.downloading,
+        Downloaded() => KMessageDownloadState.done,
+        _ => KMessageDownloadState.idle,
+      },
+      downloadProgress: status is Downloading ? status.fraction : null,
+      downloadLabel: switch (status) {
+        Downloading() => 'Cancel download',
+        Downloaded() => 'Downloaded',
+        _ => 'Download',
+      },
+      addToCollectionKey: const Key('messages-hero-collect'),
+      onAddToCollection: () => unawaited(
+        showAddToPlaylistSheet(
+          context,
+          sermonId: sermon.id,
+          sermonTitle: sermon.title,
+        ),
+      ),
     );
   }
-
-  static OutlineInputBorder _pillBorder(BorderSide side) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(AppRadius.pill),
-    borderSide: side,
-  );
 }
 
-// ── Featured hero carousel ─────────────────────────────────────────────────────
+class _Collections extends ConsumerWidget {
+  const _Collections();
 
-class _FeaturedCarousel extends StatefulWidget {
-  const _FeaturedCarousel({
-    required this.sermons,
-    required this.currentSermonId,
-    required this.isPlaying,
-    required this.onPlay,
-  });
-
-  final List<Sermon> sermons;
-  final String? currentSermonId;
-  final bool isPlaying;
-  final void Function(Sermon) onPlay;
-
-  @override
-  State<_FeaturedCarousel> createState() => _FeaturedCarouselState();
-}
-
-class _FeaturedCarouselState extends State<_FeaturedCarousel> {
-  late final PageController _pageCtrl;
-  int _currentPage = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _pageCtrl = PageController(viewportFraction: 0.88);
+  Future<void> _create(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(playlistRepositoryProvider);
+    if (!repo.hasUser) {
+      ref.read(anonymousSignInProvider).ensure();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Still signing you in. Try again in a moment.'),
+        ),
+      );
+      return;
+    }
+    final name = await showPlaylistNameDialog(context, title: 'New collection');
+    if (name == null || !context.mounted) return;
+    final id = repo.create(name);
+    unawaited(context.push('/playlists/$id'));
   }
 
   @override
-  void didUpdateWidget(covariant _FeaturedCarousel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // A shorter list (e.g. pinned picks replacing auto ones) must not leave
-    // the active dot past the end; the PageView clamps without telling us.
-    final last = widget.sermons.length - 1;
-    if (_currentPage > last) _currentPage = last < 0 ? 0 : last;
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playlists = ref.watch(playlistsProvider).valueOrNull;
+    if (playlists == null) return const SizedBox.shrink();
 
-  @override
-  void dispose() {
-    _pageCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.sermons.isEmpty) return const SizedBox.shrink();
     return Column(
+      key: const Key('messages-collections'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 200,
-          child: PageView.builder(
-            controller: _pageCtrl,
-            itemCount: widget.sermons.length,
-            onPageChanged: (i) => setState(() => _currentPage = i),
-            itemBuilder: (context, index) {
-              final sermon = widget.sermons[index];
-              final isCurrent = widget.currentSermonId == sermon.id;
-              final isPlaying = isCurrent && widget.isPlaying;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _FeaturedCard(
-                  sermon: sermon,
-                  isPlaying: isPlaying,
-                  onPlay: () => widget.onPlay(sermon),
+        KSectionHeader(
+          title: 'Your collections',
+          actionLabel: '+ New',
+          onAction: () => unawaited(_create(context, ref)),
+        ),
+        if (playlists.isEmpty)
+          Text(
+            'Group messages you want to come back to.',
+            style: KharisText.meta.copyWith(color: context.k.muted),
+          )
+        else
+          KListGroup(
+            children: [
+              for (final p in playlists)
+                KListRow(
+                  key: ValueKey('collection-${p.id}'),
+                  title: p.name,
+                  meta: p.sermonIds.length == 1
+                      ? '1 message'
+                      : '${p.sermonIds.length} messages',
+                  leading: const KIconTile(KIcons.collection),
+                  showChevron: true,
+                  onTap: () => context.push('/playlists/${p.id}'),
                 ),
-              );
-            },
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        // Page dots
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            widget.sermons.length,
-            (i) => AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: i == _currentPage ? 18 : 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: i == _currentPage
-                    ? context.kc.accent
-                    : context.kc.outline,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
 }
 
-// ── Featured card ──────────────────────────────────────────────────────────────
-
-class _FeaturedCard extends StatelessWidget {
-  const _FeaturedCard({
-    required this.sermon,
-    required this.isPlaying,
-    required this.onPlay,
+/// A list of named groups (books, themes, series), each opening its
+/// messages.
+class _GroupList extends StatelessWidget {
+  const _GroupList({
+    required this.groups,
+    required this.listKey,
+    this.artwork = false,
   });
 
-  final Sermon sermon;
-  final bool isPlaying;
-  final VoidCallback onPlay;
+  final List<({String name, List<Sermon> sermons})> groups;
+
+  /// Leads each row with its newest message's artwork.
+  final bool artwork;
+  final Key listKey;
 
   @override
   Widget build(BuildContext context) {
-    return PressEffect(
-      onTap: onPlay,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Sermon artwork thumbnail as the card background.
-          ArtworkImage(
-            url: sermon.artworkUrl,
-            gradientIndex: sermon.artworkColor ?? 0,
-            radius: AppRadius.lg,
-          ),
-          // Bottom scrim for text legibility
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(AppRadius.lg),
-                  bottomRight: Radius.circular(AppRadius.lg),
-                ),
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xE6000000)],
-                ),
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
+      sliver: KSliverListGroup(
+        key: listKey,
+        itemCount: groups.length,
+        itemBuilder: (context, i) {
+          final g = groups[i];
+          final count = g.sermons.length == 1
+              ? '1 message'
+              : '${g.sermons.length} messages';
+          return KListRow(
+            key: ValueKey('group-${g.name}'),
+            title: g.name,
+            meta: count,
+            leading: artwork
+                ? KThumbnail(image: messageArtwork(g.sermons.last))
+                : null,
+            showChevron: true,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    MessageListScreen(title: g.name, sermons: g.sermons),
               ),
             ),
-          ),
-          // Featured badge
-          Positioned(
-            top: 14,
-            left: 14,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: context.kc.accent.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // The label says "Featured"; only the playing state earns
-                  // a glyph (the equaliser marks live playback).
-                  if (isPlaying) ...[
-                    Icon(
-                      Icons.equalizer_rounded,
-                      size: 12,
-                      color: context.kc.onAccent,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    isPlaying ? 'NOW PLAYING' : 'FEATURED',
-                    style: AppTypography.labelMd.copyWith(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: context.kc.onAccent,
-                      letterSpacing: 0.08,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Play button
-          Positioned(
-            top: 14,
-            right: 14,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              child: Icon(
-                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-          ),
-          // Title + speaker
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  sermon.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodyLg.copyWith(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.25,
-                    letterSpacing: -0.15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      sermon.speaker,
-                      style: AppTypography.labelMd.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                    if (sermon.category != null) ...[
-                      Text(
-                        ' · ${sermon.category}',
-                        style: AppTypography.labelMd.copyWith(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-// ── Recently played card ───────────────────────────────────────────────────────
-
-class _RecentlyPlayedCard extends StatelessWidget {
-  const _RecentlyPlayedCard({
-    required this.sermon,
-    required this.isPlaying,
-    required this.onTap,
-  });
-
-  final Sermon sermon;
-  final bool isPlaying;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressEffect(
-      onTap: onTap,
-      child: SizedBox(
-        width: 120,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              children: [
-                SizedBox(
-                  width: 120,
-                  height: 120,
-                  child: ArtworkImage(
-                    url: sermon.artworkUrl,
-                    gradientIndex: sermon.artworkColor ?? 0,
-                    radius: AppRadius.md,
-                    overlay: isPlaying
-                        ? Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.equalizer_rounded,
-                                color: AppColors.secondary,
-                                size: 28,
-                              ),
-                            ),
-                          )
-                        : null,
-                  ),
-                ),
-                Positioned(
-                  bottom: 6,
-                  right: 6,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: context.kc.accent,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                    ),
-                    child: Icon(
-                      isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      color: context.kc.onAccent,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              sermon.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.labelMd.copyWith(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: context.kc.onBg,
-                height: 1.3,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Active filter chip (tap to clear) ─────────────────────────────────────────
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label, required this.onClear});
-
-  final String label;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    // 7 px of slack above and below lifts the 31 px chip to a 45 px target.
-    return Semantics(
-      button: true,
-      label: 'Clear filter: $label',
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onClear,
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 7, 10, 7),
-            decoration: BoxDecoration(
-              color: context.kc.accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(
-                color: context.kc.accent.withValues(alpha: 0.5),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.labelMd.copyWith(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: context.kc.accentInk,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.close_rounded,
-                  size: 16,
-                  color: context.kc.accentInk,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Filters button (opens the sheet) ──────────────────────────────────────────
-
-class _FiltersButton extends StatelessWidget {
-  const _FiltersButton({required this.count, required this.onTap});
-
-  final int count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    final active = count > 0;
-    final ink = active ? kc.accentInk : kc.onBg;
-    // 6 px of slack above and below lifts the 34 px pill to a 46 px target.
-    return Semantics(
-      button: true,
-      label: active ? 'Filters, $count active' : 'Filters',
-      excludeSemantics: true,
-      child: GestureDetector(
-        key: const Key('messages-filters-button'),
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.fromLTRB(12, 7, 14, 7),
-            decoration: BoxDecoration(
-              color: active ? kc.accent.withValues(alpha: 0.14) : null,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(
-                color: active ? kc.accent.withValues(alpha: 0.5) : kc.outline,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.tune_rounded, size: 16, color: ink),
-                const SizedBox(width: 6),
-                Text(
-                  active ? 'Filters \u00b7 $count' : 'Filters',
-                  style: AppTypography.labelMd.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: ink,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Current sort (opens the sheet) ────────────────────────────────────────────
-
-class _SortButton extends StatelessWidget {
-  const _SortButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = context.kc.muted;
-    return Semantics(
-      button: true,
-      label: 'Sort: $label',
-      excludeSemantics: true,
-      child: GestureDetector(
-        key: const Key('messages-sort-button'),
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.swap_vert_rounded, size: 16, color: muted),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: AppTypography.labelMd.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: muted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Skeleton row (loading state) ──────────────────────────────────────────────
-
-class _SermonRowSkeleton extends StatelessWidget {
-  const _SermonRowSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: context.kc.surfaceAlt,
-              borderRadius: BorderRadius.circular(11),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 14,
-                  width: 180,
-                  decoration: BoxDecoration(
-                    color: context.kc.surfaceAlt,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  height: 12,
-                  width: 120,
-                  decoration: BoxDecoration(
-                    color: context.kc.surfaceAlt,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: context.kc.surfaceAlt,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Related to what's playing ─────────────────────────────────────────────────
-
-/// Messages related to [sermon] (the one playing in the background), in the
-/// player's discovery panel; nothing until the library can suggest any.
-class _NowPlayingRelated extends ConsumerWidget {
-  const _NowPlayingRelated({required this.sermon});
-
-  final Sermon sermon;
+class _Books extends ConsumerWidget {
+  const _Books();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final related = ref.watch(relatedMessagesProvider(sermon));
-    if (related.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      key: const Key('messages-now-playing-related'),
-      padding: const EdgeInsets.only(top: 24),
-      child: PlayerDiscoveryPanel(
-        child: RelatedMessagesRail(
-          title: 'More like what\u2019s playing',
-          sermons: related,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          onOpen: (target) =>
-              startPlayback(context, ref, target, queue: related),
-        ),
-      ),
+    final books = ref.watch(messageBooksProvider);
+    return _GroupList(
+      listKey: const Key('messages-books'),
+      groups: [for (final b in books) (name: b.name, sermons: b.sermons)],
+    );
+  }
+}
+
+class _Themes extends ConsumerWidget {
+  const _Themes();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+    final labels = ref.watch(categoryLabelsProvider);
+    final byTopic = <String, List<Sermon>>{};
+    for (final s in sermons) {
+      (byTopic[sermonTopic(s)] ??= []).add(s);
+    }
+    return _GroupList(
+      listKey: const Key('messages-themes'),
+      groups: [
+        for (final label in labels)
+          if (byTopic[label] case final list?)
+            (name: label, sermons: newestFirst(list)),
+      ],
+    );
+  }
+}
+
+class _Series extends ConsumerWidget {
+  const _Series();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
+    final series = ref.watch(seriesListProvider);
+    return _GroupList(
+      listKey: const Key('messages-series'),
+      groups: [
+        for (final s in series)
+          (name: s.name, sermons: seriesParts(sermons, s.name)),
+      ],
+      artwork: true,
     );
   }
 }

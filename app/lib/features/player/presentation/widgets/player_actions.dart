@@ -3,17 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/share_sermon.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/sermon_notes_sheet.dart';
 import 'package:kharis_app/features/player/presentation/widgets/transcript_sheet.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// Row of secondary player actions shown below the transport controls:
-/// Notes · Playlist · Transcript · Share, each an icon over a small muted
-/// label.
+/// Notes · Playlist · Transcript · Share, each a chip with its icon and
+/// label. The row scrolls sideways when the chips do not fit.
 ///
 /// Notes opens [SermonNotesSheet] for the message on screen — its notepad,
 /// free typing with an Insert action that stamps the live playback position
@@ -52,94 +52,44 @@ class PlayerActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final target = sermon ?? ref.watch(currentSermonProvider);
+    if (target == null) return const SizedBox.shrink();
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return KChipRow(
       children: [
-        if (target != null)
-          _ActionButton(
-            icon: Icons.notes_rounded,
-            label: 'Notes',
-            onTap: () =>
-                SermonNotesSheet.show(context, target, timeline: timeline),
+        KChip(
+          key: const Key('player-action-notes'),
+          label: 'Notes',
+          leading: KIcons.note,
+          onTap: () =>
+              SermonNotesSheet.show(context, target, timeline: timeline),
+        ),
+        KChip(
+          key: const Key('player-action-playlist'),
+          label: 'Add to collection',
+          leading: KIcons.plus,
+          onTap: () => showAddToPlaylistSheet(
+            context,
+            sermonId: target.id,
+            sermonTitle: target.title,
           ),
-        if (target != null)
-          _ActionButton(
-            icon: Icons.add_rounded,
-            label: 'Playlist',
-            onTap: () => showAddToPlaylistSheet(
-              context,
-              sermonId: target.id,
-              sermonTitle: target.title,
-            ),
-          ),
-        if (target != null && target.hasTranscript)
-          _ActionButton(
-            icon: Icons.article_outlined,
+        ),
+        if (target.hasTranscript)
+          KChip(
+            key: const Key('player-action-transcript'),
             label: 'Transcript',
+            leading: KIcons.scroll,
             onTap: () =>
                 TranscriptSheet.show(context, target, timeline: timeline),
           ),
-        if (target != null)
-          _ActionButton(
-            icon: Icons.ios_share_rounded,
-            label: 'Share',
-            onTap: () => unawaited(
-              shareSermon(
-                target,
-                asVideo: asVideo,
-                position: positionOf?.call(),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ── Private icon + label button ───────────────────────────────────────────────
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        // Icon + label is ~40 px; the box makes the target 56 x 48.
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 56, minHeight: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: context.kc.muted, size: 22),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                label,
-                style: AppTypography.ui(
-                  size: 10,
-                  weight: FontWeight.w600,
-                  color: context.kc.muted,
-                ),
-              ),
-            ],
+        KChip(
+          key: const Key('player-action-share'),
+          label: 'Share',
+          leading: KIcons.share,
+          onTap: () => unawaited(
+            shareSermon(target, asVideo: asVideo, position: positionOf?.call()),
           ),
         ),
-      ),
+      ],
     );
   }
 }

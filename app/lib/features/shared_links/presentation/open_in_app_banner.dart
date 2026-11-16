@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/constants/app_links.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// The universal / App Link for the shared path the browser landed on, and
 /// on Android an `intent:` URL for the same link that Chrome hands straight
@@ -92,73 +92,56 @@ class _OpenInAppBannerState extends State<OpenInAppBanner> {
   Widget _bar(BuildContext context) {
     final android = widget.platform == TargetPlatform.android;
     final showStore = widget.platform != TargetPlatform.iOS;
-    final kc = context.kc;
-    return Material(
+    final k = context.k;
+    return ColoredBox(
       key: const Key('open-in-app-banner'),
-      color: kc.surface,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: kc.divider)),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: SizedBox(
-            height: 48,
+      color: k.bg,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: KSpace.xl,
+            vertical: KSpace.md,
+          ),
+          child: KCard(
+            padding: const EdgeInsetsDirectional.only(
+              start: KSpace.x3,
+              end: KSpace.xs,
+            ),
             child: Row(
               children: [
-                const SizedBox(width: AppSpacing.gutter),
                 Expanded(
                   child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        foregroundColor: kc.accentInk,
-                        padding: EdgeInsets.zero,
-                      ),
+                    alignment: AlignmentDirectional.centerStart,
+                    child: KTextLink(
+                      label: 'Open in the Kharis app',
                       // Chrome only hands an intent: URL to the app from
                       // a same-tab navigation.
-                      onPressed: () => _launch(
+                      onTap: () => _launch(
                         openInAppUri(_landed, widget.platform),
                         window: android ? '_self' : '_blank',
                       ),
-                      child: Text(
-                        'Open in the Kharis app',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodySm.copyWith(
-                          color: kc.accentInk,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
                     ),
                   ),
                 ),
-                if (showStore)
-                  TextButton(
-                    style: TextButton.styleFrom(foregroundColor: kc.onBg),
-                    onPressed: () => _launch(
+                if (showStore) ...[
+                  const SizedBox(width: KSpace.md),
+                  KTextLink(
+                    label: 'Get the app',
+                    onTap: () => _launch(
                       Uri.parse(AppLinks.playStoreUrl),
                       window: '_blank',
                     ),
-                    child: Text(
-                      'Get the app',
-                      style: AppTypography.bodySm.copyWith(
-                        color: kc.onBg,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ),
-                // No tooltip: the banner sits above the Navigator, so
-                // there is no Overlay for one.
-                Semantics(
-                  button: true,
+                ],
+                const SizedBox(width: KSpace.md),
+                KIconButton(
+                  key: const Key('open-in-app-dismiss'),
+                  icon: KIcons.close,
                   label: 'Dismiss',
-                  child: IconButton(
-                    key: const Key('open-in-app-dismiss'),
-                    icon: Icon(Icons.close_rounded, size: 18, color: kc.muted),
-                    onPressed: () => setState(() => _dismissed = true),
-                  ),
+                  color: k.muted,
+                  onPressed: () => setState(() => _dismissed = true),
                 ),
-                const SizedBox(width: AppSpacing.xs),
               ],
             ),
           ),

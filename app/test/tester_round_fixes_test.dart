@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart';
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
+import 'support/more_screen_overrides.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/features/player/presentation/widgets/mini_player.dart';
@@ -24,6 +24,8 @@ import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
+import 'package:kharis_app/ui/components/k_button.dart';
 
 /// Regression guards for the tester-round fixes closed on 9 Sep
 /// (docs/BUG-TRACKER.md): each test pins one acceptance criterion so a later
@@ -66,11 +68,10 @@ final _member = User(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets(
-    'KA-001: the mini-player hides on Giving and returns on Home without '
-    'stopping the message',
+    'KA-001: the mini-player is out of the way on Give and back on Home '
+    'without stopping the message',
     (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
@@ -84,13 +85,7 @@ void main() {
             builder: (context, state, shell) =>
                 DashboardShell(navigationShell: shell),
             branches: [
-              for (final path in [
-                '/home',
-                '/messages',
-                '/calendar',
-                '/giving',
-                '/more',
-              ])
+              for (final path in ['/home', '/messages', '/bible', '/more'])
                 StatefulShellBranch(
                   routes: [
                     GoRoute(
@@ -100,6 +95,11 @@ void main() {
                   ],
                 ),
             ],
+          ),
+          // Give is a screen pushed over the tabs: it covers the mini player.
+          GoRoute(
+            path: '/give',
+            builder: (_, _) => const Scaffold(body: Text('page /give')),
           ),
         ],
       );
@@ -114,7 +114,10 @@ void main() {
             currentUserProvider.overrideWith((ref) => Stream.value(_member)),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       // Flush the shell's launch work (branch prompt delay, nudge decision).
@@ -122,10 +125,9 @@ void main() {
 
       expect(find.byType(MiniPlayer), findsOneWidget, reason: 'docked on Home');
 
-      router.go('/giving');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('page /giving'), findsOneWidget);
+      unawaited(router.push('/give'));
+      await tester.pumpAndSettle();
+      expect(find.text('page /give'), findsOneWidget);
       expect(
         find.byType(MiniPlayer),
         findsNothing,
@@ -138,18 +140,17 @@ void main() {
       );
       expect(audio.stopCalls, 0);
 
-      router.go('/messages');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('page /home'), findsOneWidget);
       expect(
         find.byType(MiniPlayer),
         findsOneWidget,
-        reason: 'the bar is back on any other tab',
+        reason: 'the bar is back once Give is closed',
       );
 
-      router.go('/home');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      router.go('/messages');
+      await tester.pumpAndSettle();
       expect(find.byType(MiniPlayer), findsOneWidget);
     },
   );
@@ -172,8 +173,9 @@ void main() {
             audioPlayerServiceProvider.overrideWithValue(audio),
             currentSermonProvider.overrideWith((ref) => ref.watch(live)),
           ],
-          child: const MaterialApp(
-            home: Scaffold(body: Column(children: [MiniPlayer()])),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const Scaffold(body: Column(children: [MiniPlayer()])),
           ),
         ),
       );
@@ -241,6 +243,7 @@ void main() {
           favoritesProvider.overrideWith((ref) => Stream.value(null)),
         ],
         child: MaterialApp(
+          theme: KharisTheme.light(),
           home: MediaPlayerScreen(sermon: _sermon, mode: MediaMode.audio),
         ),
       ),
@@ -248,20 +251,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byIcon(Icons.ios_share_rounded),
+      find.byKey(const Key('player-action-share')),
       findsOneWidget,
       reason: 'KA-013: header duplicate removed; actions-row share stays',
     );
     expect(find.text('Share'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
-    expect(find.text('Playlist'), findsOneWidget);
-    // KA-007: the player keeps its close chevron.
-    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+    expect(find.text('Playlist'), findsNothing);
+    expect(find.bySemanticsLabel('Add to collection'), findsOneWidget);
+    // KA-007: the player can always be closed: the grab handle is a
+    // "Close player" button.
+    expect(find.bySemanticsLabel('Close player'), findsOneWidget);
     // KA-017: the transport controls (now Previous / Next message) are real
     // buttons with a ripple.
     expect(
-      find.ancestor(
-        of: find.byIcon(Icons.skip_previous_rounded),
+      find.descendant(
+        of: find.byKey(const Key('player-previous')),
         matching: find.byType(InkWell),
       ),
       findsWidgets,
@@ -269,8 +274,8 @@ void main() {
   });
 
   testWidgets(
-    'KA-003 / KA-012: More lists My Notes, My Playlists and Rate & Feedback, '
-    'and the row opens the sheet',
+    'KA-003 / KA-012: More shows My notes, Collections and Help & feedback, '
+    'and Help & feedback opens the feedback sheet',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
@@ -282,24 +287,23 @@ void main() {
             firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
             currentUserProvider.overrideWith((ref) => Stream.value(_member)),
             currentBranchProvider.overrideWith((ref) => Stream.value('London')),
+            ...moreScreenOverrides(),
           ],
-          child: const MaterialApp(home: SettingsScreen()),
+          child: MaterialApp(
+            theme: KharisTheme.light(),
+            home: const SettingsScreen(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
-      for (final label in [
-        'Daily reading',
-        'My notes',
-        'My playlists',
-        'Rate & feedback',
-      ]) {
-        expect(find.text(label), findsOneWidget, reason: 'More row "$label"');
+      for (final label in ['My notes', 'Collections', 'Help & feedback']) {
+        expect(find.text(label), findsOneWidget, reason: 'More shows "$label"');
       }
 
-      await tester.ensureVisible(find.text('Rate & feedback'));
+      await tester.ensureVisible(find.text('Help & feedback'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Rate & feedback'));
+      await tester.tap(find.text('Help & feedback'));
       await tester.pumpAndSettle();
 
       // KA-012 now opens the in-app feedback sheet (stars + comment saved to
@@ -319,20 +323,29 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
+    // A phone: on wider screens the form column is capped, not full width.
+    tester.view.physicalSize = const Size(KSize.designWidth, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-        child: const MaterialApp(home: LoginScreen()),
+        child: MaterialApp(
+          theme: KharisTheme.light(),
+          home: const LoginScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     final guest = find.text('Continue as guest');
     expect(guest, findsOneWidget);
-    final button = find.ancestor(
-      of: guest,
-      matching: find.byType(OutlinedButton),
+    final button = find.ancestor(of: guest, matching: find.byType(KButton));
+    expect(
+      tester.widget<KButton>(button).variant,
+      KButtonVariant.outline,
+      reason: 'KA-016: the guest path must read as a button, not a link',
     );
     expect(
       button,

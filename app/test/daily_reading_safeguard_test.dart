@@ -119,10 +119,10 @@ void main() {
       expect(topics.calls, ['-daily_reading']);
     });
 
-    test('a daily reading push opens the reader', () {
+    test('a daily reading push opens today\'s reading in the Bible tab', () {
       expect(
         notificationTargetFor({'type': 'reading'}),
-        const NotificationTarget('/reading', overlay: true),
+        const NotificationTarget('/bible/reading'),
       );
     });
   });

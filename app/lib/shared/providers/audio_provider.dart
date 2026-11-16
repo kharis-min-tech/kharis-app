@@ -6,11 +6,17 @@ import '../../features/player/data/audio_player_service.dart';
 import '../../features/player/data/kharis_audio_handler.dart';
 import '../../features/player/data/playback_history.dart';
 import 'cache_provider.dart';
+import 'downloads_provider.dart';
+import 'streaks_provider.dart';
 
 /// Resume points, recently played and sermon snapshots, shared by the audio
-/// and video engines.
+/// and video engines. Every position either engine saves also feeds the
+/// messages streak.
 final playbackHistoryProvider = Provider<PlaybackHistory>((ref) {
-  return PlaybackHistory(ref.watch(cacheServiceProvider));
+  return PlaybackHistory(
+    ref.watch(cacheServiceProvider),
+    onListened: ref.watch(streakRepositoryProvider).recordListening,
+  );
 });
 
 /// Where the member is with one message (not started, "28 min left", or
@@ -37,6 +43,7 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final service = AudioPlayerService(
     cache,
     history: ref.read(playbackHistoryProvider),
+    localAudio: ref.read(downloadsRepositoryProvider).localAudioUri,
   );
   final handler = ref.read(audioHandlerProvider);
   handler?.attach(service);

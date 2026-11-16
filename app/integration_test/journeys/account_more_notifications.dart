@@ -3,18 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
+import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/event_detail_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/presentation/feedback_sheet.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
-import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
+import 'package:kharis_app/features/home/presentation/screens/branch_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
-import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
+import 'package:kharis_app/features/messages/presentation/screens/downloads_screen.dart';
 import 'package:kharis_app/features/notes/presentation/screens/notes_screen.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
-import 'package:kharis_app/features/onboarding/presentation/screens/branch_selection_screen.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart';
 import 'package:kharis_app/features/playlists/presentation/screens/favorites_screen.dart';
 import 'package:kharis_app/features/playlists/presentation/screens/playlists_screen.dart';
@@ -23,6 +23,10 @@ import 'package:kharis_app/features/settings/presentation/screens/notifications_
 import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/campus_config_provider.dart'
+    show kDefaultHomeBranch;
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import '../support/actions.dart';
 import '../support/channels.dart';
@@ -36,6 +40,8 @@ bool _moreShows(String label) => find
     )
     .evaluate()
     .isNotEmpty;
+
+Finder get _dialog => find.byType(Dialog);
 
 // ── (l) Account ──────────────────────────────────────────────────────────────
 
@@ -105,7 +111,7 @@ Future<void> accountJourney(Journey j) async {
     await pumpUntil(t, () => find.byType(LoginScreen).evaluate().isNotEmpty),
     'guest More offers Sign in',
   );
-  await tapBack(t);
+  await goBack(t);
   await pumpUntilFound(t, find.byType(SettingsScreen));
   j.check(!_moreShows('Delete account'), 'guest More has no Delete account');
   j.check(!_moreShows('Sign out'), 'guest More has no Sign out');
@@ -138,7 +144,7 @@ Future<void> accountJourney(Journey j) async {
   await j.shot('delete-dialog');
   await t.tap(
     find.descendant(
-      of: find.byType(AlertDialog),
+      of: _dialog,
       matching: find.text('Cancel'),
     ),
     warnIfMissed: false,
@@ -153,10 +159,10 @@ Future<void> accountJourney(Journey j) async {
   await openMoreRow(t, 'Delete account');
   await pumpUntilFound(t, find.text('Delete account?'));
   final confirm = find.descendant(
-    of: find.byType(AlertDialog),
+    of: _dialog,
     matching: find.text('Delete account'),
   );
-  await t.tap(confirm, warnIfMissed: false);
+  await tapVisible(t, confirm);
   await pumpFor(t, const Duration(milliseconds: 600));
   j.check(
     find.text('Delete account?').evaluate().isNotEmpty &&
@@ -165,13 +171,15 @@ Future<void> accountJourney(Journey j) async {
   );
   await t.enterText(
     find.descendant(
-      of: find.byType(AlertDialog),
-      matching: find.byType(TextField),
+      of: _dialog,
+      matching: find.byType(EditableText),
     ),
     'e2e-password',
   );
   await pumpFor(t, const Duration(milliseconds: 400));
-  await t.tap(confirm, warnIfMissed: false);
+  FocusManager.instance.primaryFocus?.unfocus();
+  await pumpFor(t, const Duration(milliseconds: 600));
+  await tapVisible(t, confirm);
   j.check(
     await pumpUntil(
       t,
@@ -198,8 +206,9 @@ Future<void> accountJourney(Journey j) async {
 
 // ── (m) More menu ────────────────────────────────────────────────────────────
 
-/// (m) Every More row opens its destination and comes back; web rows
-/// open their page in the in-app browser; the version is pubspec's.
+/// (m) Every More tile and row opens its destination and comes back with
+/// the swipe back; the two choice rows open their sheets; web rows open
+/// their page in the in-app browser; the version is pubspec's.
 Future<void> moreMenuJourney(Journey j) async {
   final t = j.tester;
   await j.launch();
@@ -207,7 +216,20 @@ Future<void> moreMenuJourney(Journey j) async {
   await pumpUntilFound(t, find.byType(SettingsScreen));
   j.check(!_moreShows('Admin console'), 'More has no in-app Studio entry');
 
-  Future<void> pushed(String label, Finder destination) async {
+  Future<void> backToMore(String label, Finder destination) async {
+    await goBack(t);
+    j.check(
+      await pumpUntil(
+        t,
+        () =>
+            destination.evaluate().isEmpty &&
+            find.byType(SettingsScreen).hitTestable().evaluate().isNotEmpty,
+      ),
+      '"$label" returns to More',
+    );
+  }
+
+  Future<void> opens(String label, Finder destination) async {
     await openMoreRow(t, label);
     final opened = await pumpUntil(
       t,
@@ -218,68 +240,94 @@ Future<void> moreMenuJourney(Journey j) async {
     if (!opened) return;
     await pumpFor(t, const Duration(seconds: 1));
     await j.shot(label);
-    if (find.byType(BranchSelectionScreen).evaluate().isNotEmpty) {
-      await t.tap(find.text('Back').first, warnIfMissed: false);
-      await pumpFor(t, const Duration(milliseconds: 800));
-    } else {
-      await tapBack(t);
-    }
-    j.check(
-      await pumpUntil(
-        t,
-        () =>
-            destination.evaluate().isEmpty &&
-            find.byType(SettingsScreen).evaluate().isNotEmpty,
-      ),
-      '"$label" returns to More',
-    );
+    await backToMore(label, destination);
   }
 
-  await pushed('Daily reading', find.byType(ReadingScreen));
-  // More's Bible row opens on the book list; Close returns straight to More.
-  await pushed('Bible', find.byType(BibleBooksScreen));
-  await pushed('My notes', find.byType(NotesScreen));
-  await pushed('Favourites', find.byType(FavoritesScreen));
-  await pushed('My playlists', find.byType(PlaylistsScreen));
-  await pushed('Switch branch', find.byType(BranchSelectionScreen));
-  await pushed('Notifications', find.byType(NotificationsSettingsScreen));
-  await pushed("I'm new here", find.byType(NewHereScreen));
-  await pushed('Share a testimony', find.byType(TestimonyScreen));
-  await pushed('Sign in', find.byType(LoginScreen));
+  // The tiles.
+  await opens('My notes', find.byType(NotesScreen));
+  await opens('Downloads', find.byType(DownloadsScreen));
+  await opens('Collections', find.byType(PlaylistsScreen));
+  await opens('Favourites', find.byType(FavoritesScreen));
+  await opens('Give', find.byType(GivingScreen));
+  await opens('Events', find.byType(CalendarScreen));
 
-  await openMoreRow(t, 'Give');
+  // Your branch: the card opens the branch page; Change branch the picker.
+  final campus = find.byKey(const Key('campus-card'));
+  await scrollUntilFound(t, campus, scrollable: moreScroll);
   j.check(
-    await pumpUntil(t, () => find.byType(GivingScreen).evaluate().isNotEmpty),
-    '"Give" opens the Giving tab',
+    find
+        .descendant(of: campus, matching: find.text(kDefaultHomeBranch))
+        .evaluate()
+        .isNotEmpty,
+    'Your branch shows $kDefaultHomeBranch',
   );
-  await tapNav(t, 'More');
+  await tapVisible(t, campus);
   j.check(
-    find.byType(SettingsScreen).evaluate().isNotEmpty,
-    'tab bar returns to More',
+    await pumpUntil(t, () => find.byType(BranchScreen).evaluate().isNotEmpty),
+    'the branch card opens the branch page',
+  );
+  await j.shot('branch-page');
+  await backToMore('Your branch', find.byType(BranchScreen));
+  await tapVisible(t, find.byKey(const Key('campus-change')));
+  j.check(
+    await pumpUntil(
+      t,
+      () => find.byType(BranchPickerSheet).evaluate().isNotEmpty,
+    ),
+    '"Change branch" opens the branch picker',
+  );
+  await j.shot('Change branch');
+  await goBack(t);
+  j.check(
+    await pumpUntil(
+      t,
+      () => find.byType(BranchPickerSheet).evaluate().isEmpty,
+    ),
+    'the branch picker closes without a change',
+  );
+  j.check(
+    prefs.getString('onboarding_branch') == kDefaultHomeBranch,
+    'closing the picker keeps $kDefaultHomeBranch',
   );
 
-  await openMoreRow(t, 'Rate & feedback');
+  // The rows.
+  await opens('Notifications', find.byType(NotificationsSettingsScreen));
+  for (final label in const ['Appearance', 'Text size']) {
+    await openMoreRow(t, label);
+    final sheet = find.byWidgetPredicate((w) => w is KSortSheet);
+    j.check(
+      await pumpUntil(t, () => sheet.evaluate().isNotEmpty),
+      '"$label" opens its choices',
+    );
+    await j.shot(label);
+    await goBack(t);
+    j.check(
+      await pumpUntil(t, () => sheet.evaluate().isEmpty),
+      '"$label" choices close back to More',
+    );
+  }
+  await opens("I'm new here", find.byType(NewHereScreen));
+  await opens('Share a testimony', find.byType(TestimonyScreen));
+  await opens('Sign in', find.byType(LoginScreen));
+
+  await openMoreRow(t, 'Help & feedback');
   j.check(
     await pumpUntil(
       t,
       () => find.byType(FeedbackSheet).evaluate().isNotEmpty,
       timeout: const Duration(seconds: 10),
     ),
-    '"Rate & feedback" opens the feedback sheet',
+    '"Help & feedback" opens the feedback sheet',
   );
   await j.shot('feedback');
-  if (find.text('Cancel').evaluate().isNotEmpty) {
-    await t.tap(find.text('Cancel').last, warnIfMissed: false);
-  } else {
-    Navigator.of(t.element(find.byType(FeedbackSheet))).pop();
-  }
+  await goBack(t);
   j.check(
     await pumpUntil(t, () => find.byType(FeedbackSheet).evaluate().isEmpty),
     'feedback sheet closes',
   );
 
   for (final (label, url) in [
-    ('Help & support', kHelpUrl),
+    ('Contact us', kHelpUrl),
     ('Privacy policy', kPrivacyPolicyUrl),
   ]) {
     launches.clear();
@@ -362,7 +410,7 @@ Future<void> notificationsJourney(Journey j) async {
   await j.shot('inbox');
 
   for (final (data, want) in [
-    (const {'type': 'reading'}, '/reading'),
+    (const {'type': 'reading'}, '/bible/reading'),
     (const {'type': 'service_reminder'}, '/home'),
     (const {'type': 'event', 'eventId': 'abc'}, '/events/abc'),
     (const {'type': 'announcement', 'newsId': 'n1'}, '/announcements?id=n1'),
@@ -377,7 +425,7 @@ Future<void> notificationsJourney(Journey j) async {
   }
   final first = upcoming.first;
   final row = find.descendant(of: inbox, matching: find.text(first.title));
-  await pumpUntilFound(t, row, reason: 'event row');
+  await scrollUntilFound(t, row, scrollable: verticalScrollableIn(inbox));
   await tapVisible(t, row);
   final detail = find.byType(EventDetailScreen);
   j.check(

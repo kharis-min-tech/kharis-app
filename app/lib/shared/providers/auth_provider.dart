@@ -157,18 +157,12 @@ class RouterNotifier extends ChangeNotifier {
 /// Preference holding the tab the member last chose, as its path.
 const String kLastTabKey = 'last_tab';
 
-/// The dashboard's tabs in tab-bar order (see app_router.dart's shell
-/// branches and the dashboard's tab row).
-const List<String> kTabPaths = [
-  '/home',
-  '/messages',
-  '/calendar',
-  '/giving',
-  '/more',
-];
+/// The dashboard's tabs in nav order (see app_router.dart's shell branches
+/// and the dashboard's floating nav).
+const List<String> kTabPaths = ['/home', '/messages', '/bible', '/more'];
 
-/// The tab order before Events moved ahead of Giving, when the preference
-/// held the tab's index rather than its path.
+/// The five-tab order from when the preference held the tab's index rather
+/// than its path.
 const List<String> _legacyTabPaths = [
   '/home',
   '/messages',
@@ -178,14 +172,14 @@ const List<String> _legacyTabPaths = [
 ];
 
 /// Where launch reopens for the saved [kLastTabKey] value: its path, or an
-/// index saved by an older version read through that version's order;
-/// Home when there is none or it is unknown.
+/// index saved by an older version read through that version's order. Home
+/// when there is none, it is unknown, or it names a screen that is no longer
+/// a tab (Giving, Events).
 String lastTabLocation(Object? saved) {
-  if (saved is String && kTabPaths.contains(saved)) return saved;
-  if (saved is int && saved >= 0 && saved < _legacyTabPaths.length) {
-    return _legacyTabPaths[saved];
-  }
-  return kTabPaths.first;
+  final path = saved is int && saved >= 0 && saved < _legacyTabPaths.length
+      ? _legacyTabPaths[saved]
+      : saved;
+  return kTabPaths.contains(path) ? path! as String : kTabPaths.first;
 }
 
 final routerNotifierProvider = ChangeNotifierProvider<RouterNotifier>((ref) {

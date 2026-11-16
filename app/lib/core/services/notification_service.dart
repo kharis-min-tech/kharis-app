@@ -155,7 +155,7 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
     case KharisTopics.events:
       return eventId != null
           ? eventDetail(eventId)
-          : const NotificationTarget('/calendar');
+          : const NotificationTarget('/calendar', overlay: true);
     case 'service_reminder':
     case KharisTopics.serviceReminders:
     case 'venue':
@@ -164,7 +164,8 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
     case 'reading':
     case KharisTopics.dailyReading:
     case KharisTopics.legacyDailyReading:
-      return const NotificationTarget('/reading', overlay: true);
+      // The Bible tab with today's reading open, so back lands on the tab.
+      return const NotificationTarget('/bible/reading');
     default:
       return const NotificationTarget('/home');
   }
@@ -172,7 +173,8 @@ NotificationTarget notificationTargetFor(Map<String, dynamic> data) {
 
 /// Whether a push that arrived in the foreground may be shown in-app.
 ///
-/// A daily reading push ([notificationTargetFor] routes it to `/reading`) is
+/// A daily reading push ([notificationTargetFor] routes it to the Bible tab's
+/// `/bible/reading`) is
 /// shown only when its reference, `data['reference']` else [body], names one
 /// or more passages and every one is a real book of the 66-book canon with a
 /// chapter that book has. An older backend sent "2 Corinthians 40"; the app

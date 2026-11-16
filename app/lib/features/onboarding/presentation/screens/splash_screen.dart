@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kharis_app/core/configs/app_startup.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/alert_dialog.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/splash_dove.dart';
 import 'package:kharis_app/shared/models/remote_config.dart';
@@ -11,7 +11,7 @@ import 'package:kharis_app/shared/models/remote_config.dart';
 ///
 /// Solid ink, the dove centred exactly where the native launch screen draws
 /// it. The dove's outline draws itself in and fills, the "Kharis" wordmark
-/// and tagline fade up beneath it, then the gold **Get started** CTA and the
+/// and tagline fade up beneath it, then the **Get started** button and the
 /// "I already have an account" row appear. Button-driven (no auto-advance)
 /// so returning users are routed by the auth redirect and new users choose
 /// to begin. With reduce motion on, the first frame is the final state.
@@ -96,14 +96,13 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final dark = KharisColors.dark;
+    final k = context.k;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        // Theme-invariant: it must equal the native launch colour
-        // (flutter_native_splash `color` in pubspec.yaml), which cannot
-        // follow the in-app theme.
-        backgroundColor: AppColors.ink,
+        // The launch screen is dark in both modes, so this screen sits on
+        // the ink role and its text on onInk.
+        backgroundColor: k.ink,
         body: CustomMultiChildLayout(
           delegate: _SplashLayout(safeArea: MediaQuery.paddingOf(context)),
           children: [
@@ -121,29 +120,22 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
+                      horizontal: KSpace.gutter,
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           'Kharis',
-                          style: AppTypography.display(
-                            size: 44,
-                            weight: FontWeight.w700,
-                            color: Colors.white,
+                          style: KharisText.screenTitle.copyWith(
+                            color: k.onInk,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: KSpace.md),
                         Text(
                           'Changing the world with a touch of His Grace',
                           textAlign: TextAlign.center,
-                          style: AppTypography.serif(
-                            size: 17,
-                            italic: true,
-                            height: 1.4,
-                            color: dark.onBg,
-                          ),
+                          style: KharisText.body.copyWith(color: k.onInk),
                         ),
                       ],
                     ),
@@ -157,33 +149,34 @@ class _SplashScreenState extends State<SplashScreen>
                 opacity: _actions,
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
-                    AppSpacing.md,
+                    KSpace.gutter,
                     0,
-                    AppSpacing.md,
-                    AppSpacing.md + MediaQuery.paddingOf(context).bottom,
+                    KSpace.gutter,
+                    KSpace.gutter + MediaQuery.paddingOf(context).bottom,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: KSize.maxContentWidth,
+                        ),
+                        child: KButton(
+                          label: 'Get started',
+                          size: KButtonSize.cta,
+                          expand: true,
                           onPressed: () => context.go('/role-selection'),
-                          child: const Text('Get started'),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: KSpace.md),
                       // Returning members sign in with their Kharis app
                       // account.
                       _SignInRow(onTap: () => context.go('/login')),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: KSpace.x3),
                       Text(
                         'Establishing believers · Strengthening churches',
                         textAlign: TextAlign.center,
-                        style: AppTypography.labelMd.copyWith(
-                          color: dark.muted,
-                          letterSpacing: 0.2,
-                        ),
+                        style: KharisText.caption.copyWith(color: k.onInk),
                       ),
                     ],
                   ),
@@ -208,8 +201,8 @@ class _SplashLayout extends MultiChildLayoutDelegate {
 
   final EdgeInsets safeArea;
 
-  static const double _doveToTitle = 20;
-  static const double _minTitleToActions = 24;
+  static const double _doveToTitle = KSpace.gutter;
+  static const double _minTitleToActions = KSpace.section;
 
   @override
   void performLayout(Size size) {
@@ -228,7 +221,7 @@ class _SplashLayout extends MultiChildLayoutDelegate {
         _minTitleToActions -
         actionsTop;
     if (overflow > 0) {
-      final room = doveTop - safeArea.top - AppSpacing.md;
+      final room = doveTop - safeArea.top - KSpace.gutter;
       doveTop -= overflow.clamp(0, room > 0 ? room : 0);
     }
 
@@ -249,29 +242,27 @@ class _SignInRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppRadius.buttonBorder,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.lock_outline_rounded,
-              size: 18,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'I already have an account',
-              style: AppTypography.ui(
-                size: 15,
-                weight: FontWeight.w600,
-                color: Colors.white,
+    final onInk = context.k.onInk;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: const BorderRadius.all(Radius.circular(KRadius.button)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: KSize.touchMin),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              KIcon(KIcons.lock, size: KSize.iconMd, color: onInk),
+              const SizedBox(width: KSpace.md),
+              Flexible(
+                child: Text(
+                  'I already have an account',
+                  style: KharisText.link.copyWith(color: onInk),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

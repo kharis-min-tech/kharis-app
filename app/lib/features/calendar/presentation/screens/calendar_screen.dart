@@ -2,20 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
 import 'package:kharis_app/features/calendar/data/rsvp_repository.dart';
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
-import 'package:kharis_app/features/home/presentation/widgets/campus_card.dart';
-import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// Events tab (design-handoff v3). Segmented Upcoming / Past /
-/// My RSVPs tabs, a branch selector, and event cards with a photo banner, an
-/// overlaid date chip, title/time/location, and RSVP + Add-to-calendar actions.
+/// The events list (`/calendar`): the branch it lists, Upcoming / Past /
+/// My RSVPs tabs, and one card per event with "Remind me".
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
 
@@ -23,13 +21,22 @@ class CalendarScreen extends ConsumerStatefulWidget {
   ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-enum _EventTab { upcoming, past, rsvps }
+enum _EventTab {
+  upcoming('Upcoming'),
+  past('Past'),
+  rsvps('My RSVPs');
+
+  const _EventTab(this.label);
+
+  final String label;
+}
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   _EventTab _tab = _EventTab.upcoming;
 
   @override
   Widget build(BuildContext context) {
+    final k = context.k;
     // The member's branch is persisted state, read from
     // [currentBranchProvider] and written through [setActiveBranch]. The
     // only screen-level choice is the session "All branches" browse filter
@@ -39,36 +46,55 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
-          color: context.kc.accentInk,
-          backgroundColor: context.kc.surface,
-          onRefresh: _refresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _Header(
-                        branchLabel: branchLabel,
-                        isMemberBranch: branch != null,
-                        onTapBranch: _pickBranch,
-                      ),
-                      const SizedBox(height: 16),
-                      _SegmentedTabs(
-                        selected: _tab,
-                        onChanged: (t) => setState(() => _tab = t),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: RefreshIndicator(
+              color: k.primaryText,
+              backgroundColor: k.surface,
+              onRefresh: _refresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: KSpace.md),
+                        const KScreenHeader(title: 'Events'),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: KSpace.gutter,
+                          ),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: KTextLink(
+                              label: branch != null
+                                  ? 'Your branch \u00b7 $branchLabel'
+                                  : 'Showing \u00b7 $branchLabel',
+                              semanticLabel: branch != null
+                                  ? 'Your branch: $branchLabel. Change branch'
+                                  : 'Showing $branchLabel. Change branch',
+                              showChevron: true,
+                              onTap: _pickBranch,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: KSpace.md),
+                        KTabs(
+                          tabs: [for (final t in _EventTab.values) t.label],
+                          currentIndex: _tab.index,
+                          onChanged: (i) =>
+                              setState(() => _tab = _EventTab.values[i]),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  _tabSliver(branchLabel: branchLabel),
+                ],
               ),
-              _tabSliver(branchLabel: branchLabel),
-            ],
+            ),
           ),
         ),
       ),
@@ -103,42 +129,51 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }
   }
 
+  void _show(_EventTab tab) => setState(() => _tab = tab);
+
   Widget _tabSliver({required String branchLabel}) {
     switch (_tab) {
       case _EventTab.upcoming:
         return _eventsSliver(
           ref.watch(eventsUpcomingProvider),
-          emptyIcon: Icons.event_busy_outlined,
-          emptyTitle: 'No upcoming events',
-          emptySubtitle: 'Check back soon for events at $branchLabel.',
-          // Not a dead end: past events are one tap away.
-          emptyActionLabel: 'See past events',
-          onEmptyAction: () => setState(() => _tab = _EventTab.past),
-          // A quiet week still says when the branch meets.
-          emptyFooter: const CampusCard(
-            padding: EdgeInsets.only(top: 24),
-            showHeader: false,
+          empty: KEmptyState(
+            icon: KIcons.calendar,
+            title: 'No upcoming events',
+            hint: 'Check back soon for events at $branchLabel.',
+            // Not a dead end: past events are one tap away.
+            action: KButton(
+              label: 'See past events',
+              variant: KButtonVariant.outline,
+              onPressed: () => _show(_EventTab.past),
+            ),
           ),
         );
       case _EventTab.past:
         return _eventsSliver(
           ref.watch(eventsPastProvider),
-          emptyIcon: Icons.history_rounded,
-          emptyTitle: 'No past events',
-          emptySubtitle:
-              'Events at $branchLabel that have finished '
-              'will appear here.',
+          empty: KEmptyState(
+            icon: KIcons.calendar,
+            title: 'No past events',
+            hint: 'Events at $branchLabel that have finished appear here.',
+          ),
           capNote:
               'Showing the ${EventRepository.pastEventLimit} most recent '
               'events. Anything older is no longer listed.',
         );
       case _EventTab.rsvps:
         if (ref.watch(currentUserProvider).valueOrNull == null) {
-          return _signInSliver(
-            title: 'Sign in to see your RSVPs',
-            subtitle:
-                'Your RSVPs are saved to your account so they follow '
-                'you between devices.',
+          return _MessageSliver(
+            child: KEmptyState(
+              icon: KIcons.lock,
+              title: 'Sign in to see your RSVPs',
+              hint:
+                  'Your RSVPs are saved to your account so they follow you '
+                  'between devices.',
+              action: KButton(
+                label: 'Sign in',
+                onPressed: () => context.push('/login'),
+              ),
+            ),
           );
         }
         return _rsvpSliver(ref.watch(myRsvpEventsProvider));
@@ -149,51 +184,28 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   /// truncated archive never reads as the whole history.
   Widget _eventsSliver(
     AsyncValue<List<Event>> async, {
-    required IconData emptyIcon,
-    required String emptyTitle,
-    required String emptySubtitle,
-    String? emptyActionLabel,
-    VoidCallback? onEmptyAction,
-    Widget? emptyFooter,
+    required Widget empty,
     String? capNote,
   }) {
     return async.when(
       skipLoadingOnRefresh: true,
       loading: () => const _LoadingSliver(),
-      error: (_, _) => _messageSliver(
-        context,
-        icon: Icons.error_outline_rounded,
-        title: 'Unable to load events',
-        subtitle: 'Please check your connection and try again.',
-        actionLabel: 'Retry',
-        onAction: _refresh,
+      error: (_, _) => _MessageSliver(
+        child: KErrorState(
+          message: 'Events didn\u2019t load. Check your connection and retry.',
+          onRetry: _refresh,
+        ),
       ),
       data: (events) {
-        if (events.isEmpty) {
-          return _messageSliver(
-            context,
-            icon: emptyIcon,
-            title: emptyTitle,
-            subtitle: emptySubtitle,
-            actionLabel: emptyActionLabel,
-            onAction: onEmptyAction,
-            footer: emptyFooter,
-          );
-        }
+        if (events.isEmpty) return _MessageSliver(child: empty);
         final note = events.length >= EventRepository.pastEventLimit
             ? capNote
             : null;
-        return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 150),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              if (index == events.length) return _CapNote(text: note!);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: EventCard(event: events[index]),
-              );
-            }, childCount: events.length + (note == null ? 0 : 1)),
-          ),
+        return _ListSliver(
+          children: [
+            for (final event in events) EventCard(event: event),
+            if (note != null) _CapNote(text: note),
+          ],
         );
       },
     );
@@ -202,221 +214,138 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   /// "My RSVPs" is sectioned rather than flat: an RSVP'd event whose date has
   /// passed belongs under Past, never Upcoming. A group with no events
   /// contributes no header.
+  ///
+  /// The Past group is capped at [EventRepository.pastEventLimit] by
+  /// [myRsvpEventsProvider]; when it is full, a closing note says so rather
+  /// than letting a truncated list pass for the member's whole RSVP history.
   Widget _rsvpSliver(AsyncValue<RsvpEvents> async) {
     return async.when(
       skipLoadingOnRefresh: true,
       loading: () => const _LoadingSliver(),
-      error: (_, _) => _messageSliver(
-        context,
-        icon: Icons.error_outline_rounded,
-        title: 'Unable to load your RSVPs',
-        subtitle: 'Please check your connection and try again.',
-        actionLabel: 'Retry',
-        onAction: _refresh,
+      error: (_, _) => _MessageSliver(
+        child: KErrorState(
+          message:
+              'Your RSVPs didn\u2019t load. Check your connection and retry.',
+          onRetry: _refresh,
+        ),
       ),
       data: (grouped) {
         if (grouped.isEmpty) {
-          return _messageSliver(
-            context,
-            icon: Icons.check_circle_outline_rounded,
-            title: 'No RSVPs yet',
-            subtitle: 'Events you RSVP to will show up here.',
-            actionLabel: 'See upcoming events',
-            onAction: () => setState(() => _tab = _EventTab.upcoming),
+          return _MessageSliver(
+            child: KEmptyState(
+              icon: KIcons.check,
+              title: 'No RSVPs yet',
+              hint: 'Events you RSVP to will show up here.',
+              action: KButton(
+                label: 'See upcoming events',
+                variant: KButtonVariant.outline,
+                onPressed: () => _show(_EventTab.upcoming),
+              ),
+            ),
           );
         }
-        final rows = _rsvpRows(grouped);
-        return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 150),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => switch (rows[index]) {
-                _RsvpHeaderRow(:final label) => _GroupHeader(label: label),
-                _RsvpCardRow(:final event) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: EventCard(event: event),
-                ),
-                _RsvpNoteRow(:final text) => _CapNote(text: text),
-              },
-              childCount: rows.length,
-            ),
-          ),
+        return _ListSliver(
+          children: [
+            if (grouped.upcoming.isNotEmpty) ...[
+              const _GroupHeader(title: 'Upcoming'),
+              for (final event in grouped.upcoming) EventCard(event: event),
+            ],
+            if (grouped.past.isNotEmpty) ...[
+              const _GroupHeader(title: 'Past'),
+              for (final event in grouped.past) EventCard(event: event),
+            ],
+            if (grouped.past.length >= EventRepository.pastEventLimit)
+              const _CapNote(
+                text:
+                    'Showing your ${EventRepository.pastEventLimit} most '
+                    'recent past RSVPs.',
+              ),
+          ],
         );
       },
     );
   }
-
-  Widget _signInSliver({required String title, required String subtitle}) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 60, 20, 150),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock_outline_rounded, color: context.kc.muted, size: 44),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              style: AppTypography.ui(
-                size: 15,
-                weight: FontWeight.w600,
-              ).copyWith(color: context.kc.onBg),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: AppTypography.ui(
-                size: 13,
-              ).copyWith(color: context.kc.muted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 18),
-            // DESIGN.md: one CTA style, gold with gold ink.
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: context.kc.accent,
-                foregroundColor: context.kc.onAccent,
-                minimumSize: const Size(0, 44),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 12,
-                ),
-              ),
-              onPressed: () => context.push('/login'),
-              child: Text(
-                'Sign in',
-                style: AppTypography.ui(size: 14, weight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
-Widget _messageSliver(
-  BuildContext context, {
-  required IconData icon,
-  required String title,
-  required String subtitle,
-  String? actionLabel,
-  VoidCallback? onAction,
-  Widget? footer,
-}) {
-  return SliverToBoxAdapter(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(20, 60, 20, 150),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: context.kc.muted, size: 44),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: AppTypography.ui(
-              size: 15,
-              weight: FontWeight.w600,
-            ).copyWith(color: context.kc.onBg),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: AppTypography.ui(size: 13).copyWith(color: context.kc.muted),
-            textAlign: TextAlign.center,
-          ),
-          if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: onAction,
-              child: Text(
-                actionLabel,
-                style: AppTypography.ui(
-                  size: 14,
-                  weight: FontWeight.w700,
-                ).copyWith(color: context.kc.accentInk),
-              ),
-            ),
-          ],
-          ?footer,
-        ],
-      ),
-    ),
-  );
-}
+const EdgeInsets _listPadding = EdgeInsets.fromLTRB(
+  KSpace.gutter,
+  KSpace.x3,
+  KSpace.gutter,
+  KSpace.section,
+);
 
-class _LoadingSliver extends StatelessWidget {
-  const _LoadingSliver();
+/// Event cards (and the headers and notes between them), [KSpace.lg] apart.
+class _ListSliver extends StatelessWidget {
+  const _ListSliver({required this.children});
+
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 60),
-        child: Center(
-          child: CircularProgressIndicator(
-            color: context.kc.onChip,
-            strokeWidth: 2,
-          ),
+    return SliverPadding(
+      padding: _listPadding,
+      sliver: SliverList.separated(
+        itemCount: children.length,
+        itemBuilder: (_, index) => children[index],
+        separatorBuilder: (_, _) => const SizedBox(height: KSpace.lg),
+      ),
+    );
+  }
+}
+
+/// An empty or error state, centred in the space under the tabs.
+class _MessageSliver extends StatelessWidget {
+  const _MessageSliver({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverFillRemaining(
+      hasScrollBody: false,
+      child: Center(child: child),
+    );
+  }
+}
+
+/// Blocks the size of event cards while the list loads.
+class _LoadingSliver extends StatelessWidget {
+  const _LoadingSliver();
+
+  static const int _cards = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: _listPadding,
+      sliver: SliverList.separated(
+        itemCount: _cards,
+        itemBuilder: (_, _) => const KSkeleton(
+          height: KSize.dateBlockHeight + 2 * KSpace.xxl,
+          radius: KRadius.card,
         ),
+        separatorBuilder: (_, _) => const SizedBox(height: KSpace.lg),
       ),
     );
   }
 }
 
-// ── My RSVPs sections ─────────────────────────────────────────────────────────
+/// "Upcoming" / "Past" above a group of RSVPs.
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({required this.title});
 
-/// One row of the sectioned "My RSVPs" list.
-sealed class _RsvpRow {
-  const _RsvpRow();
-}
+  final String title;
 
-class _RsvpHeaderRow extends _RsvpRow {
-  const _RsvpHeaderRow(this.label);
-
-  final String label;
-}
-
-class _RsvpCardRow extends _RsvpRow {
-  const _RsvpCardRow(this.event);
-
-  final Event event;
-}
-
-class _RsvpNoteRow extends _RsvpRow {
-  const _RsvpNoteRow(this.text);
-
-  final String text;
-}
-
-/// Flattens [grouped] into header + card rows.
-///
-/// The Past group is capped at [EventRepository.pastEventLimit] by
-/// [myRsvpEventsProvider]; when it is full, a closing note says so rather
-/// than letting a truncated list pass for the member's whole RSVP history.
-List<_RsvpRow> _rsvpRows(RsvpEvents grouped) {
-  final rows = <_RsvpRow>[];
-
-  void addGroup(String label, List<Event> events) {
-    if (events.isEmpty) return;
-    rows.add(_RsvpHeaderRow(label));
-    for (final event in events) {
-      rows.add(_RsvpCardRow(event));
-    }
-  }
-
-  addGroup('Upcoming', grouped.upcoming);
-  addGroup('Past', grouped.past);
-  if (grouped.past.length >= EventRepository.pastEventLimit) {
-    rows.add(
-      _RsvpNoteRow(
-        'Showing your ${EventRepository.pastEventLimit} most recent past '
-        'RSVPs.',
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Text(
+        title,
+        style: KharisText.title.copyWith(color: context.k.text),
       ),
     );
   }
-  return rows;
 }
 
 /// Closing line under a list that has been trimmed to a view cap. Quiet by
@@ -428,213 +357,10 @@ class _CapNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 14),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: AppTypography.ui(size: 12).copyWith(color: context.kc.muted),
-      ),
-    );
-  }
-}
-
-class _GroupHeader extends StatelessWidget {
-  const _GroupHeader({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        label.toUpperCase(),
-        style: AppTypography.ui(
-          size: 11,
-          weight: FontWeight.w700,
-          letterSpacing: 0.8,
-        ).copyWith(color: context.kc.muted),
-      ),
-    );
-  }
-}
-
-// ── Header ───────────────────────────────────────────────────────────────────
-
-/// Screen title plus the branch chip. The chip is captioned "YOUR BRANCH"
-/// while it shows the member's branch: choosing a branch there changes it
-/// everywhere. "All branches" is a browse filter, captioned "SHOWING".
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.branchLabel,
-    required this.isMemberBranch,
-    required this.onTapBranch,
-  });
-
-  final String branchLabel;
-  final bool isMemberBranch;
-  final VoidCallback onTapBranch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Text(
-            'Events',
-            style: AppTypography.display(
-              size: 27,
-              weight: FontWeight.w700,
-            ).copyWith(color: context.kc.onBg),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Semantics(
-            button: true,
-            label: isMemberBranch
-                ? 'Your branch: $branchLabel. Change branch'
-                : 'Showing $branchLabel. Change branch',
-            excludeSemantics: true,
-            child: GestureDetector(
-              onTap: onTapBranch,
-              behavior: HitTestBehavior.opaque,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.kc.surface,
-                    borderRadius: AppRadius.pillBorder,
-                    boxShadow: AppShadows.card,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isMemberBranch ? 'YOUR BRANCH' : 'SHOWING',
-                        style: AppTypography.ui(
-                          size: 9,
-                          weight: FontWeight.w700,
-                          letterSpacing: 0.7,
-                        ).copyWith(color: context.kc.muted),
-                      ),
-                      const SizedBox(height: 1),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              branchLabel,
-                              style: AppTypography.ui(
-                                size: 13,
-                                weight: FontWeight.w600,
-                              ).copyWith(color: context.kc.onChip),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 16,
-                            color: context.kc.onChip,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-// ── Segmented tabs ────────────────────────────────────────────────────────────
-
-class _SegmentedTabs extends StatelessWidget {
-  const _SegmentedTabs({required this.selected, required this.onChanged});
-
-  final _EventTab selected;
-  final ValueChanged<_EventTab> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _TabChip(
-          label: 'Upcoming',
-          active: selected == _EventTab.upcoming,
-          onTap: () => onChanged(_EventTab.upcoming),
-        ),
-        const SizedBox(width: 9),
-        _TabChip(
-          label: 'Past',
-          active: selected == _EventTab.past,
-          onTap: () => onChanged(_EventTab.past),
-        ),
-        const SizedBox(width: 9),
-        _TabChip(
-          label: 'My RSVPs',
-          active: selected == _EventTab.rsvps,
-          onTap: () => onChanged(_EventTab.rsvps),
-        ),
-      ],
-    );
-  }
-}
-
-class _TabChip extends StatelessWidget {
-  const _TabChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    // Selection is announced, not only coloured. 5 px of slack above and
-    // below lifts the 35 px chip to a 45 px target.
-    return Semantics(
-      button: true,
-      selected: active,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-            decoration: BoxDecoration(
-              color: active ? AppColors.primary : context.kc.surfaceMuted,
-              borderRadius: AppRadius.pillBorder,
-            ),
-            child: Text(
-              label,
-              style:
-                  AppTypography.ui(
-                    size: 13,
-                    weight: active ? FontWeight.w700 : FontWeight.w600,
-                  ).copyWith(
-                    color: active ? AppColors.onPrimary : context.kc.muted,
-                  ),
-            ),
-          ),
-        ),
-      ),
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: KharisText.caption.copyWith(color: context.k.muted),
     );
   }
 }

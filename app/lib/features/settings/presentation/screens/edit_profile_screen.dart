@@ -2,12 +2,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// Whether [user] has an editable member profile. Guests (anonymous
 /// sessions) and signed-out sessions do not.
@@ -15,8 +16,8 @@ bool hasMemberProfile(User? user) =>
     user != null && user.role != 'guest' && user.email.isNotEmpty;
 
 /// Lets a signed-in member edit their display name, avatar, phone and
-/// birthday. The campus row opens the shared branch sheet, which persists
-/// through [setActiveBranch] like every other campus change. Guests see a
+/// birthday. The branch row opens the shared branch sheet, which persists
+/// through [setActiveBranch] like every other branch change. Guests see a
 /// sign-in prompt instead of a form that cannot save.
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -46,6 +47,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
+    final k = context.k;
+    SnackBar failure(String message) => SnackBar(
+      content: Text(message, style: KharisText.body.copyWith(color: k.onError)),
+      backgroundColor: k.error,
+    );
     try {
       final photo = _photoController.text.trim();
       final phone = _phoneController.text.trim();
@@ -63,22 +69,24 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } on FirebaseException catch (e) {
       // Surface the real reason: a permission or network failure reads very
       // differently to the member.
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Could not save: ${e.message ?? e.code}'),
-          backgroundColor: AppColors.errorContainer,
-        ),
-      );
+      messenger.showSnackBar(failure('Could not save: ${e.message ?? e.code}'));
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Could not save. Please try again.'),
-          backgroundColor: AppColors.errorContainer,
-        ),
-      );
+      messenger.showSnackBar(failure('Could not save. Please try again.'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dob ?? DateTime(now.year - 25, now.month, now.day),
+      firstDate: DateTime(1920),
+      lastDate: now,
+      helpText: 'Date of birth',
+    );
+    if (picked != null) setState(() => _dob = picked);
   }
 
   @override
@@ -89,12 +97,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     final Widget body;
     if (userAsync.isLoading && user == null) {
-      body = Center(
-        child: CircularProgressIndicator(
-          color: context.kc.accentInk,
-          strokeWidth: 2.4,
-        ),
-      );
+      body = const _FormSkeleton();
     } else if (!hasMemberProfile(user)) {
       body = const _SignInPrompt();
     } else {
@@ -110,224 +113,127 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: context.kc.onBg),
-        title: Text(
-          'Edit profile',
-          style: AppTypography.display(
-            size: 18,
-            weight: FontWeight.w700,
-          ).copyWith(color: context.kc.onBg),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(
+                top: KSpace.md,
+                bottom: KSpace.section,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const KScreenHeader(title: 'Edit profile'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      KSpace.gutter,
+                      KSpace.x3,
+                      KSpace.gutter,
+                      0,
+                    ),
+                    child: body,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-      body: SafeArea(top: false, child: body),
     );
   }
 
   Widget _form(String? branch) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _label('Display name'),
-            _field(
-              controller: _nameController,
-              hint: 'Your name',
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-            ),
-            const SizedBox(height: 20),
-            _label('Home branch'),
-            _CampusRow(
-              label: branch ?? kChooseBranchLabel,
-              onTap: () => pickActiveBranch(context, ref),
-            ),
-            const SizedBox(height: 20),
-            _label('Avatar image URL (optional)'),
-            _field(
-              controller: _photoController,
-              hint: 'https://...',
-              keyboardType: TextInputType.url,
-            ),
-            const SizedBox(height: 20),
-            _label('Phone (optional)'),
-            _field(
-              controller: _phoneController,
-              hint: '+44 ...',
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 20),
-            _label('Birthday (optional)'),
-            GestureDetector(
-              onTap: () async {
-                final now = DateTime.now();
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate:
-                      _dob ?? DateTime(now.year - 25, now.month, now.day),
-                  firstDate: DateTime(1920),
-                  lastDate: now,
-                  helpText: 'Date of birth',
-                );
-                if (picked != null) setState(() => _dob = picked);
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 15,
+    final k = context.k;
+    final dob = _dob;
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          KTextField(
+            label: 'Display name',
+            controller: _nameController,
+            hint: 'Your name',
+            textCapitalization: TextCapitalization.words,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Enter your name' : null,
+          ),
+          const SizedBox(height: KSpace.gutter),
+          KFieldLabel(
+            label: 'Home branch',
+            child: KListGroup(
+              children: [
+                KListRow(
+                  key: const ValueKey('profile-campus-row'),
+                  title: branch ?? kChooseBranchLabel,
+                  trailing: Text(
+                    'Change',
+                    style: KharisText.link.copyWith(color: k.primaryText),
+                  ),
+                  onTap: () => pickActiveBranch(context, ref),
                 ),
-                decoration: BoxDecoration(
-                  color: context.kc.surface,
-                  borderRadius: AppRadius.inputBorder,
-                  border: Border.all(color: context.kc.outline),
-                ),
-                child: Text(
-                  _dob == null
+              ],
+            ),
+          ),
+          const SizedBox(height: KSpace.gutter),
+          KTextField(
+            label: 'Avatar image URL (optional)',
+            controller: _photoController,
+            hint: 'https://...',
+            keyboardType: TextInputType.url,
+          ),
+          const SizedBox(height: KSpace.gutter),
+          KTextField(
+            label: 'Phone (optional)',
+            controller: _phoneController,
+            hint: '+44 ...',
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: KSpace.gutter),
+          KFieldLabel(
+            label: 'Birthday (optional)',
+            child: KListGroup(
+              children: [
+                KListRow(
+                  key: const ValueKey('profile-birthday-row'),
+                  title: dob == null
                       ? 'Add your birthday'
-                      : '${_dob!.day.toString().padLeft(2, '0')}/'
-                            '${_dob!.month.toString().padLeft(2, '0')}/'
-                            '${_dob!.year}',
-                  style: AppTypography.ui(size: 15).copyWith(
-                    color: _dob == null ? context.kc.muted : context.kc.onBg,
-                  ),
+                      : DateFormat('d MMMM y').format(dob),
+                  showChevron: true,
+                  onTap: _pickBirthday,
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.kc.accent,
-                  foregroundColor: context.kc.onAccent,
-                  disabledBackgroundColor: context.kc.accent.withValues(
-                    alpha: 0.5,
-                  ),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          color: context.kc.onAccent,
-                        ),
-                      )
-                    : Text(
-                        'Save changes',
-                        style: AppTypography.ui(
-                          size: 15,
-                          weight: FontWeight.w700,
-                          color: context.kc.onAccent,
-                        ),
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(left: 2, bottom: 8),
-    child: Text(
-      text,
-      style: AppTypography.ui(
-        size: 13,
-        weight: FontWeight.w600,
-      ).copyWith(color: context.kc.onBg),
-    ),
-  );
-
-  Widget _field({
-    required TextEditingController controller,
-    required String hint,
-    String? Function(String?)? validator,
-    TextInputType? keyboardType,
-  }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      keyboardType: keyboardType,
-      style: AppTypography.ui(size: 15).copyWith(color: context.kc.onBg),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: AppTypography.ui(size: 15).copyWith(color: context.kc.muted),
-        filled: true,
-        fillColor: context.kc.surface,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide(color: context.kc.outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide(color: context.kc.accentInk, width: 1.4),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide(color: context.kc.danger),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: AppRadius.inputBorder,
-          borderSide: BorderSide(color: context.kc.danger, width: 1.4),
-        ),
+          ),
+          const SizedBox(height: KSpace.section),
+          KButton(
+            label: 'Save changes',
+            expand: true,
+            loading: _saving,
+            onPressed: _save,
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Campus row: shows the active campus and opens the shared branch sheet.
-class _CampusRow extends StatelessWidget {
-  const _CampusRow({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
+/// Field-sized blocks while the member's profile loads.
+class _FormSkeleton extends StatelessWidget {
+  const _FormSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return GestureDetector(
-      key: const ValueKey('profile-campus-row'),
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-        decoration: BoxDecoration(
-          color: kc.surface,
-          borderRadius: AppRadius.inputBorder,
-          border: Border.all(color: kc.outline),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: AppTypography.ui(size: 15).copyWith(color: kc.onBg),
-              ),
-            ),
-            Text(
-              'Change',
-              style: AppTypography.ui(
-                size: 13,
-                weight: FontWeight.w600,
-              ).copyWith(color: kc.onChip),
-            ),
-          ],
-        ),
-      ),
+    return Column(
+      children: [
+        for (var i = 0; i < 5; i++) ...[
+          if (i > 0) const SizedBox(height: KSpace.gutter),
+          const KSkeleton(height: KSize.listRow),
+        ],
+      ],
     );
   }
 }
@@ -339,66 +245,27 @@ class _SignInPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.person_outline_rounded, size: 48, color: kc.muted),
-            const SizedBox(height: 14),
-            Text(
-              'Sign in to edit your profile',
-              textAlign: TextAlign.center,
-              style: AppTypography.display(
-                size: 20,
-                weight: FontWeight.w700,
-              ).copyWith(color: kc.onBg),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your name, photo and details are saved to your Kharis account.',
-              textAlign: TextAlign.center,
-              style: AppTypography.ui(
-                size: 14,
-                height: 1.45,
-              ).copyWith(color: kc.muted),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: () => context.push('/login'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kc.accent,
-                  foregroundColor: kc.onAccent,
-                  elevation: 0,
-                ),
-                child: Text(
-                  'Sign in',
-                  style: AppTypography.ui(
-                    size: 15,
-                    weight: FontWeight.w700,
-                    color: kc.onAccent,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => context.push('/register'),
-              child: Text(
-                'Create an account',
-                style: AppTypography.ui(
-                  size: 14,
-                  weight: FontWeight.w600,
-                ).copyWith(color: kc.accentInk),
-              ),
-            ),
-          ],
-        ),
+    return KEmptyState(
+      icon: KIcons.users,
+      title: 'Sign in to edit your profile',
+      hint: 'Your name, photo and details are saved to your Kharis account.',
+      action: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          KButton(
+            label: 'Sign in',
+            expand: true,
+            onPressed: () => context.push('/login'),
+          ),
+          const SizedBox(height: KSpace.md),
+          KButton(
+            label: 'Create an account',
+            variant: KButtonVariant.text,
+            expand: true,
+            onPressed: () => context.push('/register'),
+          ),
+        ],
       ),
     );
   }

@@ -16,6 +16,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -152,40 +153,37 @@ Future<void> scrollUntilFound(
   throw TestFailure('Timed out scrolling for $finder');
 }
 
-/// Taps the bottom-most match of [label]: the tab bar item, even when the
-/// same word appears in the page above it. The bar slides away while a list
-/// scrolls down, so a small scroll up brings it back first.
-Future<void> tapNav(WidgetTester tester, String label) async {
-  await _revealTabBar(tester);
-  final matches = find.text(label);
-  await pumpUntilFound(tester, matches, reason: 'tab "$label"');
-  var best = 0;
-  var bestDy = -1.0;
-  for (var i = 0; i < matches.evaluate().length; i++) {
-    final dy = tester.getCenter(matches.at(i)).dy;
-    if (dy > bestDy) {
-      bestDy = dy;
-      best = i;
-    }
-  }
-  await tester.tap(matches.at(best), warnIfMissed: false);
-  await pumpFor(tester, const Duration(milliseconds: 700));
-}
+/// The app's four tabs: nav label to shell path.
+const navTabs = <String, String>{
+  'Home': '/home',
+  'Messages': '/messages',
+  'Bible': '/bible',
+  'More': '/more',
+};
 
-/// Scrolls the visible page up a little when the shell's bottom bar has slid
-/// off screen, which is how a member brings it back.
-Future<void> _revealTabBar(WidgetTester tester) async {
-  final bar = find.byKey(const Key('dashboard-bottom-bar'));
-  if (bar.evaluate().isEmpty) return;
-  final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
-  for (var i = 0; i < 3; i++) {
-    if (tester.getRect(bar).top < screen.height - 8) return;
-    await tester.dragFrom(
-      Offset(screen.width / 2, screen.height * 0.5),
-      const Offset(0, 80),
-    );
-    await pumpFor(tester, const Duration(milliseconds: 500));
+/// The floating nav, when the tab shell is the screen on top.
+final Finder _floatingNav = find.byKey(const Key('dashboard-nav'));
+
+GoRouter appRouter(WidgetTester tester) => ProviderScope.containerOf(
+  tester.element(find.byType(MaterialApp)),
+  listen: false,
+).read(appRouterProvider);
+
+/// Opens the tab labelled [label] (Home, Messages, Bible, More) by tapping
+/// it in the floating nav. When a pushed screen, a sheet or the keyboard has
+/// the nav out of reach, goes to the tab's path through the router instead.
+/// Events and Give are not tabs: open them from their real entry points
+/// (`openEvents` / `openGive` in actions.dart).
+Future<void> tapNav(WidgetTester tester, String label) async {
+  final path = navTabs[label];
+  if (path == null) throw TestFailure('No tab is labelled "$label"');
+  final tab = find.descendant(of: _floatingNav, matching: find.text(label));
+  if (tab.evaluate().isEmpty) {
+    appRouter(tester).go(path);
+  } else {
+    await tester.tap(tab, warnIfMissed: false);
   }
+  await pumpFor(tester, const Duration(milliseconds: 700));
 }
 
 /// Taps the first match of [finder] after scrolling it into view.
@@ -236,38 +234,40 @@ List<String> paintedTexts({Finder? within}) => [
     (e.widget as RichText).text.toPlainText(),
 ];
 
-/// Back / close affordances the app uses on pushed surfaces.
-final _backIcons = <IconData>{
-  Icons.arrow_back,
-  Icons.arrow_back_rounded,
-  Icons.arrow_back_ios,
-  Icons.arrow_back_ios_new,
-  Icons.arrow_back_ios_new_rounded,
-  Icons.keyboard_arrow_down_rounded,
-  Icons.chevron_left_rounded,
-  Icons.close,
-  Icons.close_rounded,
-};
+/// The route on top of the app's root navigator (pages, sheets, dialogs).
+Route<dynamic>? topRoute(WidgetTester tester) {
+  Route<dynamic>? top;
+  appRouter(tester).routerDelegate.navigatorKey.currentState?.popUntil((r) {
+    top ??= r;
+    return true;
+  });
+  return top;
+}
 
-/// Taps the top-left-most back affordance (the app-bar leading button).
-Future<void> tapBack(WidgetTester tester) async {
-  final candidates = find.byWidgetPredicate(
-    (w) => w is BackButton || (w is Icon && _backIcons.contains(w.icon)),
-  );
-  if (candidates.evaluate().isEmpty) {
-    throw TestFailure('no back affordance on screen');
-  }
-  var best = 0;
-  var bestScore = double.infinity;
-  for (var i = 0; i < candidates.evaluate().length; i++) {
-    final c = tester.getCenter(candidates.at(i));
-    final score = c.dy * 10 + c.dx;
-    if (score < bestScore) {
-      bestScore = score;
-      best = i;
+/// Where the member is: the root navigator's top route (pages, sheets,
+/// dialogs) plus the router location (routes inside the tab shell).
+String _whereAmI(WidgetTester tester) =>
+    '${identityHashCode(topRoute(tester))}|'
+    '${appRouter(tester).routerDelegate.currentConfiguration.uri}';
+
+/// Leaves the screen on top the way a member does, since the redesign has
+/// no on-screen back buttons: a pushed page by the iOS edge swipe-back; a
+/// sheet or dialog (or a page the swipe did not leave) by the system back,
+/// as Android's back button does.
+Future<void> goBack(WidgetTester tester) async {
+  final before = _whereAmI(tester);
+  if (topRoute(tester) is PageRoute) {
+    final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+    final gesture = await tester.startGesture(Offset(4, size.height / 2));
+    for (var i = 1; i <= 8; i++) {
+      await gesture.moveTo(Offset(4 + size.width * 0.08 * i, size.height / 2));
+      await tester.pump(const Duration(milliseconds: 16));
     }
+    await gesture.up();
+    await pumpFor(tester, const Duration(milliseconds: 800));
+    if (_whereAmI(tester) != before) return;
   }
-  await tester.tap(candidates.at(best), warnIfMissed: false);
+  await tester.binding.handlePopRoute();
   await pumpFor(tester, const Duration(milliseconds: 800));
 }
 

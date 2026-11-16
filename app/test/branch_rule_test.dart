@@ -2,7 +2,6 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
@@ -18,8 +17,10 @@ import 'package:kharis_app/shared/providers/location_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_location_service.dart';
+import 'support/more_screen_overrides.dart';
 
 /// Every member has a branch: "All branches" is no longer a member's
 /// choice, "Use my location" picks the nearest branch, and Home follows the
@@ -35,8 +36,6 @@ Branch _branch(String name, double lat, double lng) => Branch(
   id: name.toLowerCase(),
   name: name,
   subtitle: '$name branch',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
   venues: [CampusVenue(id: '$name-hall', latitude: lat, longitude: lng)],
 );
 
@@ -48,8 +47,6 @@ const _online = Branch(
   id: 'online',
   name: 'Online',
   subtitle: '',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
 );
 
 /// About a mile from the Bristol venue.
@@ -59,7 +56,6 @@ const _nearBristol = GeoPoint(51.47, -2.6);
 const _nearLondon = GeoPoint(51.51, -0.13);
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('nearestBranch', () {
     test('picks the branch whose venue is closest, skipping venue-less '
@@ -166,6 +162,7 @@ void main() {
         UncontrolledProviderScope(
           container: c,
           child: MaterialApp(
+            theme: KharisTheme.light(),
             home: Scaffold(
               body: Consumer(
                 builder: (context, ref, _) => TextButton(
@@ -291,14 +288,18 @@ void main() {
           firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
           currentUserProvider.overrideWith((ref) => Stream.value(member)),
           currentBranchProvider.overrideWith((ref) => Stream.value(null)),
+          ...moreScreenOverrides(),
         ],
-        child: const MaterialApp(home: SettingsScreen()),
+        child: MaterialApp(
+          theme: KharisTheme.light(),
+          home: const SettingsScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Switch branch'), findsOneWidget);
     expect(find.text('Choose your branch'), findsOneWidget);
+    expect(find.text('Choose branch'), findsOneWidget);
     expect(find.text('All branches'), findsNothing);
   });
 }

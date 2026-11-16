@@ -8,7 +8,9 @@ import 'package:kharis_app/features/calendar/presentation/screens/event_detail_s
 import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
+import '../support/actions.dart';
 import '../support/channels.dart';
 import '../support/harness.dart';
 import '../support/live_data.dart';
@@ -72,16 +74,20 @@ Future<void> eventsJourney(Journey j) async {
   );
 
   await j.launch();
-  await tapNav(t, 'Events');
+  await openEvents(t);
   await pumpUntilFound(t, find.byType(CalendarScreen));
-  // Browse All branches (the Events tab filter): every Studio event applies.
-  final chip = _inCalendar(find.text('YOUR BRANCH'));
+  // Browse All branches (the events list's filter): every Studio event
+  // applies.
+  final chip = _inCalendar(find.textContaining('Your branch \u00b7 '));
   await pumpUntilFound(t, chip);
   await t.tap(chip, warnIfMissed: false);
   final all = find.byKey(const ValueKey('branch-choice-all'));
   await pumpUntilFound(t, all, reason: 'branch picker sheet');
   await t.tap(all, warnIfMissed: false);
-  await pumpUntilFound(t, _inCalendar(find.text('All branches')));
+  await pumpUntilFound(
+    t,
+    _inCalendar(find.text('Showing \u00b7 $kAllCampusesLabel')),
+  );
   await pumpUntil(
     t,
     () =>
@@ -127,7 +133,7 @@ Future<void> eventsJourney(Journey j) async {
     );
     if (e.weekly && cards.evaluate().isNotEmpty) {
       j.check(
-        paintedTexts(within: cards.first).contains(e.everyLabel),
+        paintedTexts(within: cards.first).any((s) => s.contains(e.everyLabel)),
         'weekly "${e.title}" card reads "${e.everyLabel}" '
         '(painted ${paintedTexts(within: cards.first)})',
       );
@@ -205,8 +211,8 @@ Future<void> eventsJourney(Journey j) async {
     j.check(
       paintedTexts(
         within: find.byKey(const Key('event-detail-recurrence')),
-      ).any((s) => s.contains(target.everyLabel)),
-      'detail repeats "${target.everyLabel}"',
+      ).any((s) => s.toUpperCase() == target.everyDays.toUpperCase()),
+      'detail repeats "${target.everyDays}"',
     );
   }
   await j.shot('detail');
@@ -273,7 +279,7 @@ Future<void> eventsJourney(Journey j) async {
   final rsvp = find.descendant(of: detail, matching: find.text('RSVP'));
   final going = find.descendant(
     of: detail,
-    matching: find.text('Going \u2713'),
+    matching: find.text('Going'),
   );
   await tapVisible(t, rsvp);
   j.check(
@@ -282,7 +288,7 @@ Future<void> eventsJourney(Journey j) async {
       () => going.evaluate().isNotEmpty,
       timeout: const Duration(seconds: 20),
     ),
-    'RSVP turns into "Going ✓"',
+    'RSVP turns into "Going"',
   );
   j.check(
     await pumpUntil(
@@ -293,7 +299,7 @@ Future<void> eventsJourney(Journey j) async {
     'RSVP saved to the account',
   );
   await j.shot('rsvp-going');
-  await tapBack(t);
+  await goBack(t);
   await pumpUntilFound(t, find.byType(CalendarScreen));
   await _tab(t, 'My RSVPs');
   j.check(
@@ -316,7 +322,7 @@ Future<void> eventsJourney(Journey j) async {
       () => rsvp.evaluate().isNotEmpty,
       timeout: const Duration(seconds: 20),
     ),
-    'tapping "Going ✓" cancels the RSVP',
+    'tapping "Going" cancels the RSVP',
   );
   j.check(
     await pumpUntil(
@@ -326,7 +332,7 @@ Future<void> eventsJourney(Journey j) async {
     ),
     'RSVP removed from the account',
   );
-  await tapBack(t);
+  await goBack(t);
   await pumpUntilFound(t, find.byType(CalendarScreen));
   await _tab(t, 'My RSVPs');
   j.check(

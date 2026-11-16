@@ -1,45 +1,49 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kharis_app/features/bible/presentation/screens/bible_screen.dart';
+import 'package:kharis_app/features/bible/presentation/screens/reading_screen.dart';
+import 'package:kharis_app/features/bible/presentation/widgets/passage_picker.dart';
 import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
-import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
-import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
-import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-import '../support/actions.dart';
 import '../support/harness.dart';
 import '../support/live_data.dart';
 
 Finder _inReader(Finder f) =>
     find.descendant(of: find.byType(ReadingScreen), matching: f);
 
-/// The reference heading ("John 3", "John 3:16") without the chevron.
+Finder get _picker => find.byType(PassagePicker);
+
+/// The chapter heading over the verses ("John 3").
 String _label(WidgetTester t) {
-  final ref = _inReader(find.byKey(const Key('bible-reference')));
-  if (ref.evaluate().isEmpty) return '';
-  return paintedTexts(within: ref)
-      .join()
-      // No-break space, the chevron's placeholder and its icon-font glyph.
-      .replaceAll(RegExp(r'[\u00A0\uFFFC\uE000-\uF8FF]'), '')
-      .trim();
+  final title = _inReader(find.byKey(const Key('bible-chapter-title')));
+  if (title.evaluate().isEmpty) return '';
+  return t.widget<Text>(title.first).data ?? '';
 }
+
+/// The verse numbers marked in the open chapter (a searched or linked verse).
+Set<int> _markedVerses(WidgetTester t) => {
+  for (final e in _inReader(find.byType(KVerse)).evaluate())
+    for (final p in (e.widget as KVerse).parts)
+      if (p.marked && p.number != null) p.number!,
+};
 
 Future<bool> _passageLoaded(Journey j) async {
   final t = j.tester;
   return pumpUntil(
     t,
     () =>
-        _inReader(find.byType(CircularProgressIndicator)).evaluate().isEmpty &&
+        _inReader(find.byKey(const Key('bible-loading'))).evaluate().isEmpty &&
         _label(t).isNotEmpty &&
-        (paintedTexts(
-              within: find.byType(ReadingScreen),
-            ).where((s) => s.length > 60).isNotEmpty ||
+        (_inReader(find.byKey(const Key('bible-text'))).evaluate().isNotEmpty ||
             _inReader(
               find.text('This passage isn\u2019t available'),
             ).evaluate().isNotEmpty),
@@ -47,67 +51,54 @@ Future<bool> _passageLoaded(Journey j) async {
   );
 }
 
-/// Opens the book list from the reference and picks [title] chapter [chapter].
+/// In the open passage picker, picks [usfm] ([title]) chapter [chapter].
+Future<void> _chooseInPicker(
+  Journey j,
+  String usfm,
+  int chapters,
+  int chapter, {
+  required bool newTestament,
+}) async {
+  final t = j.tester;
+  await pumpUntilFound(t, _picker);
+  final sheet = verticalScrollableIn(_picker);
+  final testament = find.byKey(
+    Key('bible-testament-${newTestament ? 'newTestament' : 'old'}'),
+  );
+  if (testament.evaluate().isNotEmpty) {
+    await tapVisible(t, testament);
+    await pumpFor(t, const Duration(milliseconds: 400));
+  }
+  final book = find.byKey(Key('bible-book-$usfm'));
+  await scrollUntilFound(t, book, scrollable: sheet);
+  await tapVisible(t, book);
+  if (chapters > 1) {
+    final cell = find.byKey(Key('bible-chapter-$chapter'));
+    await scrollUntilFound(t, cell, scrollable: sheet);
+    await tapVisible(t, cell);
+  }
+  await pumpUntil(t, () => _picker.evaluate().isEmpty);
+  await _passageLoaded(j);
+}
+
+/// Opens the picker from the reader's reference and picks a chapter.
 Future<void> _pickChapter(
   Journey j,
-  String title,
-  int chapters,
-  int chapter,
-) async {
-  // A verse search scrolls the passage: bring the heading back first.
+  ({String usfm, String title, int chapters}) book,
+  int chapter, {
+  required bool newTestament,
+}) async {
   await tapVisible(
     j.tester,
     _inReader(find.byKey(const Key('bible-reference'))),
   );
-  await _chooseFromBooks(j, title, chapters, chapter);
-}
-
-/// On the book list (pushed, or More's Bible row), picks [title] chapter
-/// [chapter] and waits for its passage.
-Future<void> _chooseFromBooks(
-  Journey j,
-  String title,
-  int chapters,
-  int chapter,
-) async {
-  final t = j.tester;
-  await pumpUntilFound(t, find.byType(BibleBooksScreen));
-  final books = verticalScrollableIn(find.byType(BibleBooksScreen));
-  final row = find.descendant(
-    of: find.byType(BibleBooksScreen),
-    matching: find.text(title),
+  await _chooseInPicker(
+    j,
+    book.usfm,
+    book.chapters,
+    chapter,
+    newTestament: newTestament,
   );
-  // The list opens scrolled to the current book: search both directions.
-  final end = DateTime.now().add(const Duration(seconds: 40));
-  var dir = -400.0;
-  var lastFirst = '';
-  while (row.evaluate().isEmpty && DateTime.now().isBefore(end)) {
-    await t.drag(books.first, Offset(0, dir), warnIfMissed: false);
-    await pumpFor(t, const Duration(milliseconds: 250));
-    final first = paintedTexts(
-      within: find.byType(BibleBooksScreen),
-    ).take(3).join('|');
-    if (first == lastFirst) dir = -dir; // hit an end: turn round
-    lastFirst = first;
-  }
-  await tapVisible(t, row);
-  if (chapters > 1) {
-    final cell = find.byKey(Key('bible-chapter-$chapter'));
-    await pumpUntilFound(t, find.byType(BibleChaptersScreen));
-    await scrollUntilFound(
-      t,
-      cell,
-      scrollable: verticalScrollableIn(find.byType(BibleChaptersScreen)),
-    );
-    await t.tap(cell, warnIfMissed: false);
-  }
-  await pumpUntil(
-    t,
-    () =>
-        find.byType(BibleBooksScreen).evaluate().isEmpty &&
-        find.byType(BibleChaptersScreen).evaluate().isEmpty,
-  );
-  await _passageLoaded(j);
 }
 
 Future<void> _tapStep(Journey j, String key) async {
@@ -125,11 +116,13 @@ Future<void> _tapStep(Journey j, String key) async {
   await _passageLoaded(j);
 }
 
-/// (g) Bible: Daily reading opens on today's reading; "John 3:16" search
-/// highlights the verse; a random book + chapter from the picker; previous /
-/// next across a book boundary; another translation, then NIV again. More's
-/// Bible row opens on the book list, Close from it returns to More, and a
-/// chapter chosen there offers the way back to today's reading.
+/// (g) Bible: the Bible tab's Daily reading opens on today's reading;
+/// "John 3:16" search marks the verse; a random book + chapter from the
+/// picker; previous / next across a book boundary; another translation, then
+/// NIV again; a chapter chosen away from today offers the way back to
+/// today's reading. The landing screen's picker opens a chapter, Done on it
+/// stays on the landing screen, the swipe back returns there and Continue
+/// reading offers that chapter; its search field opens a verse.
 Future<void> bibleJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'bible');
@@ -140,10 +133,13 @@ Future<void> bibleJourney(Journey j) async {
     books.length >= 66,
     'YouVersion NIV lists the books (${books.length})',
   );
+  final ntStart = books.indexWhere((b) => b.usfm == 'MAT');
+  bool isNt(({String usfm, String title, int chapters}) b) =>
+      ntStart >= 0 && books.indexOf(b) >= ntStart;
 
   await j.launch();
-  await openMoreRow(t, 'Daily reading');
-  await pumpUntilFound(t, find.byType(ReadingScreen));
+  await tapNav(t, 'Bible');
+  await pumpUntilFound(t, find.byType(BibleScreen));
 
   // ── Today's reading ──────────────────────────────────────────────────────
   await pumpUntil(
@@ -154,17 +150,22 @@ Future<void> bibleJourney(Journey j) async {
   );
   final daily = j.c.read(dailyContentProvider);
   final content = daily.valueOrNull;
-  if (content == null) {
-    final title = daily.hasError
-        ? 'Couldn\u2019t load today\u2019s reading'
-        : 'No reading today';
+  final card = find.byKey(const Key('bible-daily-reading'));
+  if (content?.reading == null) {
+    await pumpFor(t, const Duration(seconds: 1));
     j.check(
-      _inReader(find.text(title)).evaluate().isNotEmpty,
-      'no daily content: the reader says so and offers to browse',
+      card.evaluate().isEmpty,
+      'no daily reading: the Bible tab leaves the Daily reading card out',
     );
+    j.note('DATA: no daily reading today; the reader opens on John 3');
+    unawaited(appRouter(t).push('/bible/reading'));
   } else {
+    await tapVisible(t, card);
+  }
+  await pumpUntilFound(t, find.byType(ReadingScreen));
+  if (content?.reading != null) {
     final index = BibleIndex.bundled();
-    final reference = content.reading?.reference ?? '';
+    final reference = content!.reading!.reference;
     // A reading can name several passages ("Romans 8:1-11; Psalm 23"); the
     // reader opens on the first, as the app does.
     final passages = reference.isEmpty
@@ -173,6 +174,10 @@ Future<void> bibleJourney(Journey j) async {
     final want = passages.isEmpty ? null : passages.first;
     if (passages.length > 1) {
       j.note('today names ${passages.length} passages: $reference');
+      j.check(
+        _inReader(find.byKey(const Key('reading-parts'))).evaluate().isNotEmpty,
+        'a reading with several passages offers each one',
+      );
     }
     if (want == null) {
       j.check(
@@ -184,11 +189,17 @@ Future<void> bibleJourney(Journey j) async {
     } else {
       j.check(await _passageLoaded(j), 'today\u2019s passage loads');
       final label = _label(t);
-      final shown = parseBibleReference(label, index);
       j.check(
-        shown is ReferenceFound && shown.location == want,
+        label == index.label(want.wholeChapter),
         'opens on today\u2019s reading $reference (shows "$label")',
       );
+      if (want.verseStart != null) {
+        final marked = _markedVerses(t);
+        j.check(
+          marked.contains(want.verseStart),
+          'today\u2019s verses are marked ($marked)',
+        );
+      }
       j.check(
         _inReader(find.text('TODAY\u2019S READING')).evaluate().isNotEmpty,
         'marked as today\u2019s reading',
@@ -198,10 +209,7 @@ Future<void> bibleJourney(Journey j) async {
   await j.shot('today');
 
   // ── Search John 3:16 ─────────────────────────────────────────────────────
-  await t.tap(
-    _inReader(find.byKey(const Key('bible-search'))),
-    warnIfMissed: false,
-  );
+  await tapVisible(t, _inReader(find.byKey(const Key('bible-search'))));
   await pumpUntilFound(t, find.byKey(const Key('bible-search-field')));
   await t.enterText(find.byKey(const Key('bible-search-field')), 'John 3:16');
   // The sheet rides above the keyboard; close it so Go is where it is drawn.
@@ -210,31 +218,23 @@ Future<void> bibleJourney(Journey j) async {
   await tapVisible(t, find.byKey(const Key('bible-search-go')));
   await pumpUntil(
     t,
-    () => _label(t) == 'John 3:16',
+    () => _label(t) == 'John 3',
     timeout: const Duration(seconds: 20),
   );
-  j.check(
-    _label(t) == 'John 3:16',
-    'search lands on "John 3:16" (shows "${_label(t)}")',
-  );
   await _passageLoaded(j);
-  await pumpFor(t, const Duration(seconds: 1));
-  final lit = <String>[];
-  for (final e in _inReader(find.byType(RichText)).evaluate()) {
-    (e.widget as RichText).text.visitChildren((span) {
-      if (span is TextSpan &&
-          span.style?.backgroundColor != null &&
-          span.text != null) {
-        lit.add(span.text!);
-      }
-      return true;
-    });
-  }
-  final litText = lit.join();
   j.check(
-    litText.contains('16') &&
-        litText.replaceAll(RegExp(r'\d'), '').trim().length > 30,
-    'verse 16 is highlighted ("${litText.length > 60 ? litText.substring(0, 60) : litText}…")',
+    _label(t) == 'John 3',
+    'search lands on John 3 (shows "${_label(t)}")',
+  );
+  await pumpFor(t, const Duration(seconds: 1));
+  final marked = _markedVerses(t);
+  j.check(
+    marked.length == 1 && marked.contains(16),
+    'verse 16 is marked (marked: $marked)',
+  );
+  j.check(
+    _inReader(find.byKey(const Key('bible-today'))).evaluate().isNotEmpty,
+    'away from today\u2019s reading, the reader offers the way back',
   );
   await j.shot('john-3-16');
 
@@ -242,7 +242,7 @@ Future<void> bibleJourney(Journey j) async {
   final book = pick(r, books);
   final chapter = 1 + r.nextInt(book.chapters);
   j.note('random browse: ${book.title} $chapter');
-  await _pickChapter(j, book.title, book.chapters, chapter);
+  await _pickChapter(j, book, chapter, newTestament: isNt(book));
   j.check(
     _label(t) == '${book.title} $chapter',
     'picker opens ${book.title} $chapter (shows "${_label(t)}")',
@@ -254,7 +254,7 @@ Future<void> bibleJourney(Journey j) async {
   final a = books[i];
   final b = books[i + 1];
   j.note('boundary: ${a.title} ${a.chapters} -> ${b.title} 1');
-  await _pickChapter(j, a.title, a.chapters, a.chapters);
+  await _pickChapter(j, a, a.chapters, newTestament: isNt(a));
   j.check(
     _label(t) == '${a.title} ${a.chapters}',
     'at ${a.title} ${a.chapters}',
@@ -288,14 +288,11 @@ Future<void> bibleJourney(Journey j) async {
     'NIV is the default version (got ${before.abbreviation})',
   );
   Future<void> chooseVersion(int id) async {
-    final current = j.c.read(selectedBibleProvider).abbreviation;
-    // The pill heads the passage; the chapter steps left it scrolled away.
-    await tapVisible(t, _inReader(find.text(current)));
-    await pumpUntilFound(
-      t,
-      find.text('BIBLE VERSION'),
-      reason: 'version sheet',
-    );
+    await tapVisible(t, _inReader(find.byKey(const Key('bible-reference'))));
+    await pumpUntilFound(t, _picker, reason: 'passage picker');
+    final sheet = verticalScrollableIn(_picker);
+    final tile = find.byKey(Key('bible-version-$id'));
+    await scrollUntilFound(t, tile, scrollable: sheet);
     final listed = j.c.read(biblesProvider).valueOrNull ?? const [];
     j.check(
       listed.every((v) => BibleRepository.approvedBibleIds.contains(v.id)) &&
@@ -305,19 +302,17 @@ Future<void> bibleJourney(Journey j) async {
       'picker lists only approved versions '
       '(${listed.map((v) => v.abbreviation).join(', ')})',
     );
-    final tile = find.byKey(Key('bible-version-$id'));
-    await scrollUntilFound(
-      t,
-      tile,
-      // The sheet's list is the topmost Scrollable. Finding it through the
-      // "BIBLE VERSION" heading broke once scrolling took the heading off
-      // screen (the list builds lazily), aborting on versions far down.
-      scrollable: find.byType(Scrollable).last,
-    );
-    await t.tap(tile, warnIfMissed: false);
-    await pumpUntil(t, () => find.text('BIBLE VERSION').evaluate().isEmpty);
+    await tapVisible(t, tile);
+    await pumpUntil(t, () => j.c.read(selectedBibleProvider).id == id);
+    // Choosing a version leaves the sheet open; Done closes it.
+    await tapVisible(t, find.byKey(const Key('passage-picker-done')));
+    await pumpUntil(t, () => _picker.evaluate().isEmpty);
     await _passageLoaded(j);
   }
+
+  String toolbarVersion() => paintedTexts(
+    within: _inReader(find.byKey(const Key('bible-toolbar'))),
+  ).join(' ');
 
   if (offered.isEmpty) {
     j.note('DATA: YouVersion offers no other English version to this key');
@@ -331,8 +326,8 @@ Future<void> bibleJourney(Journey j) async {
       'version switched to ${other.abbreviation} (now ${now.abbreviation})',
     );
     j.check(
-      _inReader(find.text(now.abbreviation)).evaluate().isNotEmpty,
-      'version pill reads "${now.abbreviation}"',
+      toolbarVersion().contains(now.abbreviation),
+      'the toolbar reads "${now.abbreviation}" ("${toolbarVersion()}")',
     );
     j.check(
       prefs.getInt('bible_version_id') == other.id,
@@ -357,49 +352,99 @@ Future<void> bibleJourney(Journey j) async {
   );
   await j.shot('niv-restored');
 
-  // ── More > Bible: the book list first ────────────────────────────────────
-  await tapBack(t);
-  await pumpUntilFound(t, find.byType(SettingsScreen));
-  await openMoreRow(t, 'Bible');
-  j.check(
-    await pumpUntil(
-      t,
-      () => _inReader(find.byType(BibleBooksScreen)).evaluate().isNotEmpty,
-    ),
-    'More > Bible opens on the book list',
-  );
-  await j.shot('bible-books');
-  await tapBack(t);
+  // ── Back to today's reading ──────────────────────────────────────────────
+  if (content?.reading != null) {
+    await tapVisible(t, _inReader(find.byKey(const Key('bible-today'))));
+    await pumpFor(t, const Duration(milliseconds: 600));
+    j.check(
+      await pumpUntil(
+        t,
+        () =>
+            _inReader(find.text('TODAY\u2019S READING')).evaluate().isNotEmpty,
+      ),
+      'Today\u2019s reading returns to today\u2019s passage',
+    );
+  }
+
+  // ── The Bible tab: picker, Continue reading, search ──────────────────────
+  await goBack(t);
   j.check(
     await pumpUntil(
       t,
       () =>
           find.byType(ReadingScreen).evaluate().isEmpty &&
-          find.byType(SettingsScreen).evaluate().isNotEmpty,
+          find.byType(BibleScreen).evaluate().isNotEmpty,
     ),
-    'Close on the book list returns straight to More',
+    'the swipe back from the reader returns to the Bible tab',
+  );
+  await tapVisible(t, find.byKey(const Key('bible-open-picker')));
+  j.check(
+    await pumpUntil(t, () => _picker.evaluate().isNotEmpty),
+    'Choose a passage opens the picker',
+  );
+  await j.shot('bible-picker');
+  await tapVisible(t, find.byKey(const Key('passage-picker-done')));
+  j.check(
+    await pumpUntil(
+      t,
+      () =>
+          _picker.evaluate().isEmpty &&
+          find.byType(ReadingScreen).evaluate().isEmpty &&
+          find.byType(BibleScreen).evaluate().isNotEmpty,
+    ),
+    'Done on the picker stays on the Bible tab',
   );
 
-  await openMoreRow(t, 'Bible');
-  await _chooseFromBooks(j, book.title, book.chapters, chapter);
+  await tapVisible(t, find.byKey(const Key('bible-open-picker')));
+  await _chooseInPicker(
+    j,
+    book.usfm,
+    book.chapters,
+    chapter,
+    newTestament: isNt(book),
+  );
   j.check(
     _label(t) == '${book.title} $chapter',
-    'More > Bible opens ${book.title} $chapter (shows "${_label(t)}")',
-  );
-  j.check(
-    _inReader(find.byKey(const Key('bible-today'))).evaluate().isNotEmpty ||
-        _inReader(find.text('TODAY\u2019S READING')).evaluate().isNotEmpty,
-    'a chapter chosen from More > Bible offers Today\u2019s reading',
+    'the Bible tab\u2019s picker opens ${book.title} $chapter (shows "${_label(t)}")',
   );
   await j.shot('bible-chosen');
-  await tapBack(t);
+  await goBack(t);
+  await pumpUntil(t, () => find.byType(ReadingScreen).evaluate().isEmpty);
+  final cont = find.byKey(const Key('bible-continue'));
   j.check(
     await pumpUntil(
       t,
-      () =>
-          find.byType(ReadingScreen).evaluate().isEmpty &&
-          find.byType(SettingsScreen).evaluate().isNotEmpty,
+      () => find
+          .descendant(of: cont, matching: find.text('${book.title} $chapter'))
+          .evaluate()
+          .isNotEmpty,
     ),
-    'Close from that chapter returns to More',
+    'Continue reading offers ${book.title} $chapter',
   );
+  await tapVisible(t, find.byKey(const Key('bible-continue-button')));
+  await pumpUntilFound(t, find.byType(ReadingScreen));
+  await _passageLoaded(j);
+  j.check(
+    _label(t) == '${book.title} $chapter',
+    'Continue reopens ${book.title} $chapter (shows "${_label(t)}")',
+  );
+  await goBack(t);
+  await pumpUntil(t, () => find.byType(ReadingScreen).evaluate().isEmpty);
+
+  final field = find.descendant(
+    of: find.byKey(const Key('bible-landing-search')),
+    matching: find.byType(EditableText),
+  );
+  await t.tap(field, warnIfMissed: false);
+  await t.enterText(field, 'Romans 8:28');
+  await t.testTextInput.receiveAction(TextInputAction.search);
+  await pumpUntilFound(t, find.byType(ReadingScreen));
+  await _passageLoaded(j);
+  await pumpFor(t, const Duration(seconds: 1));
+  j.check(
+    _label(t) == 'Romans 8' && _markedVerses(t).contains(28),
+    'the Bible tab\u2019s search opens Romans 8 with verse 28 marked '
+    '(shows "${_label(t)}", marked ${_markedVerses(t)})',
+  );
+  await j.shot('landing-search');
 }

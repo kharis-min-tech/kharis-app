@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
 import 'package:kharis_app/features/feedback/domain/review_prompt_policy.dart';
 import 'package:kharis_app/features/feedback/providers/feedback_providers.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// Opens the feedback sheet and records how it was left.
 ///
@@ -21,11 +21,10 @@ Future<FeedbackSheetOutcome?> showFeedbackSheet(
   final store = ref.read(reviewPromptStoreProvider);
   final now = ref.read(reviewClockProvider);
   var sent = false;
-  final popped = await showModalBottomSheet<FeedbackSheetOutcome>(
-    context: context,
-    useRootNavigator: true,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
+  final popped = await showKBottomSheet<FeedbackSheetOutcome>(
+    // The root navigator, so the sheet covers the tab bar and mini player.
+    context: Navigator.of(context, rootNavigator: true).context,
+    title: 'How is the Kharis app serving you?',
     builder: (_) => FeedbackSheet(source: source, onSent: () => sent = true),
   );
   final outcome = sent ? FeedbackSheetOutcome.sent : popped;
@@ -42,6 +41,9 @@ Future<FeedbackSheetOutcome?> showFeedbackSheet(
 
 /// Stars + optional comment, saved to the church's backend. This is our own
 /// feedback channel, not a store review: it never routes to the App Store.
+///
+/// The content of the sheet [showFeedbackSheet] opens, which supplies the
+/// title.
 class FeedbackSheet extends ConsumerStatefulWidget {
   const FeedbackSheet({super.key, required this.source, this.onSent});
 
@@ -117,44 +119,207 @@ class _FeedbackSheetState extends ConsumerState<FeedbackSheet> {
     // Watched, not just read at send time: keeps the auth stream subscribed
     // so the member's uid is ready when they tap Send.
     ref.watch(appFeedbackRepositoryProvider);
-    final kc = context.kc;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SafeArea(
-        // Material, not a decorated Container: the star and text-button ink
-        // must paint on the sheet surface to be visible.
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          child: Material(
-            color: kc.surface,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            clipBehavior: Clip.antiAlias,
-            child: AnimatedSize(
-              duration: reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 200),
-              curve: Curves.easeOutQuart,
-              alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        child: _sent ? _thanks(context) : _form(context),
+      ),
+    );
+  }
+
+  Widget _form(BuildContext context) {
+    final k = context.k;
+    final rating = _rating;
+    final lowRating = rating != null && rating <= 3;
+    final error = _error;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Your rating goes straight to the Kharis team.',
+                style: KharisText.meta.copyWith(color: k.muted),
+              ),
+            ),
+            const SizedBox(width: KSpace.md),
+            KIconButton(
+              icon: KIcons.close,
+              label: 'Close feedback',
+              onPressed: _sending ? null : () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+        const SizedBox(height: KSpace.x3),
+        Row(
+          children: [
+            for (var n = 1; n <= 5; n++) ...[
+              if (n > 1) const SizedBox(width: KSpace.md),
+              Expanded(
+                child: _Star(
+                  key: ValueKey('feedback-star-$n'),
+                  number: n,
+                  label: _ratingLabels[n - 1],
+                  filled: rating != null && n <= rating,
+                  selected: rating == n,
+                  onTap: _sending
+                      ? null
+                      : () => setState(() {
+                          _rating = n;
+                          _error = null;
+                        }),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: KSpace.md),
+        Text(
+          rating == null ? 'Tap a star to rate' : _ratingLabels[rating - 1],
+          textAlign: TextAlign.center,
+          style: KharisText.itemTitle.copyWith(
+            color: rating == null ? k.muted : k.text,
+          ),
+        ),
+        if (rating != null) ...[
+          const SizedBox(height: KSpace.x3),
+          KTextField(
+            key: const ValueKey('feedback-comment'),
+            controller: _comment,
+            label: lowRating
+                ? 'What should we improve? (optional)'
+                : 'What do you value most? (optional)',
+            enabled: !_sending,
+            minLines: 3,
+            maxLines: 5,
+            maxLength: AppFeedbackRepository.maxCommentLength,
+            textCapitalization: TextCapitalization.sentences,
+          ),
+        ],
+        if (error != null) ...[
+          const SizedBox(height: KSpace.lg),
+          KInlineError(error),
+        ],
+        const SizedBox(height: KSpace.x3),
+        KButton(
+          label: 'Send feedback',
+          size: KButtonSize.cta,
+          expand: true,
+          loading: _sending,
+          onPressed: rating == null ? null : _send,
+        ),
+        const SizedBox(height: KSpace.xs),
+        if (widget.source == FeedbackSource.prompt)
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: KSpace.md,
+            children: [
+              KTextLink(
+                label: 'Don’t ask again',
+                onTap: _sending
+                    ? null
+                    : () => _close(FeedbackSheetOutcome.optOut),
+              ),
+              KTextLink(
+                label: 'Not now',
+                onTap: _sending
+                    ? null
+                    : () => _close(FeedbackSheetOutcome.notNow),
+              ),
+            ],
+          )
+        else
+          Center(
+            child: KTextLink(
+              label: 'Cancel',
+              onTap: _sending ? null : () => Navigator.of(context).pop(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _thanks(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: KEmptyState(
+        icon: KIcons.check,
+        title: 'Thank you',
+        hint: 'Your feedback has been sent to the Kharis team.',
+        action: KButton(
+          label: 'Done',
+          expand: true,
+          onPressed: () => _close(FeedbackSheetOutcome.sent),
+        ),
+      ),
+    );
+  }
+}
+
+/// One step of the five-star rating: the star mark over its number. Stars up
+/// to the chosen rating are filled tiles, the rest outlined, and the chosen
+/// one is announced as selected, so the rating never rests on colour alone.
+class _Star extends StatelessWidget {
+  const _Star({
+    super.key,
+    required this.number,
+    required this.label,
+    required this.filled,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int number;
+  final String label;
+  final bool filled;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    final ink = filled ? k.onInverse : k.muted;
+    const shape = BorderRadius.all(Radius.circular(KRadius.button));
+
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      selected: selected,
+      label: '$number of 5 stars, $label',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: filled ? k.inverse : k.sheet,
+        shape: RoundedRectangleBorder(
+          borderRadius: shape,
+          side: BorderSide(
+            color: filled ? k.inverse : k.line,
+            width: KSize.outline,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: KSize.touchMin,
+              minHeight: KSize.listRow,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: KSpace.md),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 10),
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: kc.outline,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                    child: _sent ? _thanks(context) : _form(context),
+                  KIcon(KIcons.sparkle, color: ink),
+                  const SizedBox(height: KSpace.xxs),
+                  Text(
+                    '$number',
+                    style: KharisText.caption.copyWith(color: ink),
                   ),
                 ],
               ),
@@ -162,176 +327,6 @@ class _FeedbackSheetState extends ConsumerState<FeedbackSheet> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _form(BuildContext context) {
-    final kc = context.kc;
-    final rating = _rating;
-    final lowRating = rating != null && rating <= 3;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'How is the Kharis app serving you?',
-          style: AppTypography.display(
-            size: 20,
-            weight: FontWeight.w700,
-            color: kc.onBg,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Your rating goes straight to the Kharis team.',
-          style: AppTypography.bodySm.copyWith(color: kc.muted),
-        ),
-        const SizedBox(height: 18),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var n = 1; n <= 5; n++)
-              Semantics(
-                button: true,
-                selected: rating == n,
-                label: '$n of 5 stars, ${_ratingLabels[n - 1]}',
-                excludeSemantics: true,
-                child: IconButton(
-                  key: ValueKey('feedback-star-$n'),
-                  iconSize: 36,
-                  onPressed: _sending
-                      ? null
-                      : () => setState(() {
-                          _rating = n;
-                          _error = null;
-                        }),
-                  icon: Icon(
-                    rating != null && n <= rating
-                        ? Icons.star_rounded
-                        : Icons.star_outline_rounded,
-                    // accentInk, not the gold fill: raw gold is 1.9:1 on the
-                    // light sheet. The empty star uses full muted (60% gave
-                    // 2.4 to 2.9:1) because it is the control.
-                    color: rating != null && n <= rating
-                        ? kc.accentInk
-                        : kc.muted,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          rating == null ? 'Tap a star to rate' : _ratingLabels[rating - 1],
-          textAlign: TextAlign.center,
-          style: AppTypography.ui(
-            size: 13,
-            weight: FontWeight.w600,
-            color: rating == null ? kc.muted : kc.onBg,
-          ),
-        ),
-        if (rating != null) ...[
-          const SizedBox(height: 16),
-          TextField(
-            key: const ValueKey('feedback-comment'),
-            controller: _comment,
-            enabled: !_sending,
-            minLines: 3,
-            maxLines: 5,
-            maxLength: AppFeedbackRepository.maxCommentLength,
-            textCapitalization: TextCapitalization.sentences,
-            style: AppTypography.bodySm.copyWith(color: kc.onBg),
-            decoration: InputDecoration(
-              hintText: lowRating
-                  ? 'What should we improve? (optional)'
-                  : 'What do you value most? (optional)',
-              counterText: '',
-            ),
-          ),
-        ],
-        if (_error != null) ...[
-          const SizedBox(height: 10),
-          Text(
-            _error!,
-            style: AppTypography.bodySm.copyWith(color: context.kc.danger),
-          ),
-        ],
-        const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: rating == null || _sending ? null : _send,
-          child: _sending
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: kc.onAccent,
-                  ),
-                )
-              : const Text('Send feedback'),
-        ),
-        const SizedBox(height: 4),
-        if (widget.source == FeedbackSource.prompt)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _quietButton(
-                'Don’t ask again',
-                () => _close(FeedbackSheetOutcome.optOut),
-              ),
-              _quietButton(
-                'Not now',
-                () => _close(FeedbackSheetOutcome.notNow),
-              ),
-            ],
-          )
-        else
-          Center(
-            child: _quietButton('Cancel', () => Navigator.of(context).pop()),
-          ),
-      ],
-    );
-  }
-
-  Widget _quietButton(String label, VoidCallback onPressed) => TextButton(
-    onPressed: _sending ? null : onPressed,
-    style: TextButton.styleFrom(foregroundColor: context.kc.muted),
-    child: Text(
-      label,
-      style: AppTypography.ui(size: 14, weight: FontWeight.w600),
-    ),
-  );
-
-  Widget _thanks(BuildContext context) {
-    final kc = context.kc;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Icon(Icons.check_circle_rounded, size: 44, color: kc.accentInk),
-        const SizedBox(height: 12),
-        Text(
-          'Thank you',
-          textAlign: TextAlign.center,
-          style: AppTypography.display(
-            size: 20,
-            weight: FontWeight.w700,
-            color: kc.onBg,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Your feedback has been sent to the Kharis team.',
-          textAlign: TextAlign.center,
-          style: AppTypography.bodySm.copyWith(color: kc.muted),
-        ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          onPressed: () => _close(FeedbackSheetOutcome.sent),
-          child: const Text('Done'),
-        ),
-      ],
     );
   }
 }

@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/settings/presentation/screens/notifications_settings_screen.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
@@ -28,7 +28,6 @@ class _PendingPrompt extends NotificationService {
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets('leaving the screen while the OS prompt is up neither throws '
       'nor skips the follow-up', (tester) async {
@@ -55,6 +54,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          theme: KharisTheme.light(),
           home: Builder(
             builder: (context) => TextButton(
               onPressed: () => Navigator.of(context).push(
@@ -73,8 +73,9 @@ void main() {
 
     await tester.tap(find.text('Turn on notifications'));
     await tester.pump();
-    // The member backs out while the system sheet is still showing.
-    await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+    // The member backs out (system back; the header has no back button)
+    // while the system sheet is still showing.
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pumpAndSettle();
     expect(find.byType(NotificationsSettingsScreen), findsNothing);
 

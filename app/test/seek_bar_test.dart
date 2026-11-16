@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/features/player/presentation/widgets/seek_bar.dart';
 
 const _width = 400.0;
@@ -13,6 +12,7 @@ Widget _host({
   List<Duration> pins = const [],
 }) {
   return MaterialApp(
+    theme: KharisTheme.light(),
     home: Scaffold(
       body: Center(
         child: SizedBox(
@@ -35,7 +35,6 @@ Finder get _track => find.descendant(
 );
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   testWidgets('shows elapsed on the left and time remaining on the right', (
     tester,
@@ -187,13 +186,11 @@ void main() {
 
   group('note pins', () {
     const tenMinutes = Duration(minutes: 10);
-    // The test host has no theme extension, so the bar paints the light
-    // palette.
-    final accent = KharisColors.light.accentInk;
+    final accent = KharisColors.light.highlight;
     final halo = KharisColors.light.bg;
     const outer = SeekBar.pinRadius + SeekBar.pinHalo;
-    // The track is 28 px tall; the rail runs through its middle.
-    const cy = 14.0;
+    // The track is a 44 px touch target; the rail runs through its middle.
+    const cy = KSize.touchMin / 2;
 
     RenderObject timeline(WidgetTester tester) => tester.renderObject(
       find.descendant(

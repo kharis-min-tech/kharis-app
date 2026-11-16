@@ -1,88 +1,55 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/collection_labels.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
-import 'package:kharis_app/shared/widgets/artwork_image.dart';
-import 'package:kharis_app/shared/widgets/press_effect.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// Stable gradient pick for a playlist — derived from the id so the artwork
-/// never shuffles between launches.
-int playlistGradientIndex(String playlistId) {
-  var sum = 0;
-  for (final unit in playlistId.codeUnits) {
-    sum = (sum + unit) % 997;
-  }
-  return sum % 10;
-}
-
-/// Square playlist cover, reused by the library card, the Add to playlist
-/// sheet and the detail header: a mosaic of the playlist's message artwork,
-/// or a flat tile with a queue glyph when none of its messages has artwork.
+/// Square collection cover, reused by the library row, the Add to collection
+/// sheet and the detail header: a mosaic of the collection's message artwork,
+/// or a plain tile with the collection icon when none of its messages has
+/// artwork.
 class PlaylistArt extends ConsumerWidget {
   const PlaylistArt({
     super.key,
     required this.playlist,
-    this.radius = 0,
-    this.glyphSize = 44,
+    this.size = KSize.thumb,
   });
 
   final Playlist playlist;
-  final double radius;
-  final double glyphSize;
+  final double size;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return PlaylistMosaic(
-      urls: ref.watch(playlistArtworkProvider(playlist.id)),
-      fallbackIndex: playlistGradientIndex(playlist.id),
-      radius: radius,
-      glyphSize: glyphSize,
+    return SizedBox.square(
+      dimension: size,
+      child: PlaylistMosaic(
+        urls: ref.watch(playlistArtworkProvider(playlist.id)),
+      ),
     );
   }
 }
 
 /// Lays out up to four artwork [urls]: one fills the square, two split it
 /// side by side, three put one tall tile beside two stacked, four make a
-/// 2x2 grid. No URLs falls back to the flat [fallbackIndex] tile.
+/// 2x2 grid. No URLs shows the collection icon on the placeholder fill.
 class PlaylistMosaic extends StatelessWidget {
-  const PlaylistMosaic({
-    super.key,
-    required this.urls,
-    required this.fallbackIndex,
-    this.radius = 0,
-    this.glyphSize = 44,
-  });
+  const PlaylistMosaic({super.key, required this.urls});
 
   final List<String> urls;
-  final int fallbackIndex;
-  final double radius;
-  final double glyphSize;
 
   @override
   Widget build(BuildContext context) {
-    if (urls.isEmpty) {
-      return ArtworkImage(
-        url: null,
-        gradientIndex: fallbackIndex,
-        radius: radius,
-        overlay: Icon(
-          Icons.queue_music_rounded,
-          color: Colors.white70,
-          size: glyphSize,
-        ),
-      );
-    }
-    Widget tile(int i) => Expanded(
-      child: ArtworkImage(
-        url: urls[i],
-        gradientIndex: fallbackIndex,
-        radius: 0,
+    final k = context.k;
+    Widget tile(int i) => Expanded(child: _MosaicTile(urls[i]));
+    final Widget content = switch (urls.length) {
+      0 => ColoredBox(
+        color: k.surface2,
+        child: Center(child: KIcon(KIcons.collection, color: k.muted)),
       ),
-    );
-    final Widget grid = switch (urls.length) {
-      1 => ArtworkImage(url: urls[0], gradientIndex: fallbackIndex, radius: 0),
+      1 => _MosaicTile(urls[0]),
       2 => Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [tile(0), tile(1)],
@@ -118,91 +85,57 @@ class PlaylistMosaic extends StatelessWidget {
       ),
     };
     return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: grid,
+      borderRadius: const BorderRadius.all(Radius.circular(KRadius.tile)),
+      child: content,
     );
   }
 }
 
-/// Library grid card for one playlist. Mirrors the Messages collection-card
-/// spec: artwork on top, title + count below, gold play badge.
-class PlaylistCard extends StatelessWidget {
+/// One image of the mosaic, decoded at the size it is drawn so a list of
+/// covers never holds full-resolution artwork.
+class _MosaicTile extends StatelessWidget {
+  const _MosaicTile(this.url);
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : KSize.designWidth;
+        return KImageFill(
+          image: ResizeImage(
+            CachedNetworkImageProvider(url),
+            width: (width * dpr).round().clamp(64, 1080),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// One of the member's collections in the library list: cover, name, and
+/// "8 messages · 3 h 40 min".
+class PlaylistCard extends ConsumerWidget {
   const PlaylistCard({super.key, required this.playlist, required this.onTap});
 
   final Playlist playlist;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final count = playlist.sermonIds.length;
-    return PressEffect(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.kc.surface,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // The artwork takes whatever the grid cell leaves after the
-            // labels, so larger text sizes shrink the art instead of
-            // overflowing the fixed-ratio cell.
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  PlaylistArt(playlist: playlist),
-                  Positioned(
-                    right: 10,
-                    bottom: 10,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: context.kc.accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.play_arrow_rounded,
-                        color: context.kc.onAccent,
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    playlist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.display(
-                      size: 15,
-                      weight: FontWeight.w700,
-                      color: context.kc.onBg,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    count == 1 ? '1 message' : '$count messages',
-                    style: AppTypography.labelMd.copyWith(
-                      fontSize: 11.5,
-                      color: context.kc.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return KListRow(
+      title: playlist.name,
+      meta: collectionMeta(
+        playlist.sermonIds.length,
+        ref.watch(playlistResolutionProvider(playlist.id)),
       ),
+      leading: PlaylistArt(playlist: playlist),
+      showChevron: true,
+      onTap: onTap,
     );
   }
 }

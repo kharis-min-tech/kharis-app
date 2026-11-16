@@ -42,7 +42,6 @@ dependencies:
   go_router: ^14.8.1
   dio: ^5.7.0
   intl: ^0.19.0
-  google_fonts: ^6.2.1
   just_audio: ^0.10.6
   audio_service: ^0.18.17
   cached_network_image: ^3.4.1
@@ -81,6 +80,15 @@ dependencies:
   video_player: ^2.14.1
   # "Use my location" in the branch picker: one approximate fix, on request.
   geolocator: ^14.0.1
+  # Draws the Kharis icon set (KIcon, lib/ui/components/k_icon.dart).
+  flutter_svg: ^2.0.10
+  # "Remind me" on events: a local notification an hour before the start
+  # (lib/features/calendar/data/event_reminder_service.dart). 22.x on
+  # purpose: 23.x needs compileSdk 37 and AGP 9.1.1, ahead of what Flutter
+  # 3.44 and this project build with. timezone only supplies the UTC instant
+  # type the plugin schedules with.
+  flutter_local_notifications: ^22.3.3
+  timezone: ^0.11.2
 
 dev_dependencies:
   flutter_test:
@@ -108,11 +116,12 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/figma/
     - assets/icon/
     - assets/design/
-    - assets/google_fonts/
+    - assets/fonts/OFL.txt
     - assets/hero/
+    - assets/icons/
+    - assets/brand/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -140,6 +149,21 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
+  # Plus Jakarta Sans (SIL Open Font License, assets/fonts/OFL.txt): the only
+  # family of the redesigned theme (lib/theme/), bundled so it never loads at
+  # runtime.
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
+          weight: 800
+
 flutter_launcher_icons:
   android: true
   ios: true
@@ -150,7 +174,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 # Native splash: what shows before the first Flutter frame. It is the opening
-# frame of SplashScreen: solid ink (AppColors.ink) with the dove centred at
+# frame of SplashScreen: solid ink (the `ink` brand token) with the dove centred at
 # 117x110 pt, drawn faint (SplashDove.launchOpacity). Flutter then draws the
 # outline over that same faint dove and fills it, so the handover shows no
 # change. The launch images are assets/design/splash-dove.png with alpha

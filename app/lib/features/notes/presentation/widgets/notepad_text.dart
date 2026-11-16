@@ -1,16 +1,16 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/notes/data/notepad.dart';
 
-/// How a timestamp token reads inside notepad text: a tinted, semibold time
+/// How a timestamp token reads inside notepad text: a tinted, bold time
 /// with even-width figures, so it scans as a link to that moment.
 TextStyle notepadTimestampStyle(BuildContext context, TextStyle? base) =>
     (base ?? const TextStyle()).copyWith(
-      color: context.kc.onChip,
-      backgroundColor: context.kc.chipBg,
-      fontWeight: FontWeight.w600,
+      color: context.k.primaryText,
+      backgroundColor: context.k.primaryTint,
+      fontWeight: FontWeight.w700,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
 

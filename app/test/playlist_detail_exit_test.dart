@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 
 import 'package:kharis_app/features/playlists/presentation/screens/playlist_detail_screen.dart';
@@ -16,6 +15,7 @@ import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'support/fake_cache_service.dart';
 
 /// Regression guard for the "playlist view overtakes the page and cannot be
@@ -24,7 +24,6 @@ import 'support/fake_cache_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   final member = User(
     id: 'member-1',
@@ -89,21 +88,24 @@ void main() {
     ],
   );
 
-  testWidgets('playlist detail is a pushed route whose back button pops home', (
+  testWidgets('collection detail is a pushed route that pops back home', (
     tester,
   ) async {
     final db = await seededDb();
     await tester.pumpWidget(
       ProviderScope(
         overrides: overridesFor(db),
-        child: MaterialApp.router(routerConfig: routerFor()),
+        child: MaterialApp.router(
+          theme: KharisTheme.light(),
+          routerConfig: routerFor(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     // Playlists home shows the member's playlist.
     expect(find.text('Deep Roots'), findsOneWidget);
-    expect(find.text('Play all'), findsNothing);
+    expect(find.byKey(const Key('playlist-play-all')), findsNothing);
 
     // Open the detail — a push, so home stays on the stack beneath. The
     // pinned Favorites tile sits above the grid, so scroll the card in.
@@ -111,16 +113,17 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Deep Roots'));
     await tester.pumpAndSettle();
-    expect(find.text('Play all'), findsOneWidget);
+    expect(find.byKey(const Key('playlist-play-all')), findsOneWidget);
+    expect(find.text('Play'), findsOneWidget);
     expect(find.text('Walking in Faith'), findsOneWidget);
 
-    // The standard AppBar back affordance exists and pops to the home.
-    final back = find.byType(BackButton);
-    expect(back, findsOneWidget);
-    await tester.tap(back);
+    // No on-screen back button: the system back (and swipe back) pops to
+    // the collections home.
+    expect(find.byType(BackButton), findsNothing);
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('Play all'), findsNothing);
+    expect(find.byKey(const Key('playlist-play-all')), findsNothing);
     expect(find.text('Deep Roots'), findsOneWidget); // home again
   });
 
@@ -137,7 +140,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: overridesFor(db),
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          theme: KharisTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -157,7 +163,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: overridesFor(db),
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          theme: KharisTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -165,9 +174,8 @@ void main() {
     router.push('/playlists/does-not-exist');
     await tester.pumpAndSettle();
 
-    expect(find.text('This playlist no longer exists.'), findsOneWidget);
-    expect(find.byType(BackButton), findsOneWidget);
-    await tester.tap(find.byType(BackButton));
+    expect(find.text('This collection no longer exists'), findsOneWidget);
+    await tester.tap(find.text('See collections'));
     await tester.pumpAndSettle();
     expect(find.text('Deep Roots'), findsOneWidget);
   });

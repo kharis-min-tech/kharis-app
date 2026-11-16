@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/features/player/presentation/playback_launcher.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
@@ -9,6 +8,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -39,6 +39,7 @@ Widget _harness(
       favoritesProvider.overrideWith((ref) => Stream.value(null)),
     ],
     child: MaterialApp(
+      theme: KharisTheme.light(),
       home: Scaffold(
         body: Consumer(
           builder: (context, ref, _) => TextButton(
@@ -58,7 +59,6 @@ Widget _harness(
 }
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   setUp(() => MediaPlayerScreen.debugDisableVideoEngine = true);
   tearDown(() => MediaPlayerScreen.debugDisableVideoEngine = false);

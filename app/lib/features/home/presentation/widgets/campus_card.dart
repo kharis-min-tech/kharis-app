@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/core/utils/service_time.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/event_detail_screen.dart'
     show directionsUri;
@@ -11,8 +10,9 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// When [service] meets, e.g. `Sundays · 10:00 AM – 12:00 PM`; null when the
+/// When [service] meets, e.g. `Sundays · 10:00 – 12:00`; null when the
 /// Studio set neither a day nor a time.
 @visibleForTesting
 String? campusServiceWhen(CampusService service) {
@@ -41,36 +41,48 @@ Uri? instagramUri(String raw) {
   return Uri.https('www.instagram.com', '/$handle/');
 }
 
-/// "Your campus" card: when and where the member's campus meets, and how
+/// "Your branch" card: when and where the member's branch meets, and how
 /// to reach it.
 ///
 /// Reads the Studio's structured [Branch.services] (each with its venue and
-/// directions) and [Branch.contact] (call, email, Instagram). A campus with
+/// directions) and [Branch.contact] (call, email, Instagram). A branch with
 /// no services yet falls back to the legacy [Branch.meetingDays] /
 /// [Branch.meetingTime] / [Branch.address] mirrors.
 ///
-/// Renders nothing when no campus is selected (all-campus view) or the
-/// campus has nothing to show, rather than an empty card.
+/// With [showHeader] the services sit inside the card under their venue;
+/// without it (the Branch page) they follow the card as a timetable.
+///
+/// Renders nothing when no branch is selected (all-branch view) or the
+/// branch has nothing to show, rather than an empty card.
 class CampusCard extends ConsumerWidget {
   const CampusCard({
     super.key,
     this.padding = EdgeInsets.zero,
     this.showHeader = true,
     this.homeScope = false,
+    this.summary = false,
+    this.onTap,
   });
 
   /// Outer padding, applied only when the card renders, so Home's spacing
   /// collapses with it.
   final EdgeInsetsGeometry padding;
 
-  /// Whether the card leads with "YOUR BRANCH", the branch name and its
-  /// Change link. Off where the screen already names the branch (the
-  /// Branch page's AppBar).
+  /// Whether the card leads with "Your branch" and the branch name. Off
+  /// where the screen already names the branch (the Branch page's header).
   final bool showHeader;
 
   /// Show Home's branch ([homeCampusProvider]) rather than the member's
   /// chosen one, as the Branch page opened from Home does.
   final bool homeScope;
+
+  /// The short card on More: the branch name, one address row, one service
+  /// row and the two buttons. No contacts, notes or full service list; the
+  /// Branch page ([onTap]) has those.
+  final bool summary;
+
+  /// Tapping the card itself (its buttons keep their own actions).
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -81,7 +93,7 @@ class CampusCard extends ConsumerWidget {
 
     final services = branch.services;
     // Venues the services meet at, in service order; when no service names
-    // one, every venue the campus lists.
+    // one, every venue the branch lists.
     final used = <CampusVenue>{
       for (final s in services) ?branch.venueById(s.venueId),
     }.toList();
@@ -105,7 +117,10 @@ class CampusCard extends ConsumerWidget {
           ];
     final contact = branch.contact;
 
-    if (services.isEmpty &&
+    // The summary always renders for a chosen branch: it is More's way to
+    // change branch.
+    if (!summary &&
+        services.isEmpty &&
         venues.isEmpty &&
         legacySchedule == null &&
         !hasLegacyAddress &&
@@ -113,118 +128,177 @@ class CampusCard extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final kc = context.kc;
-    // Without the header, the first venue block's own top padding stands in
-    // for the card's, and no divider sits above it.
-    final venuesLead =
-        !showHeader && unplaced.isEmpty && legacySchedule == null;
-    return Padding(
-      padding: padding,
-      child: Container(
-        key: const Key('campus-card'),
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(
-          18,
-          venuesLead && venues.isNotEmpty ? 4 : 16,
-          18,
-          18,
+    final k = context.k;
+    List<CampusService> at(CampusVenue v) => [
+      for (final s in services)
+        if (s.venueId == v.id) s,
+    ];
+    // Where the Directions button leads: the first venue that can be found
+    // on a map, else the legacy address.
+    final directions =
+        venues.map(venueDirectionsQuery).nonNulls.firstOrNull ??
+        (hasLegacyAddress ? legacyAddress : null);
+
+    final buttons = [
+      if (directions != null)
+        KButton(
+          key: const Key('campus-directions-button'),
+          label: 'Directions',
+          variant: KButtonVariant.inverse,
+          expand: true,
+          onPressed: () => _openDirections(context, directions),
         ),
-        decoration: BoxDecoration(
-          color: kc.surface,
-          borderRadius: AppRadius.cardBorder,
-          boxShadow: AppShadows.card,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showHeader) ...[
-              Row(
-                children: [
-                  Text(
-                    'YOUR BRANCH',
-                    style: AppTypography.ui(
-                      size: 11,
-                      weight: FontWeight.w700,
-                      letterSpacing: 1.1,
-                    ).copyWith(color: kc.muted, height: 1),
-                  ),
-                  const Spacer(),
-                  Semantics(
-                    label: 'Change branch',
-                    button: true,
-                    excludeSemantics: true,
-                    child: TextButton(
-                      onPressed: () => pickActiveBranch(context, ref),
-                      style: TextButton.styleFrom(
-                        foregroundColor: kc.onChip,
-                        minimumSize: const Size(48, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(
-                        'Change',
-                        style: AppTypography.ui(
-                          size: 12.5,
-                          weight: FontWeight.w600,
-                        ).copyWith(color: kc.onChip, height: 1),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      KButton(
+        key: Key(homeScope ? 'home-branch-change' : 'campus-change'),
+        label: 'Change branch',
+        variant: KButtonVariant.outline,
+        expand: true,
+        onPressed: () => pickActiveBranch(context, ref),
+      ),
+    ];
+
+    // Side by side at the default size; stacked once text is 130% or more,
+    // so neither label is cut.
+    final stacked =
+        MediaQuery.textScalerOf(context).scale(1) >= KRatio.largeTextScale;
+    final buttonRow = stacked
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (i, b) in buttons.indexed) ...[
+                if (i > 0) const SizedBox(height: KSpace.md),
+                b,
+              ],
+            ],
+          )
+        : Row(
+            children: [
+              for (final (i, b) in buttons.indexed) ...[
+                if (i > 0) const SizedBox(width: KSpace.md),
+                Expanded(child: b),
+              ],
+            ],
+          );
+
+    if (summary) {
+      final firstVenue = venues.firstOrNull;
+      final address = firstVenue == null
+          ? (hasLegacyAddress ? legacyAddress : null)
+          : (firstVenue.address.isNotEmpty
+                ? firstVenue.address
+                : firstVenue.name);
+      final service = services.firstOrNull;
+      final serviceLine = service == null
+          ? legacySchedule
+          : [service.name, ?campusServiceWhen(service)].join(' \u00b7 ');
+      return Padding(
+        padding: padding,
+        child: KCard(
+          key: const Key('campus-card'),
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const KOverline('Your branch'),
+              const SizedBox(height: KSpace.sm),
               Text(
                 branch.name,
-                style: AppTypography.display(
-                  size: 22,
-                  weight: FontWeight.w700,
-                ).copyWith(color: kc.onBg, height: 1.1),
+                style: KharisText.title.copyWith(color: k.text),
               ),
-            ],
-            // One block per venue: its name, the services that meet there,
-            // its address and its own notes. Notes every venue shares show
-            // once at the end rather than under each.
-            if (unplaced.isNotEmpty) ...[
-              if (showHeader) const SizedBox(height: 14),
-              _ServiceList(services: unplaced),
-            ] else if (legacySchedule != null) ...[
-              if (showHeader) const SizedBox(height: 12),
-              _IconLine(icon: Icons.schedule_rounded, text: legacySchedule),
-            ],
-            for (final (i, v) in venues.indexed) ...[
-              if (!venuesLead || i > 0) ...[
-                const SizedBox(height: 14),
-                Divider(height: 1, thickness: 1, color: kc.divider),
+              if (address != null) ...[
+                const SizedBox(height: KSpace.md),
+                _IconLine(icon: KIcons.pin, text: address),
               ],
-              _VenueBlock(
-                venue: v,
-                services: [
-                  for (final s in services)
-                    if (s.venueId == v.id) s,
-                ],
-                notes: [
-                  for (final n in venueNotes(v))
-                    if (!shared.contains(n)) n,
-                ],
-              ),
+              if (serviceLine != null) ...[
+                const SizedBox(height: KSpace.md),
+                _IconLine(icon: KIcons.calendar, text: serviceLine),
+              ],
+              const SizedBox(height: KSpace.xl),
+              buttonRow,
             ],
-            if (shared.isNotEmpty) ...[
-              for (final n in shared) ...[const SizedBox(height: 4), _Note(n)],
-            ],
-            if (venues.isEmpty && hasLegacyAddress) ...[
-              const SizedBox(height: 2),
-              _AddressLink(
-                key: const Key('campus-directions'),
-                text: legacyAddress,
-                onTap: () => _openDirections(context, legacyAddress),
-              ),
-            ],
-            if (!contact.isEmpty) ...[
-              const SizedBox(height: 14),
-              CampusContactActions(contact: contact),
-            ],
-          ],
+          ),
         ),
+      );
+    }
+
+    final card = KCard(
+      key: const Key('campus-card'),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showHeader) ...[
+            const KOverline('Your branch'),
+            const SizedBox(height: KSpace.sm),
+            Text(branch.name, style: KharisText.title.copyWith(color: k.text)),
+            const SizedBox(height: KSpace.md),
+          ],
+          // One block per venue: its name, the services that meet there (in
+          // the card only when it carries the header), its address and its
+          // own notes. Notes every venue shares show once at the end.
+          if (showHeader && unplaced.isNotEmpty)
+            _ServiceList(services: unplaced)
+          else if (legacySchedule != null)
+            _IconLine(icon: KIcons.calendar, text: legacySchedule),
+          for (final (i, v) in venues.indexed) ...[
+            if (i > 0) ...[
+              const SizedBox(height: KSpace.xl),
+              Divider(height: 1, thickness: 1, color: k.line),
+              const SizedBox(height: KSpace.xl),
+            ],
+            _VenueBlock(
+              venue: v,
+              services: showHeader ? at(v) : const [],
+              notes: [
+                for (final n in venueNotes(v))
+                  if (!shared.contains(n)) n,
+              ],
+            ),
+          ],
+          for (final n in shared) ...[
+            const SizedBox(height: KSpace.xs),
+            _Note(n),
+          ],
+          if (venues.isEmpty && hasLegacyAddress)
+            _AddressLink(
+              key: const Key('campus-directions'),
+              text: legacyAddress,
+              onTap: () => _openDirections(context, legacyAddress),
+            ),
+          const SizedBox(height: KSpace.xl),
+          buttonRow,
+          if (!contact.isEmpty) ...[
+            const SizedBox(height: KSpace.xl),
+            CampusContactActions(contact: contact),
+          ],
+        ],
       ),
+    );
+
+    return Padding(
+      padding: padding,
+      child: showHeader || services.isEmpty
+          ? card
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                card,
+                if (unplaced.isNotEmpty) ...[
+                  const SizedBox(height: KSpace.gutter),
+                  _Timetable(services: unplaced),
+                ],
+                for (final v in venues)
+                  if (at(v).isNotEmpty) ...[
+                    const SizedBox(height: KSpace.gutter),
+                    _Timetable(
+                      heading: venues.length > 1 ? v.name : null,
+                      services: at(v),
+                    ),
+                  ],
+              ],
+            ),
     );
   }
 }
@@ -244,30 +318,27 @@ class CampusContactActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
+    spacing: KSpace.md,
+    runSpacing: KSpace.md,
     children: [
       if (contact.phone case final phone?)
-        _ContactChip(
+        _ContactButton(
           key: Key('$keyPrefix-call'),
-          icon: Icons.call_outlined,
           label: 'Call',
           semanticsLabel: 'Call $phone',
           onTap: () => _launch(Uri(scheme: 'tel', path: phone)),
         ),
       if (contact.email case final email?)
-        _ContactChip(
+        _ContactButton(
           key: Key('$keyPrefix-email'),
-          icon: Icons.mail_outline_rounded,
           label: 'Email',
           semanticsLabel: 'Email $email',
           onTap: () => _launch(Uri(scheme: 'mailto', path: email)),
         ),
       if (contact.instagram case final ig?)
         if (instagramUri(ig) case final uri?)
-          _ContactChip(
+          _ContactButton(
             key: Key('$keyPrefix-instagram'),
-            icon: Icons.photo_camera_outlined,
             label: 'Instagram',
             semanticsLabel: 'Instagram $ig',
             onTap: () => _launch(uri),
@@ -309,13 +380,15 @@ class _ServiceList extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       for (final (i, s) in services.indexed) ...[
-        if (i > 0) const SizedBox(height: 12),
+        if (i > 0) const SizedBox(height: KSpace.md),
         _ServiceRow(service: s),
       ],
     ],
   );
 }
 
+/// A service inside the card: a small calendar icon, its name and when it
+/// meets.
 class _ServiceRow extends StatelessWidget {
   const _ServiceRow({required this.service});
 
@@ -323,45 +396,68 @@ class _ServiceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
+    final k = context.k;
     final when = campusServiceWhen(service);
-    return Row(
-      key: Key('campus-service-${service.id}'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: kc.chipBg,
-            borderRadius: AppRadius.tileBorder,
-          ),
-          child: Icon(Icons.schedule_rounded, size: 18, color: kc.onChip),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                service.name,
-                style: AppTypography.ui(
-                  size: 14.5,
-                  weight: FontWeight.w700,
-                ).copyWith(color: kc.onBg, height: 1.25),
-              ),
-              if (when != null) ...[
-                const SizedBox(height: 2),
+    return MergeSemantics(
+      child: Row(
+        key: Key('campus-service-${service.id}'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          KIcon(KIcons.calendar, size: KSize.iconSm, color: k.muted),
+          const SizedBox(width: KSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  when,
-                  style: AppTypography.ui(
-                    size: 13,
-                    weight: FontWeight.w500,
-                  ).copyWith(color: kc.muted, height: 1.3),
+                  service.name,
+                  style: KharisText.itemTitle.copyWith(color: k.text),
                 ),
+                if (when != null)
+                  Text(when, style: KharisText.meta.copyWith(color: k.muted)),
               ],
-            ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The Branch page's timetable: the services as rows in one group, under
+/// the venue's name when the branch meets at several.
+class _Timetable extends StatelessWidget {
+  const _Timetable({required this.services, this.heading});
+
+  final List<CampusService> services;
+  final String? heading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (heading case final text?) ...[
+          Semantics(
+            header: true,
+            child: Text(
+              text,
+              style: KharisText.caption.copyWith(color: context.k.muted),
+            ),
+          ),
+          const SizedBox(height: KSpace.md),
+        ],
+        KListGroup(
+          children: [
+            for (final s in services)
+              KListRow(
+                key: Key('campus-service-${s.id}'),
+                leading: const KIconTile(KIcons.calendar),
+                title: s.name,
+                meta: campusServiceWhen(s),
+              ),
+          ],
         ),
       ],
     );
@@ -383,35 +479,23 @@ class _VenueBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Padding(
+    final k = context.k;
+    return Column(
       key: Key('campus-venue-${venue.id}'),
-      padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (venue.name case final name?) ...[
-            Text(
-              name,
-              style: AppTypography.ui(
-                size: 14,
-                weight: FontWeight.w700,
-              ).copyWith(color: kc.onBg, height: 1.25),
-            ),
-            if (services.isNotEmpty) const SizedBox(height: 10),
-          ],
-          if (services.isNotEmpty) ...[
-            _ServiceList(services: services),
-            const SizedBox(height: 8),
-          ],
-          if (venueDirectionsQuery(venue) != null)
-            VenueDirectionsLink(
-              key: Key('campus-directions-${venue.id}'),
-              venue: venue,
-            ),
-          for (final n in notes) ...[const SizedBox(height: 4), _Note(n)],
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (venue.name case final name?) ...[
+          Text(name, style: KharisText.itemTitle.copyWith(color: k.text)),
+          if (services.isNotEmpty) const SizedBox(height: KSpace.md),
         ],
-      ),
+        if (services.isNotEmpty) _ServiceList(services: services),
+        if (venueDirectionsQuery(venue) != null)
+          VenueDirectionsLink(
+            key: Key('campus-directions-${venue.id}'),
+            venue: venue,
+          ),
+        for (final n in notes) ...[const SizedBox(height: KSpace.xs), _Note(n)],
+      ],
     );
   }
 }
@@ -452,15 +536,11 @@ class _Note extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: AppTypography.ui(
-      size: 12.5,
-    ).copyWith(color: context.kc.muted, height: 1.35),
-  );
+  Widget build(BuildContext context) =>
+      Text(text, style: KharisText.meta.copyWith(color: context.k.muted));
 }
 
-/// An address that opens directions; tinted so the affordance is visible.
+/// An address that opens directions: a pin and the address, 44 tall.
 class _AddressLink extends StatelessWidget {
   const _AddressLink({super.key, required this.text, required this.onTap});
 
@@ -469,32 +549,30 @@ class _AddressLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = context.kc.onChip;
+    final k = context.k;
     return Semantics(
       button: true,
       label: 'Directions to $text',
       excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: InkWell(
         onTap: onTap,
-        // 10 px above and below lifts a one-line address to a 44 px target.
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.directions_outlined, size: 16, color: color),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  text,
-                  style: AppTypography.ui(
-                    size: 13.5,
-                    weight: FontWeight.w600,
-                  ).copyWith(color: color, height: 1.35),
+        borderRadius: const BorderRadius.all(Radius.circular(KRadius.button)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: KSize.touchMin),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: KSpace.sm),
+            child: Row(
+              children: [
+                KIcon(KIcons.pin, size: KSize.iconSm, color: k.muted),
+                const SizedBox(width: KSpace.md),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: KharisText.meta.copyWith(color: k.muted),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -505,65 +583,47 @@ class _AddressLink extends StatelessWidget {
 class _IconLine extends StatelessWidget {
   const _IconLine({required this.icon, required this.text});
 
-  final IconData icon;
+  final String icon;
   final String text;
 
   @override
   Widget build(BuildContext context) {
-    final color = context.kc.muted;
+    final k = context.k;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 8),
+        KIcon(icon, size: KSize.iconSm, color: k.muted),
+        const SizedBox(width: KSpace.md),
         Expanded(
-          child: Text(
-            text,
-            style: AppTypography.ui(
-              size: 13.5,
-              weight: FontWeight.w500,
-            ).copyWith(color: color, height: 1.35),
-          ),
+          child: Text(text, style: KharisText.meta.copyWith(color: k.muted)),
         ),
       ],
     );
   }
 }
 
-class _ContactChip extends StatelessWidget {
-  const _ContactChip({
+class _ContactButton extends StatelessWidget {
+  const _ContactButton({
     super.key,
-    required this.icon,
     required this.label,
     required this.semanticsLabel,
     required this.onTap,
   });
 
-  final IconData icon;
   final String label;
   final String semanticsLabel;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
     return Semantics(
       label: semanticsLabel,
       button: true,
       excludeSemantics: true,
-      child: OutlinedButton.icon(
+      child: KButton(
+        label: label,
+        variant: KButtonVariant.outline,
         onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: kc.onBg,
-          side: BorderSide(color: kc.outline),
-          minimumSize: const Size(0, 38),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-        ),
-        icon: Icon(icon, size: 16),
-        label: Text(
-          label,
-          style: AppTypography.ui(size: 13, weight: FontWeight.w700),
-        ),
       ),
     );
   }

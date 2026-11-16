@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
@@ -14,13 +13,16 @@ import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/content_api_provider.dart';
 import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/supabase_stub.dart';
+import 'support/fake_cache_service.dart';
 
 const _hall = CampusVenue(
   id: 'v1',
@@ -33,8 +35,6 @@ const _bristol = Branch(
   id: 'bristol',
   name: 'Bristol',
   subtitle: '',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
   venues: [_hall],
   services: [
     CampusService(
@@ -68,8 +68,6 @@ const _london = Branch(
   id: 'london',
   name: 'London',
   subtitle: '',
-  gradientStart: Colors.black,
-  gradientEnd: Colors.black,
   services: [
     CampusService(
       id: 'sun',
@@ -85,7 +83,6 @@ DateTime _sun(int hour, [int minute = 0]) =>
     DateTime(2026, 10, 25, hour, minute);
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   group('branchServiceEvents', () {
     test('today before a service starts lists today', () {
@@ -139,8 +136,6 @@ void main() {
         id: 'late',
         name: 'Late',
         subtitle: '',
-        gradientStart: Colors.black,
-        gradientEnd: Colors.black,
         address: '1 Night St',
         services: [
           CampusService(
@@ -231,8 +226,6 @@ void main() {
         id: 'bristol',
         name: 'Bristol',
         subtitle: '',
-        gradientStart: Colors.black,
-        gradientEnd: Colors.black,
         services: [
           CampusService(
             id: 'early',
@@ -333,9 +326,13 @@ void main() {
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
+            cacheServiceProvider.overrideWithValue(FakeCacheService()),
             ...overrides(),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -360,7 +357,14 @@ void main() {
       expect(find.text('Get directions'), findsOneWidget);
       expect(find.text('Add to calendar'), findsOneWidget);
       expect(find.text('RSVP'), findsOneWidget);
-      expect(find.text('Every Wednesday \u00b7 7:00 PM'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('event-detail-recurrence')),
+          matching: find.text('EVERY WEDNESDAY'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('19:00'), findsOneWidget);
       expect(stub.requests, isEmpty);
     });
 

@@ -1,22 +1,23 @@
 import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// Player timeline scrubber.
 ///
-/// A thin rounded track: the played portion is filled solid up to the exact
-/// `position / duration` fraction, the rest is a faint rail, and a round thumb
-/// marks the play head. Tap or drag anywhere to seek; the thumb grows while
-/// dragging. Time labels sit below — elapsed on the left, time remaining
-/// (`-m:ss`) on the right.
+/// A thin rounded track: the played portion is filled in the primary colour
+/// up to the exact `position / duration` fraction, the rest is the surface2
+/// rail, and a round thumb marks the play head. Tap or drag anywhere to seek;
+/// the thumb grows while dragging. Time labels sit below — elapsed on the
+/// left, time remaining (`-m:ss`) on the right.
 ///
 /// Until the engine reports a duration the timeline is inert: gestures are
 /// ignored (a tap would otherwise compute 0:00 and throw the member back to
 /// the start) and the unknown times read `--:--`.
 ///
-/// [pins] mark the member's notes on this timeline: a small gold bead on the
-/// rail per note, so the moments they pinned are visible while scrubbing.
+/// [pins] mark the member's notes on this timeline: a small bead in the
+/// highlight colour on the rail per note, so the moments they pinned are
+/// visible while scrubbing.
 /// Positions must already be on the timeline this bar draws (the caller maps
 /// audio-timeline notes onto a video timeline). See [pinCentres].
 class SeekBar extends StatefulWidget {
@@ -82,7 +83,7 @@ class SeekBar extends StatefulWidget {
 
 class _SeekBarState extends State<SeekBar> {
   /// Touch target height; the painted track is much thinner and centred.
-  static const _hitHeight = 28.0;
+  static const _hitHeight = KSize.touchMin;
 
   double? _dragFraction;
 
@@ -137,12 +138,8 @@ class _SeekBarState extends State<SeekBar> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.kc;
-    final timeStyle = AppTypography.ui(
-      size: 11.5,
-      weight: FontWeight.w600,
-      color: colors.muted,
-    );
+    final colors = context.k;
+    final timeStyle = KharisText.caption.copyWith(color: colors.muted);
 
     final known = _known;
     final elapsed = _displayPosition;
@@ -161,14 +158,14 @@ class _SeekBarState extends State<SeekBar> {
               fraction: _fraction,
               dragging: _dragFraction != null,
               showThumb: known,
-              played: colors.onBg,
-              rail: colors.onBg.withValues(alpha: 0.22),
+              played: colors.primary,
+              rail: colors.surface2,
               pins: SeekBar.pinCentres(
                 widget.pins,
                 duration: widget.duration,
                 width: width,
               ),
-              pin: colors.accentInk,
+              pin: colors.highlight,
               pinHalo: colors.bg,
             ),
           ),
@@ -205,7 +202,6 @@ class _SeekBarState extends State<SeekBar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           track,
-          const SizedBox(height: 2),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

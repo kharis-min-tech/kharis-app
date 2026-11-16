@@ -3,34 +3,42 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kharis_app/core/utils/media_url.dart';
-import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/collection_message_row.dart';
+import 'package:kharis_app/features/messages/presentation/screens/message_search_screen.dart';
 import 'package:kharis_app/features/playlists/presentation/screens/favorites_screen.dart';
 import 'package:kharis_app/features/playlists/presentation/screens/playlist_detail_screen.dart';
 import 'package:kharis_app/features/playlists/presentation/screens/playlists_screen.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/add_to_playlist_sheet.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/playlist_card.dart';
+import 'package:kharis_app/features/playlists/presentation/widgets/playlist_name_dialog.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import '../support/actions.dart';
 import '../support/harness.dart';
 import '../support/live_data.dart';
 
-/// Brings [s]'s row on screen through search and returns its finder.
+/// Brings [s]'s row on screen through Messages' Search and returns its
+/// finder.
 Future<Finder> _findRow(Journey j, Sermon s) async {
   final t = j.tester;
   await j.resetTo('/home');
   await openMessagesReset(j);
-  final field = find.byType(TextField).first;
-  await t.tap(field, warnIfMissed: false);
+  await tapVisible(t, find.byKey(const Key('messages-search')));
+  final field = find.descendant(
+    of: find.byKey(const Key('search-field')),
+    matching: find.byType(EditableText),
+  );
+  await pumpUntilFound(t, field, reason: 'Search');
   await t.enterText(field, s.title);
-  final row = find.byKey(ValueKey(s.id));
-  // Results are newest first and the list builds lazily: once they have
-  // settled, close the keyboard and scroll the row into being.
+  final row = find.byKey(ValueKey('search-${s.id}'));
+  // The list builds lazily: once the results have settled, close the
+  // keyboard and scroll the row into being.
   await pumpUntilFound(
     t,
-    find.textContaining(RegExp(r'results? for "')),
+    find.byKey(const Key('search-count')),
     timeout: const Duration(seconds: 30),
     reason: 'results for "${s.title}"',
   );
@@ -40,17 +48,28 @@ Future<Finder> _findRow(Journey j, Sermon s) async {
   await scrollUntilFound(
     t,
     row,
-    scrollable: messagesScroll,
+    scrollable: verticalScrollableIn(find.byType(MessageSearchScreen)),
     timeout: const Duration(seconds: 30),
   );
   await ensureCentred(t, row);
   return row;
 }
 
+/// Leaves Search for the Messages tab.
+Future<void> _closeSearch(Journey j) async {
+  final t = j.tester;
+  if (find.byType(MessageSearchScreen).evaluate().isEmpty) return;
+  await goBack(t);
+  await pumpUntil(
+    t,
+    () => find.byType(MessageSearchScreen).evaluate().isEmpty,
+  );
+}
+
 Future<void> _openPlaylists(Journey j) async {
   final t = j.tester;
   if (find.byType(PlaylistsScreen).evaluate().isNotEmpty) return;
-  await openMoreRow(t, 'My playlists');
+  await openMoreRow(t, 'Collections');
   await pumpUntilFound(t, find.byType(PlaylistsScreen));
 }
 
@@ -92,31 +111,23 @@ Future<void> playlistsJourney(Journey j) async {
     timeout: const Duration(seconds: 30),
   );
   await t.tap(find.byKey(const ValueKey('playlists-new')), warnIfMissed: false);
-  await pumpUntilFound(t, find.byType(AlertDialog));
+  final nameSheet = find.byType(PlaylistNameSheet);
+  await pumpUntilFound(t, nameSheet);
   await t.tap(
-    find.descendant(
-      of: find.byType(AlertDialog),
-      matching: find.text('Create'),
-    ),
+    find.descendant(of: nameSheet, matching: find.text('Create')),
     warnIfMissed: false,
   );
   await pumpFor(t, const Duration(milliseconds: 500));
   j.check(
-    find.text('Give your playlist a name').evaluate().isNotEmpty,
-    'empty playlist name is refused',
+    find.text('Give your collection a name').evaluate().isNotEmpty,
+    'empty collection name is refused',
   );
   await t.enterText(
-    find.descendant(
-      of: find.byType(AlertDialog),
-      matching: find.byType(TextField),
-    ),
+    find.descendant(of: nameSheet, matching: find.byType(TextField)),
     name,
   );
   await t.tap(
-    find.descendant(
-      of: find.byType(AlertDialog),
-      matching: find.text('Create'),
-    ),
+    find.descendant(of: nameSheet, matching: find.text('Create')),
     warnIfMissed: false,
   );
   await pumpUntilFound(
@@ -141,16 +152,10 @@ Future<void> playlistsJourney(Journey j) async {
   await j.shot('playlist-created');
 
   try {
-    // ── Add three messages from their ⋮ menu ───────────────────────────────
+    // ── Add three messages from their long-press menu ──────────────────────
     for (final s in chosen) {
       final row = await _findRow(j, s);
-      await t.tap(
-        find.descendant(
-          of: row,
-          matching: find.byIcon(Icons.more_vert_rounded),
-        ),
-        warnIfMissed: false,
-      );
+      await t.longPress(row, warnIfMissed: false);
       final sheet = find.byType(AddToPlaylistSheet);
       final entry = find.descendant(of: sheet, matching: find.text(name));
       await pumpUntilFound(t, entry, reason: 'playlist in the add sheet');
@@ -164,10 +169,14 @@ Future<void> playlistsJourney(Journey j) async {
         ),
         '"${s.title}" added',
       );
-      Navigator.of(t.element(sheet)).pop();
+      await tapVisible(
+        t,
+        find.descendant(of: sheet, matching: find.text('Done')),
+      );
+      await pumpUntil(t, () => sheet.evaluate().isEmpty);
       await pumpFor(t, const Duration(milliseconds: 600));
     }
-    await clearMessagesSearch(t);
+    await _closeSearch(j);
 
     // ── Mosaic ─────────────────────────────────────────────────────────────
     await _openPlaylists(j);
@@ -215,7 +224,7 @@ Future<void> playlistsJourney(Journey j) async {
     await pumpUntilFound(t, find.byType(PlaylistDetailScreen));
     final rows = find.descendant(
       of: find.byType(PlaylistDetailScreen),
-      matching: find.byType(SermonListItem),
+      matching: find.byType(CollectionMessageRow),
     );
     j.check(
       await pumpUntil(
@@ -226,28 +235,16 @@ Future<void> playlistsJourney(Journey j) async {
       'playlist lists 3 messages (got ${rows.evaluate().length})',
     );
     final renamed = '$name renamed';
-    await t.tap(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.byIcon(Icons.more_vert_rounded),
-      ),
-      warnIfMissed: false,
-    );
+    await t.tap(find.byKey(const Key('playlist-options')), warnIfMissed: false);
     await pumpUntilFound(t, find.text('Rename'));
     await t.tap(find.text('Rename'), warnIfMissed: false);
-    await pumpUntilFound(t, find.text('Rename playlist'));
+    await pumpUntilFound(t, find.text('Rename collection'));
     await t.enterText(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.byType(TextField),
-      ),
+      find.descendant(of: nameSheet, matching: find.byType(TextField)),
       renamed,
     );
     await t.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Save'),
-      ),
+      find.descendant(of: nameSheet, matching: find.text('Save')),
       warnIfMissed: false,
     );
     j.check(
@@ -266,22 +263,19 @@ Future<void> playlistsJourney(Journey j) async {
     );
 
     // ── Remove one ─────────────────────────────────────────────────────────
-    final removed = t.widget<SermonListItem>(rows.first).title;
+    final removed = t.widget<CollectionMessageRow>(rows.first).sermon.title;
     await t.tap(
-      find.descendant(
-        of: rows.first,
-        matching: find.byIcon(Icons.more_vert_rounded),
-      ),
+      find.descendant(of: rows.first, matching: find.byType(KIconButton)),
       warnIfMissed: false,
     );
-    await pumpUntilFound(t, find.text('Remove from this playlist'));
-    await t.tap(find.text('Remove from this playlist'), warnIfMissed: false);
+    await pumpUntilFound(t, find.text('Remove from this collection?'));
+    await t.tap(find.text('Remove'), warnIfMissed: false);
     j.check(
       await pumpUntil(
         t,
         () =>
             rows.evaluate().length == 2 &&
-            find.text('2 messages').evaluate().isNotEmpty,
+            find.textContaining('2 messages').evaluate().isNotEmpty,
         timeout: const Duration(seconds: 15),
       ),
       'removing "$removed" leaves 2 messages',
@@ -301,23 +295,11 @@ Future<void> playlistsJourney(Journey j) async {
       await j.resetTo('/playlists/$id');
       await pumpUntilFound(t, find.byType(PlaylistDetailScreen));
     }
-    await t.tap(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.byIcon(Icons.more_vert_rounded),
-      ),
-      warnIfMissed: false,
-    );
-    await pumpUntilFound(t, find.text('Delete playlist'));
-    await t.tap(find.text('Delete playlist'), warnIfMissed: false);
-    await pumpUntilFound(t, find.text('Delete playlist?'));
-    await t.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Delete'),
-      ),
-      warnIfMissed: false,
-    );
+    await t.tap(find.byKey(const Key('playlist-options')), warnIfMissed: false);
+    await pumpUntilFound(t, find.text('Delete collection'));
+    await t.tap(find.text('Delete collection'), warnIfMissed: false);
+    await pumpUntilFound(t, find.text('Delete collection?'));
+    await t.tap(find.text('Delete'), warnIfMissed: false);
     j.check(
       await pumpUntil(
         t,
@@ -331,7 +313,7 @@ Future<void> playlistsJourney(Journey j) async {
     await pumpFor(t, const Duration(seconds: 1));
     j.check(
       find.textContaining(name).evaluate().isEmpty,
-      'deleted playlist gone from My playlists',
+      'deleted collection gone from Collections',
     );
   } catch (e) {
     j.check(
@@ -373,7 +355,7 @@ Future<void> playlistsJourney(Journey j) async {
   );
   await j.shot('liked');
   await closePlayer(t);
-  await clearMessagesSearch(t);
+  await _closeSearch(j);
   await openMoreRow(t, 'Favourites');
   await pumpUntilFound(t, find.byType(FavoritesScreen));
   final listed = find.descendant(
@@ -389,7 +371,7 @@ Future<void> playlistsJourney(Journey j) async {
     'Favourites lists "${fav.title}"',
   );
   await j.shot('favourites');
-  await tapBack(t);
+  await goBack(t);
   // Reopen the message the way it was liked (from its row).
   final again = await _findRow(j, fav);
   await t.tap(again, warnIfMissed: false);

@@ -25,10 +25,40 @@ Future<double> _effectiveScale(WidgetTester tester, double systemScale) async {
 }
 
 void main() {
+  test('the max scale supports 200% system text', () {
+    expect(kMaxTextScale, 2.0);
+    expect(kMinTextScale, 0.85);
+  });
+
+  testWidgets('200% system text reaches routes unclamped', (tester) async {
+    expect(await _effectiveScale(tester, 2.0), closeTo(2.0, 1e-9));
+  });
+
   testWidgets('very large system text is capped at the max scale', (
     tester,
   ) async {
-    expect(await _effectiveScale(tester, 2.0), closeTo(kMaxTextScale, 1e-9));
+    expect(await _effectiveScale(tester, 3.0), closeTo(kMaxTextScale, 1e-9));
+  });
+
+  testWidgets('the Text size choice is capped at the max scale too', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    late TextScaler seen;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            clampTextScaling(context, child, factor: 1.3),
+        home: Builder(
+          builder: (context) {
+            seen = MediaQuery.textScalerOf(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    expect(seen.scale(10) / 10, closeTo(kMaxTextScale, 1e-9));
   });
 
   testWidgets('very small system text is raised to the min scale', (
