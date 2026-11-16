@@ -1222,6 +1222,9 @@ PODS:
   - Firebase/Performance (12.19.0):
     - Firebase/CoreOnly
     - FirebasePerformance (~> 12.19.0)
+  - Firebase/RemoteConfig (12.19.0):
+    - Firebase/CoreOnly
+    - FirebaseRemoteConfig (~> 12.19.0)
   - firebase_analytics (12.6.0):
     - firebase_core
     - FirebaseAnalytics (= 12.19.0)
@@ -1243,6 +1246,10 @@ PODS:
     - Flutter
   - firebase_performance (0.11.6):
     - Firebase/Performance (= 12.19.0)
+    - firebase_core
+    - Flutter
+  - firebase_remote_config (6.7.0):
+    - Firebase/RemoteConfig (= 12.19.0)
     - firebase_core
     - Flutter
   - FirebaseABTesting (12.19.0):
@@ -1559,6 +1566,7 @@ DEPENDENCIES:
   - firebase_crashlytics (from `.symlinks/plugins/firebase_crashlytics/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - firebase_performance (from `.symlinks/plugins/firebase_performance/ios`)
+  - firebase_remote_config (from `.symlinks/plugins/firebase_remote_config/ios`)
   - Flutter (from `Flutter`)
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - in_app_review (from `.symlinks/plugins/in_app_review/ios`)
@@ -1630,6 +1638,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/firebase_messaging/ios"
   firebase_performance:
     :path: ".symlinks/plugins/firebase_performance/ios"
+  firebase_remote_config:
+    :path: ".symlinks/plugins/firebase_remote_config/ios"
   Flutter:
     :path: Flutter
   geolocator_apple:
@@ -1671,6 +1681,7 @@ SPEC CHECKSUMS:
   firebase_crashlytics: 289a6a01605d663873a978d9daaa3648edc3f3b5
   firebase_messaging: df68cb5feefa02766144a50fa5348362a0127008
   firebase_performance: aa276b86630c0ad77b82200e10351815909e9cd6
+  firebase_remote_config: 90077eb53965c58556b28c65c9dccd0b66b991af
   FirebaseABTesting: 3f0f330ed5e19323fe512006d62a38399a7de7c1
   FirebaseAnalytics: e9f8c369447e453da23f0455a06e4910bad10de0
   FirebaseAppCheckInterop: bd4b791ffaed7ae719304af6369d243ddee5e4a0
