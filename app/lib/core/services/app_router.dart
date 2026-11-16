@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +12,9 @@ import '../../features/home/presentation/screens/branch_screen.dart';
 import '../../features/home/presentation/screens/dashboard_shell.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/messages/presentation/screens/messages_screen.dart';
+import '../../features/messages/presentation/screens/downloads_screen.dart';
+import '../../features/messages/presentation/screens/listening_history_screen.dart';
+import '../../features/messages/presentation/screens/message_search_screen.dart';
 import '../../features/onboarding/presentation/screens/branch_selection_screen.dart';
 import '../../features/onboarding/presentation/screens/login_screen.dart';
 import '../../features/onboarding/presentation/screens/register_screen.dart';
@@ -21,12 +25,14 @@ import '../../features/player/presentation/screens/full_player_screen.dart';
 import '../../features/playlists/presentation/screens/favorites_screen.dart';
 import '../../features/playlists/presentation/screens/playlist_detail_screen.dart';
 import '../../features/playlists/presentation/screens/playlists_screen.dart';
-import '../../features/home/presentation/screens/reading_screen.dart';
+import '../../features/bible/presentation/bible_routes.dart';
 import '../../features/notes/presentation/screens/notes_screen.dart';
 import '../../features/home/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
+import '../../features/settings/presentation/screens/notifications_settings_screen.dart';
 import '../../features/shared_links/presentation/shared_link_screens.dart';
 import '../../shared/providers/auth_provider.dart';
+import '../../ui/gallery/component_gallery_screen.dart';
 
 /// Central router as a Riverpod provider so [RouterNotifier] can drive
 /// reactive redirects when auth state changes.
@@ -35,18 +41,22 @@ import '../../shared/providers/auth_provider.dart';
 ///   - `/` (welcome) routes straight to the last tab once onboarding is
 ///     complete or the member is signed in.
 ///
-/// Overlay routes (`/reading`, `/notifications`, `/announcements`,
-/// `/branch`, `/events/:id`, ...) sit on the root navigator above the tab
-/// shell and are meant to be PUSHED, so the AppBar back button always
-/// returns to the tab underneath.
+/// Pushed routes (`/give`, `/calendar`, `/reading`, `/notifications`,
+/// `/announcements`, `/branch`, `/events/:id`, ...) sit on the root navigator
+/// above the tab shell and are meant to be PUSHED, so swipe back and the
+/// system back button always return to the tab underneath. Every route uses
+/// the default page, whose transition supports the iOS swipe-back gesture.
 final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
+  // The shell hides the nav while a sheet is open on any navigator.
+  final openSheets = ref.read(openSheetsProvider);
 
   final router = GoRouter(
     initialLocation: '/',
     refreshListenable: notifier,
     redirect: notifier.redirect,
     observers: [
+      SheetObserver(openSheets),
       // Screen-view analytics; no-op when Firebase isn't initialized.
       if (Firebase.apps.isNotEmpty)
         FirebaseAnalyticsObserver(analytics: FirebaseAnalytics.instance),
@@ -70,12 +80,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // ── Main app (shell with bottom nav) ──────────────────────────────────
+      // ── Main app (shell with the floating nav): Home, Messages, Bible, More
+      // Branch order matches kTabPaths and the nav's items.
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             DashboardShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
               GoRoute(
                 path: '/home',
@@ -84,33 +96,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
               GoRoute(
                 path: '/messages',
                 builder: (context, state) => const MessagesScreen(),
                 // Shared message links (/m/:id redirects here) open inside
                 // the Messages tab so the shell is never torn down.
-                routes: [sharedMessageRoute],
+                routes: [
+                  GoRoute(
+                    path: 'search',
+                    builder: (context, state) => const MessageSearchScreen(),
+                  ),
+                  sharedMessageRoute,
+                ],
               ),
             ],
           ),
           StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
-              GoRoute(
-                path: '/calendar',
-                builder: (context, state) => const CalendarScreen(),
-              ),
+              // Bible: the landing screen, today's reading, the reader,
+              // Highlights and My notes.
+              bibleTabRoute,
             ],
           ),
           StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/giving',
-                builder: (context, state) => const GivingScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
+            observers: [SheetObserver(openSheets)],
             routes: [
               GoRoute(
                 path: '/more',
@@ -121,23 +133,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
+      // ── Events list (pushed; event pushes and Home's "See all") ───────────
+      GoRoute(
+        path: '/calendar',
+        builder: (context, state) => const CalendarScreen(),
+      ),
+
+      // ── Give (pushed). /giving is the old tab path, kept for saved links ──
+      GoRoute(path: '/give', builder: (context, state) => const GivingScreen()),
+      GoRoute(path: '/giving', redirect: (context, state) => '/give'),
+
+      // ── Listening history and downloads (pushed) ──────────────────────────
+      GoRoute(
+        path: '/history',
+        builder: (context, state) => const ListeningHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/downloads',
+        builder: (context, state) => const DownloadsScreen(),
+      ),
+
       // ── Full player (overlays shell) ──────────────────────────────────────
       GoRoute(
         path: '/player',
         builder: (context, state) => const FullPlayerScreen(),
       ),
 
-      // ── Today's reading / Bible (overlays shell) ──────────────────────────
-      // /reading (Home card, More's "Daily reading", reading pushes) opens the
-      // reader on today's reading; /bible (More's "Bible") on the book list.
-      GoRoute(
-        path: '/reading',
-        builder: (context, state) => const ReadingScreen(),
-      ),
-      GoRoute(
-        path: '/bible',
-        builder: (context, state) => const ReadingScreen(browse: true),
-      ),
+      // ── /reading and /highlights land in the Bible tab ────────────────────
+      ...bibleRedirectRoutes,
 
       // ── Playlists (overlays shell) ────────────────────────────────────────
       // The member's own playlists. Home and detail are both pushed routes on
@@ -206,6 +229,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/profile/edit',
         builder: (context, state) => const EditProfileScreen(),
       ),
+
+      // ── Notification settings (More's Notifications row) ──────────────────
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (context, state) => const NotificationsSettingsScreen(),
+      ),
+
+      // ── Design check (debug builds only; never ships in release) ──────────
+      if (kDebugMode)
+        GoRoute(
+          path: '/design',
+          builder: (context, state) => const ComponentGalleryScreen(),
+        ),
     ],
   );
 

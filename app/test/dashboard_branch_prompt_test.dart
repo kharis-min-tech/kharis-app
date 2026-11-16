@@ -4,18 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
+import 'package:kharis_app/features/onboarding/presentation/screens/branch_selection_screen.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
+import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -24,8 +27,6 @@ import 'support/fake_cache_service.dart';
 /// after the first frame; it can be dismissed. A member with a branch is
 /// never asked.
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
-
   final guest = User(
     id: 'guest-1',
     email: '',
@@ -34,13 +35,7 @@ void main() {
     createdAt: DateTime(2026),
   );
 
-  const london = Branch(
-    id: 'london',
-    name: 'London',
-    subtitle: 'Main branch',
-    gradientStart: Colors.black,
-    gradientEnd: Colors.black,
-  );
+  const london = Branch(id: 'london', name: 'London', subtitle: 'Main branch');
 
   /// One launch: a fresh [ProviderScope] unless [container] is reused.
   Future<ProviderContainer> launch(
@@ -48,23 +43,18 @@ void main() {
     Map<String, Object> prefs = const {'onboarding_completed': true},
     Stream<String?>? branch,
     ProviderContainer? container,
+    String initialLocation = '/home',
   }) async {
     SharedPreferences.setMockInitialValues(prefs);
     final sp = await SharedPreferences.getInstance();
     final router = GoRouter(
-      initialLocation: '/home',
+      initialLocation: initialLocation,
       routes: [
         StatefulShellRoute.indexedStack(
           builder: (context, state, shell) =>
               DashboardShell(navigationShell: shell),
           branches: [
-            for (final path in [
-              '/home',
-              '/messages',
-              '/calendar',
-              '/giving',
-              '/more',
-            ])
+            for (final path in ['/home', '/messages', '/bible', '/more'])
               StatefulShellBranch(
                 routes: [
                   GoRoute(
@@ -74,6 +64,10 @@ void main() {
                 ],
               ),
           ],
+        ),
+        GoRoute(
+          path: '/branch-selection',
+          builder: (_, _) => const BranchSelectionScreen(),
         ),
       ],
     );
@@ -93,6 +87,9 @@ void main() {
             if (branch != null)
               currentBranchProvider.overrideWith((ref) => branch),
             branchesProvider.overrideWith((ref) => Stream.value([london])),
+            notificationServiceProvider.overrideWithValue(
+              _QuietNotifications(),
+            ),
           ],
         );
     if (container == null) addTearDown(c.dispose);
@@ -100,7 +97,10 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: c,
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          theme: KharisTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pump(const Duration(seconds: 2));
@@ -169,4 +169,37 @@ void main() {
 
     expect(picker, findsNothing);
   });
+
+  testWidgets('a branch chosen in onboarding opens Home with no prompt', (
+    tester,
+  ) async {
+    // Fresh install: Get started -> Member -> Find your branch.
+    final c = await launch(
+      tester,
+      prefs: {'onboarding_role': 'member'},
+      initialLocation: '/branch-selection',
+    );
+    expect(find.text('Find your branch'), findsOneWidget);
+
+    await tester.tap(find.text('London'));
+    // Home's first frame already has the choice: no stale "no branch"
+    // carried over from before it was made.
+    for (var i = 0; i < 20 && find.text('page /home').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.text('page /home'), findsOneWidget);
+    final atHome = c.read(currentBranchProvider);
+    expect(atHome.isLoading, isFalse);
+    expect(atHome.valueOrNull, 'London');
+
+    await tester.pumpAndSettle();
+    expect(find.text('page /home'), findsOneWidget);
+    expect(picker, findsNothing);
+    expect(find.text('Choose your branch'), findsNothing);
+  });
+}
+
+class _QuietNotifications extends NotificationService {
+  @override
+  Future<void> switchBranchTopic({String? from, String? to}) async {}
 }

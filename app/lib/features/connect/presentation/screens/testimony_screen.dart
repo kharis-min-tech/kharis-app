@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/widgets/connect_form_widgets.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/shared/widgets/press_effect.dart';
-import 'package:kharis_app/shared/widgets/shake_effect.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 enum _FormState { form, sending, success }
 
@@ -27,12 +25,12 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
   final _phoneController = TextEditingController();
   final _summaryController = TextEditingController();
   final _testimonyController = TextEditingController();
-  final _shakeKey = GlobalKey<ShakeEffectState>();
 
   String? _selectedBranch;
   String? _category;
   bool _anonymous = false;
   _FormState _state = _FormState.form;
+  String? _error;
 
   @override
   void dispose() {
@@ -45,17 +43,14 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
   }
 
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      _shakeKey.currentState?.shake();
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     final branches = ref.read(branchesProvider).valueOrNull ?? const [];
     final branch = branches.where((b) => b.name == _selectedBranch).firstOrNull;
-    if (branch == null) {
-      _shakeKey.currentState?.shake();
-      return;
-    }
-    setState(() => _state = _FormState.sending);
+    if (branch == null) return;
+    setState(() {
+      _state = _FormState.sending;
+      _error = null;
+    });
     try {
       await ref
           .read(connectRepositoryProvider)
@@ -74,241 +69,244 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
       if (mounted) setState(() => _state = _FormState.success);
     } catch (_) {
       if (mounted) {
-        setState(() => _state = _FormState.form);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Your testimony was not sent. Please try again later.',
-            ),
-            backgroundColor: AppColors.errorContainer,
-          ),
-        );
+        setState(() {
+          _state = _FormState.form;
+          _error = 'Your testimony was not sent. Please try again later.';
+        });
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: context.kc.onBg, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _state == _FormState.success ? _buildSuccess() : _buildForm(),
-      ),
-    );
-  }
-
-  Widget _buildSuccess() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: context.kc.accentInk, size: 56),
-            const SizedBox(height: 24),
-            Text(
-              'Thank you for sharing',
-              textAlign: TextAlign.center,
-              style: AppTypography.display(
-                size: 22,
-                weight: FontWeight.w700,
-                color: context.kc.onBg,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Our team reviews every testimony.',
-              textAlign: TextAlign.center,
-              style: AppTypography.ui(size: 15, color: context.kc.muted),
-            ),
-            const SizedBox(height: 36),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.kc.accent,
-                  foregroundColor: context.kc.onAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  elevation: 0,
-                ),
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  'Done',
-                  style: AppTypography.ui(size: 14, weight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ConnectFormPage(
+      child: _state == _FormState.success
+          ? const ConnectFormSuccess(
+              title: 'Thank you for sharing',
+              hint: 'Our team reviews every testimony.',
+            )
+          : _buildForm(),
     );
   }
 
   Widget _buildForm() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Form(
-        key: _formKey,
-        child: ShakeEffect(
-          key: _shakeKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Share your testimony',
-                style: AppTypography.display(
-                  size: 28,
-                  weight: FontWeight.w700,
-                  color: context.kc.onBg,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Tell us what God has done',
-                style: AppTypography.ui(size: 15, color: context.kc.muted),
-              ),
-              const SizedBox(height: 28),
+    final error = _error;
+    return ConnectFormBody(
+      formKey: _formKey,
+      title: 'Share your testimony',
+      subtitle: 'Tell us what God has done',
+      children: [
+        KTextField(
+          controller: _nameController,
+          label: 'Full name *',
+          hint: 'Your name',
+          textInputAction: TextInputAction.next,
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Name is required';
+            return null;
+          },
+        ),
+        const SizedBox(height: KSpace.x3),
+        KTextField(
+          controller: _emailController,
+          label: 'Email address',
+          hint: 'Optional',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return null;
+            final emailRe = RegExp(r'^[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+            if (!emailRe.hasMatch(v.trim())) return 'Enter a valid email';
+            return null;
+          },
+        ),
+        const SizedBox(height: KSpace.x3),
+        KTextField(
+          controller: _phoneController,
+          label: 'Phone number',
+          hint: 'Optional',
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: KSpace.x3),
+        ConnectBranchDropdown(
+          label: 'Branch *',
+          value: _selectedBranch,
+          onChanged: (v) => setState(() => _selectedBranch = v),
+          validator: (v) => v == null ? 'Branch is required' : null,
+        ),
+        const SizedBox(height: KSpace.x3),
+        KSelectField(
+          label: 'Category',
+          hint: 'Choose a category',
+          items: kTestimonyCategories,
+          value: _category,
+          onChanged: (v) => setState(() => _category = v),
+        ),
+        const SizedBox(height: KSpace.x3),
+        KTextField(
+          controller: _summaryController,
+          label: 'Short title / summary *',
+          hint: 'e.g. Healed after surgery',
+          maxLength: kTestimonySummaryMaxLength,
+          textInputAction: TextInputAction.next,
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) {
+              return 'Add a short title';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: KSpace.md),
+        KTextField(
+          controller: _testimonyController,
+          label: 'Your testimony *',
+          hint: 'Tell us what God has done',
+          maxLines: 6,
+          maxLength: kTestimonyMaxLength,
+          textInputAction: TextInputAction.newline,
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) {
+              return 'Please share your testimony';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: KSpace.md),
+        _ConsentField(
+          anonymous: _anonymous,
+          onAnonymousChanged: (v) => setState(() => _anonymous = v),
+          validator: (agreed) =>
+              agreed ? null : 'Please confirm we may share your testimony',
+        ),
+        const SizedBox(height: KSpace.section),
+        if (error != null) ...[
+          KInlineError(error),
+          const SizedBox(height: KSpace.xl),
+        ],
+        KButton(
+          label: 'Share testimony',
+          size: KButtonSize.cta,
+          expand: true,
+          loading: _state == _FormState.sending,
+          onPressed: _submit,
+        ),
+      ],
+    );
+  }
+}
 
-              ConnectFormField(
-                controller: _nameController,
-                label: 'Full name *',
-                hint: 'Your name',
-                textInputAction: TextInputAction.next,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Name is required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              ConnectFormField(
-                controller: _emailController,
-                label: 'Email address',
-                hint: 'Optional',
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return null;
-                  final emailRe = RegExp(r'^[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
-                  if (!emailRe.hasMatch(v.trim())) return 'Enter a valid email';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              ConnectFormField(
-                controller: _phoneController,
-                label: 'Phone number',
-                hint: 'Optional',
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 16),
-              ConnectBranchDropdown(
-                label: 'Branch *',
-                value: _selectedBranch,
-                onChanged: (v) => setState(() => _selectedBranch = v),
-                validator: (v) => v == null ? 'Branch is required' : null,
-              ),
-              const SizedBox(height: 16),
-              ConnectDropdownField(
-                label: 'Category',
-                hint: 'Choose a category',
-                items: kTestimonyCategories,
-                value: _category,
-                onChanged: (v) => setState(() => _category = v),
-              ),
-              const SizedBox(height: 16),
-              ConnectFormField(
-                controller: _summaryController,
-                label: 'Short title / summary *',
-                hint: 'e.g. Healed after surgery',
-                maxLength: kTestimonySummaryMaxLength,
-                textInputAction: TextInputAction.next,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Add a short title';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-              ConnectFormField(
-                controller: _testimonyController,
-                label: 'Your testimony *',
-                hint: 'Tell us what God has done',
-                maxLines: 6,
-                maxLength: kTestimonyMaxLength,
-                textInputAction: TextInputAction.newline,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Please share your testimony';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile.adaptive(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                value: _anonymous,
-                onChanged: (v) => setState(() => _anonymous = v),
-                activeTrackColor: context.kc.accent,
-                title: Text(
-                  'Share anonymously',
-                  style: AppTypography.ui(
-                    size: 15,
-                    weight: FontWeight.w600,
-                    color: context.kc.onBg,
+/// The two choices about sharing, in one card: the anonymous switch, and the
+/// required consent tick, which validates with the form.
+class _ConsentField extends StatelessWidget {
+  const _ConsentField({
+    required this.anonymous,
+    required this.onAnonymousChanged,
+    required this.validator,
+  });
+
+  final bool anonymous;
+  final ValueChanged<bool> onAnonymousChanged;
+  final String? Function(bool agreed) validator;
+
+  @override
+  Widget build(BuildContext context) {
+    return FormField<bool>(
+      initialValue: false,
+      validator: (v) => validator(v ?? false),
+      builder: (state) {
+        final agreed = state.value ?? false;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            KListGroup(
+              children: [
+                _ChoiceRow(
+                  title: 'Share anonymously',
+                  subtitle: 'Your name is not shown if it is published',
+                  onTap: () => onAnonymousChanged(!anonymous),
+                  control: KSwitch(
+                    value: anonymous,
+                    onChanged: onAnonymousChanged,
                   ),
                 ),
-                subtitle: Text(
-                  'Your name is not shown if it is published',
-                  style: AppTypography.ui(size: 13, color: context.kc.muted),
-                ),
-              ),
-              _ConsentField(
-                title: 'I am happy for Kharis to share my testimony',
-                subtitle:
-                    'In services, in the app and online, after our team '
-                    'reviews it',
-                validator: (agreed) => agreed
-                    ? null
-                    : 'Please confirm we may share your testimony',
-              ),
-              const SizedBox(height: 24),
-
-              // Submit
-              PressEffect(
-                child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.kc.accent,
-                      foregroundColor: context.kc.onAccent,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 0,
-                    ),
-                    onPressed: _state == _FormState.sending ? null : _submit,
-                    child: Text(
-                      _state == _FormState.sending
-                          ? 'Sending...'
-                          : 'Share testimony',
-                      style: AppTypography.ui(
-                        size: 14,
-                        weight: FontWeight.w700,
-                      ),
-                    ),
+                _ChoiceRow(
+                  title: 'I am happy for Kharis to share my testimony',
+                  subtitle:
+                      'In services, in the app and online, after our team '
+                      'reviews it',
+                  onTap: () => state.didChange(!agreed),
+                  control: _Tick(
+                    checked: agreed,
+                    onTap: () => state.didChange(!agreed),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 32),
+              ],
+            ),
+            if (state.hasError) ...[
+              const SizedBox(height: KSpace.sm),
+              KInlineError(state.errorText!),
             ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A row with a title that wraps, a line under it and a switch or tick at
+/// the end. Tapping anywhere on the row changes the control, and the row
+/// reads as one item.
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.control,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Widget control;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    return MergeSemantics(
+      child: InkWell(
+        onTap: onTap,
+        excludeFromSemantics: true,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: KSize.listRow),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: KSpace.x3,
+              vertical: KSpace.xl,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: KharisText.itemTitle.copyWith(color: k.text),
+                      ),
+                      const SizedBox(height: KSpace.xxs),
+                      Text(
+                        subtitle,
+                        style: KharisText.meta.copyWith(color: k.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: KSpace.xl),
+                control,
+              ],
+            ),
           ),
         ),
       ),
@@ -316,57 +314,42 @@ class _TestimonyScreenState extends ConsumerState<TestimonyScreen> {
   }
 }
 
-/// A required tick box that validates with the form, styled like the
-/// anonymous switch above it.
-class _ConsentField extends StatelessWidget {
-  const _ConsentField({
-    required this.title,
-    required this.subtitle,
-    required this.validator,
-  });
+/// A tick box: an empty outlined square, or a filled one with a tick, so the
+/// state never rests on colour alone. Exposed to screen readers as checked
+/// or not.
+class _Tick extends StatelessWidget {
+  const _Tick({required this.checked, required this.onTap});
 
-  final String title;
-  final String subtitle;
-  final String? Function(bool agreed) validator;
+  final bool checked;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return FormField<bool>(
-      initialValue: false,
-      validator: (v) => validator(v ?? false),
-      builder: (state) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CheckboxListTile.adaptive(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            controlAffinity: ListTileControlAffinity.trailing,
-            value: state.value ?? false,
-            onChanged: (v) => state.didChange(v ?? false),
-            activeColor: kc.accent,
-            checkColor: kc.onAccent,
-            title: Text(
-              title,
-              style: AppTypography.ui(
-                size: 15,
-                weight: FontWeight.w600,
-                color: kc.onBg,
-              ),
-            ),
-            subtitle: Text(
-              subtitle,
-              style: AppTypography.ui(size: 13, color: kc.muted),
-            ),
+    final k = context.k;
+    return Semantics(
+      checked: checked,
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: checked ? k.primary : k.surface,
+          borderRadius: const BorderRadius.all(Radius.circular(KRadius.xs)),
+          border: Border.all(
+            color: checked ? k.primary : k.muted,
+            width: KSize.outline,
           ),
-          if (state.hasError)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                state.errorText!,
-                style: AppTypography.ui(size: 12, color: kc.danger),
-              ),
-            ),
-        ],
+        ),
+        child: SizedBox.square(
+          dimension: KSize.radio,
+          child: checked
+              ? Center(
+                  child: KIcon(
+                    KIcons.check,
+                    size: KSize.iconSm,
+                    color: k.onPrimary,
+                  ),
+                )
+              : null,
+        ),
       ),
     );
   }

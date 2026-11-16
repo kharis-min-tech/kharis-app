@@ -15,8 +15,6 @@ class Branch {
     required this.id,
     required this.name,
     required this.subtitle,
-    required this.gradientStart,
-    required this.gradientEnd,
     this.imageUrl,
     this.order = 0,
     this.address,
@@ -44,8 +42,6 @@ class Branch {
   /// the FCM branch topic, so it is the key screens match branches by.
   final String name;
   final String subtitle;
-  final Color gradientStart;
-  final Color gradientEnd;
 
   /// Hero image; null when the Studio has no usable URL for it.
   final String? imageUrl;
@@ -76,16 +72,6 @@ class Branch {
       if (v.id == venueId) return v;
     }
     return null;
-  }
-
-  List<Color> get gradient => [gradientStart, gradientEnd];
-
-  static Color parseHex(String? hex, Color fallback) {
-    if (hex == null) return fallback;
-    var h = hex.replaceFirst('#', '').trim();
-    if (h.length == 6) h = 'FF$h';
-    final v = int.tryParse(h, radix: 16);
-    return v == null ? fallback : Color(v);
   }
 }
 
@@ -219,14 +205,6 @@ class BranchRepository {
       id: slug,
       name: name,
       subtitle: _text(b['subtitle']) ?? _text(b['short_description']) ?? '',
-      gradientStart: Branch.parseHex(
-        _text(b['gradient_start']),
-        const Color(0xFF3B2A6B),
-      ),
-      gradientEnd: Branch.parseHex(
-        _text(b['gradient_end']),
-        const Color(0xFF7C3AED),
-      ),
       imageUrl: usableMediaUrl(_text(b['hero_image_url'])),
       order: (b['sort_order'] as num?)?.toInt() ?? 0,
       address: address == null || address.isEmpty ? null : address,
@@ -290,7 +268,7 @@ class BranchRepository {
   }
 
   /// Postgres `time` ("14:00:00") as "14:00", which the service-time
-  /// formatter shows as "2:00 PM". Anything else passes through.
+  /// formatter shows as is. Anything else passes through.
   static String? _clock(Object? raw) {
     final t = _text(raw);
     if (t == null) return null;

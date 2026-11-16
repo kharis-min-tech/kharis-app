@@ -9,42 +9,60 @@ import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
+import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
+import 'package:kharis_app/shared/widgets/branch_picker_sheet.dart';
 
 import '../support/actions.dart';
 import '../support/channels.dart';
 import '../support/harness.dart';
 import '../support/live_data.dart';
 
-/// (h) Giving: no branch picker; Give securely hands kharis.org to the
-/// in-app browser; Copy bank details fills the clipboard.
+/// (h) Give, from Home's Give card: no branch picker, the button names the
+/// member's branch ("Give to" the branch) and hands kharis.org to the in-app
+/// browser; Copy bank details fills the clipboard.
 Future<void> givingJourney(Journey j) async {
   final t = j.tester;
   final branches = await studioBranches();
-  await j.launch(branch: pick(seeded(effectiveSeed, 'giving'), branches).name);
-  await tapNav(t, 'Giving');
+  final branch = pick(seeded(effectiveSeed, 'giving'), branches).name;
+  await j.launch(branch: branch);
+  await pumpUntilFound(t, find.byType(HomeScreen));
+  final card = find.byKey(const Key('home-give-button'));
+  await scrollUntilFound(
+    t,
+    card,
+    scrollable: verticalScrollableIn(find.byType(HomeScreen)),
+  );
+  await tapVisible(t, card);
   await pumpUntilFound(t, find.byType(GivingScreen));
   await pumpFor(t, const Duration(seconds: 1));
   final giving = find.byType(GivingScreen);
-  final scroll = find
-      .descendant(of: giving, matching: find.byType(Scrollable))
-      .first;
+  final scroll = verticalScrollableIn(giving);
   j.check(
-    find
-            .descendant(of: giving, matching: find.text('YOUR BRANCH'))
+    find.descendant(of: giving, matching: find.byType(BranchPickerSheet))
             .evaluate()
             .isEmpty &&
         find
-            .descendant(of: giving, matching: find.text('GIVING TO'))
+            .descendant(
+              of: giving,
+              matching: find.textContaining('Change branch'),
+            )
             .evaluate()
             .isEmpty,
-    'Giving has no branch picker',
+    'Give has no branch picker',
   );
   await j.shot('giving');
 
   final give = find.descendant(
     of: giving,
-    matching: find.text('Give securely'),
+    matching: find.byKey(const Key('give-button')),
+  );
+  j.check(
+    find
+        .descendant(of: give, matching: find.text('Give to $branch'))
+        .evaluate()
+        .isNotEmpty,
+    'the button reads "Give to $branch"',
   );
   await scrollUntilFound(t, give, scrollable: scroll);
   await t.tap(give, warnIfMissed: false);

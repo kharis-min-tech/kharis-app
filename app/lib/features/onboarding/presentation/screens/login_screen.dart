@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
@@ -19,7 +19,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -88,8 +87,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _forgotPassword() async {
-    final sentTo = await showDialog<String>(
+    final sentTo = await showKBottomSheet<String>(
       context: context,
+      title: 'Reset your password',
       builder: (_) =>
           ForgotPasswordDialog(initialEmail: _emailController.text.trim()),
     );
@@ -109,215 +109,124 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    final canPop = Navigator.of(context).canPop();
+    final k = context.k;
     return Scaffold(
-      appBar: canPop
-          ? AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              iconTheme: IconThemeData(color: kc.onBg),
-            )
-          : null,
       body: SafeArea(
-        top: !canPop,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: canPop ? 8 : 56),
-
-                // ── Dove logo ──────────────────────────────────────────────
-                Center(
-                  child: Image.asset(
-                    'assets/figma/dove_logo.png',
-                    width: 72,
-                    height: 72,
-                    color: kc.onChip,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // ── Heading ─────────────────────────────────────────────────
-                Text(
-                  'Welcome back',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.headlineLgMobile.copyWith(
-                    color: kc.onBg,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sign in to your account',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodyLg.copyWith(color: kc.muted),
-                ),
-                const SizedBox(height: 40),
-
-                // ── Email field ─────────────────────────────────────────────
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  textInputAction: TextInputAction.next,
-                  style: AppTypography.ui(size: 15, color: kc.onBg),
-                  decoration: authFieldDecoration(
-                    context,
-                    hint: 'Email address',
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Email is required';
-                    }
-                    if (!_emailPattern.hasMatch(v.trim())) {
-                      return 'Enter a valid email address';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // ── Password field ──────────────────────────────────────────
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  autofillHints: const [AutofillHints.password],
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _signIn(),
-                  style: AppTypography.ui(size: 15, color: kc.onBg),
-                  decoration: authFieldDecoration(context, hint: 'Password')
-                      .copyWith(
-                        suffixIcon: IconButton(
-                          tooltip: _obscurePassword
-                              ? 'Show password'
-                              : 'Hide password',
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: kc.muted,
-                            size: 20,
-                          ),
-                          onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
-                        ),
-                      ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Password is required';
-                    if (v.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _isLoading ? null : _forgotPassword,
-                    child: Text(
-                      'Forgot password?',
-                      style: AppTypography.ui(
-                        size: 13.5,
-                        weight: FontWeight.w600,
-                        color: kc.accentInk,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // ── Error message ───────────────────────────────────────────
-                if (_errorMessage != null) ...[
-                  Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.ui(size: 14, color: kc.danger),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // ── Sign In button ──────────────────────────────────────────
-                SizedBox(
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _signIn,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kc.accent,
-                      disabledBackgroundColor: kc.accent.withValues(alpha: 0.4),
-                      foregroundColor: kc.onAccent,
-                      elevation: 0,
-                      shadowColor: Colors.transparent,
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: kc.onAccent,
-                            ),
-                          )
-                        : Text(
-                            'Sign in',
-                            style: AppTypography.ui(
-                              size: 15,
-                              weight: FontWeight.w700,
-                              color: kc.onAccent,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // ── Register link ───────────────────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: KSpace.gutter),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      "Don't have an account?",
-                      style: AppTypography.ui(size: 14, color: kc.muted),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: KSpace.gutter),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: KDoveMark(size: KSize.thumb),
+                      ),
                     ),
-                    TextButton(
-                      onPressed: () => context.push('/register'),
-                      child: Text(
-                        'Register',
-                        style: AppTypography.ui(
-                          size: 14,
-                          weight: FontWeight.w600,
-                          color: kc.accentInk,
-                        ),
+                    const SizedBox(height: KSpace.x3),
+                    const KScreenHeader(title: 'Welcome back'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: KSpace.gutter,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: KSpace.md),
+                          Text(
+                            'Sign in to your account',
+                            style: KharisText.body.copyWith(color: k.muted),
+                          ),
+                          const SizedBox(height: KSpace.section),
+                          KTextField(
+                            label: 'Email address',
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.email],
+                            textInputAction: TextInputAction.next,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Email is required';
+                              }
+                              if (!_emailPattern.hasMatch(v.trim())) {
+                                return 'Enter a valid email address';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: KSpace.x3),
+                          KTextField(
+                            label: 'Password',
+                            controller: _passwordController,
+                            password: true,
+                            autofillHints: const [AutofillHints.password],
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _signIn(),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Password is required';
+                              }
+                              if (v.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: KTextLink(
+                              label: 'Forgot password?',
+                              onTap: _isLoading ? null : _forgotPassword,
+                            ),
+                          ),
+                          const SizedBox(height: KSpace.md),
+                          if (_errorMessage != null) ...[
+                            KInlineError(_errorMessage!),
+                            const SizedBox(height: KSpace.xl),
+                          ],
+                          KButton(
+                            label: 'Sign in',
+                            size: KButtonSize.cta,
+                            expand: true,
+                            loading: _isLoading,
+                            onPressed: _signIn,
+                          ),
+                          const SizedBox(height: KSpace.xl),
+                          KButton(
+                            label: 'Continue as guest',
+                            variant: KButtonVariant.outline,
+                            expand: true,
+                            onPressed: _isLoading ? null : _continueAsGuest,
+                          ),
+                          const SizedBox(height: KSpace.x3),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: KSpace.md,
+                            children: [
+                              Text(
+                                "Don't have an account?",
+                                style: KharisText.body.copyWith(color: k.muted),
+                              ),
+                              KTextLink(
+                                label: 'Register',
+                                onTap: () => context.push('/register'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
-
-                // ── Continue as Guest ───────────────────────────────────────
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: _isLoading ? null : _continueAsGuest,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: kc.onBg,
-                      side: BorderSide(color: kc.outline),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: Text(
-                      'Continue as guest',
-                      style: AppTypography.ui(
-                        size: 15,
-                        weight: FontWeight.w600,
-                        color: kc.onBg,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           ),
         ),
@@ -326,36 +235,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-/// Text-field decoration shared by the sign-in and register forms.
-InputDecoration authFieldDecoration(
-  BuildContext context, {
-  required String hint,
-}) {
-  final kc = context.kc;
-  OutlineInputBorder border(Color? color, [double width = 1]) =>
-      OutlineInputBorder(
-        borderRadius: AppRadius.inputBorder,
-        borderSide: color == null
-            ? BorderSide.none
-            : BorderSide(color: color, width: width),
-      );
-  return InputDecoration(
-    filled: true,
-    fillColor: kc.surfaceAlt,
-    hintText: hint,
-    hintStyle: AppTypography.ui(size: 15, color: kc.muted),
-    errorStyle: AppTypography.ui(size: 12, color: kc.danger),
-    border: border(null),
-    enabledBorder: border(null),
-    focusedBorder: border(kc.accentInk, 2),
-    errorBorder: border(kc.danger),
-    focusedErrorBorder: border(kc.danger, 1.5),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  );
-}
-
 /// Asks for an email and sends a password-reset link through the auth
-/// repository. Pops the address the link was sent to, or null if cancelled.
+/// repository. Shown in a bottom sheet; pops the address the link was sent
+/// to, or null if cancelled.
 class ForgotPasswordDialog extends ConsumerStatefulWidget {
   const ForgotPasswordDialog({super.key, this.initialEmail = ''});
 
@@ -405,40 +287,30 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return AlertDialog(
-      backgroundColor: kc.surface,
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
-      title: Text(
-        'Reset your password',
-        style: AppTypography.display(
-          size: 20,
-          weight: FontWeight.w700,
-          color: kc.onBg,
-        ),
-      ),
-      content: Form(
+    return SingleChildScrollView(
+      // Keeps the field and button above the keyboard.
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Form(
         key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'Enter the email you sign in with and we will send you a link '
               'to choose a new password.',
-              style: AppTypography.ui(size: 14, height: 1.45, color: kc.muted),
+              style: KharisText.body.copyWith(color: context.k.muted),
             ),
-            const SizedBox(height: 16),
-            TextFormField(
+            const SizedBox(height: KSpace.x3),
+            KTextField(
               key: const ValueKey('reset-email'),
+              label: 'Email address',
               controller: _emailController,
               autofocus: widget.initialEmail.isEmpty,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               textInputAction: TextInputAction.send,
               onFieldSubmitted: (_) => _send(),
-              style: AppTypography.ui(size: 15, color: kc.onBg),
-              decoration: authFieldDecoration(context, hint: 'Email address'),
               validator: (v) {
                 final value = v?.trim() ?? '';
                 if (value.isEmpty) return 'Email is required';
@@ -449,53 +321,26 @@ class _ForgotPasswordDialogState extends ConsumerState<ForgotPasswordDialog> {
               },
             ),
             if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                style: AppTypography.ui(size: 13, color: kc.danger),
-              ),
+              const SizedBox(height: KSpace.lg),
+              KInlineError(_error!),
             ],
+            const SizedBox(height: KSpace.x3),
+            KButton(
+              label: 'Send reset link',
+              expand: true,
+              loading: _sending,
+              onPressed: _send,
+            ),
+            const SizedBox(height: KSpace.md),
+            KButton(
+              label: 'Cancel',
+              variant: KButtonVariant.text,
+              expand: true,
+              onPressed: _sending ? null : () => Navigator.of(context).pop(),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _sending ? null : () => Navigator.of(context).pop(),
-          child: Text(
-            'Cancel',
-            style: AppTypography.ui(
-              size: 14,
-              weight: FontWeight.w600,
-              color: kc.muted,
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: _sending ? null : _send,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kc.accent,
-            foregroundColor: kc.onAccent,
-            elevation: 0,
-          ),
-          child: _sending
-              ? SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: kc.onAccent,
-                  ),
-                )
-              : Text(
-                  'Send reset link',
-                  style: AppTypography.ui(
-                    size: 14,
-                    weight: FontWeight.w700,
-                    color: kc.onAccent,
-                  ),
-                ),
-        ),
-      ],
     );
   }
 }

@@ -26,9 +26,23 @@ abstract interface class SermonArchiveStore {
   Future<void> writeSermonArchive(SermonArchiveSnapshot snapshot);
 }
 
+/// Archive schema written today. Version 2 archives were saved before
+/// sermons carried their Bible passages: [decodeSermonArchive] still loads
+/// them, so the library paints at once, but as never fetched, so the library
+/// re-walks the archive on that launch and saves it as version 3.
+const _archiveVersion = 3;
+const _archiveVersionBeforePassages = 2;
+
+/// The fetch time given to an archive that must be fetched again: older
+/// than any maximum age.
+final DateTime _dueForRefetch = DateTime.fromMillisecondsSinceEpoch(
+  0,
+  isUtc: true,
+);
+
 /// Encodes [snapshot] for disk. Top-level so it can run under [compute].
 String encodeSermonArchive(SermonArchiveSnapshot snapshot) => jsonEncode({
-  'v': 2,
+  'v': _archiveVersion,
   'fetchedAt': snapshot.fetchedAt.toIso8601String(),
   'sermons': [for (final s in snapshot.sermons) s.toJson()],
 });
@@ -39,11 +53,16 @@ String encodeSermonArchive(SermonArchiveSnapshot snapshot) => jsonEncode({
 SermonArchiveSnapshot? decodeSermonArchive(String raw) {
   try {
     final data = jsonDecode(raw);
-    if (data is! Map || data['v'] != 2) return null;
+    if (data is! Map) return null;
+    final version = data['v'];
+    if (version != _archiveVersion &&
+        version != _archiveVersionBeforePassages) {
+      return null;
+    }
     final fetchedAt = DateTime.tryParse(data['fetchedAt'] as String? ?? '');
     if (fetchedAt == null) return null;
     return SermonArchiveSnapshot(
-      fetchedAt: fetchedAt,
+      fetchedAt: version == _archiveVersion ? fetchedAt : _dueForRefetch,
       sermons: [
         for (final m in data['sermons'] as List)
           Sermon.fromJson(Map<String, dynamic>.from(m as Map)),
@@ -73,8 +92,11 @@ class CacheService implements SermonArchiveStore {
   /// Direct access to the raw Hive box for notes storage.
   Box<dynamic> get notesBox => _notesBox;
 
-  /// Versioned archive key. The unversioned `sermons_list` blob it replaces
-  /// stored series names as categories and had no fetch time.
+  /// Archive key. The name predates the schema version inside the blob
+  /// (see [encodeSermonArchive]); it stays so an upgrade reads, then
+  /// overwrites, the archive already on the phone. The unversioned
+  /// `sermons_list` blob it replaced stored series names as categories and
+  /// had no fetch time.
   static const _archiveKey = 'sermon_archive_v2';
   static const _legacyArchiveKey = 'sermons_list';
 

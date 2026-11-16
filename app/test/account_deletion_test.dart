@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/core/services/notification_service.dart';
 import 'package:kharis_app/features/onboarding/data/auth_repository.dart';
 import 'package:kharis_app/features/settings/data/account_deletion.dart';
@@ -19,6 +19,8 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+
+import 'support/more_screen_overrides.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -156,8 +158,12 @@ Future<void> _pumpMore(
         authRepositoryProvider.overrideWithValue(auth ?? _FakeAuth()),
         accountDataRepositoryProvider.overrideWithValue(data ?? _FakeData()),
         localAccountDataProvider.overrideWithValue(_FakeLocal()),
+        ...moreScreenOverrides(),
       ],
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        theme: KharisTheme.light(),
+        routerConfig: router,
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -178,7 +184,6 @@ TextButton _button(WidgetTester tester) => tester.widget<TextButton>(_confirm);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   setUp(() {
     _log.clear();
@@ -222,7 +227,7 @@ void main() {
       for (final line in [
         'Your profile and sign-in',
         'Your notes',
-        'Your playlists and favourites',
+        'Your collections and favourites',
         'Your event RSVPs',
       ]) {
         expect(find.textContaining(line), findsOneWidget);

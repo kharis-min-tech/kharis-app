@@ -1,22 +1,20 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
-import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// Persistent mini player shown above the tab bar when a sermon is loaded.
+/// The mini player shown above the floating nav while a message is loaded:
+/// artwork, title, speaker, progress, play or pause, and close.
 ///
-/// A 58-px `context.kc.surface` bar (radius [AppRadius.tile], separated by
-/// a 1px `kc.divider` border and the neutral [AppShadows.card]) with the
-/// artwork thumbnail, title/speaker, and a
-/// play/pause button, plus a gold progress line pinned to the bottom edge.
-/// Tapping the body pushes `/player`; the play/pause button is isolated.
-/// Hidden entirely when [currentSermonProvider] is null.
+/// Tapping the card pushes `/player`; play or pause and close act in place.
+/// Close (or a swipe down) stops playback. Draws nothing when
+/// [currentSermonProvider] is null.
 class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({super.key});
 
@@ -25,9 +23,9 @@ class MiniPlayer extends ConsumerStatefulWidget {
 }
 
 class _MiniPlayerState extends ConsumerState<MiniPlayer> {
-  /// Sermon whose bar the member just swiped away. `stop()` clears
-  /// [currentSermonProvider] through the engine's stream — a frame or more
-  /// later on a real device — and a dismissed [Dismissible] that is still in
+  /// Sermon whose card the member just closed. `stop()` clears
+  /// [currentSermonProvider] through the engine's stream, a frame or more
+  /// later on a real device, and a dismissed [Dismissible] that is still in
   /// the tree for that frame asserts ("A dismissed Dismissible widget is still
   /// part of the tree", seen on iPhone during the KA-001 walkthrough). Hiding
   /// synchronously here closes that gap; the flag resets once the sermon is
@@ -60,7 +58,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
         ref.watch(durationProvider).valueOrNull ?? Duration.zero;
     final service = ref.read(audioPlayerServiceProvider);
 
-    // A failed load keeps the sermon loaded here, so the bar doubles as the
+    // A failed load keeps the sermon loaded here, so the card doubles as the
     // error state: it says what happened and retries in place.
     final failure = ref.watch(playbackFailureProvider).valueOrNull;
     final failed = failure != null && failure.sermonId == sermon.id;
@@ -69,191 +67,53 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
         ? (position.inMilliseconds / rawDuration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
 
-    return Semantics(
-      label:
-          'Now playing: ${sermon.title} by ${sermon.speaker}. '
-          'Swipe down to dismiss.',
-      // The bar used to be permanent: once a message was loaded it sat above
-      // the nav on every tab with no way to remove it, which testers hit hardest
-      // on Giving, where it crowds the bank details they are trying to read.
-      // Swiping down stops playback, which nulls currentSermon and takes the
-      // bar out of the shell.
-      child: Dismissible(
-        key: ValueKey('mini-player-${sermon.id}'),
-        direction: DismissDirection.down,
-        // A short fling should be enough; this is a 58px bar, not a list row.
-        dismissThresholds: const {DismissDirection.down: 0.35},
-        onDismissed: (_) {
-          setState(() => _dismissedSermonId = sermon.id);
-          unawaited(service.stop());
-        },
-        child: Container(
-          height: 58,
-          margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
-          decoration: BoxDecoration(
-            color: context.kc.surface,
-            borderRadius: BorderRadius.circular(AppRadius.tile),
-            border: Border.all(color: context.kc.divider),
-            boxShadow: AppShadows.card,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.tile),
-            child: Stack(
-              children: [
-                // Content row: tap navigates to the full player.
-                GestureDetector(
-                  onTap: () => context.push('/player'),
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 6, 8),
-                    child: Row(
-                      children: [
-                        // Album artwork.
-                        SizedBox(
-                          width: 42,
-                          height: 42,
-                          child: ArtworkImage(
-                            url: sermon.artworkUrl,
-                            gradientIndex: sermon.artworkColor ?? 0,
-                            radius: 9,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
+    void close() {
+      setState(() => _dismissedSermonId = sermon.id);
+      unawaited(service.stop());
+    }
 
-                        // Title and speaker.
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                sermon.title,
-                                style: AppTypography.ui(
-                                  size: 12.5,
-                                  weight: FontWeight.w600,
-                                  height: 1.25,
-                                  color: context.kc.onBg,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                failed
-                                    ? (sermon.hasAudio
-                                          ? 'Couldn\u2019t play \u00b7 tap to retry'
-                                          : 'Video only \u00b7 no audio recording')
-                                    : sermon.speaker,
-                                style: AppTypography.ui(
-                                  size: 11,
-                                  height: 1.25,
-                                  color: failed
-                                      ? context.kc.danger
-                                      : context.kc.muted,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
+    final String? subtitle;
+    if (failed) {
+      subtitle = sermon.hasAudio
+          ? 'Couldn\u2019t play \u00b7 tap to retry'
+          : 'Video only \u00b7 no audio recording';
+    } else {
+      subtitle = sermon.speaker.isEmpty ? null : sermon.speaker;
+    }
 
-                        // Play / pause icon button (does not navigate).
-                        Semantics(
-                          button: true,
-                          label: failed
-                              ? 'Retry'
-                              : isBuffering
-                              ? 'Loading'
-                              : (isPlaying ? 'Pause' : 'Play'),
-                          excludeSemantics: true,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              if (failed) {
-                                if (sermon.hasAudio) service.retry();
-                                return;
-                              }
-                              if (isPlaying) {
-                                service.pause();
-                              } else {
-                                service.resume();
-                              }
-                            },
-                            // 9 + 26 + 9: a 44 px target.
-                            child: Padding(
-                              padding: const EdgeInsets.all(9),
-                              child: isBuffering && !failed
-                                  ? SizedBox(
-                                      width: 26,
-                                      height: 26,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(4),
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.2,
-                                          color: context.kc.onBg,
-                                        ),
-                                      ),
-                                    )
-                                  : Icon(
-                                      failed
-                                          ? Icons.refresh_rounded
-                                          : (isPlaying
-                                                ? Icons.pause_rounded
-                                                : Icons.play_arrow_rounded),
-                                      color: failed
-                                          ? context.kc.danger
-                                          : context.kc.onBg,
-                                      size: 26,
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+    final artworkUrl = sermon.artworkUrl;
+    // Decoded at the thumbnail's size, never the full-resolution artwork.
+    final artworkWidth = (KSize.thumb * MediaQuery.devicePixelRatioOf(context))
+        .round();
 
-                // Gold progress line pinned to the bottom edge.
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _ProgressLine(progress: progress),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Progress line (height 3, gold fill) ──────────────────────────────────────
-
-class _ProgressLine extends StatelessWidget {
-  const _ProgressLine({required this.progress});
-
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 3,
-      child: Stack(
-        children: [
-          Container(
-            width: double.infinity,
-            height: 3,
-            color: context.kc.divider,
-          ),
-          FractionallySizedBox(
-            widthFactor: progress.clamp(0.0, 1.0),
-            alignment: Alignment.centerLeft,
-            child: Container(height: 3, color: context.kc.accent),
-          ),
-        ],
+    return Dismissible(
+      key: ValueKey('mini-player-${sermon.id}'),
+      direction: DismissDirection.down,
+      // A short fling should be enough; this is a small card, not a list row.
+      dismissThresholds: const {DismissDirection.down: 0.35},
+      onDismissed: (_) => close(),
+      child: KMiniPlayer(
+        title: sermon.title,
+        subtitle: subtitle,
+        artwork: artworkUrl == null || artworkUrl.isEmpty
+            ? null
+            : ResizeImage(
+                CachedNetworkImageProvider(artworkUrl),
+                width: artworkWidth,
+              ),
+        progress: progress,
+        playing: isPlaying && !failed,
+        playLabel: failed
+            ? 'Retry'
+            : isBuffering
+            ? 'Loading'
+            : 'Play',
+        pauseLabel: isBuffering ? 'Loading' : 'Pause',
+        onPlayPause: failed
+            ? (sermon.hasAudio ? service.retry : null)
+            : (isPlaying ? service.pause : service.resume),
+        onClose: close,
+        onTap: () => context.push('/player'),
       ),
     );
   }

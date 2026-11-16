@@ -1,43 +1,42 @@
 import 'package:flutter/material.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/playlists/data/playlist_repository.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// Prompts for a playlist name (create or rename). Returns the trimmed name,
-/// or null when the member cancels. Enforces the same 1..80 bounds the
-/// Firestore rules do, so an accepted name can never be rejected server-side.
+/// Asks for a collection name (create or rename) in a bottom sheet. Returns
+/// the trimmed name, or null when the member cancels. Enforces the same
+/// 1..80 bounds the Firestore rules do, so an accepted name can never be
+/// rejected server-side.
 Future<String?> showPlaylistNameDialog(
   BuildContext context, {
   required String title,
   String? initialName,
   String confirmLabel = 'Create',
 }) {
-  return showDialog<String>(
+  return showKBottomSheet<String>(
     context: context,
-    builder: (_) => _PlaylistNameDialog(
-      title: title,
-      initialName: initialName,
-      confirmLabel: confirmLabel,
-    ),
+    title: title,
+    builder: (_) =>
+        PlaylistNameSheet(initialName: initialName, confirmLabel: confirmLabel),
   );
 }
 
-class _PlaylistNameDialog extends StatefulWidget {
-  const _PlaylistNameDialog({
-    required this.title,
+/// The content of the name sheet: one field and one primary button.
+class PlaylistNameSheet extends StatefulWidget {
+  const PlaylistNameSheet({
+    super.key,
     required this.confirmLabel,
     this.initialName,
   });
 
-  final String title;
   final String confirmLabel;
   final String? initialName;
 
   @override
-  State<_PlaylistNameDialog> createState() => _PlaylistNameDialogState();
+  State<PlaylistNameSheet> createState() => _PlaylistNameSheetState();
 }
 
-class _PlaylistNameDialogState extends State<_PlaylistNameDialog> {
+class _PlaylistNameSheetState extends State<PlaylistNameSheet> {
   late final TextEditingController _controller;
   String? _error;
 
@@ -56,7 +55,7 @@ class _PlaylistNameDialogState extends State<_PlaylistNameDialog> {
   void _submit() {
     final name = _controller.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Give your playlist a name');
+      setState(() => _error = 'Give your collection a name');
       return;
     }
     Navigator.of(context).pop(name);
@@ -64,68 +63,64 @@ class _PlaylistNameDialogState extends State<_PlaylistNameDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: context.kc.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      title: Text(
-        widget.title,
-        style: AppTypography.display(
-          size: 20,
-          weight: FontWeight.w700,
-          color: context.kc.onBg,
-        ),
-      ),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        maxLength: kPlaylistNameMaxLength,
-        textCapitalization: TextCapitalization.sentences,
-        onSubmitted: (_) => _submit(),
-        style: AppTypography.bodyLg.copyWith(color: context.kc.onBg),
-        cursorColor: context.kc.accentInk,
-        decoration: InputDecoration(
-          hintText: 'e.g. Sunday drive, Faith builders…',
-          hintStyle: AppTypography.bodySm.copyWith(color: context.kc.muted),
-          errorText: _error,
-          counterStyle: AppTypography.labelMd.copyWith(color: context.kc.muted),
-          enabledBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: context.kc.divider),
-          ),
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: context.kc.accentInk, width: 1.5),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Cancel',
-            style: AppTypography.ui(
-              size: 14,
-              weight: FontWeight.w600,
-              color: context.kc.muted,
+    final k = context.k;
+    OutlineInputBorder border(Color color, [double width = 1]) =>
+        OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(KRadius.tile)),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return Padding(
+      // Lift the field and the button over the keyboard.
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              maxLength: kPlaylistNameMaxLength,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+              style: KharisText.body.copyWith(color: k.text),
+              cursorColor: k.primaryText,
+              decoration: InputDecoration(
+                hintText: 'Collection name',
+                hintStyle: KharisText.body.copyWith(color: k.muted),
+                errorText: _error,
+                errorStyle: KharisText.caption.copyWith(color: k.error),
+                counterStyle: KharisText.caption.copyWith(color: k.muted),
+                filled: true,
+                fillColor: k.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: KSpace.x3,
+                  vertical: KSpace.xl,
+                ),
+                enabledBorder: border(k.line),
+                focusedBorder: border(k.primaryText, KSize.outline),
+                errorBorder: border(k.error),
+                focusedErrorBorder: border(k.error, KSize.outline),
+              ),
             ),
-          ),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          style: FilledButton.styleFrom(
-            backgroundColor: context.kc.accent,
-            foregroundColor: context.kc.onAccent,
-          ),
-          child: Text(
-            widget.confirmLabel,
-            style: AppTypography.ui(
-              size: 14,
-              weight: FontWeight.w700,
-              color: context.kc.onAccent,
+            const SizedBox(height: KSpace.xl),
+            KButton(
+              label: widget.confirmLabel,
+              expand: true,
+              onPressed: _submit,
             ),
-          ),
+            const SizedBox(height: KSpace.md),
+            KButton(
+              label: 'Cancel',
+              variant: KButtonVariant.text,
+              expand: true,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

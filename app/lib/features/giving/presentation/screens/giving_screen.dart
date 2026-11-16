@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:kharis_app/core/constants/app_assets.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/shared/models/campus_config.dart';
+import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// The bank-transfer rows of [giving], in display order. The card renders
 /// these rows and "Copy bank details" copies the same rows, so what the
@@ -27,13 +28,13 @@ String givingClipboardText(GivingDetails giving) =>
 String _rowsText(List<(String, String)> rows) =>
     rows.map((r) => '${r.$1}: ${r.$2}').join('\n');
 
-/// Giving tab.
+/// Give (`/give`).
 ///
-/// A calm, single-column giving landing: a scripture card, a full-width gold
-/// **Give securely** call to action that opens the church giving page
-/// ([kGivingUrl]) in the in-app browser, and the church-wide bank-transfer
-/// details ([kBuiltInGiving]) below.
-class GivingScreen extends StatelessWidget {
+/// One column: the title, who the gift is for, 2 Corinthians 9:7, and one
+/// primary button that opens the church giving page ([kGivingUrl]) in the
+/// in-app browser. The church-wide bank-transfer details ([kBuiltInGiving])
+/// sit below as a secondary card.
+class GivingScreen extends ConsumerWidget {
   const GivingScreen({super.key});
 
   Future<void> _give(BuildContext context) async {
@@ -55,64 +56,74 @@ class GivingScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final k = context.k;
     const giving = kBuiltInGiving;
     final rows = givingBankRows(giving);
     final note = giving.note;
+    final recipient =
+        ref.watch(currentBranchProvider).valueOrNull ?? kChurchWideRecipient;
 
     return Scaffold(
       body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 140),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Text(
-                  'Giving',
-                  style: AppTypography.headlineLgMobile.copyWith(
-                    color: context.kc.onBg,
-                  ),
-                ),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(
+                top: KSpace.md,
+                bottom: KSpace.section,
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _ScriptureCard(),
-                    const SizedBox(height: 18),
-                    _GiveSecurelyButton(onTap: () => _give(context)),
-                    const SizedBox(height: 9),
-                    const _SecureNote(),
-                    if (rows.isNotEmpty) ...[
-                      const SizedBox(height: 22),
-                      _BankTransferCard(
-                        rows: rows,
-                        recipient: kChurchWideRecipient,
-                      ),
-                    ],
-                    if (note != null) ...[
-                      const SizedBox(height: 14),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          note,
-                          key: const ValueKey('giving-note'),
-                          style: AppTypography.ui(
-                            size: 13.5,
-                            height: 1.45,
-                            color: context.kc.muted,
-                          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const KScreenHeader(title: 'Give'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      KSpace.gutter,
+                      KSpace.xs,
+                      KSpace.gutter,
+                      0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'To $recipient. Thank you for giving.',
+                          style: KharisText.body.copyWith(color: k.muted),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
+                        const SizedBox(height: KSpace.x3),
+                        const _ScriptureCard(),
+                        const SizedBox(height: KSpace.x3),
+                        KButton(
+                          key: const Key('give-button'),
+                          label: 'Give to $recipient',
+                          size: KButtonSize.cta,
+                          expand: true,
+                          onPressed: () => _give(context),
+                        ),
+                        if (rows.isNotEmpty) ...[
+                          const SizedBox(height: KSpace.section),
+                          _BankTransferCard(
+                            rows: rows,
+                            recipient: kChurchWideRecipient,
+                          ),
+                        ],
+                        if (note != null) ...[
+                          const SizedBox(height: KSpace.xl),
+                          Text(
+                            note,
+                            key: const ValueKey('giving-note'),
+                            style: KharisText.meta.copyWith(color: k.muted),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -122,120 +133,41 @@ class GivingScreen extends StatelessWidget {
 
 // ── Scripture card ────────────────────────────────────────────────────────────
 
+/// 2 Corinthians 9:7 (KJV, public domain) on the highlight tint.
 class _ScriptureCard extends StatelessWidget {
   const _ScriptureCard();
 
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: AppRadius.cardBorder,
-      child: ColoredBox(
-        // Solid brand card in both themes; text on it stays light.
-        color: AppColors.primaryDeep,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -14,
-              top: -10,
-              child: Opacity(
-                opacity: 0.12,
-                child: Image.asset(AppAssets.doveWhite, width: 96),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'So let each one give as he purposes in his heart, not '
-                    'grudgingly or of necessity; for God loves a cheerful '
-                    'giver.',
-                    style: AppTypography.serif(
-                      size: 19,
-                      italic: true,
-                      height: 1.35,
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '2 Corinthians 9:7 (NKJV)',
-                    style: AppTypography.ui(
-                      size: 12,
-                      weight: FontWeight.w600,
-                      color: AppColors.darkMuted2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Give securely CTA ─────────────────────────────────────────────────────────
-
-class _GiveSecurelyButton extends StatelessWidget {
-  const _GiveSecurelyButton({required this.onTap});
-
-  final VoidCallback onTap;
+  static const String _verse =
+      '\u201cEvery man according as he purposeth in his heart, so let him '
+      'give; not grudgingly, or of necessity: for God loveth a cheerful '
+      'giver.\u201d';
+  static const String _reference = '2 Corinthians 9:7 \u00b7 KJV';
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return SizedBox(
-      height: 56,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: kc.accent,
-          foregroundColor: kc.onAccent,
-          elevation: 0,
-          shadowColor: Colors.transparent,
+    final k = context.k;
+    return MergeSemantics(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: k.highlightTint,
+          borderRadius: const BorderRadius.all(Radius.circular(KRadius.card)),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Give securely',
-              style: AppTypography.ui(
-                size: 16,
-                weight: FontWeight.w700,
-                color: kc.onAccent,
+        child: Padding(
+          padding: const EdgeInsets.all(KSpace.x3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_verse, style: KharisText.title.copyWith(color: k.text)),
+              const SizedBox(height: KSpace.md),
+              Text(
+                _reference.toUpperCase(),
+                semanticsLabel: _reference,
+                style: KharisText.overline.copyWith(color: k.highlightText),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.north_east_rounded, size: 17, color: kc.onAccent),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Secure note ───────────────────────────────────────────────────────────────
-
-class _SecureNote extends StatelessWidget {
-  const _SecureNote();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.lock_outline_rounded, size: 13, color: context.kc.muted),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            'Secure page on kharis.org, inside the app',
-            style: AppTypography.ui(size: 12, color: context.kc.muted),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -264,96 +196,59 @@ class _BankTransferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
+    final k = context.k;
+    return KCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: kc.chipBg,
-                  borderRadius: AppRadius.tileBorder,
-                ),
-                child: Icon(
-                  Icons.account_balance_outlined,
-                  size: 19,
-                  color: kc.onChip,
-                ),
-              ),
-              const SizedBox(width: 12),
+              const KIconTile(KIcons.card),
+              const SizedBox(width: KSpace.xl),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Bank transfer',
-                      style: AppTypography.display(
-                        size: 18,
-                        weight: FontWeight.w700,
-                        color: kc.onBg,
-                      ),
+                      style: KharisText.title.copyWith(color: k.text),
                     ),
                     Text(
                       'To $recipient',
-                      style: AppTypography.ui(size: 12.5, color: kc.muted),
+                      style: KharisText.meta.copyWith(color: k.muted),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: KSpace.xxl),
           for (final (label, value) in rows)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: KSpace.md),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: AppTypography.ui(size: 13.5, color: kc.muted),
-                  ),
-                  const SizedBox(width: 12),
+                  Text(label, style: KharisText.meta.copyWith(color: k.muted)),
+                  const SizedBox(width: KSpace.xl),
                   // The value takes the rest and wraps: a 22-character IBAN
-                  // at 1.3x text no longer pushes the row off a small phone.
+                  // at large text never pushes the row off a small phone.
                   Expanded(
                     child: SelectableText(
                       value,
                       textAlign: TextAlign.end,
-                      style: AppTypography.ui(
-                        size: 13.5,
-                        weight: FontWeight.w600,
-                        color: kc.onBg,
-                      ),
+                      style: KharisText.itemTitle.copyWith(color: k.text),
                     ),
                   ),
                 ],
               ),
             ),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
+          const SizedBox(height: KSpace.sm),
+          KButton(
+            label: 'Copy bank details',
+            variant: KButtonVariant.outline,
+            expand: true,
             onPressed: () => _copy(context),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: kc.onBg,
-              side: BorderSide(color: kc.outline),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            ),
-            icon: const Icon(Icons.copy_rounded, size: 16),
-            label: Text(
-              'Copy bank details',
-              style: AppTypography.ui(size: 13, weight: FontWeight.w700),
-            ),
           ),
         ],
       ),

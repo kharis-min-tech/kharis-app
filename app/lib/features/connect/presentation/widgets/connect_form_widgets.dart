@@ -2,156 +2,112 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
-/// Every connect-form control has the same shape: a [label] line above, a
-/// filled input below (with an optional muted placeholder). Text fields,
-/// dropdowns and the date field all use it, so no field floats its label
-/// while the others show placeholders.
-class _LabelledField extends StatelessWidget {
-  const _LabelledField({required this.label, required this.child});
+/// The page both connect forms sit on: no app bar and no back button (people
+/// swipe back or use the system back), content centred on wide screens.
+class ConnectFormPage extends StatelessWidget {
+  const ConnectFormPage({super.key, required this.child});
 
-  final String label;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 6),
-          child: Text(
-            label,
-            style: AppTypography.ui(
-              size: 13,
-              weight: FontWeight.w600,
-              color: context.kc.onBg,
-            ),
+    return Scaffold(
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: child,
           ),
         ),
-        child,
-      ],
-    );
-  }
-}
-
-InputDecoration _decoration(
-  BuildContext context, {
-  String? hint,
-  Widget? suffixIcon,
-}) {
-  final kc = context.kc;
-  OutlineInputBorder border(Color? color, double width) => OutlineInputBorder(
-    borderRadius: AppRadius.inputBorder,
-    borderSide: color == null
-        ? BorderSide.none
-        : BorderSide(color: color, width: width),
-  );
-  return InputDecoration(
-    hintText: hint,
-    hintStyle: AppTypography.ui(size: 15, color: kc.muted),
-    filled: true,
-    fillColor: kc.surfaceAlt,
-    suffixIcon: suffixIcon,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    counterStyle: AppTypography.ui(size: 12, color: kc.muted),
-    border: border(null, 0),
-    enabledBorder: border(null, 0),
-    focusedBorder: border(kc.accentInk, 2),
-    errorBorder: border(kc.danger, 1),
-    focusedErrorBorder: border(kc.danger, 1.5),
-    errorStyle: AppTypography.ui(size: 12, color: kc.danger),
-  );
-}
-
-/// Labelled text field for the connect forms. [readOnly] with [onTap] makes
-/// a picker field (the visit date) that looks exactly like the others.
-class ConnectFormField extends StatelessWidget {
-  const ConnectFormField({
-    super.key,
-    required this.controller,
-    required this.label,
-    this.hint,
-    this.keyboardType,
-    this.textInputAction,
-    this.validator,
-    this.maxLines = 1,
-    this.maxLength,
-    this.suffixIcon,
-    this.readOnly = false,
-    this.onTap,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final String? hint;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
-  final FormFieldValidator<String>? validator;
-  final int maxLines;
-  final int? maxLength;
-  final Widget? suffixIcon;
-  final bool readOnly;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _LabelledField(
-      label: label,
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        validator: validator,
-        maxLines: maxLines,
-        maxLength: maxLength,
-        readOnly: readOnly,
-        onTap: onTap,
-        style: AppTypography.ui(size: 15, color: context.kc.onBg),
-        decoration: _decoration(context, hint: hint, suffixIcon: suffixIcon),
       ),
     );
   }
 }
 
-/// Labelled dropdown for the connect forms, validated with the form.
-class ConnectDropdownField extends StatelessWidget {
-  const ConnectDropdownField({
+/// A connect form: the screen title, one line under it, then the fields and
+/// the submit button in [children], validated together through [formKey].
+class ConnectFormBody extends StatelessWidget {
+  const ConnectFormBody({
     super.key,
-    required this.label,
-    required this.hint,
-    required this.items,
-    required this.value,
-    required this.onChanged,
-    this.validator,
+    required this.formKey,
+    required this.title,
+    required this.subtitle,
+    required this.children,
   });
 
-  final String label;
-  final String hint;
-  final List<String> items;
-  final String? value;
-  final ValueChanged<String?> onChanged;
-  final FormFieldValidator<String>? validator;
+  final GlobalKey<FormState> formKey;
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return _LabelledField(
-      label: label,
-      child: DropdownButtonFormField<String>(
-        // Until the items load, a remembered choice has no item to match.
-        initialValue: items.contains(value) ? value : null,
-        items: [
-          for (final item in items)
-            DropdownMenuItem(value: item, child: Text(item)),
-        ],
-        onChanged: onChanged,
-        validator: validator,
-        isExpanded: true,
-        dropdownColor: context.kc.surface,
-        icon: Icon(Icons.keyboard_arrow_down, color: context.kc.muted),
-        style: AppTypography.ui(size: 15, color: context.kc.onBg),
-        decoration: _decoration(context, hint: hint),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(top: KSpace.md, bottom: KSpace.section),
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            KScreenHeader(title: title),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                KSpace.gutter,
+                KSpace.xs,
+                KSpace.gutter,
+                0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    subtitle,
+                    style: KharisText.body.copyWith(color: context.k.muted),
+                  ),
+                  const SizedBox(height: KSpace.gutter),
+                  ...children,
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// What a connect form shows once it has been sent: a tick, a title, one
+/// line and a Done button that closes the form.
+class ConnectFormSuccess extends StatelessWidget {
+  const ConnectFormSuccess({
+    super.key,
+    required this.title,
+    required this.hint,
+  });
+
+  final String title;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        child: Semantics(
+          liveRegion: true,
+          child: KEmptyState(
+            icon: KIcons.check,
+            title: title,
+            hint: hint,
+            action: KButton(
+              label: 'Done',
+              expand: true,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -175,10 +131,11 @@ class ConnectBranchDropdown extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final names = [
-      for (final b in ref.watch(branchesProvider).valueOrNull ?? const <Branch>[])
+      for (final b
+          in ref.watch(branchesProvider).valueOrNull ?? const <Branch>[])
         b.name,
     ]..sort();
-    return ConnectDropdownField(
+    return KSelectField(
       label: label,
       hint: 'Choose your branch',
       items: names,

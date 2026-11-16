@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
@@ -10,6 +9,7 @@ import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// Records topic changes instead of touching FCM; topics in [failing] fail.
 class _RecordingTopics extends NotificationService {
@@ -35,8 +35,6 @@ Future<String?> _stored() async =>
     (await SharedPreferences.getInstance()).getString(_key);
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
-
   group('Announcements toggle drives the opt-out mute topic', () {
     test('OFF joins mute_announcements, ON leaves it', () async {
       final topics = _RecordingTopics();
@@ -117,23 +115,26 @@ void main() {
           notificationServiceProvider.overrideWithValue(topics),
           currentUserProvider.overrideWith((ref) => Stream.value(null)),
           currentBranchProvider.overrideWith((ref) => Stream.value('Chatham')),
+          notificationPrefsProvider.overrideWith(
+            (ref) => Stream.value(const <String, bool>{}),
+          ),
           notificationPermissionProvider.overrideWith(
             (ref) async => NotificationPermission.granted,
           ),
         ],
-        child: const MaterialApp(home: NotificationsSettingsScreen()),
+        child: MaterialApp(
+          theme: KharisTheme.light(),
+          home: const NotificationsSettingsScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(Switch), findsNWidgets(4));
+    expect(find.byType(KSwitch), findsNWidgets(4));
     expect(find.text('Announcements'), findsOneWidget);
     expect(find.text('News and notices from your branch'), findsOneWidget);
     expect(
-      find.text(
-        'An hour before your branch\u2019s service, and when its time or '
-        'place changes',
-      ),
+      find.text('An hour before your branch\u2019s service, and if it changes'),
       findsOneWidget,
     );
     expect(find.text('Events'), findsOneWidget);

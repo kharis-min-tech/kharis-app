@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kharis_app/features/bible/presentation/screens/bible_screen.dart';
+import 'package:kharis_app/features/bible/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
-import 'package:kharis_app/features/home/presentation/screens/bible_books_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
-import 'package:kharis_app/features/home/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/messages/presentation/screens/messages_screen.dart';
 import 'package:kharis_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:kharis_app/main.dart';
+import 'package:kharis_app/shared/providers/text_size_provider.dart';
 import 'package:kharis_app/shared/providers/theme_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import '../support/actions.dart';
 import '../support/harness.dart';
@@ -40,10 +42,22 @@ Future<void> _sweep(Journey j, Type screen, String name) async {
   await pumpFor(t, const Duration(milliseconds: 600));
 }
 
-/// (k) Light / Dark render Home and Messages cleanly; at a large system
-/// text size Home, Messages, Events, Giving and the Bible lay out without
-/// any FlutterError (overflow included: the harness fails the journey on
-/// every FlutterError it sees).
+/// Opens More's [row] and picks [option] in its choice sheet.
+Future<void> _choose(Journey j, String row, String option) async {
+  final t = j.tester;
+  await openMoreRow(t, row);
+  final sheet = find.byWidgetPredicate((w) => w is KSortSheet);
+  await pumpUntilFound(t, sheet, reason: '$row choices');
+  await tapVisible(t, find.descendant(of: sheet, matching: find.text(option)));
+  await pumpUntil(t, () => sheet.evaluate().isEmpty);
+  await pumpFor(t, const Duration(milliseconds: 600));
+}
+
+/// (k) More's Appearance: Light / Dark render Home and Messages cleanly. At
+/// a large system text size with More's Text size on Large, Home, Messages,
+/// Events, Give, More, the Bible tab and the reader lay out without any
+/// FlutterError (overflow included: the harness fails the journey on every
+/// FlutterError it sees).
 Future<void> displayJourney(Journey j) async {
   final t = j.tester;
   await j.launch();
@@ -54,7 +68,7 @@ Future<void> displayJourney(Journey j) async {
     ('Light', ThemeMode.light, Brightness.light),
     ('Dark', ThemeMode.dark, Brightness.dark),
   ]) {
-    await openMoreRow(t, label);
+    await _choose(j, 'Appearance', label);
     j.check(
       await pumpUntil(t, () => j.c.read(themeModeProvider) == mode),
       'theme "$label" selected',
@@ -62,6 +76,16 @@ Future<void> displayJourney(Journey j) async {
     j.check(
       prefs.getString('settings_theme_mode') == mode.name,
       '"$label" saved on the device',
+    );
+    j.check(
+      find
+          .descendant(
+            of: find.byKey(const Key('more-row-appearance')),
+            matching: find.text(label),
+          )
+          .evaluate()
+          .isNotEmpty,
+      'Appearance reads "$label"',
     );
     await tapNav(t, 'Home');
     j.check(
@@ -81,32 +105,55 @@ Future<void> displayJourney(Journey j) async {
   t.platformDispatcher.textScaleFactorTestValue = 1.6;
   try {
     await pumpFor(t, const Duration(seconds: 1));
+    await _choose(j, 'Text size', TextSizeChoice.large.label);
+    j.check(
+      j.c.read(textSizeProvider) == TextSizeChoice.large,
+      'Text size "Large" selected',
+    );
     await tapNav(t, 'Home');
     final applied =
         MediaQuery.textScalerOf(t.element(find.byType(HomeScreen))).scale(10) /
         10;
+    final want = (1.6 * TextSizeChoice.large.factor).clamp(1.0, kMaxTextScale);
     j.note(
-      'system text scale 1.6 -> app applies ${applied.toStringAsFixed(2)} '
-      '(clamped to kMaxTextScale $kMaxTextScale)',
+      'system text scale 1.6 x Large -> app applies '
+      '${applied.toStringAsFixed(2)} (max $kMaxTextScale)',
     );
     j.check(
-      (applied - kMaxTextScale).abs() < 0.01,
-      'large system text reaches the app, clamped to $kMaxTextScale (got $applied)',
+      (applied - want).abs() < 0.01,
+      'large system text and Large reach the app: $want (got $applied)',
     );
     await _sweep(j, HomeScreen, 'large-home');
     await tapNav(t, 'Messages');
     await _sweep(j, MessagesScreen, 'large-messages');
-    await tapNav(t, 'Events');
+    await openEvents(t);
     await _sweep(j, CalendarScreen, 'large-events');
-    await tapNav(t, 'Giving');
+    await goBack(t);
+    await openGive(t);
     await _sweep(j, GivingScreen, 'large-giving');
-    await tapNav(t, 'More');
+    await goBack(t);
     await _sweep(j, SettingsScreen, 'large-more');
-    // More's Bible row opens the book list; Daily reading the reader.
-    await openMoreRow(t, 'Bible');
-    await _sweep(j, BibleBooksScreen, 'large-bible-books');
-    await tapBack(t);
-    await openMoreRow(t, 'Daily reading');
+    await tapNav(t, 'Bible');
+    await _sweep(j, BibleScreen, 'large-bible-tab');
+    final daily = find.byKey(const Key('bible-daily-reading'));
+    if (daily.evaluate().isEmpty) {
+      j.note('DATA: no daily reading; the reader opens on John 3');
+      final field = find.descendant(
+        of: find.byKey(const Key('bible-landing-search')),
+        matching: find.byType(EditableText),
+      );
+      await scrollUntilFound(
+        t,
+        field,
+        scrollable: verticalScrollableIn(find.byType(BibleScreen)),
+        step: const Offset(0, 300),
+      );
+      await t.tap(field, warnIfMissed: false);
+      await t.enterText(field, 'John 3');
+      await t.testTextInput.receiveAction(TextInputAction.search);
+    } else {
+      await tapVisible(t, daily);
+    }
     await _sweep(j, ReadingScreen, 'large-bible');
   } finally {
     t.platformDispatcher.clearTextScaleFactorTestValue();

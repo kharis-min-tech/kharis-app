@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:kharis_app/core/constants/app_links.dart';
 import 'package:kharis_app/core/services/app_router.dart';
@@ -33,6 +32,7 @@ import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/notes_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -99,7 +99,6 @@ void _expectOnlyKharisLinks(String text) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   // ── Link format ─────────────────────────────────────────────────────────────
 
@@ -200,7 +199,7 @@ void main() {
       expect(
         text,
         'Prayer Night\n'
-        'Friday 16 October 2026, 7:00 PM \u2013 9:00 PM\n'
+        'Friday 16 October 2026, 19:00 \u2013 21:00\n'
         'Main Hall, 12 High Street, London\n'
         'Open in the Kharis app: $_origin/e/e-prayer',
       );
@@ -256,6 +255,7 @@ void main() {
           ProviderScope(
             overrides: _playerOverrides(audio, FakeCacheService()),
             child: MaterialApp(
+              theme: KharisTheme.light(),
               home: MediaPlayerScreen(sermon: service, mode: MediaMode.video),
             ),
           ),
@@ -334,7 +334,10 @@ void main() {
               (ref, branch) async => news[branch] ?? const [],
             ),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       for (var i = 0; i < 6; i++) {
@@ -410,7 +413,10 @@ void main() {
               (ref, id) => AsyncData<Sermon?>(id == '2700' ? _audioOnly : null),
             ),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pump();
@@ -489,7 +495,10 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await settle(tester);
@@ -540,7 +549,10 @@ void main() {
             ),
             sharedLinkArchiveFillingProvider.overrideWith((ref) => true),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await settle(tester);
@@ -590,7 +602,10 @@ void main() {
             ),
             sermonsProvider.overrideWith((ref) async => const <Sermon>[]),
           ],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            theme: KharisTheme.light(),
+            routerConfig: router,
+          ),
         ),
       );
       await tester.pump();
@@ -690,6 +705,7 @@ void main() {
     }) async {
       await tester.pumpWidget(
         MaterialApp(
+          theme: KharisTheme.light(),
           builder: (context, child) => OpenInAppBanner(
             landed: Uri.parse('$_origin$landed'),
             isWeb: isWeb,

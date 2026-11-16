@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/data/audio_player_service.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
@@ -129,7 +128,6 @@ Future<void> _start(
     ..showSnackBar(
       SnackBar(
         content: Text(failure.message),
-        backgroundColor: AppColors.errorContainer,
         duration: const Duration(seconds: 6),
         action: sermon.hasAudio
             ? SnackBarAction(

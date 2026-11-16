@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
@@ -29,13 +29,15 @@ Future<BranchChoice?> showBranchPicker(
   BuildContext context, {
   required String? current,
   bool allowAll = false,
-}) => showModalBottomSheet<BranchChoice>(
-  context: context,
-  useRootNavigator: true,
-  backgroundColor: Colors.transparent,
-  isScrollControlled: true,
+}) => showKBottomSheet<BranchChoice>(
+  // Above the tab shell, so the floating nav is covered while it is open.
+  context: Navigator.of(context, rootNavigator: true).context,
+  title: kChooseBranchLabel,
   builder: (_) => BranchPickerSheet(current: current, allowAll: allowAll),
 );
+
+/// The most of the screen height the branch list takes.
+const double _kSheetHeightShare = 0.6;
 
 /// Makes [branch] the member's branch through [setActiveBranch] (unless it
 /// already is) and confirms it in a snack bar.
@@ -97,122 +99,63 @@ class BranchPickerSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final kc = context.kc;
+    final k = context.k;
     final branches =
         ref.watch(branchesProvider).valueOrNull ?? const <Branch>[];
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
+    final maxHeight = MediaQuery.sizeOf(context).height * _kSheetHeightShare;
 
     Widget row(String? name, {String? subtitle}) {
       final selected = name == current;
-      return ListTile(
-        key: ValueKey('branch-choice-${name ?? 'all'}'),
-        onTap: () => Navigator.of(context).pop(BranchChoice(name)),
-        leading: _RowIcon(
-          name == null ? Icons.public_rounded : Icons.location_on_outlined,
+      return Semantics(
+        selected: selected,
+        child: KListRow(
+          key: ValueKey('branch-choice-${name ?? 'all'}'),
+          onTap: () => Navigator.of(context).pop(BranchChoice(name)),
+          title: name ?? kAllCampusesLabel,
+          meta: subtitle == null || subtitle.isEmpty ? null : subtitle,
+          trailing: selected ? KIcon(KIcons.check, color: k.primaryText) : null,
         ),
-        title: Text(
-          name ?? kAllCampusesLabel,
-          style: AppTypography.ui(
-            size: 15,
-            weight: FontWeight.w600,
-            color: kc.onBg,
-          ),
-        ),
-        subtitle: subtitle == null || subtitle.isEmpty
-            ? null
-            : Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.ui(size: 12.5, color: kc.muted),
-              ),
-        trailing: selected
-            ? Icon(Icons.check_circle_rounded, color: kc.accentInk, size: 22)
-            : null,
       );
     }
 
-    return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        // Material (not a decorated box) so the ListTile ink is visible.
-        child: Material(
-          color: kc.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 10),
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: kc.outline,
-                    borderRadius: AppRadius.pillBorder,
-                  ),
-                ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Events, announcements and giving follow this choice.',
+                style: KharisText.meta.copyWith(color: k.muted),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 2),
-                child: Text(
-                  kChooseBranchLabel,
-                  style: AppTypography.display(
-                    size: 18,
-                    weight: FontWeight.w700,
-                    color: kc.onBg,
-                  ),
+            ),
+            const SizedBox(width: KSpace.md),
+            KIconButton(
+              icon: KIcons.close,
+              label: 'Close',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+        const SizedBox(height: KSpace.xl),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SingleChildScrollView(
+            child: KListGroup(
+              children: [
+                UseMyLocationTile(
+                  onNearest: (b) =>
+                      Navigator.of(context).pop(BranchChoice(b.name)),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  'Events, announcements and giving follow this choice.',
-                  style: AppTypography.ui(size: 13, color: kc.muted),
-                ),
-              ),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.only(bottom: 12),
-                  children: [
-                    UseMyLocationTile(
-                      onNearest: (b) =>
-                          Navigator.of(context).pop(BranchChoice(b.name)),
-                    ),
-                    if (allowAll)
-                      row(null, subtitle: 'Browse events at every branch'),
-                    for (final b in branches) row(b.name, subtitle: b.subtitle),
-                  ],
-                ),
-              ),
-            ],
+                if (allowAll)
+                  row(null, subtitle: 'Browse events at every branch'),
+                for (final b in branches) row(b.name, subtitle: b.subtitle),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _RowIcon extends StatelessWidget {
-  const _RowIcon(this.icon);
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: kc.chipBg,
-        borderRadius: AppRadius.tileBorder,
-      ),
-      child: Icon(icon, color: kc.onChip, size: 20),
+      ],
     );
   }
 }
@@ -226,14 +169,9 @@ const Duration kNearestBranchHold = Duration(milliseconds: 900);
 /// like tapping that branch. Denied or unavailable location leaves a short
 /// message in the row; the list below stays usable.
 class UseMyLocationTile extends ConsumerStatefulWidget {
-  const UseMyLocationTile({
-    super.key,
-    required this.onNearest,
-    this.contentPadding,
-  });
+  const UseMyLocationTile({super.key, required this.onNearest});
 
   final ValueChanged<Branch> onNearest;
-  final EdgeInsetsGeometry? contentPadding;
 
   @override
   ConsumerState<UseMyLocationTile> createState() => _UseMyLocationTileState();
@@ -274,36 +212,65 @@ class _UseMyLocationTileState extends ConsumerState<UseMyLocationTile> {
     _status = message;
   });
 
+  // Laid out like a [KListRow]; built here because the status line carries
+  // its own key and changes while the row is busy.
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
-    return ListTile(
-      key: const ValueKey('branch-use-location'),
-      contentPadding: widget.contentPadding,
-      onTap: _busy ? null : _locate,
-      leading: const _RowIcon(Icons.my_location_rounded),
-      title: Text(
-        'Use my location',
-        style: AppTypography.ui(
-          size: 15,
-          weight: FontWeight.w600,
-          color: kc.onBg,
+    final k = context.k;
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        enabled: !_busy,
+        child: InkWell(
+          key: const ValueKey('branch-use-location'),
+          onTap: _busy ? null : _locate,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: KSize.listRow),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: KSpace.x3,
+                vertical: KSpace.md,
+              ),
+              child: Row(
+                children: [
+                  const KIconTile(KIcons.pin),
+                  const SizedBox(width: KSpace.xl),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Use my location',
+                          style: KharisText.itemTitle.copyWith(color: k.text),
+                        ),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _status ?? 'Find the branch nearest you',
+                            key: const ValueKey('branch-location-status'),
+                            style: KharisText.meta.copyWith(color: k.muted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_busy) ...[
+                    const SizedBox(width: KSpace.md),
+                    SizedBox.square(
+                      dimension: KSize.iconMd,
+                      child: CircularProgressIndicator(
+                        strokeWidth: KSize.outline,
+                        color: k.primaryText,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-      subtitle: Text(
-        _status ?? 'Find the branch nearest you',
-        key: const ValueKey('branch-location-status'),
-        style: AppTypography.ui(size: 12.5, color: kc.muted),
-      ),
-      trailing: _busy
-          ? SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: kc.accentInk,
-              ),
-            )
-          : null,
     );
   }
 }

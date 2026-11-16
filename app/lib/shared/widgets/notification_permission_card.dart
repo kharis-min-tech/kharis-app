@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/shared/providers/notification_provider.dart';
 
 /// Says that notifications are off, what they would bring ([message]), and
@@ -91,99 +91,58 @@ class _NotificationPermissionCardState
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
+    final k = context.k;
     final onPreferences = widget.onPreferences;
     final onNotNow = widget.onNotNow;
-    return Container(
+    return KCard(
       key: const Key('notification-permission-card'),
-      decoration: BoxDecoration(
-        color: kc.surface,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.card,
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kc.chipBg,
-                ),
-                child: Icon(
-                  Icons.notifications_off_outlined,
-                  color: kc.onChip,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 14),
+              const KIconTile(KIcons.bell),
+              const SizedBox(width: KSpace.xl),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Notifications are off',
-                      style: AppTypography.ui(
-                        size: 15,
-                        weight: FontWeight.w600,
-                      ).copyWith(color: kc.onBg),
+                      style: KharisText.title.copyWith(color: k.text),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: KSpace.xs),
                     Text(
                       widget.message,
-                      style: AppTypography.bodySm.copyWith(color: kc.muted),
+                      style: KharisText.meta.copyWith(color: k.muted),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              // DESIGN.md: one CTA style, gold with gold ink.
-              style: FilledButton.styleFrom(
-                backgroundColor: kc.accent,
-                foregroundColor: kc.onAccent,
-              ),
-              onPressed: _busy ? null : _turnOn,
-              child: Text(
-                _blocked ? 'Turn on in Settings' : 'Turn on notifications',
-              ),
-            ),
+          const SizedBox(height: KSpace.x3),
+          KButton(
+            label: _blocked ? 'Turn on in Settings' : 'Turn on notifications',
+            onPressed: _turnOn,
+            loading: _busy,
+            expand: true,
           ),
-          if (onPreferences != null || onNotNow != null)
-            Row(
+          if (onPreferences != null || onNotNow != null) ...[
+            const SizedBox(height: KSpace.xs),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: KSpace.x3,
               children: [
                 if (onPreferences != null)
-                  TextButton(
-                    onPressed: onPreferences,
-                    child: Text(
-                      'Choose what you get',
-                      style: AppTypography.labelMd.copyWith(
-                        color: kc.accentInk,
-                      ),
-                    ),
-                  ),
-                const Spacer(),
+                  KTextLink(label: 'Choose what you get', onTap: onPreferences),
                 if (onNotNow != null)
-                  TextButton(
-                    onPressed: onNotNow,
-                    child: Text(
-                      'Not now',
-                      style: AppTypography.labelMd.copyWith(color: kc.muted),
-                    ),
-                  ),
+                  KTextLink(label: 'Not now', onTap: onNotNow),
               ],
             ),
-          if (onPreferences == null && onNotNow == null)
-            const SizedBox(height: 8),
+          ],
         ],
       ),
     );

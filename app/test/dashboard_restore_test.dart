@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
@@ -15,6 +14,7 @@ import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/fake_audio_player_service.dart';
 import 'support/fake_cache_service.dart';
@@ -32,7 +32,6 @@ class _RestoringAudio extends FakeAudioPlayerService {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   // Last played as a YouTube feed entry: an id the hydrated archive never
   // carries, so only the snapshot can place it before the catalogue loads.
@@ -70,13 +69,7 @@ void main() {
           builder: (context, state, shell) =>
               DashboardShell(navigationShell: shell),
           branches: [
-            for (final path in [
-              '/home',
-              '/messages',
-              '/calendar',
-              '/giving',
-              '/more',
-            ])
+            for (final path in ['/home', '/messages', '/bible', '/more'])
               StatefulShellBranch(
                 routes: [
                   GoRoute(
@@ -101,7 +94,10 @@ void main() {
           currentUserProvider.overrideWith((ref) => Stream.value(member)),
           currentBranchProvider.overrideWith((ref) => Stream.value('London')),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          theme: KharisTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     return audio;

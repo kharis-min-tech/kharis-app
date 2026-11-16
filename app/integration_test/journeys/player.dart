@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:kharis_app/features/player/presentation/widgets/player_controls.dart';
+import 'package:kharis_app/features/messages/presentation/message_list.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart' show ProcessingState;
@@ -24,14 +24,14 @@ import '../support/channels.dart';
 import '../support/harness.dart';
 import '../support/live_data.dart';
 
-/// (e) Player: play, seek, next / previous, audio <-> video keeps the
-/// position, the notepad (stamp the time, save, reopen, seek back, restore),
-/// share text, minimise to the mini player (hidden on Giving), dismiss; the
-/// transcript sheet for a message the R2 catalogue says has one.
-/// The transport row's buttons only: the Up next card below it reuses the
-/// skip-next glyph.
-Finder _transport(Finder f) =>
-    find.descendant(of: find.byType(PlayerControls), matching: f).first;
+/// (e) Player: play from a Themes list, seek, next / previous, audio <->
+/// video keeps the position, the notepad (stamp the time, save, reopen,
+/// seek back, restore), share text, minimise to the mini player (hidden on
+/// Give), dismiss; the transcript sheet for a message the R2 catalogue says
+/// has one.
+/// The transport row's buttons, by key: the Up next card below it reuses
+/// the skip-next glyph.
+Finder _transport(String key) => inPlayer(find.byKey(Key(key))).first;
 
 Future<void> playerJourney(Journey j) async {
   final t = j.tester;
@@ -40,13 +40,31 @@ Future<void> playerJourney(Journey j) async {
   await openMessagesReset(j);
   j.check(await waitArchiveHydrated(j), 'archive loaded');
   final audio = j.c.read(audioPlayerServiceProvider);
-  final list = j.c.read(librarySermonsProvider);
 
-  // ── Play ─────────────────────────────────────────────────────────────────
+  // ── Play: the largest theme's list, its newest message with audio ────────
+  final counts = j.c.read(categoryCountsProvider);
+  final theme = (counts.entries.where((e) => e.key != 'All').toList()
+        ..sort((a, b) => b.value.compareTo(a.value)))
+      .first
+      .key;
+  await tapVisible(
+    t,
+    find.descendant(of: messagesTabs, matching: find.text('Themes')),
+  );
+  final group = find.byKey(ValueKey('group-$theme'));
+  await scrollUntilFound(t, group, scrollable: messagesScroll);
+  await tapVisible(t, group);
+  final themeList = find.byType(MessageListScreen);
+  await pumpUntilFound(t, themeList);
+  final list = t.widget<MessageListScreen>(themeList).sermons;
   final first = list.firstWhere((s) => s.hasAudio);
-  final row = find.byKey(ValueKey(first.id));
-  await scrollUntilFound(t, row, scrollable: messagesScroll);
-  await t.tap(row, warnIfMissed: false);
+  j.note('playing from theme "$theme" (${list.length}): "${first.title}"');
+  final row = find.descendant(
+    of: themeList,
+    matching: find.byKey(ValueKey(first.id)),
+  );
+  await scrollUntilFound(t, row, scrollable: verticalScrollableIn(themeList));
+  await tapVisible(t, row);
   await pumpUntilFound(t, player, reason: 'player opens');
   j.check(
     modeToggleOf(t).activeMode == MediaMode.audio,
@@ -86,7 +104,7 @@ Future<void> playerJourney(Journey j) async {
   final next = queue?.next;
   if (next != null) {
     await t.tap(
-      _transport(find.byIcon(Icons.skip_next_rounded)),
+      _transport('player-next'),
       warnIfMissed: false,
     );
     j.check(
@@ -103,7 +121,7 @@ Future<void> playerJourney(Journey j) async {
     // 3 s again, and the tap would only restart it a second time.
     for (var i = 0; i < 2 && audio.currentSermon?.id != first.id; i++) {
       await t.tap(
-        _transport(find.byIcon(Icons.skip_previous_rounded)),
+        _transport('player-previous'),
         warnIfMissed: false,
       );
       await pumpUntil(
@@ -124,7 +142,7 @@ Future<void> playerJourney(Journey j) async {
   var current = audio.currentSermon!;
   for (var i = 0; i < 8 && !current.hasVideo; i++) {
     await t.tap(
-      _transport(find.byIcon(Icons.skip_next_rounded)),
+      _transport('player-next'),
       warnIfMissed: false,
     );
     await pumpUntil(
@@ -183,13 +201,15 @@ Future<void> playerJourney(Journey j) async {
     'mini player shows "${sharing.title}"',
   );
   await j.shot('mini-player');
-  await tapNav(t, 'Giving');
+  await openGive(t);
   await pumpUntilFound(t, find.byType(GivingScreen));
-  j.check(mini.evaluate().isEmpty, 'mini player hidden on Giving');
+  j.check(mini.evaluate().isEmpty, 'mini player hidden on Give');
   j.check(
     audio.currentSermon?.id == sharing.id,
-    'audio stays loaded on Giving',
+    'audio stays loaded on Give',
   );
+  await goBack(t);
+  await pumpUntil(t, () => find.byType(GivingScreen).evaluate().isEmpty);
   await tapNav(t, 'Home');
   j.check(
     await pumpUntil(t, () => mini.evaluate().isNotEmpty),
@@ -515,10 +535,14 @@ Future<void> _checkTranscript(Journey j, Random r) async {
 Future<void> _openTranscript(Journey j, Sermon sermon) async {
   final t = j.tester;
   await openMessagesReset(j);
-  final field = find.byType(TextField).first;
-  await t.tap(field, warnIfMissed: false);
+  await tapVisible(t, find.byKey(const Key('messages-search')));
+  final field = find.descendant(
+    of: find.byKey(const Key('search-field')),
+    matching: find.byType(EditableText),
+  );
+  await pumpUntilFound(t, field, reason: 'Search');
   await t.enterText(field, sermon.title);
-  final row = find.byKey(ValueKey(sermon.id));
+  final row = find.byKey(ValueKey('search-${sermon.id}'));
   await pumpUntilFound(
     t,
     row,
@@ -535,8 +559,12 @@ Future<void> _openTranscript(Journey j, Sermon sermon) async {
 
 Future<void> _closeTranscript(Journey j) async {
   final t = j.tester;
-  Navigator.of(t.element(find.byType(TranscriptSheet))).pop();
-  await pumpFor(t, const Duration(milliseconds: 600));
+  await goBack(t);
+  await pumpUntil(t, () => find.byType(TranscriptSheet).evaluate().isEmpty);
   await closePlayer(t);
-  await clearMessagesSearch(t);
+  await goBack(t);
+  await pumpUntil(
+    t,
+    () => find.byKey(const Key('search-field')).evaluate().isEmpty,
+  );
 }

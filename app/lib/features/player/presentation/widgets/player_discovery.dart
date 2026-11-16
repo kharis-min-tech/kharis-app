@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/data/related_messages.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
 import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// "More like this" for a message, from the loaded library only; empty while
 /// the library loads. Cached per message so playback ticks never re-rank.
@@ -17,8 +17,8 @@ final relatedMessagesProvider = Provider.autoDispose
       return relatedMessages(sermon, library);
     });
 
-/// A rounded panel under the player holding one discovery block (related
-/// messages, Up next), so suggestions sit apart from playback.
+/// A card under the player holding one discovery block (about, related
+/// messages, Explore, Up next), so suggestions sit apart from playback.
 class PlayerDiscoveryPanel extends StatelessWidget {
   const PlayerDiscoveryPanel({super.key, required this.child});
 
@@ -26,19 +26,18 @@ class PlayerDiscoveryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(
-        color: context.kc.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
+      child: KCard(
+        padding: const EdgeInsets.symmetric(vertical: KSpace.x3),
+        // Rows and links inside draw their ink on the card.
+        child: Material(type: MaterialType.transparency, child: child),
       ),
-      child: child,
     );
   }
 }
 
-/// A discovery panel's heading.
+/// A discovery panel's heading, inset like the rows beneath it.
 class _PanelHeading extends StatelessWidget {
   const _PanelHeading(this.text, {this.action, this.onAction});
 
@@ -50,40 +49,32 @@ class _PanelHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final action = this.action;
-    return Row(
-      children: [
-        Expanded(
-          child: Semantics(
-            header: true,
-            child: Text(
-              text,
-              style: AppTypography.ui(
-                size: 17,
-                weight: FontWeight.w700,
-                color: context.kc.onBg,
-              ),
-            ),
-          ),
-        ),
-        if (action != null && onAction != null)
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(
-              foregroundColor: context.kc.accentInk,
-              minimumSize: const Size(48, 40),
-              padding: const EdgeInsets.only(left: 12),
-            ),
-            child: Text(
-              action,
-              style: AppTypography.ui(
-                size: 13.5,
-                weight: FontWeight.w700,
-                color: context.kc.accentInk,
-              ),
-            ),
-          ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: KSpace.x3),
+      child: KSectionHeader(
+        title: text,
+        actionLabel: onAction == null ? null : action,
+        onAction: onAction,
+      ),
+    );
+  }
+}
+
+/// The artwork of [sermon] as a list row's leading thumbnail.
+class _RowArtwork extends StatelessWidget {
+  const _RowArtwork(this.sermon);
+
+  final Sermon sermon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: KSize.thumb,
+      child: ArtworkImage(
+        url: sermon.artworkUrl,
+        gradientIndex: sermon.artworkColor ?? 0,
+        radius: KRadius.tile,
+      ),
     );
   }
 }
@@ -104,11 +95,15 @@ class AboutMessageCard extends StatefulWidget {
 }
 
 class _AboutMessageCardState extends State<AboutMessageCard> {
+  /// Descriptions longer than this get "See more".
+  static const int _longBody = 140;
+  static const int _closedLines = 3;
+
   bool _open = false;
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
+    final k = context.k;
     final sermon = widget.sermon;
     final body = sermon.description?.trim() ?? '';
     final date = sermon.publishedAt;
@@ -121,104 +116,47 @@ class _AboutMessageCardState extends State<AboutMessageCard> {
             : '${length.inMinutes} min',
     ].join(' \u00b7 ');
     final series = sermon.series?.trim() ?? '';
-    return Padding(
+    return Column(
       key: const Key('player-about'),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _PanelHeading('About this message'),
-          if (meta.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(meta, style: AppTypography.ui(size: 13, color: kc.muted)),
-          ],
-          if (body.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: () => setState(() => _open = !_open),
-              child: Text(
-                body,
-                maxLines: _open ? null : 3,
-                overflow: _open ? null : TextOverflow.ellipsis,
-                style: AppTypography.ui(size: 14, height: 1.45, color: kc.onBg),
-              ),
-            ),
-            if (!_open && body.length > 140)
-              TextButton(
-                key: const Key('player-about-more'),
-                onPressed: () => setState(() => _open = true),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(48, 36),
-                ),
-                child: Text(
-                  'See more',
-                  style: AppTypography.ui(
-                    size: 13.5,
-                    weight: FontWeight.w700,
-                    color: kc.onBg,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _PanelHeading('About this message'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: KSpace.x3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (meta.isNotEmpty)
+                Text(meta, style: KharisText.meta.copyWith(color: k.muted)),
+              if (body.isNotEmpty) ...[
+                const SizedBox(height: KSpace.md),
+                GestureDetector(
+                  onTap: () => setState(() => _open = !_open),
+                  child: Text(
+                    body,
+                    maxLines: _open ? null : _closedLines,
+                    overflow: _open ? null : TextOverflow.ellipsis,
+                    style: KharisText.body.copyWith(color: k.text),
                   ),
                 ),
-              ),
-          ],
-          if (series.isNotEmpty && widget.onSeries != null) ...[
-            const SizedBox(height: 10),
-            ActionChip(
-              key: const Key('player-about-series'),
-              label: Text(series),
-              avatar: Icon(Icons.chevron_right_rounded, color: kc.onBg),
-              onPressed: widget.onSeries,
-              backgroundColor: kc.chipBg,
-              side: BorderSide.none,
-              shape: const StadiumBorder(),
-              labelStyle: AppTypography.ui(
-                size: 13,
-                weight: FontWeight.w700,
-                color: kc.onChip,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// One "Explore" tile: where it leads, over the message's artwork.
-typedef ExploreTile = ({String id, String label, VoidCallback onTap});
-
-/// "Explore": tall tiles, each opening Messages already filtered (more from
-/// this series, from this speaker, on this topic).
-class ExploreMessagesRow extends StatelessWidget {
-  const ExploreMessagesRow({
-    super.key,
-    required this.sermon,
-    required this.tiles,
-  });
-
-  /// Whose artwork the tiles carry.
-  final Sermon sermon;
-  final List<ExploreTile> tiles;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('player-explore'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: _PanelHeading('Explore'),
-        ),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              for (final (i, tile) in tiles.indexed) ...[
-                if (i > 0) const SizedBox(width: 10),
-                _ExploreTileView(sermon: sermon, tile: tile),
+                if (!_open && body.length > _longBody)
+                  KTextLink(
+                    key: const Key('player-about-more'),
+                    label: 'See more',
+                    onTap: () => setState(() => _open = true),
+                  ),
+              ],
+              if (series.isNotEmpty && widget.onSeries != null) ...[
+                const SizedBox(height: KSpace.md),
+                // A long series name scrolls rather than overflowing.
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: KChip(
+                    key: const Key('player-about-series'),
+                    label: series,
+                    onTap: widget.onSeries,
+                  ),
+                ),
               ],
             ],
           ),
@@ -228,60 +166,32 @@ class ExploreMessagesRow extends StatelessWidget {
   }
 }
 
-class _ExploreTileView extends StatelessWidget {
-  const _ExploreTileView({required this.sermon, required this.tile});
+/// One "Explore" row: where it leads.
+typedef ExploreTile = ({String id, String label, VoidCallback onTap});
 
-  final Sermon sermon;
-  final ExploreTile tile;
+/// "Explore": rows that each open Messages already filtered (more from this
+/// series, from this speaker, on this topic).
+class ExploreMessagesRow extends StatelessWidget {
+  const ExploreMessagesRow({super.key, required this.tiles});
+
+  final List<ExploreTile> tiles;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: tile.label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        key: Key('player-explore-${tile.id}'),
-        onTap: tile.onTap,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.defaultRadius),
-          child: SizedBox(
-            width: 112,
-            height: 152,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ArtworkImage(
-                  url: sermon.artworkUrl,
-                  gradientIndex: sermon.artworkColor ?? 0,
-                  radius: 0,
-                ),
-                // A solid band (no gradient) keeps the words legible on any
-                // artwork.
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Container(
-                    width: double.infinity,
-                    color: Colors.black.withValues(alpha: 0.62),
-                    padding: const EdgeInsets.fromLTRB(9, 7, 9, 9),
-                    child: Text(
-                      tile.label,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.ui(
-                        size: 13,
-                        weight: FontWeight.w700,
-                        height: 1.2,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    return Column(
+      key: const Key('player-explore'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PanelHeading('Explore'),
+        for (final tile in tiles)
+          KListRow(
+            key: Key('player-explore-${tile.id}'),
+            title: tile.label,
+            leading: const KIconTile(KIcons.collection),
+            showChevron: true,
+            onTap: tile.onTap,
           ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -296,16 +206,11 @@ class UpNextCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kc = context.kc;
     final speaker = sermon.speaker.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: _PanelHeading('Up next'),
-        ),
-        const SizedBox(height: 10),
+        const _PanelHeading('Up next'),
         Semantics(
           button: true,
           label: [
@@ -314,63 +219,15 @@ class UpNextCard extends StatelessWidget {
             if (speaker.isNotEmpty) speaker,
           ].join(', '),
           hint: 'Plays now',
+          onTap: onTap,
           excludeSemantics: true,
-          child: InkWell(
+          child: KListRow(
             key: const Key('player-up-next'),
+            title: sermon.title,
+            meta: speaker.isEmpty ? null : speaker,
+            leading: _RowArtwork(sermon),
+            trailing: const KIcon(KIcons.play, size: KSize.iconSm),
             onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-              child: Row(
-                children: [
-                  SizedBox.square(
-                    dimension: 64,
-                    child: ArtworkImage(
-                      url: sermon.artworkUrl,
-                      gradientIndex: sermon.artworkColor ?? 0,
-                      radius: AppRadius.tile,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          sermon.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.display(
-                            size: 16,
-                            weight: FontWeight.w700,
-                            height: 1.15,
-                            color: kc.onBg,
-                          ),
-                        ),
-                        if (speaker.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            speaker,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.ui(size: 13, color: kc.muted),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox.square(
-                    dimension: 44,
-                    child: Icon(
-                      Icons.skip_next_rounded,
-                      size: 28,
-                      color: kc.onBg,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ),
       ],
@@ -378,8 +235,8 @@ class UpNextCard extends StatelessWidget {
   }
 }
 
-/// "You might also like": a horizontal rail of artwork-led message cards. The
-/// caller hides it when [sermons] is empty.
+/// "You might also like": the related messages as list rows. The caller
+/// hides it when [sermons] is empty.
 class RelatedMessagesRail extends StatelessWidget {
   const RelatedMessagesRail({
     super.key,
@@ -399,97 +256,37 @@ class RelatedMessagesRail extends StatelessWidget {
   /// "See all" at the heading's right; null hides it.
   final VoidCallback? onSeeAll;
 
-  /// Inset of the heading and the rail's ends; the rail itself scrolls edge
-  /// to edge.
+  /// Extra inset around the heading and the rows, on top of their own.
   final EdgeInsets padding;
 
-  static const double cardWidth = 148;
-
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Padding(
       key: const Key('player-related'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(left: padding.left, right: padding.right),
-          child: _PanelHeading(title, action: 'See all', onAction: onSeeAll),
-        ),
-        const SizedBox(height: 14),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.only(left: padding.left, right: padding.right),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final (i, sermon) in sermons.indexed) ...[
-                if (i > 0) const SizedBox(width: 14),
-                _RelatedCard(sermon: sermon, onTap: () => onOpen(sermon)),
-              ],
-            ],
-          ),
-        ),
-      ],
+      padding: EdgeInsets.only(left: padding.left, right: padding.right),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _PanelHeading(title, action: 'See all', onAction: onSeeAll),
+          for (final sermon in sermons) _relatedRow(sermon),
+        ],
+      ),
     );
   }
-}
 
-class _RelatedCard extends StatelessWidget {
-  const _RelatedCard({required this.sermon, required this.onTap});
-
-  final Sermon sermon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
+  Widget _relatedRow(Sermon sermon) {
     final speaker = sermon.speaker.trim();
     return Semantics(
       button: true,
       label: [sermon.title, if (speaker.isNotEmpty) speaker].join(', '),
       hint: 'Plays this message',
+      onTap: () => onOpen(sermon),
       excludeSemantics: true,
-      child: SizedBox(
-        width: RelatedMessagesRail.cardWidth,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppRadius.cardBorder,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox.square(
-                dimension: RelatedMessagesRail.cardWidth,
-                child: ArtworkImage(
-                  url: sermon.artworkUrl,
-                  gradientIndex: sermon.artworkColor ?? 0,
-                  radius: AppRadius.card,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                sermon.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.display(
-                  size: 15,
-                  weight: FontWeight.w700,
-                  height: 1.15,
-                  color: kc.onBg,
-                ),
-              ),
-              if (speaker.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text(
-                  speaker,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.ui(size: 12.5, color: kc.muted),
-                ),
-              ],
-              const SizedBox(height: 4),
-            ],
-          ),
-        ),
+      child: KListRow(
+        title: sermon.title,
+        meta: speaker.isEmpty ? null : speaker,
+        leading: _RowArtwork(sermon),
+        onTap: () => onOpen(sermon),
       ),
     );
   }

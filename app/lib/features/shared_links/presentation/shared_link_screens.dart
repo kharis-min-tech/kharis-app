@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:kharis_app/core/constants/app_links.dart';
-import 'package:kharis_app/core/theme/theme.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/event_detail_screen.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
@@ -337,12 +337,8 @@ class _SharedAnnouncementScreenState
 
 // ── Shared pieces ─────────────────────────────────────────────────────────────
 
-/// Back that never dead-ends: pops when there is somewhere to go, else Home.
-void _backOrHome(BuildContext context) {
-  final router = GoRouter.of(context);
-  router.canPop() ? router.pop() : router.go('/home');
-}
-
+/// A shared link while its item is looked up: what is opening, over blocks
+/// standing in for the list the item opens on.
 class _Opening extends StatelessWidget {
   const _Opening({required this.label});
 
@@ -351,35 +347,65 @@ class _Opening extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: Icon(Icons.arrow_back_rounded, color: context.kc.onBg),
-          onPressed: () => _backOrHome(context),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: KSize.maxContentWidth),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: KSpace.x3),
+              children: [
+                Semantics(liveRegion: true, child: KScreenHeader(title: label)),
+                const SizedBox(height: KSpace.gutter),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: KSpace.gutter),
+                  child: KCard(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _SkeletonRow(),
+                        SizedBox(height: KSpace.x3),
+                        _SkeletonRow(),
+                        SizedBox(height: KSpace.x3),
+                        _SkeletonRow(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: context.kc.accentInk,
+    );
+  }
+}
+
+/// One list row while it loads: a thumbnail, a title line and a meta line.
+class _SkeletonRow extends StatelessWidget {
+  const _SkeletonRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const KSkeleton(width: KSize.thumb, height: KSize.thumb),
+        const SizedBox(width: KSpace.xl),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              KSkeleton(height: KType.itemTitle.size, radius: KRadius.xs),
+              const SizedBox(height: KSpace.md),
+              FractionallySizedBox(
+                widthFactor: 0.5,
+                child: KSkeleton(height: KType.meta.size, radius: KRadius.xs),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              label,
-              style: AppTypography.bodySm.copyWith(color: context.kc.muted),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -403,61 +429,33 @@ class SharedLinkNotFoundScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: Icon(Icons.arrow_back_rounded, color: context.kc.onBg),
-          onPressed: () => _backOrHome(context),
-        ),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.link_off_rounded, color: context.kc.muted, size: 44),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: AppTypography.ui(
-                  size: 17,
-                  weight: FontWeight.w600,
-                ).copyWith(color: context.kc.onBg),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: KSize.maxContentWidth,
               ),
-              const SizedBox(height: 6),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: AppTypography.bodySm.copyWith(color: context.kc.muted),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              FilledButton(
-                key: const Key('shared-link-home'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.kc.accent,
-                  foregroundColor: context.kc.onAccent,
-                ),
-                onPressed: () => context.go('/home'),
-                child: const Text('Go to Home'),
-              ),
-              if (onRetry != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                TextButton(
-                  onPressed: onRetry,
-                  child: Text(
-                    'Try again',
-                    style: AppTypography.bodySm.copyWith(
-                      color: context.kc.accentInk,
-                      fontWeight: FontWeight.w600,
+              child: KEmptyState(
+                icon: KIcons.search,
+                title: title,
+                hint: message,
+                action: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    KButton(
+                      key: const Key('shared-link-home'),
+                      label: 'Go to Home',
+                      onPressed: () => context.go('/home'),
                     ),
-                  ),
+                    if (onRetry != null) ...[
+                      const SizedBox(height: KSpace.md),
+                      KTextLink(label: 'Try again', onTap: onRetry),
+                    ],
+                  ],
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
         ),
       ),

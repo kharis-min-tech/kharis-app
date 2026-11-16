@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kharis_app/features/messages/presentation/widgets/sermon_list_item.dart';
+import 'package:kharis_app/features/messages/presentation/message_list.dart';
+import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/player/data/playback_history.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
@@ -88,16 +89,9 @@ void main() {
         UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
-            home: Scaffold(
-              body: Consumer(
-                builder: (context, ref, _) => SermonListItem(
-                  title: _sermon.title,
-                  speaker: _sermon.speaker,
-                  durationLabel: '56m',
-                  dateLabel: 'Aug 2026',
-                  listening: ref.watch(listeningProgressProvider(_sermon)),
-                ),
-              ),
+            theme: KharisTheme.light(),
+            home: const Scaffold(
+              body: MessageRow(sermon: _sermon, queue: [_sermon]),
             ),
           ),
         ),
@@ -108,19 +102,18 @@ void main() {
     testWidgets('shows length until played, then time left with a bar, '
         'then Finished, updating live', (tester) async {
       final history = await pumpRow(tester);
-      expect(find.text('Aug 2026 · 56m'), findsOneWidget);
-      expect(find.byKey(const Key('listening-progress')), findsNothing);
+      expect(find.text('56 min'), findsOneWidget);
+      expect(find.byType(KProgressBar), findsNothing);
 
       history.savePosition(_sermon, const Duration(minutes: 28));
       await tester.pumpAndSettle();
-      expect(find.text('Aug 2026 · 28 min left'), findsOneWidget);
-      expect(find.byKey(const Key('listening-progress')), findsOneWidget);
+      expect(find.text('28 min left'), findsOneWidget);
+      expect(find.byType(KProgressBar), findsOneWidget);
 
       history.markFinished(_sermon);
       await tester.pumpAndSettle();
-      expect(find.text('Aug 2026 · 56m · Finished'), findsOneWidget);
-      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
-      expect(find.byKey(const Key('listening-progress')), findsNothing);
+      expect(find.text('Finished'), findsOneWidget);
+      expect(find.byType(KProgressBar), findsNothing);
     });
   });
 }

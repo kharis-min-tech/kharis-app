@@ -1,29 +1,20 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:kharis_app/features/calendar/data/event_repository.dart';
-import 'package:kharis_app/features/calendar/data/rsvp_repository.dart';
-import 'package:kharis_app/features/calendar/presentation/screens/calendar_screen.dart';
 import 'package:kharis_app/features/connect/data/connect_repository.dart';
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/playlists/presentation/widgets/playlist_card.dart';
 import 'package:kharis_app/features/playlists/providers/playlist_providers.dart';
-import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
-import 'package:kharis_app/shared/providers/auth_provider.dart';
-import 'package:kharis_app/shared/providers/branch_provider.dart';
-import 'package:kharis_app/shared/providers/campus_config_provider.dart';
-import 'package:kharis_app/shared/providers/notification_feed_provider.dart';
-import 'package:kharis_app/shared/providers/onboarding_provider.dart';
-import 'package:kharis_app/shared/providers/sermon_provider.dart';
-import 'package:kharis_app/shared/widgets/artwork_image.dart';
+import 'package:kharis_app/ui/components/components.dart'
+    show KIcon, KIcons, KImageFill;
+import 'package:kharis_app/theme/kharis_theme.dart';
 
 import 'support/supabase_stub.dart';
 
@@ -31,8 +22,6 @@ const _london = Branch(
   id: 'london',
   name: 'London',
   subtitle: '',
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
 );
 
 const _barking = Branch(
@@ -40,8 +29,6 @@ const _barking = Branch(
   name: 'KP2 Barking',
   subtitle: '',
   group: Branch.phaseTwoGroup,
-  gradientStart: Color(0xFF5D3FD3),
-  gradientEnd: Color(0xFF451EBB),
 );
 
 Sermon _sermon(String id, {String? art}) => Sermon(
@@ -53,137 +40,6 @@ Sermon _sermon(String id, {String? art}) => Sermon(
 );
 
 void main() {
-  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
-
-  // ── Events ──────────────────────────────────────────────────────────────────
-
-  group('Events: Studio events as-is', () {
-    Future<void> pump(
-      WidgetTester tester, {
-      List<Event> events = const [],
-      Branch? campus,
-    }) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final prefs = await SharedPreferences.getInstance();
-      tester.view.physicalSize = const Size(1200, 4000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            sharedPreferencesProvider.overrideWithValue(prefs),
-            currentBranchProvider.overrideWith((ref) => Stream.value('London')),
-            currentUserProvider.overrideWith((ref) => Stream.value(null)),
-            eventsUpcomingProvider.overrideWithValue(AsyncValue.data(events)),
-            myRsvpsProvider.overrideWith((ref) => Stream.value(const <Rsvp>[])),
-            currentCampusProvider.overrideWithValue(campus),
-          ],
-          child: const MaterialApp(home: CalendarScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
-    }
-
-    testWidgets('a weekly event is one card with its recurrence label', (
-      tester,
-    ) async {
-      final next = DateTime.now().add(const Duration(days: 3));
-      await pump(
-        tester,
-        events: [
-          Event(
-            id: 'sun',
-            title: 'Sunday Service',
-            startTime: DateTime(next.year, next.month, next.day, 9),
-            recurrenceDays: const [0, 3],
-          ),
-          Event(
-            id: 'e1',
-            title: 'Prayer Night',
-            location: 'Main Hall',
-            startTime: next.add(const Duration(days: 1)),
-          ),
-        ],
-      );
-      expect(find.text('Sunday Service'), findsOneWidget);
-      expect(
-        find.text('Every Sunday and Wednesday \u00b7 9:00 AM'),
-        findsOneWidget,
-      );
-      expect(find.text('Prayer Night'), findsOneWidget);
-      expect(find.text('WEEKLY SERVICES'), findsNothing);
-      expect(find.text('No upcoming events'), findsNothing);
-    });
-
-    testWidgets('no Studio events shows the empty state', (tester) async {
-      await pump(tester);
-      expect(find.text('No upcoming events'), findsOneWidget);
-      expect(find.text('WEEKLY SERVICES'), findsNothing);
-      expect(find.byKey(const Key('campus-card')), findsNothing);
-    });
-
-    testWidgets('no events still shows when the branch meets', (tester) async {
-      await pump(
-        tester,
-        campus: const Branch(
-          id: 'london',
-          name: 'London',
-          subtitle: '',
-          gradientStart: Colors.black,
-          gradientEnd: Colors.black,
-          services: [
-            CampusService(
-              id: 'sun',
-              name: 'Sunday Service',
-              day: 'Sunday',
-              startTime: '10:00',
-            ),
-          ],
-        ),
-      );
-      expect(find.text('No upcoming events'), findsOneWidget);
-      expect(find.byKey(const Key('campus-card')), findsOneWidget);
-      expect(find.byKey(const Key('campus-service-sun')), findsOneWidget);
-    });
-
-    testWidgets('a quiet week names the branch in the chip only', (
-      tester,
-    ) async {
-      await pump(
-        tester,
-        campus: const Branch(
-          id: 'london',
-          name: 'London',
-          subtitle: '',
-          gradientStart: Colors.black,
-          gradientEnd: Colors.black,
-          services: [
-            CampusService(
-              id: 'sun',
-              name: 'Sunday Service',
-              day: 'Sunday',
-              startTime: '10:00',
-            ),
-          ],
-        ),
-      );
-      expect(find.byKey(const Key('campus-card')), findsOneWidget);
-      expect(find.text('YOUR BRANCH'), findsOneWidget);
-      // The chip names the branch; the card carries no heading of its own.
-      expect(find.text('London'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('campus-card')),
-          matching: find.text('London'),
-        ),
-        findsNothing,
-      );
-      expect(
-        find.text('Check back soon for events at London.'),
-        findsOneWidget,
-      );
-    });
-  });
 
   // ── Playlist artwork ───────────────────────────────────────────────────────
 
@@ -209,22 +65,23 @@ void main() {
       expect(playlistArtworkUrls([_sermon('1')]), isEmpty);
     });
 
-    Future<List<String?>> tiles(WidgetTester tester, List<String> urls) async {
+    Future<List<String>> tiles(WidgetTester tester, List<String> urls) async {
       await tester.pumpWidget(
         MaterialApp(
+          theme: KharisTheme.light(),
           home: Center(
             child: SizedBox.square(
               dimension: 120,
-              child: PlaylistMosaic(urls: urls, fallbackIndex: 3),
+              child: PlaylistMosaic(urls: urls),
             ),
           ),
         ),
       );
       return [
-        for (final w in tester.widgetList<ArtworkImage>(
-          find.byType(ArtworkImage),
-        ))
-          w.url,
+        for (final w in tester.widgetList<KImageFill>(find.byType(KImageFill)))
+          ((w.image! as ResizeImage).imageProvider
+                  as CachedNetworkImageProvider)
+              .url,
       ];
     }
 
@@ -237,30 +94,32 @@ void main() {
       const d = 'https://cdn.test/d.jpg';
       expect(await tiles(tester, [a]), [a]);
       expect(
-        tester.getSize(find.byType(ArtworkImage)),
+        tester.getSize(find.byType(KImageFill)),
         const Size(120, 120),
         reason: 'one image fills the square',
       );
       expect(await tiles(tester, [a, b]), [a, b]);
       expect(
-        tester.getSize(find.byType(ArtworkImage).first),
+        tester.getSize(find.byType(KImageFill).first),
         const Size(60, 120),
       );
       expect(await tiles(tester, [a, b, c]), [a, b, c]);
       expect(
-        tester.getSize(find.byType(ArtworkImage).first),
+        tester.getSize(find.byType(KImageFill).first),
         const Size(60, 120),
       );
-      expect(
-        tester.getSize(find.byType(ArtworkImage).last),
-        const Size(60, 60),
-      );
+      expect(tester.getSize(find.byType(KImageFill).last), const Size(60, 60));
       expect(await tiles(tester, [a, b, c, d]), [a, b, c, d]);
-      for (final e in find.byType(ArtworkImage).evaluate()) {
+      for (final e in find.byType(KImageFill).evaluate()) {
         expect(e.size, const Size(60, 60));
       }
-      expect(await tiles(tester, const []), [null]);
-      expect(find.byIcon(Icons.queue_music_rounded), findsOneWidget);
+      expect(await tiles(tester, const []), isEmpty);
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is KIcon && w.asset == KIcons.collection,
+        ),
+        findsOneWidget,
+      );
     });
   });
 
@@ -334,7 +193,7 @@ void main() {
               ConnectRepository(dio: Dio()..httpClientAdapter = stub),
             ),
           ],
-          child: MaterialApp(home: screen),
+          child: MaterialApp(theme: KharisTheme.light(), home: screen),
         ),
       );
       await tester.pumpAndSettle();

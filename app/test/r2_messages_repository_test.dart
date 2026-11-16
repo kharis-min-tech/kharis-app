@@ -277,4 +277,18 @@ void main() {
       expect(page.sermons.first.tags, ['PDAK']);
     },
   );
+
+  test('scripture refs are the message\'s passages; none is an empty list', () {
+    final s = mapR2Message({
+      ..._record('7'),
+      'scripture_refs': ['Acts 20:17-38', ' Luke 24:27 ', '', 3, null],
+    })!;
+    expect(s.passages, ['Acts 20:17-38', 'Luke 24:27']);
+    expect(
+      mapR2Message({..._record('8'), 'scripture_refs': <String>[]})!.passages,
+      isEmpty,
+    );
+    // Files written before the Worker carried the field.
+    expect(mapR2Message(_record('9'))!.passages, isEmpty);
+  });
 }

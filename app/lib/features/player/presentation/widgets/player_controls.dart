@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/player/data/playback_queue.dart';
 import 'package:kharis_app/features/player/data/time_skip.dart';
 import 'package:kharis_app/shared/providers/audio_provider.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// A snapshot of whichever engine currently owns playback, so [PlayerControls]
 /// can drive audio (just_audio) and video (YouTube) with one control row.
@@ -57,14 +57,15 @@ class TransportBinding {
 ///
 /// Main row: previous | back 15 s | play/pause | forward 30 s | next, the
 /// podcast-app arrangement with the time skips next to Play. Below it: the
-/// speed pill on the left and repeat on the right.
+/// speed chip on the left and repeat on the right.
 /// Previous and Next walk the queue the member launched from, Spotify-style:
 /// Previous restarts the message once it is past three seconds, otherwise
-/// steps back; both disable at the ends of the queue. The play/pause button
-/// is a flat 70-px accent circle (no shadow) with an ink press state, a
-/// dimmed disabled state and a spinner while buffering. The speed pill
-/// cycles 1× → 1.25× → 1.5× → 2× → 0.75× and persists; Repeat loops the
-/// current message.
+/// steps back; both disable at the ends of the queue. Play/pause is the round
+/// primary button, with a dimmed disabled state and a spinner while
+/// buffering. The icon set has no skip glyphs: Previous and Next are the
+/// double chevron (mirrored for Next) and the time skips show "−15" and
+/// "+30" as text. The speed chip cycles 1× → 1.25× → 1.5× → 2× → 0.75× and
+/// persists; Repeat loops the current message.
 class PlayerControls extends ConsumerWidget {
   const PlayerControls({super.key, this.transport});
 
@@ -79,67 +80,99 @@ class PlayerControls extends ConsumerWidget {
     return speeds[(index + 1) % speeds.length];
   }
 
+  static String _speedLabel(double speed) {
+    final s = speed == speed.roundToDouble()
+        ? speed.toStringAsFixed(0)
+        : speed.toString();
+    return '$s×';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final binding = transport ?? _audioBinding(ref);
 
     final seekBy = binding.onSeekBy;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _SkipButton(
-                icon: Icons.skip_previous_rounded,
-                label: 'Previous message',
-                size: 44,
-                onPressed: binding.onPrevious,
-              ),
-              _TimeSkipButton(
-                seconds: 15,
-                forward: false,
-                onPressed: seekBy == null ? null : () => seekBy(-TimeSkip.back),
-              ),
-              _PlayPauseButton(
-                isPlaying: binding.isPlaying,
-                isBuffering: binding.isBuffering,
-                onTap: binding.isPlaying ? binding.onPause : binding.onPlay,
-              ),
-              _TimeSkipButton(
-                seconds: 30,
-                forward: true,
-                onPressed: seekBy == null
-                    ? null
-                    : () => seekBy(TimeSkip.forward),
-              ),
-              _SkipButton(
-                icon: Icons.skip_next_rounded,
+    final speed = _speedLabel(binding.speed);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            KIconButton(
+              key: const Key('player-previous'),
+              icon: KIcons.rewind,
+              label: 'Previous message',
+              variant: KIconButtonVariant.filled,
+              onPressed: binding.onPrevious,
+            ),
+            KTransportTextButton(
+              key: const Key('skip-back'),
+              text: '\u221215',
+              label: 'Back ${TimeSkip.back.inSeconds} seconds',
+              onPressed: seekBy == null ? null : () => seekBy(-TimeSkip.back),
+            ),
+            KPlayButton(
+              key: const ValueKey('player-play-pause'),
+              playing: binding.isPlaying,
+              loading: binding.isBuffering,
+              onPressed: binding.isPlaying ? binding.onPause : binding.onPlay,
+            ),
+            KTransportTextButton(
+              key: const Key('skip-forward'),
+              text: '+30',
+              label: 'Forward ${TimeSkip.forward.inSeconds} seconds',
+              onPressed: seekBy == null ? null : () => seekBy(TimeSkip.forward),
+            ),
+            // The double chevron, mirrored to point forward.
+            Transform.flip(
+              flipX: true,
+              child: KIconButton(
+                key: const Key('player-next'),
+                icon: KIcons.rewind,
                 label: 'Next message',
-                size: 44,
+                variant: KIconButtonVariant.filled,
                 onPressed: binding.onNext,
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _SpeedPill(
-                speed: binding.speed,
+            ),
+          ],
+        ),
+        const SizedBox(height: KSpace.md),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Semantics(
+              button: true,
+              label: 'Playback speed $speed',
+              onTap: () => binding.onSetSpeed(nextSpeed(binding.speed)),
+              excludeSemantics: true,
+              child: KChip(
+                key: const Key('player-speed'),
+                label: speed,
                 onTap: () => binding.onSetSpeed(nextSpeed(binding.speed)),
               ),
-              _RepeatButton(
-                active: binding.repeatOn,
-                onTap: binding.onToggleRepeat,
+            ),
+            Semantics(
+              button: true,
+              toggled: binding.repeatOn,
+              label: 'Repeat this message',
+              onTap: binding.onToggleRepeat,
+              excludeSemantics: true,
+              child: KIconButton(
+                key: const Key('player-repeat'),
+                icon: KIcons.repeat,
+                label: 'Repeat this message',
+                variant: binding.repeatOn
+                    ? KIconButtonVariant.filled
+                    : KIconButtonVariant.plain,
+                color: binding.repeatOn ? context.k.primaryText : null,
+                onPressed: binding.onToggleRepeat,
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -201,283 +234,4 @@ class PlayerControls extends ConsumerWidget {
     PreviousAction.none => null,
   };
   return (previous: previous, next: queue.hasNext ? onNext : null);
-}
-
-// ── Speed pill ────────────────────────────────────────────────────────────────
-
-class _SpeedPill extends StatelessWidget {
-  const _SpeedPill({required this.speed, required this.onTap});
-
-  final double speed;
-  final VoidCallback onTap;
-
-  String get _label {
-    final s = speed == speed.roundToDouble()
-        ? speed.toStringAsFixed(0)
-        : speed.toString();
-    return '$s×';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Playback speed $_label',
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        // The ~32 px pill sits centred in a 44 px target.
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-          child: Center(
-            widthFactor: 1,
-            heightFactor: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                border: Border.all(
-                  color: context.kc.accentInk.withValues(alpha: 0.5),
-                  width: 1.5,
-                ),
-              ),
-              child: Text(
-                _label,
-                style: AppTypography.ui(
-                  size: 12.5,
-                  weight: FontWeight.w700,
-                  color: context.kc.accentInk,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Play / Pause circle button ────────────────────────────────────────────────
-
-class _PlayPauseButton extends StatelessWidget {
-  const _PlayPauseButton({
-    required this.isPlaying,
-    required this.isBuffering,
-    required this.onTap,
-  });
-
-  final bool isPlaying;
-  final bool isBuffering;
-
-  /// Null disables the button: dimmed fill and glyph, no ink, no taps.
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kc = context.kc;
-    final enabled = onTap != null;
-    final glyph = enabled ? kc.onAccent : kc.onAccent.withValues(alpha: 0.6);
-    // Solid accent, no shadow. Buffering keeps the button live so a member
-    // can still pause a stalled stream. excludeSemantics drops the InkWell's
-    // own tap action, so the node carries it.
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: isPlaying ? 'Pause' : 'Play',
-      value: isBuffering ? 'Loading' : null,
-      onTap: onTap,
-      excludeSemantics: true,
-      child: Material(
-        key: const ValueKey('player-play-pause'),
-        color: enabled ? kc.accent : kc.accent.withValues(alpha: 0.38),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          highlightColor: kc.onAccent.withValues(alpha: 0.16),
-          splashColor: kc.onAccent.withValues(alpha: 0.12),
-          child: SizedBox(
-            width: 70,
-            height: 70,
-            child: Center(
-              child: isBuffering
-                  ? SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(glyph),
-                      ),
-                    )
-                  : Icon(
-                      isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      color: glyph,
-                      size: 34,
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Previous / Next message button ────────────────────────────────────────────
-
-class _SkipButton extends StatelessWidget {
-  const _SkipButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.size = 54,
-  });
-
-  final double size;
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    // Tonal circle so the controls read as buttons instead of floating
-    // glyphs, with a ripple and a generous tap target.
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: label,
-      excludeSemantics: true,
-      child: Material(
-        color: context.kc.chipBg.withValues(alpha: enabled ? 1 : 0.5),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: Icon(
-              icon,
-              color: enabled
-                  ? context.kc.onBg
-                  : context.kc.onBg.withValues(alpha: 0.3),
-              size: size * 0.55,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Repeat toggle ─────────────────────────────────────────────────────────────
-
-class _RepeatButton extends StatelessWidget {
-  const _RepeatButton({required this.active, required this.onTap});
-
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      toggled: active,
-      label: 'Repeat this message',
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(
-                Icons.repeat_one_rounded,
-                color: active ? context.kc.accentInk : context.kc.muted,
-                size: 22,
-              ),
-              if (active)
-                Positioned(
-                  bottom: 4,
-                  child: Container(
-                    width: 4,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: context.kc.accentInk,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Back / forward by a fixed number of seconds: a circular arrow with the
-/// seconds in its centre, as podcast apps draw it. Material has no 15 s
-/// glyph, so the number is set as text over the plain arrow.
-class _TimeSkipButton extends StatelessWidget {
-  const _TimeSkipButton({
-    required this.seconds,
-    required this.forward,
-    required this.onPressed,
-  });
-
-  final int seconds;
-  final bool forward;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    final color = enabled
-        ? context.kc.onBg
-        : context.kc.onBg.withValues(alpha: 0.3);
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: forward ? 'Forward $seconds seconds' : 'Back $seconds seconds',
-      excludeSemantics: true,
-      child: InkResponse(
-        key: Key(forward ? 'skip-forward' : 'skip-back'),
-        onTap: onPressed,
-        radius: 30,
-        child: SizedBox(
-          width: 56,
-          height: 56,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Transform.flip(
-                flipX: forward,
-                child: Icon(Icons.replay_rounded, size: 40, color: color),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 3),
-                child: Text(
-                  '$seconds',
-                  style: AppTypography.ui(
-                    size: 11,
-                    weight: FontWeight.w800,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

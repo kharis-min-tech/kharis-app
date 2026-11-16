@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:kharis_app/core/theme/theme.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/notes/data/note_timeline_key.dart';
 import 'package:kharis_app/features/notes/presentation/note_anchor.dart';
+import 'package:kharis_app/features/notes/presentation/widgets/note_page.dart';
 import 'package:kharis_app/features/notes/presentation/widgets/notepad_editor.dart';
+import 'package:kharis_app/ui/components/components.dart';
 
 /// A message's notepad opened from the notebook. The same editor as the
 /// player's notes sheet; a tapped timestamp plays the message from there and
@@ -31,30 +32,16 @@ class NotepadScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final key = messageKey;
-    return Scaffold(
-      backgroundColor: context.kc.bg,
-      appBar: AppBar(
-        backgroundColor: context.kc.bg,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          tooltip: 'Close',
-          icon: Icon(Icons.close, color: context.kc.onBg),
-          onPressed: () => Navigator.of(context).pop(),
+    return NotePage(
+      title: 'Notes',
+      subtitle: title,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          KSpace.gutter,
+          0,
+          KSpace.gutter,
+          KSpace.x3,
         ),
-        title: Text(
-          title ?? 'Notes',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.ui(
-            size: 17,
-            weight: FontWeight.w600,
-            color: context.kc.onBg,
-          ),
-        ),
-      ),
-      body: SafeArea(
-        top: false,
         child: NotepadEditor(
           notes: notes,
           messageKey: key,
@@ -81,7 +68,6 @@ class NotepadScreen extends ConsumerWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(NoteAnchor.failureMessage(result)),
-        backgroundColor: AppColors.errorContainer,
         behavior: SnackBarBehavior.floating,
       ),
     );

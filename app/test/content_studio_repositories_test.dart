@@ -185,7 +185,6 @@ void main() {
       expect(branches.first.giving, isNull);
       expect(london.contact.email, 'london@kharis.org');
       expect(london.contact.instagram, 'https://instagram.com/london');
-      expect(london.gradientStart.toARGB32(), 0xFF112233);
       expect(london.home, isNull);
 
       expect(london.services.map((s) => s.id), ['am', 'pm']);
@@ -279,7 +278,7 @@ void main() {
       expect(e.startTime, DateTime(2026, 10, 18, 10));
       expect(e.endTime, DateTime(2026, 10, 18, 12));
       expect(e.recurrenceDays, [0]);
-      expect(e.recurrenceLabel, 'Every Sunday \u00b7 10:00 AM');
+      expect(e.recurrenceLabel, 'Every Sunday \u00b7 10:00');
       expect(e.imageUrl, 'https://cdn.example.org/e.jpg');
     });
 
@@ -289,7 +288,7 @@ void main() {
         'recurrence_days': [3, 0],
       }, now: _now)!;
       expect(e.startTime, DateTime(2026, 10, 14, 10));
-      expect(e.recurrenceLabel, 'Every Sunday and Wednesday \u00b7 10:00 AM');
+      expect(e.recurrenceLabel, 'Every Sunday and Wednesday \u00b7 10:00');
     });
 
     test('recurrence_until: kept until it passes, then hidden', () {

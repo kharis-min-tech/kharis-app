@@ -18,15 +18,18 @@ import 'core/constants/api_config.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
 import 'shared/providers/theme_provider.dart';
-import 'core/theme/theme.dart';
+import 'theme/kharis_theme.dart';
+import 'ui/components/k_layout.dart';
 import 'shared/providers/auth_provider.dart';
 import 'shared/providers/audio_provider.dart';
 import 'features/player/data/kharis_audio_handler.dart';
 import 'shared/providers/cache_provider.dart';
+import 'shared/providers/event_reminders_provider.dart';
 import 'shared/providers/sermon_provider.dart';
 import 'shared/providers/notification_provider.dart';
 import 'shared/providers/onboarding_provider.dart';
 import 'shared/providers/sound_focus_provider.dart';
+import 'shared/providers/text_size_provider.dart';
 
 Future<void> main() async {
   // Catch all errors in release mode
@@ -39,16 +42,13 @@ Future<void> main() async {
       // https://<AppLinks.host>/m/<id> routes in the web app exactly as it
       // does in the native apps. No-op off the web.
       usePathUrlStrategy();
-      // Fonts ship in assets/google_fonts (google_fonts prefers bundled files
-      // over fetching), so first launch renders the same offline as online.
-      // Their SIL Open Font Licenses appear in the licences page.
+      // Plus Jakarta Sans is bundled (assets/fonts), so first launch renders
+      // the same offline as online. Its SIL Open Font License appears in the
+      // licences page.
       LicenseRegistry.addLicense(() async* {
-        for (final family in const ['plusjakartasans', 'newsreader']) {
-          yield LicenseEntryWithLineBreaks(
-            ['google_fonts'],
-            await rootBundle.loadString('assets/google_fonts/OFL-$family.txt'),
-          );
-        }
+        yield LicenseEntryWithLineBreaks([
+          'PlusJakartaSans',
+        ], await rootBundle.loadString('assets/fonts/OFL.txt'));
       });
 
       // Lock-screen / notification / CarPlay media controls (Now Playing):
@@ -106,19 +106,53 @@ Future<void> main() async {
   );
 }
 
-/// Bounds for the member's system text size. Beyond 1.3x the fixed-height
-/// cards and the mini player clip; below 0.85x text is no longer legible.
+/// Bounds for the member's system text size: up to 200% (the spec's
+/// accessibility floor); below 0.85x text is no longer legible.
 const double kMinTextScale = 0.85;
-const double kMaxTextScale = 1.3;
+const double kMaxTextScale = 2.0;
 
-/// `MaterialApp.builder` that honours the system text size within
+/// `MaterialApp.builder` that honours the system text size, multiplied by the
+/// member's Text size choice ([factor]), within
 /// [kMinTextScale]..[kMaxTextScale] for every route, dialog and sheet.
-Widget clampTextScaling(BuildContext context, Widget? child) =>
-    MediaQuery.withClampedTextScaling(
-      minScaleFactor: kMinTextScale,
-      maxScaleFactor: kMaxTextScale,
-      child: child ?? const SizedBox.shrink(),
-    );
+Widget clampTextScaling(
+  BuildContext context,
+  Widget? child, {
+  double factor = 1.0,
+}) {
+  final media = MediaQuery.of(context);
+  final scale = (media.textScaler.scale(1) * factor).clamp(
+    kMinTextScale,
+    kMaxTextScale,
+  );
+  return MediaQuery(
+    data: media.copyWith(textScaler: TextScaler.linear(scale)),
+    child: child ?? const SizedBox.shrink(),
+  );
+}
+
+/// The app's theme for [brightness]: purely [KharisTheme].
+ThemeData kharisAppTheme(Brightness brightness) =>
+    brightness == Brightness.dark ? KharisTheme.dark() : KharisTheme.light();
+
+/// `MaterialApp.builder` step that keeps the status bar and the system
+/// navigation bar in step with the active theme.
+Widget themedSystemUi(BuildContext context, Widget child) {
+  final k = context.k;
+  final dark = context.isDarkTheme;
+  final icons = dark ? Brightness.light : Brightness.dark;
+  return AnnotatedRegion<SystemUiOverlayStyle>(
+    value: SystemUiOverlayStyle(
+      statusBarColor: kClear(k.bg),
+      statusBarIconBrightness: icons,
+      // iOS: the brightness of the bar itself, so its text contrasts.
+      statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: k.bg,
+      systemNavigationBarDividerColor: kClear(k.bg),
+      systemNavigationBarIconBrightness: icons,
+    ),
+    child: child,
+  );
+}
 
 class KharisApp extends ConsumerWidget {
   const KharisApp({super.key});
@@ -130,6 +164,11 @@ class KharisApp extends ConsumerWidget {
     ref.watch(notificationInitProvider);
     // Keeps preference-gated topic subscriptions in step with saved prefs.
     ref.watch(notificationTopicSyncProvider);
+    // Re-arms weekly event reminders and opens the event when a reminder
+    // tap started the app.
+    ref.watch(eventReminderStartupProvider);
+    // The member's Text size choice, applied on top of the system text size.
+    final textSizeFactor = ref.watch(textSizeFactorProvider);
     // Guarantees a Firebase uid for every session (anonymous when the member
     // never signs in) so per-user data — playlists, notes — has somewhere to
     // live even on the login-free onboarding path.
@@ -142,8 +181,8 @@ class KharisApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         title: 'Kharis Church',
         themeMode: ref.watch(themeModeProvider),
-        theme: kharisTheme(brightness: Brightness.light),
-        darkTheme: kharisTheme(brightness: Brightness.dark),
+        theme: kharisAppTheme(Brightness.light),
+        darkTheme: kharisAppTheme(Brightness.dark),
         scaffoldMessengerKey: kharisMessengerKey,
         routerConfig: ref.watch(appRouterProvider),
         // On web, a shared link opened in the browser gets the "Open in the
@@ -151,9 +190,13 @@ class KharisApp extends ConsumerWidget {
         // iOS Reduce Motion reaches every reduced-motion check, as Android's
         // Remove animations already does.
         builder: (context, child) => ReduceMotionScope(
-          child: clampTextScaling(
+          child: themedSystemUi(
             context,
-            OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+            clampTextScaling(
+              context,
+              OpenInAppBanner(child: child ?? const SizedBox.shrink()),
+              factor: textSizeFactor,
+            ),
           ),
         ),
       ),
