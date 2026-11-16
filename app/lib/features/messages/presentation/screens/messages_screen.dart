@@ -120,16 +120,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 ),
               ),
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: KSpace.gutter,
-                  ),
-                  child: KTabs(
-                    key: const Key('messages-tabs'),
-                    tabs: [for (final t in tabs) t.label],
-                    currentIndex: tabs.indexOf(tab),
-                    onChanged: (i) => setState(() => _tab = tabs[i]),
-                  ),
+                child: KTabs(
+                  key: const Key('messages-tabs'),
+                  tabs: [for (final t in tabs) t.label],
+                  currentIndex: tabs.indexOf(tab),
+                  onChanged: (i) => setState(() => _tab = tabs[i]),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: KSpace.section)),
@@ -146,6 +141,21 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                         'Couldn\u2019t load messages. Check your '
                         'connection and try again.',
                     onRetry: ref.read(sermonLibraryProvider.notifier).refresh,
+                  ),
+                )
+              else if (library.sermons.isEmpty && tab != MessagesTab.downloads)
+                SliverToBoxAdapter(
+                  child: KEmptyState(
+                    key: const Key('messages-empty'),
+                    icon: KIcons.soundwave,
+                    title: 'No messages yet',
+                    hint: 'New messages show here as soon as they are online.',
+                    action: KButton(
+                      label: 'Your downloads',
+                      variant: KButtonVariant.outline,
+                      onPressed: () =>
+                          setState(() => _tab = MessagesTab.downloads),
+                    ),
                   ),
                 )
               else

@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:kharis_app/core/services/app_router.dart';
+import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
 import 'package:kharis_app/features/onboarding/presentation/screens/login_screen.dart';
 import 'support/fake_audio_player_service.dart';
@@ -96,11 +98,8 @@ void main() {
                 ),
             ],
           ),
-          // Give is a screen pushed over the tabs: it covers the mini player.
-          GoRoute(
-            path: '/give',
-            builder: (_, _) => const Scaffold(body: Text('page /give')),
-          ),
+          // The app's own Give route: the tab nav over it, no mini player.
+          giveRoute(),
         ],
       );
       addTearDown(router.dispose);
@@ -127,7 +126,12 @@ void main() {
 
       unawaited(router.push('/give'));
       await tester.pumpAndSettle();
-      expect(find.text('page /give'), findsOneWidget);
+      expect(find.byType(GivingScreen), findsOneWidget);
+      expect(
+        find.byKey(const Key('dashboard-nav')).hitTestable(),
+        findsOneWidget,
+        reason: 'Give keeps the tab nav',
+      );
       expect(
         find.byType(MiniPlayer),
         findsNothing,

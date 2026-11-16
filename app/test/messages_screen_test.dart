@@ -204,6 +204,22 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('messages-hero')), findsOneWidget);
     });
+
+    testWidgets('an empty archive, loaded online, shows an empty state that '
+        'leads to Downloads', (tester) async {
+      await pump(tester, app(const MessagesScreen(), sermons: const []));
+      expect(find.byKey(const Key('messages-empty')), findsOneWidget);
+      expect(find.text('Retry'), findsNothing);
+
+      await tester.tap(find.text('Your downloads'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('downloads-empty')), findsOneWidget);
+    });
+
+    testWidgets('the tabs sit on the gutter, inset once', (tester) async {
+      await pump(tester, app(const MessagesScreen(), sermons: library));
+      expect(tester.getTopLeft(find.text('For you')).dx, KSpace.gutter);
+    });
   });
 
   group('Search', () {

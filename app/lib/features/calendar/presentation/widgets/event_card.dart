@@ -30,34 +30,11 @@ String? eventPlaceLabel(Event event) {
   return null;
 }
 
-const _weekdays = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
-
-/// "Every Sunday", "Every Sunday and Wednesday"; null for a one-off event.
-String? eventRepeatsLabel(Event event) {
-  if (!event.isWeekly) return null;
-  final names = [for (final d in event.recurrenceDays) _weekdays[d]];
-  final days = names.length == 1
-      ? names.single
-      : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
-  return 'Every $days';
-}
-
 /// When an event is, for a list: "Every Sunday · 12:00" for a weekly event,
 /// else "Sat 31 Oct · 18:00".
-String eventWhenLabel(Event event) {
-  final time = DateFormat('HH:mm').format(event.startTime);
-  final repeats = eventRepeatsLabel(event);
-  if (repeats != null) return '$repeats \u00b7 $time';
-  return '${DateFormat('EEE d MMM').format(event.startTime)} \u00b7 $time';
-}
+String eventWhenLabel(Event event) =>
+    event.recurrenceLabel ??
+    DateFormat('EEE d MMM \u00b7 HH:mm').format(event.startTime);
 
 /// Opens the event detail screen, handing over the loaded [event] so it
 /// paints immediately. Pushed (never `go`) so Back returns to the caller.
@@ -112,6 +89,21 @@ class EventReminderToggle extends ConsumerWidget {
   }
 }
 
+/// What the member is told after tapping "Remind me" on [event], on Events
+/// and on Home alike.
+String reminderOutcomeMessage(
+  ReminderOutcome outcome,
+  Event event,
+) => switch (outcome) {
+  ReminderOutcome.on => 'We\u2019ll remind you an hour before ${event.title}.',
+  ReminderOutcome.off => 'Reminder off for ${event.title}.',
+  ReminderOutcome.permissionRefused =>
+    'Notifications are off. Turn them on in Settings to get reminders.',
+  ReminderOutcome.startsTooSoon =>
+    'This starts within the hour, too soon for a reminder.',
+  ReminderOutcome.failed => 'Couldn\u2019t set the reminder. Please try again.',
+};
+
 /// Turns the reminder for [event] on or off and says what came of it. The
 /// button state comes from [isEventRemindedProvider].
 Future<void> toggleEventReminder(
@@ -124,19 +116,7 @@ Future<void> toggleEventReminder(
   final outcome = await toggle(event);
   messenger
     ..hideCurrentSnackBar()
-    ..showSnackBar(
-      eventToast(switch (outcome) {
-        ReminderOutcome.on =>
-          'We\u2019ll remind you an hour before ${event.title}.',
-        ReminderOutcome.off => 'Reminder off for ${event.title}.',
-        ReminderOutcome.permissionRefused =>
-          'Notifications are off. Turn them on in Settings to get reminders.',
-        ReminderOutcome.startsTooSoon =>
-          'This starts within the hour, too soon for a reminder.',
-        ReminderOutcome.failed =>
-          'Couldn\u2019t set the reminder. Please try again.',
-      }),
-    );
+    ..showSnackBar(eventToast(reminderOutcomeMessage(outcome, event)));
 }
 
 /// Toggles the persisted RSVP for [event]. Button state comes from

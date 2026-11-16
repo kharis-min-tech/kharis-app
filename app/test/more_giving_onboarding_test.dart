@@ -105,16 +105,8 @@ final _guest = User(
 );
 
 const _branches = [
-  Branch(
-    id: 'london',
-    name: 'London',
-    subtitle: 'England · Main campus',
-  ),
-  Branch(
-    id: 'manchester',
-    name: 'Manchester',
-    subtitle: 'England',
-  ),
+  Branch(id: 'london', name: 'London', subtitle: 'England · Main campus'),
+  Branch(id: 'manchester', name: 'Manchester', subtitle: 'England'),
 ];
 
 /// URLs handed to url_launcher (method-channel implementation in tests).
@@ -231,6 +223,20 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('2 CORINTHIANS 9:7 \u00b7 KJV'), findsOneWidget);
+    });
+
+    testWidgets('says where the gift is made, under the Give button', (
+      tester,
+    ) async {
+      await pumpGiving(tester);
+      final note = find.text(
+        'You give securely on kharis.org, inside the app.',
+      );
+      expect(note, findsOneWidget);
+      expect(
+        tester.getTopLeft(note).dy,
+        greaterThan(tester.getBottomLeft(find.text('Give')).dy),
+      );
     });
 
     testWidgets('Copy bank details copies exactly the displayed rows', (

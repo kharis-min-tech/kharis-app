@@ -11,12 +11,13 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart'
+    show reminderOutcomeMessage;
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/features/home/data/live_repository.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
 import 'package:kharis_app/features/home/presentation/screens/home_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/home_hero.dart';
-import 'package:kharis_app/features/home/presentation/widgets/home_this_week.dart';
 import 'package:kharis_app/features/notes/data/note_repository.dart';
 import 'package:kharis_app/features/onboarding/data/branch_repository.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
@@ -741,8 +742,9 @@ void main() {
 
       expect(home.reminders.scheduled, hasLength(1));
       expect(find.text('Reminder on'), findsOneWidget);
+      // The same words the Events screen uses, naming the event.
       expect(
-        find.text(reminderOutcomeMessage(ReminderOutcome.on)),
+        find.text('We\u2019ll remind you an hour before ${prayer.title}.'),
         findsOneWidget,
       );
     });
@@ -758,7 +760,10 @@ void main() {
         );
 
         await _tap(tester, find.byKey(const Key('home-event-remind-e-prayer')));
-        expect(find.text(reminderOutcomeMessage(outcome)), findsOneWidget);
+        expect(
+          find.text(reminderOutcomeMessage(outcome, prayer)),
+          findsOneWidget,
+        );
       });
     }
 

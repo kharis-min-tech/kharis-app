@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/services/app_router.dart';
+import 'package:kharis_app/features/giving/presentation/screens/giving_screen.dart';
 import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/models/user.dart';
@@ -189,6 +190,19 @@ void main() {
       );
     });
 
+    testWidgets('Give alone leaves the mini player out (KA-001)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const SizedBox());
+      for (final location in _pushedPages) {
+        expect(
+          (page(tester, location) as WithTabNav).showMiniPlayer,
+          location != '/give',
+          reason: location,
+        );
+      }
+    });
+
     testWidgets('the full player has no nav', (tester) async {
       await tester.pumpWidget(const SizedBox());
       expect(page(tester, '/player'), isNot(isA<WithTabNav>()));
@@ -253,10 +267,7 @@ void main() {
                 ),
             ],
           ),
-          GoRoute(
-            path: '/give',
-            builder: (_, _) => const WithTabNav(child: _Pushed('give page')),
-          ),
+          giveRoute(),
           GoRoute(
             path: '/calendar',
             builder: (_, _) => const WithTabNav(
@@ -314,18 +325,16 @@ void main() {
       expect(_highlighted(tester), 3);
     });
 
-    testWidgets('from Home: Give shows the nav with Home highlighted, and the '
-        'mini player above it', (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(390, 800);
-      addTearDown(tester.view.reset);
+    testWidgets('from Home: Give shows the nav with Home highlighted, and no '
+        'mini player (KA-001)', (tester) async {
       await pumpApp(tester, playing: _sermon);
+      expect(find.byType(KMiniPlayer), findsOneWidget, reason: 'on Home');
       await tapAndSettle(tester, find.text('Give card'));
 
-      expect(find.text('give page'), findsOneWidget);
+      expect(find.byType(GivingScreen), findsOneWidget);
       expect(_highlighted(tester), 0);
-      final mini = tester.getRect(find.byType(KMiniPlayer));
-      expect(mini.bottom, lessThanOrEqualTo(tester.getRect(_nav).top));
+      expect(_nav.hitTestable(), findsOneWidget);
+      expect(find.byType(KMiniPlayer).hitTestable(), findsNothing);
     });
 
     testWidgets('from Messages: Search keeps Messages highlighted, and the nav '
@@ -363,7 +372,7 @@ void main() {
 
       unawaited(
         showModalBottomSheet<void>(
-          context: tester.element(find.text('give page')),
+          context: tester.element(find.byType(GivingScreen)),
           useRootNavigator: true,
           builder: (_) => const SizedBox(height: 200, child: Text('a sheet')),
         ),
@@ -371,6 +380,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(_nav, findsNothing);
       Navigator.of(tester.element(find.text('a sheet'))).pop();
+      await tester.pumpAndSettle();
+      expect(_nav, findsOneWidget);
+
+      // Under Reduce Motion a sheet opens as a dialog route.
+      unawaited(
+        showGeneralDialog<void>(
+          context: tester.element(find.byType(GivingScreen)),
+          pageBuilder: (_, _, _) => const Text('a reduce-motion sheet'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(_nav, findsNothing);
+      Navigator.of(tester.element(find.text('a reduce-motion sheet'))).pop();
       await tester.pumpAndSettle();
       expect(_nav, findsOneWidget);
     });
@@ -382,7 +404,7 @@ void main() {
       await tapAndSettle(tester, find.text('Give card'));
       await tapAndSettle(tester, _tab('Messages'));
 
-      expect(find.text('give page'), findsNothing);
+      expect(find.byType(GivingScreen), findsNothing);
       expect(find.text('page /messages'), findsOneWidget);
       expect(location(), '/messages');
       expect(_highlighted(tester), 1);

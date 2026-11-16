@@ -23,8 +23,7 @@ class RelatedMessages {
   bool get isEmpty => _ranges.isEmpty;
 
   /// Whether any message is preached from [verse].
-  bool has(int verse) =>
-      _ranges.any((r) => verse >= r.start && verse <= r.end);
+  bool has(int verse) => _ranges.any((r) => verse >= r.start && verse <= r.end);
 
   /// The messages preached from [verse], newest first, each once.
   List<Sermon> forVerse(int verse) {
@@ -38,10 +37,9 @@ class RelatedMessages {
 }
 
 /// The passages each `Sermon.passages` string names, parsed once per string
-/// for the life of the app: the library re-emits as its pages land.
-final _parsedPassagesProvider = Provider<Map<String, List<BibleLocation>>>(
-  (ref) => {},
-);
+/// for the life of the app: the library re-emits as its pages land. A plain
+/// cache, not provider state: the parse of a string never changes.
+final Map<String, List<BibleLocation>> _parsedPassages = {};
 
 /// Every verse range the library's messages name, by chapter id (`JHN.3`),
 /// newest message first.
@@ -51,15 +49,17 @@ final _parsedPassagesProvider = Provider<Map<String, List<BibleLocation>>>(
 /// that names a whole chapter ("Romans 8") or does not parse marks no verse.
 final _relatedIndexProvider = Provider<Map<String, List<_Range>>>((ref) {
   final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
-  final parsed = ref.watch(_parsedPassagesProvider);
+  final parsed = _parsedPassages;
   final canon = BibleIndex.bundled();
-  final newestFirst = [
-    for (final s in sermons)
-      if (s.passages.isNotEmpty) s,
-  ]..sort(
-    (a, b) =>
-        (b.publishedAt ?? DateTime(0)).compareTo(a.publishedAt ?? DateTime(0)),
-  );
+  final newestFirst =
+      [
+        for (final s in sermons)
+          if (s.passages.isNotEmpty) s,
+      ]..sort(
+        (a, b) => (b.publishedAt ?? DateTime(0)).compareTo(
+          a.publishedAt ?? DateTime(0),
+        ),
+      );
 
   final index = <String, List<_Range>>{};
   for (final sermon in newestFirst) {

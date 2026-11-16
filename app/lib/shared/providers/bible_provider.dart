@@ -59,16 +59,15 @@ final biblesProvider = FutureProvider<List<BibleVersion>>(
 );
 
 /// Books and chapters of a version. Falls back to the bundled 66-book table
-/// when the list cannot be fetched (offline), so browsing still works and
-/// only the chapter text shows an error with Retry.
+/// when the list cannot be fetched (offline) or comes back empty, so browsing
+/// still works and only the chapter text shows an error with Retry.
 final bibleIndexProvider = FutureProvider.family<BibleIndex, int>((
   ref,
   bibleId,
 ) async {
   try {
-    return BibleIndex(
-      await ref.watch(bibleRepositoryProvider).getBooks(bibleId),
-    );
+    final books = await ref.watch(bibleRepositoryProvider).getBooks(bibleId);
+    return books.isEmpty ? BibleIndex.bundled() : BibleIndex(books);
   } on Object {
     return BibleIndex.bundled();
   }

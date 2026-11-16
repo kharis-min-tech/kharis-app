@@ -39,7 +39,8 @@ Future<void> givingJourney(Journey j) async {
   final giving = find.byType(GivingScreen);
   final scroll = verticalScrollableIn(giving);
   j.check(
-    find.descendant(of: giving, matching: find.byType(BranchPickerSheet))
+    find
+            .descendant(of: giving, matching: find.byType(BranchPickerSheet))
             .evaluate()
             .isEmpty &&
         find
@@ -63,6 +64,18 @@ Future<void> givingJourney(Journey j) async {
         .evaluate()
         .isNotEmpty,
     'the button reads "Give to $branch"',
+  );
+  j.check(
+    find
+        .descendant(
+          of: giving,
+          matching: find.text(
+            'You give securely on kharis.org, inside the app.',
+          ),
+        )
+        .evaluate()
+        .isNotEmpty,
+    'Give says the gift is made securely on kharis.org',
   );
   await scrollUntilFound(t, give, scrollable: scroll);
   await t.tap(give, warnIfMissed: false);
