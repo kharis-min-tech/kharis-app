@@ -93,6 +93,9 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
   /// A video that has not started after this long gets the error banner.
   static const Duration videoStartTimeout = Duration(seconds: 15);
 
+  /// A video that played, then sits buffering this long, gets the banner.
+  static const Duration videoStallTimeout = Duration(seconds: 20);
+
   /// Skips creating the real YouTube engine (and its wakelock) so widget tests
   /// can pump the video layout without platform views.
   @visibleForTesting
@@ -126,7 +129,7 @@ class MediaPlayerScreen extends ConsumerStatefulWidget {
 }
 
 /// Why the video engine is showing its error banner.
-enum _VideoProblem { notEmbeddable, unavailable, failed, stalled }
+enum _VideoProblem { notEmbeddable, unavailable, failed, stalled, stopped }
 
 class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   late MediaMode _mode;
@@ -170,8 +173,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
   /// once the library reveals a video-only variant's audio twin.
   Duration _videoOffset = Duration.zero;
 
-  /// Whether the embed ever left "unstarted"; the watchdog's question.
-  bool _videoStarted = false;
+  /// Whether the video has played at all since the engine started, which
+  /// decides the watchdog's limit and message.
+  bool _videoPlayed = false;
   _VideoProblem? _videoProblem;
 
   /// Position handed to the web iframe embed, which takes it as a URL
@@ -400,7 +404,8 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     _videoOffset = _offsetFor(_sermon);
     _videoPosition = startAt;
     _videoRecorded = false;
-    _videoStarted = false;
+    _videoPlayed = false;
+    _videoWatchdog?.cancel();
     _videoProblem = null;
     _lastVideoSave = null;
     if (kIsWeb) {
@@ -449,14 +454,27 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
     _armVideoWatchdog();
   }
 
-  /// An embed that never leaves "unstarted" (blocked network, region lock
-  /// without an error code) would otherwise spin forever.
+  /// An embed that never gets going (blocked network, a region lock without
+  /// an error code) or one YouTube never delivers (it sits buffering), and a
+  /// playing video that falls back to buffering for good, would otherwise
+  /// spin forever with no way on. Armed at start and on every buffering;
+  /// only real playback, a pause or the end stands it down.
   void _armVideoWatchdog() {
-    _videoWatchdog?.cancel();
-    _videoWatchdog = Timer(MediaPlayerScreen.videoStartTimeout, () {
-      if (!mounted || _videoStarted || _videoProblem != null) return;
-      setState(() => _videoProblem = _VideoProblem.stalled);
-    });
+    if (_videoWatchdog?.isActive ?? false) return;
+    final played = _videoPlayed;
+    _videoWatchdog = Timer(
+      played
+          ? MediaPlayerScreen.videoStallTimeout
+          : MediaPlayerScreen.videoStartTimeout,
+      () {
+        if (!mounted || _videoProblem != null) return;
+        setState(
+          () => _videoProblem = played
+              ? _VideoProblem.stopped
+              : _VideoProblem.stalled,
+        );
+      },
+    );
   }
 
   void _disposeVideoEngine() {
@@ -528,12 +546,9 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
       }
       return;
     }
-    if (value.playerState != PlayerState.unStarted &&
-        value.playerState != PlayerState.unknown) {
-      _videoStarted = true;
-    }
     switch (value.playerState) {
       case PlayerState.playing:
+        _videoPlayed = true;
         _videoWatchdog?.cancel();
         if (!_videoRecorded) {
           _recordVideoPlay();
@@ -561,6 +576,7 @@ class _MediaPlayerScreenState extends ConsumerState<MediaPlayerScreen> {
           }
         }
       case PlayerState.buffering:
+        _armVideoWatchdog();
       case PlayerState.cued:
         _videoWatchdog?.cancel();
       case PlayerState.unStarted:
@@ -1403,6 +1419,7 @@ class _VideoErrorBanner extends StatelessWidget {
     _VideoProblem.unavailable => 'This video is no longer on YouTube.',
     _VideoProblem.failed => 'This video couldn\u2019t be played.',
     _VideoProblem.stalled => 'This video is taking too long to start.',
+    _VideoProblem.stopped => 'This video stopped loading.',
   };
 
   @override

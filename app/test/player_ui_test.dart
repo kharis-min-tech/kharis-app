@@ -734,6 +734,54 @@ void main() {
         findsNothing,
       );
     });
+
+    testWidgets('a video that sits buffering without ever playing gets the '
+        'banner (YouTube never delivered it)', (tester) async {
+      await open(tester);
+      values.add(YoutubePlayerValue(playerState: PlayerState.buffering));
+      await tester.pump(const Duration(seconds: 16));
+      expect(
+        find.text('This video is taking too long to start.'),
+        findsOneWidget,
+      );
+      expect(find.text('Listen instead'), findsOneWidget);
+    });
+
+    testWidgets('a playing video that stalls for 20 s says it stopped '
+        'loading; playback resuming clears it', (tester) async {
+      await open(tester);
+      values.add(YoutubePlayerValue(playerState: PlayerState.playing));
+      await tester.pump(const Duration(seconds: 5));
+      values.add(YoutubePlayerValue(playerState: PlayerState.buffering));
+      await tester.pump(const Duration(seconds: 19));
+      expect(find.text('This video stopped loading.'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('This video stopped loading.'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+
+      values.add(YoutubePlayerValue(playerState: PlayerState.playing));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('This video stopped loading.'), findsNothing);
+    });
+
+    testWidgets('a short rebuffer while playing raises nothing', (
+      tester,
+    ) async {
+      await open(tester);
+      values.add(YoutubePlayerValue(playerState: PlayerState.playing));
+      await tester.pump(const Duration(seconds: 5));
+      values.add(YoutubePlayerValue(playerState: PlayerState.buffering));
+      await tester.pump(const Duration(seconds: 3));
+      values.add(YoutubePlayerValue(playerState: PlayerState.playing));
+      await tester.pump(const Duration(seconds: 30));
+      expect(find.text('This video stopped loading.'), findsNothing);
+      expect(
+        find.text('This video is taking too long to start.'),
+        findsNothing,
+      );
+    });
   });
 
   // ── Share ───────────────────────────────────────────────────────────────────
