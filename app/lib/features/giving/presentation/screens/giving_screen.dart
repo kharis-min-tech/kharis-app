@@ -133,6 +133,10 @@ class GivingScreen extends ConsumerWidget {
   }
 }
 
+/// The line under the Give button saying where the gift is made.
+const String kGiveSecureNote =
+    'You give securely on kharis.org, inside the app.';
+
 /// Where the gift is made, under the Give button.
 class _SecureNote extends StatelessWidget {
   const _SecureNote();
@@ -149,7 +153,7 @@ class _SecureNote extends StatelessWidget {
           const SizedBox(width: KSpace.xs),
           Flexible(
             child: Text(
-              'You give securely on kharis.org, inside the app.',
+              kGiveSecureNote,
               style: KharisText.meta.copyWith(color: k.muted),
             ),
           ),

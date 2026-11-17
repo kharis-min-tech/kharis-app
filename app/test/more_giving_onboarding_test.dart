@@ -229,9 +229,7 @@ void main() {
       tester,
     ) async {
       await pumpGiving(tester);
-      final note = find.text(
-        'You give securely on kharis.org, inside the app.',
-      );
+      final note = find.text(kGiveSecureNote);
       expect(note, findsOneWidget);
       expect(
         tester.getTopLeft(note).dy,

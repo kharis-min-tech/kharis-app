@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -205,15 +207,47 @@ void main() {
       expect(find.byKey(const Key('messages-hero')), findsOneWidget);
     });
 
-    testWidgets('an empty archive, loaded online, shows an empty state that '
-        'leads to Downloads', (tester) async {
+    testWidgets('an empty archive, loaded online, shows an empty state above '
+        'the collections, leading to Downloads; other tabs do not show it', (
+      tester,
+    ) async {
       await pump(tester, app(const MessagesScreen(), sermons: const []));
-      expect(find.byKey(const Key('messages-empty')), findsOneWidget);
+      final empty = find.byKey(const Key('messages-empty'));
+      expect(empty, findsOneWidget);
       expect(find.text('Retry'), findsNothing);
+      final collections = find.byKey(const Key('messages-collections'));
+      expect(collections, findsOneWidget);
+      expect(
+        tester.getTopLeft(collections).dy,
+        greaterThan(tester.getTopLeft(empty).dy),
+      );
 
+      await tester.tap(find.text('Themes'));
+      await tester.pumpAndSettle();
+      expect(empty, findsNothing);
+
+      await tester.tap(find.text('For you'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Your downloads'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('downloads-empty')), findsOneWidget);
+    });
+
+    testWidgets('a library still loading shows the skeleton, not the empty '
+        'state', (tester) async {
+      final hold = Completer<void>();
+      final repo = FakePagedSermonRepository([const []])..holdFirstPage = hold;
+      tester.view.physicalSize = const Size(390, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(app(const MessagesScreen(), repo: repo));
+      await tester.pump();
+      expect(find.byType(KSkeleton), findsWidgets);
+      expect(find.byKey(const Key('messages-empty')), findsNothing);
+
+      hold.complete();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('messages-empty')), findsOneWidget);
     });
 
     testWidgets('the tabs sit on the gutter, inset once', (tester) async {

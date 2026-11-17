@@ -28,6 +28,7 @@ import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/onboarding_provider.dart';
 import 'package:kharis_app/theme/kharis_theme.dart';
 import 'package:kharis_app/ui/components/k_button.dart';
+import 'package:kharis_app/ui/components/k_mini_player.dart';
 
 /// Regression guards for the tester-round fixes closed on 9 Sep
 /// (docs/BUG-TRACKER.md): each test pins one acceptance criterion so a later
@@ -122,7 +123,11 @@ void main() {
       // Flush the shell's launch work (branch prompt delay, nudge decision).
       await tester.pump(const Duration(seconds: 2));
 
-      expect(find.byType(MiniPlayer), findsOneWidget, reason: 'docked on Home');
+      expect(
+        find.byType(KMiniPlayer),
+        findsOneWidget,
+        reason: 'docked on Home',
+      );
 
       unawaited(router.push('/give'));
       await tester.pumpAndSettle();
@@ -132,11 +137,20 @@ void main() {
         findsOneWidget,
         reason: 'Give keeps the tab nav',
       );
+      // Not built at all in Give's frame, not merely covered by the page.
       expect(
-        find.byType(MiniPlayer),
+        find.descendant(
+          of: find.ancestor(
+            of: find.byType(GivingScreen),
+            matching: find.byType(DashboardNavFrame),
+          ),
+          matching: find.byType(KMiniPlayer, skipOffstage: false),
+        ),
         findsNothing,
         reason: 'KA-001: no bar over the giving flow',
       );
+      expect(find.byType(KMiniPlayer), findsNothing);
+      expect(find.byType(KMiniPlayer).hitTestable(), findsNothing);
       expect(
         audio.currentSermon,
         isNotNull,
@@ -148,14 +162,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('page /home'), findsOneWidget);
       expect(
-        find.byType(MiniPlayer),
+        find.byType(KMiniPlayer),
         findsOneWidget,
         reason: 'the bar is back once Give is closed',
       );
 
       router.go('/messages');
       await tester.pumpAndSettle();
-      expect(find.byType(MiniPlayer), findsOneWidget);
+      expect(find.byType(KMiniPlayer), findsOneWidget);
     },
   );
 

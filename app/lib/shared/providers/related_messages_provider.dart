@@ -36,10 +36,32 @@ class RelatedMessages {
   }
 }
 
-/// The passages each `Sermon.passages` string names, parsed once per string
-/// for the life of the app: the library re-emits as its pages land. A plain
-/// cache, not provider state: the parse of a string never changes.
+/// The passages each `Sermon.passages` string names, parsed once per string:
+/// the library re-emits as its pages land. A plain cache, not provider
+/// state: the parse of a string never changes.
 final Map<String, List<BibleLocation>> _parsedPassages = {};
+
+/// Most distinct passage strings kept parsed; past it the cache starts over.
+/// Far above a church archive's few thousand, it only bounds bad input.
+@visibleForTesting
+const int kParsedPassagesCap = 10000;
+
+/// How many passage strings are parsed and kept.
+@visibleForTesting
+int get parsedPassagesCacheSize => _parsedPassages.length;
+
+/// Empties the parse cache, so a test starts cold.
+@visibleForTesting
+void clearParsedPassagesCache() => _parsedPassages.clear();
+
+/// [passage] parsed against [canon], from the cache when seen before.
+@visibleForTesting
+List<BibleLocation> parsePassageCached(String passage, BibleIndex canon) {
+  final hit = _parsedPassages[passage];
+  if (hit != null) return hit;
+  if (_parsedPassages.length >= kParsedPassagesCap) _parsedPassages.clear();
+  return _parsedPassages[passage] = parseReadingReferences(passage, canon);
+}
 
 /// Every verse range the library's messages name, by chapter id (`JHN.3`),
 /// newest message first.
@@ -49,7 +71,6 @@ final Map<String, List<BibleLocation>> _parsedPassages = {};
 /// that names a whole chapter ("Romans 8") or does not parse marks no verse.
 final _relatedIndexProvider = Provider<Map<String, List<_Range>>>((ref) {
   final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
-  final parsed = _parsedPassages;
   final canon = BibleIndex.bundled();
   final newestFirst =
       [
@@ -64,10 +85,7 @@ final _relatedIndexProvider = Provider<Map<String, List<_Range>>>((ref) {
   final index = <String, List<_Range>>{};
   for (final sermon in newestFirst) {
     for (final passage in sermon.passages) {
-      final locations = parsed[passage] ??= parseReadingReferences(
-        passage,
-        canon,
-      );
+      final locations = parsePassageCached(passage, canon);
       for (final at in locations) {
         final start = at.verseStart;
         if (start == null) continue;

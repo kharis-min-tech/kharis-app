@@ -67,12 +67,7 @@ Future<void> givingJourney(Journey j) async {
   );
   j.check(
     find
-        .descendant(
-          of: giving,
-          matching: find.text(
-            'You give securely on kharis.org, inside the app.',
-          ),
-        )
+        .descendant(of: giving, matching: find.text(kGiveSecureNote))
         .evaluate()
         .isNotEmpty,
     'Give says the gift is made securely on kharis.org',

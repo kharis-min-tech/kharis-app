@@ -196,8 +196,12 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       for (final location in _pushedPages) {
         expect(
-          (page(tester, location) as WithTabNav).showMiniPlayer,
-          location != '/give',
+          page(tester, location),
+          isA<WithTabNav>().having(
+            (w) => w.showMiniPlayer,
+            'showMiniPlayer',
+            location != '/give',
+          ),
           reason: location,
         );
       }
@@ -334,6 +338,18 @@ void main() {
       expect(find.byType(GivingScreen), findsOneWidget);
       expect(_highlighted(tester), 0);
       expect(_nav.hitTestable(), findsOneWidget);
+      // Not built at all in Give's frame, not merely covered by the page.
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: find.byType(GivingScreen),
+            matching: find.byType(DashboardNavFrame),
+          ),
+          matching: find.byType(KMiniPlayer, skipOffstage: false),
+        ),
+        findsNothing,
+      );
+      expect(find.byType(KMiniPlayer), findsNothing);
       expect(find.byType(KMiniPlayer).hitTestable(), findsNothing);
     });
 

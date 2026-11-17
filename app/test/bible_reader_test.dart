@@ -775,13 +775,14 @@ void main() {
       expect(find.byKey(const Key('bible-books')), findsOneWidget);
     });
 
-    testWidgets('an empty book list from the API still leaves the picker '
-        'working', (tester) async {
+    testWidgets('a version that answers with no books says so in the picker '
+        'instead of offering another canon', (tester) async {
       await _pumpReader(tester, booksEmpty: true);
       await _openPicker(tester);
       expect(tester.takeException(), isNull);
-      await _chooseBook(tester, 'ROM', 8);
-      expect(_title('Romans 8'), findsOneWidget);
+      expect(find.byKey(const Key('bible-books-empty')), findsOneWidget);
+      expect(find.byKey(const Key('bible-books')), findsNothing);
+      expect(find.text('No books in this version'), findsOneWidget);
     });
 
     testWidgets('search explains an unknown book or chapter', (tester) async {
