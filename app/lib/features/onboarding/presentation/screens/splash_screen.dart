@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kharis_app/core/configs/app_startup.dart';
 import 'package:kharis_app/ui/components/components.dart';
+import 'package:kharis_app/features/onboarding/presentation/screens/alert_dialog.dart';
 import 'package:kharis_app/features/onboarding/presentation/widgets/splash_dove.dart';
+import 'package:kharis_app/shared/models/remote_config.dart';
 
 /// Splash / brand entry.
 ///
@@ -39,6 +42,11 @@ class _SplashScreenState extends State<SplashScreen>
         parent: _entry,
         curve: Interval(begin, end, curve: curve),
       );
+  @override
+  void initState() {
+    super.initState();
+    performUpdateChecksAndNavigate();
+  }
 
   @override
   void didChangeDependencies() {
@@ -56,6 +64,34 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _entry.dispose();
     super.dispose();
+  }
+
+  void performUpdateChecksAndNavigate() {
+    // check for update
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      if (getIt.isRegistered<RemoteConfigModel>()) {
+        RemoteConfigModel config = getIt<RemoteConfigModel>();
+        if (config.remoteBuildNumber != null &&
+            config.localBuildNumber != null &&
+            config.remoteBuildNumber! > config.localBuildNumber!) {
+          showPlatformAlertDialogAdaptive(
+            context,
+            description: config.forceUpdate!
+                ? "You're using an older version of the app that is no longer supported.\nPlease update to the latest version to continue enjoying our services."
+                : "A new version of the app is available with improvements and bug fixes to make your experience even better.\n\nUpdate now to enjoy the latest features.",
+            title: config.forceUpdate!
+                ? "Update required"
+                : "App update available",
+            forceUpdate: config.forceUpdate!,
+            onOk: () {
+              //Navigate to appstore Url
+            },
+            cancelText: "Later",
+            okText: config.forceUpdate! ? "Update now" : "Update",
+          );
+        }
+      }
+    });
   }
 
   @override
