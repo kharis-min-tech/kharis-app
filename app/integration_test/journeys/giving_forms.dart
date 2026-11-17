@@ -200,6 +200,10 @@ Future<void> _choose(
   String hint,
   String item,
 ) async {
+  // An open keyboard is still animating away when the field below is
+  // tapped, and that tap is swallowed: the menu never opens.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await pumpFor(t, const Duration(milliseconds: 700));
   await tapVisible(t, find.descendant(of: screen, matching: find.text(hint)));
   await pumpFor(t, const Duration(milliseconds: 800));
   final entry = find.text(item);

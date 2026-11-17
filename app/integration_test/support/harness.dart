@@ -21,6 +21,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kharis_app/core/configs/app_startup.dart';
+import 'package:kharis_app/shared/models/remote_config.dart';
 import 'package:kharis_app/core/services/app_router.dart';
 import 'package:kharis_app/core/services/cache_service.dart';
 import 'package:kharis_app/features/player/data/kharis_audio_handler.dart';
@@ -204,6 +205,10 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 /// The scroll is animated and frames only advance when the test pumps, so
 /// the animation is started, not awaited: awaiting it before pumping left
 /// the journey waiting forever whenever [finder] actually had to move.
+///
+/// A fixed pause is not enough on a loaded device: the tap is aimed where
+/// the widget was mid-scroll and lands on its neighbour. So after the pause,
+/// pump until the widget is in the same place on two frames running.
 Future<void> ensureCentred(WidgetTester tester, Finder finder) async {
   unawaited(
     Scrollable.ensureVisible(
@@ -213,6 +218,18 @@ Future<void> ensureCentred(WidgetTester tester, Finder finder) async {
     ),
   );
   await pumpFor(tester, const Duration(milliseconds: 400));
+  var last = tester.getCenter(finder);
+  await pumpUntil(
+    tester,
+    () {
+      final now = tester.getCenter(finder);
+      final settled = now == last;
+      last = now;
+      return settled;
+    },
+    timeout: const Duration(seconds: 3),
+    step: const Duration(milliseconds: 100),
+  );
 }
 
 /// The first vertical [Scrollable] under [of] (text fields and horizontal
@@ -295,6 +312,17 @@ Future<void> bootstrapOnce() async {
   ]);
   _prefs = results[0] as SharedPreferences;
   _cache = results[1] as CacheService;
+  // AppStartUp reads Firebase Remote Config, whose live build number is in
+  // the CI numbering (far above a local debug build's), so every launch
+  // would open "App update available" over the screen under test. The
+  // journeys test the app, not that live setting: pin "no update".
+  getIt.registerSingleton<RemoteConfigModel>(
+    RemoteConfigModel(
+      forceUpdate: false,
+      localBuildNumber: 0,
+      remoteBuildNumber: 0,
+    ),
+  );
   debugPrint('KNOTE:run:seed=$effectiveSeed platform=$defaultTargetPlatform');
 }
 
