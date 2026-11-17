@@ -141,7 +141,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       _navPage('/calendar', (state) => const CalendarScreen()),
 
       // ── Give (pushed). /giving is the old tab path, kept for saved links ──
-      _navPage('/give', (state) => const GivingScreen()),
+      giveRoute(),
       GoRoute(path: '/giving', redirect: (context, state) => '/give'),
 
       // ── Listening history and downloads (pushed) ──────────────────────────
@@ -232,13 +232,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return router;
 });
 
+/// Give (`/give`): the tab nav stays, the mini player does not (KA-001: it
+/// crowded the bank details).
+GoRoute giveRoute() =>
+    _navPage('/give', (state) => const GivingScreen(), showMiniPlayer: false);
+
 /// A page pushed above the tab shell that keeps the shell's nav.
 GoRoute _navPage(
   String path,
   Widget Function(GoRouterState state) page, {
+  bool showMiniPlayer = true,
   List<RouteBase> routes = const [],
 }) => GoRoute(
   path: path,
-  builder: (context, state) => WithTabNav(child: page(state)),
+  builder: (context, state) =>
+      WithTabNav(showMiniPlayer: showMiniPlayer, child: page(state)),
   routes: routes,
 );

@@ -149,9 +149,12 @@ Future<void> accountJourney(Journey j) async {
     ),
     warnIfMissed: false,
   );
-  await pumpFor(t, const Duration(seconds: 1));
   j.check(
-    find.text('Delete account?').evaluate().isEmpty,
+    await pumpUntil(
+      t,
+      () => find.text('Delete account?').evaluate().isEmpty,
+      timeout: const Duration(seconds: 10),
+    ),
     'Cancel closes the dialog',
   );
   j.check(deletion?.calls.isEmpty ?? true, 'Cancel deletes nothing');

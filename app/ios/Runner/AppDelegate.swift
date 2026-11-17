@@ -18,7 +18,9 @@ import UserNotifications
     // reminder through this delegate. Set before any plugin registers:
     // firebase_messaging then leaves it in place and receives its own
     // callbacks through FlutterAppDelegate, as the reminders plugin does.
-    UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
+    // FlutterAppDelegate conforms (FlutterAppLifeCycleProvider refines
+    // UNUserNotificationCenterDelegate), so no cast: a break won't compile.
+    UNUserNotificationCenter.current().delegate = self
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
