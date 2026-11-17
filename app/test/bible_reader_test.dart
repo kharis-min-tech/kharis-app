@@ -537,7 +537,11 @@ void main() {
         dio: dio,
         appKey: 'test',
       ).getBibles();
-      expect(versions.map((v) => v.id), [111, 2692]);
+      expect(
+        versions.map((v) => v.id),
+        [111, 2692, 1],
+        reason: 'the bundled KJV is offered after the licensed versions',
+      );
     });
   });
 

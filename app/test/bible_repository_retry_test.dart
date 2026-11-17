@@ -100,7 +100,7 @@ void main() {
 
     await expectLater(repo.getBibles(), throwsA(isA<StateError>()));
     body = '{"data":[{"id":111,"abbreviation":"NIV","title":"NIV"}]}';
-    expect((await repo.getBibles()).single.abbreviation, 'NIV');
+    expect((await repo.getBibles()).map((v) => v.abbreviation), ['NIV', 'KJV']);
     expect(calls, 2);
   });
 }

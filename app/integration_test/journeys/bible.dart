@@ -351,6 +351,32 @@ Future<void> bibleJourney(Journey j) async {
     await j.shot('other-version');
     await chooseVersion(111);
   }
+
+  // ── KJV, bundled in the app (public domain) ──────────────────────────────
+  if (licensed.any((v) => v.id == 1)) {
+    j.note('DATA: YouVersion licenses KJV to this key; it serves KJV');
+  } else {
+    await chooseVersion(1);
+    j.check(
+      j.c.read(selectedBibleProvider).id == 1,
+      'KJV can be chosen (bundled, not on the YouVersion key)',
+    );
+    final john = books.firstWhere((b) => b.usfm == 'JHN');
+    await _pickChapter(j, john, 3, newTestament: true);
+    final text = paintedTexts(
+      within: _inReader(find.byKey(const Key('bible-text'))),
+    ).join(' ');
+    j.check(
+      _label(t) == 'John 3' && text.contains('only begotten Son'),
+      'KJV John 3 reads "his only begotten Son" (shows "${_label(t)}")',
+    );
+    j.check(
+      toolbarVersion().contains('KJV'),
+      'the toolbar reads "KJV" ("${toolbarVersion()}")',
+    );
+    await j.shot('kjv');
+    await chooseVersion(111);
+  }
   final restored = j.c.read(selectedBibleProvider);
   j.check(restored.id == 111, 'NIV restored (now ${restored.abbreviation})');
   j.check(
