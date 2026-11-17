@@ -16,6 +16,7 @@ import 'package:kharis_app/features/bible/presentation/screens/reading_screen.da
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/features/home/data/daily_content_repository.dart';
 import 'package:kharis_app/shared/models/sermon.dart';
+import 'package:kharis_app/shared/providers/clock_provider.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/last_read_provider.dart';
@@ -84,6 +85,9 @@ Future<ProviderContainer> _container() async {
       sharedPreferencesProvider.overrideWithValue(prefs),
       cacheServiceProvider.overrideWithValue(FakeCacheService()),
       bibleRepositoryProvider.overrideWithValue(_Bible()),
+      // The streak dots read the clock: pin it to the same day so the
+      // goldens never depend on the day the test runs.
+      clockProvider.overrideWithValue(() => DateTime(2026, 11, 13)),
       todayProvider.overrideWithValue(DateTime(2026, 11, 13)),
       sermonsProvider.overrideWith(
         (ref) async => const [

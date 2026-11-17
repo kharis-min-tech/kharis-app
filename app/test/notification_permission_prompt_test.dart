@@ -90,6 +90,10 @@ Future<void> _pumpInbox(
   final router = GoRouter(
     routes: [
       GoRoute(path: '/', builder: (_, _) => const NotificationsScreen()),
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (_, _) => const NotificationsSettingsScreen(),
+      ),
     ],
   );
   await tester.pumpWidget(
@@ -105,7 +109,6 @@ Future<void> _pumpInbox(
 }
 
 void main() {
-
   group('notifications inbox', () {
     testWidgets('not yet allowed: says what the member would get and the OS '
         'prompt turns notifications on', (tester) async {

@@ -46,7 +46,10 @@ class ConnectFormBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(top: KSpace.md, bottom: KSpace.section),
+      padding: const EdgeInsets.only(
+        top: KSpace.md,
+        bottom: KSize.contentBottomPad,
+      ),
       child: Form(
         key: formKey,
         child: Column(

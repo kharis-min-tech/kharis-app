@@ -73,7 +73,7 @@ class GivingScreen extends ConsumerWidget {
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(
                 top: KSpace.md,
-                bottom: KSpace.section,
+                bottom: KSize.contentBottomPad,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -158,9 +158,11 @@ class _TodayView extends ConsumerWidget {
         ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
         BibleIndex.bundled();
 
-    Widget bare(Widget child) => _ReaderFrame(
+    // With no reading today there is no passage to name: the toolbar keeps
+    // Search only, and the empty state offers "Choose a passage".
+    Widget bare(Widget child, {bool hasReading = true}) => _ReaderFrame(
       toolbar: _Toolbar(
-        passage: 'Today\u2019s reading',
+        passage: hasReading ? 'Today\u2019s reading' : null,
         onPassage: () => onPickPassage(null),
         onSearch: onSearch,
       ),
@@ -192,6 +194,7 @@ class _TodayView extends ConsumerWidget {
                     onPressed: () => onPickPassage(null),
                   ),
                 ),
+                hasReading: false,
               );
             }
             final parts = todayLocations(content.reading, index);
@@ -273,7 +276,7 @@ class _Toolbar extends ConsumerWidget {
     required this.onSearch,
   });
 
-  final String passage;
+  final String? passage;
   final VoidCallback onPassage;
   final VoidCallback onSearch;
 

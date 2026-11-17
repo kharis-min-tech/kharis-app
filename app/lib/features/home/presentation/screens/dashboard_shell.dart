@@ -21,8 +21,9 @@ import 'package:kharis_app/ui/components/components.dart';
 /// Uses [StatefulNavigationShell] from [StatefulShellRoute.indexedStack] so
 /// every branch gets its own navigator and state is preserved between tab
 /// switches. The floating nav, with the mini player above it while a message
-/// is loaded, sits in a [Stack] over the page; pages pad their own scrolling
-/// content with `KSize.contentBottomPad`.
+/// is loaded, sits in a [Stack] over the page ([DashboardNavFrame]); pages
+/// pad their own scrolling content with `KSize.contentBottomPad`. Pages
+/// pushed above the shell keep the same nav through [WithTabNav].
 class DashboardShell extends ConsumerStatefulWidget {
   const DashboardShell({super.key, required this.navigationShell});
 
@@ -58,6 +59,37 @@ final openSheetsProvider = Provider<ValueNotifier<int>>((ref) {
   return open;
 });
 
+/// The tab shell while it is mounted, so a page pushed above it can show the
+/// nav with the tab the member came from ([WithTabNav]).
+class ActiveTabShell {
+  StatefulNavigationShell? shell;
+}
+
+final activeTabShellProvider = Provider<ActiveTabShell>(
+  (ref) => ActiveTabShell(),
+);
+
+/// Opens tab [index] from the nav and remembers it for the next launch.
+///
+/// With the tab shell underneath ([shell]) it switches branch the way the
+/// shell does: the tab already highlighted returns to its root, another tab
+/// comes back as the member left it, and pages pushed above the shell close
+/// either way. Without a shell (a deep link opened the page on its own) it
+/// goes to the tab's root.
+void openDashboardTab(
+  WidgetRef ref,
+  GoRouter? router,
+  StatefulNavigationShell? shell,
+  int index,
+) {
+  if (shell != null) {
+    shell.goBranch(index, initialLocation: index == shell.currentIndex);
+  } else {
+    router?.go(kTabPaths[index]);
+  }
+  ref.read(cacheServiceProvider).cachePreference(kLastTabKey, kTabPaths[index]);
+}
+
 /// Counts modal bottom sheets as they open and close on one navigator.
 /// A navigator observer serves a single navigator: create one per navigator
 /// (the root and each tab branch), all sharing [openSheetsProvider]'s count.
@@ -90,12 +122,12 @@ class SheetObserver extends NavigatorObserver {
 }
 
 class _DashboardShellState extends ConsumerState<DashboardShell> {
-  late final ValueNotifier<int> _openSheets;
+  late final ActiveTabShell _active;
 
   @override
   void initState() {
     super.initState();
-    _openSheets = ref.read(openSheetsProvider)..addListener(_onSheetsChanged);
+    _active = ref.read(activeTabShellProvider)..shell = widget.navigationShell;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreMiniPlayer();
       _promptBranchOnce();
@@ -105,24 +137,16 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 
   @override
-  void dispose() {
-    _openSheets.removeListener(_onSheetsChanged);
-    super.dispose();
+  void didUpdateWidget(DashboardShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _active.shell = widget.navigationShell;
   }
 
-  /// A navigator can report a route change while the tree is building;
-  /// rebuild after that frame instead of during it.
-  void _onSheetsChanged() {
-    void rebuild() {
-      if (mounted) setState(() {});
-    }
-
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) => rebuild());
-    } else {
-      rebuild();
-    }
+  @override
+  void dispose() {
+    // A replacement shell may already have registered itself.
+    if (identical(_active.shell, widget.navigationShell)) _active.shell = null;
+    super.dispose();
   }
 
   /// While the member has not chosen a branch, offer the picker once per
@@ -205,17 +229,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     return null;
   }
 
-  void _onTap(int index) {
-    // Tapping the active tab pops it to its root.
-    widget.navigationShell.goBranch(
-      index,
-      initialLocation: index == widget.navigationShell.currentIndex,
-    );
-    ref
-        .read(cacheServiceProvider)
-        .cachePreference(kLastTabKey, kTabPaths[index]);
-  }
-
   /// Whether the Give screen is the route on top.
   bool _giving() {
     final stack = GoRouter.of(
@@ -227,59 +240,154 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
   @override
   Widget build(BuildContext context) {
+    final shell = widget.navigationShell;
+    return ReviewPromptListener(
+      // Never interrupt a member mid-gift.
+      canInterrupt: () => !_giving(),
+      child: DashboardNavFrame(
+        currentIndex: shell.currentIndex,
+        onTap: (index) =>
+            openDashboardTab(ref, GoRouter.of(context), shell, index),
+        child: shell,
+      ),
+    );
+  }
+}
+
+/// A page pushed above the tab shell, with the shell's nav over it.
+///
+/// The tab the member came from stays highlighted (Home when a deep link
+/// opened the page with no tab underneath). Tapping another tab goes there;
+/// tapping the highlighted one returns to its root. Back and swipe-back
+/// still leave just this page.
+class WithTabNav extends ConsumerWidget {
+  const WithTabNav({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = GoRouter.maybeOf(context);
+    final overShell =
+        router?.routerDelegate.currentConfiguration.matches.any(
+          (m) => m is ShellRouteMatch,
+        ) ??
+        false;
+    final shell = overShell ? ref.read(activeTabShellProvider).shell : null;
+    return DashboardNavFrame(
+      currentIndex: shell?.currentIndex ?? 0,
+      onTap: (index) {
+        // A page pushed straight onto the navigator, without a route of its
+        // own, stays above the shell when the router moves: close it first.
+        Navigator.of(context).popUntil((route) => route.settings is Page);
+        openDashboardTab(ref, router, shell, index);
+      },
+      child: child,
+    );
+  }
+}
+
+/// [child] with the floating nav over it, and the mini player above the nav
+/// while a message is loaded. Both step out of the way while a sheet is open
+/// or the keyboard is up.
+class DashboardNavFrame extends ConsumerStatefulWidget {
+  const DashboardNavFrame({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    required this.child,
+  });
+
+  /// The highlighted tab, an index into [kDashboardTabs].
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final Widget child;
+
+  @override
+  ConsumerState<DashboardNavFrame> createState() => _DashboardNavFrameState();
+}
+
+class _DashboardNavFrameState extends ConsumerState<DashboardNavFrame> {
+  late final ValueNotifier<int> _openSheets;
+
+  @override
+  void initState() {
+    super.initState();
+    _openSheets = ref.read(openSheetsProvider)..addListener(_onSheetsChanged);
+  }
+
+  @override
+  void dispose() {
+    _openSheets.removeListener(_onSheetsChanged);
+    super.dispose();
+  }
+
+  /// A navigator can report a route change while the tree is building;
+  /// rebuild after that frame instead of during it.
+  void _onSheetsChanged() {
+    void rebuild() {
+      if (mounted) setState(() {});
+    }
+
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) => rebuild());
+    } else {
+      rebuild();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentSermon = ref.watch(currentSermonProvider);
     // Out of the way while a sheet is open or the member is typing.
     final hidden =
         _openSheets.value > 0 || MediaQuery.viewInsetsOf(context).bottom > 0;
     final wide = MediaQuery.sizeOf(context).width > _wideLayout;
 
-    return ReviewPromptListener(
-      // Never interrupt a member mid-gift.
-      canInterrupt: () => !_giving(),
-      child: Scaffold(
-        body: Stack(
-          children: [
-            Positioned.fill(child: widget.navigationShell),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Visibility(
-                visible: !hidden,
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: wide ? KSize.maxContentWidth : double.infinity,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (currentSermon != null)
-                          const Padding(
-                            padding: EdgeInsets.fromLTRB(
-                              KSize.navInsetX,
-                              0,
-                              KSize.navInsetX,
-                              KSpace.md,
-                            ),
-                            child: MiniPlayer(),
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned.fill(child: widget.child),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Visibility(
+              visible: !hidden,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: wide ? KSize.maxContentWidth : double.infinity,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (currentSermon != null)
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            KSize.navInsetX,
+                            0,
+                            KSize.navInsetX,
+                            KSpace.md,
                           ),
-                        KFloatingNav(
-                          key: const Key('dashboard-nav'),
-                          items: kDashboardTabs,
-                          currentIndex: widget.navigationShell.currentIndex,
-                          onTap: _onTap,
+                          child: MiniPlayer(),
                         ),
-                      ],
-                    ),
+                      KFloatingNav(
+                        key: const Key('dashboard-nav'),
+                        items: kDashboardTabs,
+                        currentIndex: widget.currentIndex,
+                        onTap: widget.onTap,
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

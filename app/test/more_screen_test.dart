@@ -20,6 +20,7 @@ import 'package:kharis_app/features/settings/presentation/screens/settings_scree
 import 'package:kharis_app/shared/models/campus_config.dart';
 import 'package:kharis_app/shared/models/user.dart';
 import 'package:kharis_app/shared/providers/admin_provider.dart';
+import 'package:kharis_app/shared/providers/audio_provider.dart';
 import 'package:kharis_app/shared/providers/auth_provider.dart';
 import 'package:kharis_app/shared/providers/branch_provider.dart';
 import 'package:kharis_app/shared/providers/location_provider.dart';
@@ -172,6 +173,8 @@ Future<SharedPreferences> _pumpMore(
         sharedPreferencesProvider.overrideWithValue(prefs),
         firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
         currentUserProvider.overrideWith((ref) => Stream.value(user)),
+        // The forms keep the tab nav, whose mini player reads this.
+        currentSermonProvider.overrideWith((ref) => null),
         currentBranchProvider.overrideWith((ref) => Stream.value(branch)),
         branchesProvider.overrideWith((ref) => Stream.value(branches)),
         notificationServiceProvider.overrideWithValue(_QuietNotifications()),

@@ -14,7 +14,8 @@ enum KReaderLayout {
 
 /// The Bible reader's toolbar: the layout toggle on the left, and on the
 /// right one grouped control holding Search and the passage button
-/// ("John 1 · NIV" with a chevron), which opens the passage picker.
+/// ("John 1 · NIV" with a chevron), which opens the passage picker. With no
+/// [passage] (nothing to read) the group holds Search alone.
 ///
 /// The controls are 38 tall inside a 44 hit area, and grow with the text.
 class KReaderToolbar extends StatelessWidget {
@@ -31,8 +32,8 @@ class KReaderToolbar extends StatelessWidget {
   final KReaderLayout layout;
   final ValueChanged<KReaderLayout> onLayoutChanged;
 
-  /// The open chapter, for example "John 1".
-  final String passage;
+  /// The open chapter, for example "John 1"; null hides the passage button.
+  final String? passage;
 
   /// The version's abbreviation, for example "NIV".
   final String version;
@@ -82,59 +83,61 @@ class KReaderToolbar extends StatelessWidget {
                   onTap: onSearch,
                   child: const KIcon(KIcons.search, size: KSize.iconSm),
                 ),
-                DecoratedBox(
-                  decoration: BoxDecoration(color: k.line),
-                  child: const SizedBox(width: 1, height: KSize.iconMd),
-                ),
-                Flexible(
-                  child: _Hit(
-                    key: const Key('bible-reference'),
-                    label:
-                        '$passage, $version. '
-                        'Change book, chapter or version',
-                    onTap: onPassage,
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.only(
-                        start: KSpace.xl,
-                        end: KSpace.lg,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              passage,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: KharisText.itemTitle.copyWith(
-                                color: k.text,
+                if (passage case final passage?) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(color: k.line),
+                    child: const SizedBox(width: 1, height: KSize.iconMd),
+                  ),
+                  Flexible(
+                    child: _Hit(
+                      key: const Key('bible-reference'),
+                      label:
+                          '$passage, $version. '
+                          'Change book, chapter or version',
+                      onTap: onPassage,
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          start: KSpace.xl,
+                          end: KSpace.lg,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                passage,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: KharisText.itemTitle.copyWith(
+                                  color: k.text,
+                                ),
                               ),
                             ),
-                          ),
-                          Text(
-                            ' \u00B7 ',
-                            style: KharisText.itemTitle.copyWith(
-                              color: k.muted,
+                            Text(
+                              ' \u00B7 ',
+                              style: KharisText.itemTitle.copyWith(
+                                color: k.muted,
+                              ),
                             ),
-                          ),
-                          Text(
-                            version,
-                            maxLines: 1,
-                            style: KharisText.itemTitle.copyWith(
-                              color: k.primaryText,
+                            Text(
+                              version,
+                              maxLines: 1,
+                              style: KharisText.itemTitle.copyWith(
+                                color: k.primaryText,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: KSpace.xs),
-                          KIcon(
-                            KIcons.chevronDown,
-                            size: KSize.iconSm,
-                            color: k.text,
-                          ),
-                        ],
+                            const SizedBox(width: KSpace.xs),
+                            KIcon(
+                              KIcons.chevronDown,
+                              size: KSize.iconSm,
+                              color: k.text,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

@@ -9,6 +9,7 @@ import 'package:kharis_app/core/constants/app_links.dart';
 import 'package:kharis_app/ui/components/components.dart';
 import 'package:kharis_app/features/calendar/presentation/screens/event_detail_screen.dart';
 import 'package:kharis_app/features/home/data/news_repository.dart';
+import 'package:kharis_app/features/home/presentation/screens/dashboard_shell.dart';
 import 'package:kharis_app/features/home/presentation/screens/notifications_screen.dart';
 import 'package:kharis_app/features/home/presentation/widgets/announcement_detail.dart';
 import 'package:kharis_app/features/player/presentation/screens/media_player_screen.dart';
@@ -58,12 +59,13 @@ final List<RouteBase> sharedLinkRoutes = [
   GoRoute(
     path: '/${AppLinks.eventSegment}/:id',
     builder: (context, state) =>
-        SharedEventScreen(id: state.pathParameters['id']!),
+        WithTabNav(child: SharedEventScreen(id: state.pathParameters['id']!)),
   ),
   GoRoute(
     path: '/${AppLinks.announcementSegment}/:id',
-    builder: (context, state) =>
-        SharedAnnouncementScreen(id: state.pathParameters['id']!),
+    builder: (context, state) => WithTabNav(
+      child: SharedAnnouncementScreen(id: state.pathParameters['id']!),
+    ),
   ),
 ];
 
