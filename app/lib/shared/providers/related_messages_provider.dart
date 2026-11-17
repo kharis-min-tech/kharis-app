@@ -55,7 +55,6 @@ int get parsedPassagesCacheSize => _parsedPassages.length;
 void clearParsedPassagesCache() => _parsedPassages.clear();
 
 /// [passage] parsed against [canon], from the cache when seen before.
-@visibleForTesting
 List<BibleLocation> parsePassageCached(String passage, BibleIndex canon) {
   final hit = _parsedPassages[passage];
   if (hit != null) return hit;

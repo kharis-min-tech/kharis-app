@@ -242,8 +242,9 @@ class _ForYou extends ConsumerWidget {
           );
 
     return _Sections([
-      // Only once the archive has finished loading, and came back empty.
-      if (library.loaded && library.sermons.isEmpty)
+      // Only once the archive has finished loading, came back empty, and
+      // there is nothing to feature either (the hero reads a wider list).
+      if (library.loaded && library.sermons.isEmpty && sermons.isEmpty)
         KEmptyState(
           key: const Key('messages-empty'),
           icon: KIcons.soundwave,
