@@ -262,11 +262,12 @@ class _BooksStep extends StatelessWidget {
         if (index.books.any((b) => b.testament == t)) t,
     ];
     final open = selected == null ? null : index.book(selected!);
-    final shown = testaments.contains(testament)
+    // Null when the version answered with no books at all.
+    final Testament? shown = testaments.contains(testament)
         ? testament!
         : testaments.contains(open?.testament)
         ? open!.testament
-        : testaments.first;
+        : testaments.firstOrNull;
     final matches = this.matches;
     final books =
         matches ??
@@ -274,6 +275,25 @@ class _BooksStep extends StatelessWidget {
           for (final b in index.books)
             if (b.testament == shown) b,
         ];
+
+    if (shown == null) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _Header(title: 'Choose a book'),
+          SizedBox(height: KSpace.x3),
+          KEmptyState(
+            key: Key('bible-books-empty'),
+            icon: KIcons.bookOpen,
+            title: 'No books in this version',
+            hint:
+                'Tap Done, then choose another translation with the '
+                'translation button.',
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

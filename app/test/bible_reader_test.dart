@@ -81,6 +81,9 @@ class _FakeBibleRepository extends BibleRepository {
   /// When set, the version's book list never arrives (a stalled request).
   bool booksHang = false;
 
+  /// When set, the version's book list arrives empty (a bad API answer).
+  bool booksEmpty = false;
+
   @override
   Future<List<BibleVersion>> getBibles() async => const [
     BibleVersion(id: 111, abbreviation: 'NIV', title: 'New International'),
@@ -90,7 +93,7 @@ class _FakeBibleRepository extends BibleRepository {
   @override
   Future<List<BibleBook>> getBooks(int bibleId) => booksHang
       ? Completer<List<BibleBook>>().future
-      : Future.value(_indexWithVerses().books);
+      : Future.value(booksEmpty ? const [] : _indexWithVerses().books);
 
   @override
   Future<BiblePassage> getPassage(
@@ -177,6 +180,7 @@ Future<_Reader> _pumpReader(
   bool nothingToday = false,
   Map<String, Object> prefs = const {},
   bool booksHang = false,
+  bool booksEmpty = false,
   Set<String> missing = const {},
   BibleLocation? location,
   bool dark = false,
@@ -187,6 +191,7 @@ Future<_Reader> _pumpReader(
   final sharedPrefs = await SharedPreferences.getInstance();
   final repo = _FakeBibleRepository()
     ..booksHang = booksHang
+    ..booksEmpty = booksEmpty
     ..missing.addAll(missing);
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -894,6 +899,16 @@ void main() {
       await tester.tap(find.byKey(const Key('passage-picker-books')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('bible-books')), findsOneWidget);
+    });
+
+    testWidgets('a version that answers with no books says so in the picker '
+        'instead of offering another canon', (tester) async {
+      await _pumpReader(tester, booksEmpty: true);
+      await _openPicker(tester);
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('bible-books-empty')), findsOneWidget);
+      expect(find.byKey(const Key('bible-books')), findsNothing);
+      expect(find.text('No books in this version'), findsOneWidget);
     });
 
     testWidgets('search explains an unknown book or chapter', (tester) async {

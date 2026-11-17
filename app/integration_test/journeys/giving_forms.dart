@@ -39,7 +39,8 @@ Future<void> givingJourney(Journey j) async {
   final giving = find.byType(GivingScreen);
   final scroll = verticalScrollableIn(giving);
   j.check(
-    find.descendant(of: giving, matching: find.byType(BranchPickerSheet))
+    find
+            .descendant(of: giving, matching: find.byType(BranchPickerSheet))
             .evaluate()
             .isEmpty &&
         find
@@ -63,6 +64,13 @@ Future<void> givingJourney(Journey j) async {
         .evaluate()
         .isNotEmpty,
     'the button reads "Give to $branch"',
+  );
+  j.check(
+    find
+        .descendant(of: giving, matching: find.text(kGiveSecureNote))
+        .evaluate()
+        .isNotEmpty,
+    'Give says the gift is made securely on kharis.org',
   );
   await scrollUntilFound(t, give, scrollable: scroll);
   await t.tap(give, warnIfMissed: false);
@@ -192,6 +200,10 @@ Future<void> _choose(
   String hint,
   String item,
 ) async {
+  // An open keyboard is still animating away when the field below is
+  // tapped, and that tap is swallowed: the menu never opens.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await pumpFor(t, const Duration(milliseconds: 700));
   await tapVisible(t, find.descendant(of: screen, matching: find.text(hint)));
   await pumpFor(t, const Duration(milliseconds: 800));
   final entry = find.text(item);

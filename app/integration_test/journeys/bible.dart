@@ -81,7 +81,19 @@ Future<void> _chooseInPicker(
   }
   final book = find.byKey(Key('bible-book-$usfm'));
   await scrollUntilFound(t, book, scrollable: verticalScrollableIn(_picker));
+  // On a loaded device the tap can land while the list is still settling
+  // and be swallowed; the sheet would then still show the books. Wait for
+  // the book's chapters (or, for a one-chapter book, the sheet to close),
+  // tapping again once.
+  bool chosen() => chapters > 1
+      ? find.byKey(const Key('bible-chapters')).evaluate().isNotEmpty
+      : _picker.evaluate().isEmpty;
   await tapVisible(t, book);
+  if (!await pumpUntil(t, chosen, timeout: const Duration(seconds: 5)) &&
+      book.evaluate().isNotEmpty) {
+    await tapVisible(t, book);
+    await pumpUntil(t, chosen, timeout: const Duration(seconds: 5));
+  }
   if (chapters > 1) {
     await pumpUntilFound(t, find.byKey(const Key('bible-chapters')));
     await pumpFor(t, const Duration(milliseconds: 400));

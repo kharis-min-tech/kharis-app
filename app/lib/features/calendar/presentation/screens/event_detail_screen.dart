@@ -210,7 +210,7 @@ class _EventBody extends ConsumerWidget {
             const SizedBox(height: KSpace.x3),
           ],
           KOverline(
-            eventRepeatsLabel(event) ?? eventStatusLabel(event, now),
+            event.repeatsLabel ?? eventStatusLabel(event, now),
             key: event.isWeekly ? const Key('event-detail-recurrence') : null,
           ),
           const SizedBox(height: KSpace.sm),

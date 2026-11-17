@@ -60,7 +60,9 @@ final biblesProvider = FutureProvider<List<BibleVersion>>(
 
 /// Books and chapters of a version. Falls back to the bundled 66-book table
 /// when the list cannot be fetched (offline), so browsing still works and
-/// only the chapter text shows an error with Retry.
+/// only the chapter text shows an error with Retry. A version that answers
+/// with no books keeps its empty list: the picker says so rather than
+/// offering books the version may not have.
 final bibleIndexProvider = FutureProvider.family<BibleIndex, int>((
   ref,
   bibleId,

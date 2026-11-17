@@ -42,6 +42,29 @@ void main() {
     });
   });
 
+  group('startMinutes', () {
+    test('reads the same shapes formatServiceTime does', () {
+      expect(startMinutes('19:00'), 19 * 60);
+      expect(startMinutes('19:30:00'), 19 * 60 + 30);
+      expect(startMinutes(' 7:05 PM '), 19 * 60 + 5);
+      expect(startMinutes('12:00 am'), 0);
+      expect(startMinutes('12:00 PM'), 12 * 60);
+    });
+
+    test('is null for anything that is not a clock time', () {
+      for (final raw in [
+        null,
+        '',
+        'Sundays 10am',
+        '24:00',
+        '13:00 PM',
+        '9:60',
+      ]) {
+        expect(startMinutes(raw), isNull, reason: '$raw');
+      }
+    });
+  });
+
   group('formatServiceSchedule', () {
     test('joins days and normalised time', () {
       expect(formatServiceSchedule('Sundays', '14:00'), 'Sundays · 14:00');
