@@ -66,15 +66,22 @@ class Event {
     'Saturday',
   ];
 
-  /// "Every Sunday · 09:00", "Every Sunday and Wednesday · 19:30";
-  /// null for a one-off event.
-  String? get recurrenceLabel {
+  /// "Every Sunday", "Every Sunday and Wednesday"; null for a one-off event.
+  String? get repeatsLabel {
     if (!isWeekly) return null;
     final names = [for (final d in recurrenceDays) _weekdays[d]];
     final days = names.length == 1
         ? names.single
         : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
-    return 'Every $days · ${DateFormat('HH:mm').format(startTime)}';
+    return 'Every $days';
+  }
+
+  /// "Every Sunday · 09:00", "Every Sunday and Wednesday · 19:30";
+  /// null for a one-off event.
+  String? get recurrenceLabel {
+    final repeats = repeatsLabel;
+    if (repeats == null) return null;
+    return '$repeats · ${DateFormat('HH:mm').format(startTime)}';
   }
 
   /// The instant the event is over. Events with no explicit end are treated

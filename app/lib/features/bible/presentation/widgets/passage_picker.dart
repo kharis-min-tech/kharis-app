@@ -74,11 +74,12 @@ class _PassagePickerState extends ConsumerState<PassagePicker> {
       for (final t in Testament.values)
         if (index.books.any((b) => b.testament == t)) t,
     ];
-    final testament = testaments.contains(_testament)
+    // Null when the version answered with no books at all.
+    final Testament? testament = testaments.contains(_testament)
         ? _testament!
         : testaments.contains(book?.testament)
         ? book!.testament
-        : testaments.first;
+        : testaments.firstOrNull;
     final current = widget.current;
 
     Widget heading(String text) => Semantics(
@@ -136,21 +137,29 @@ class _PassagePickerState extends ConsumerState<PassagePicker> {
             ),
           ],
           const SizedBox(height: KSpace.xl),
-          Wrap(
-            key: const Key('bible-books'),
-            spacing: KSpace.sm,
-            runSpacing: KSpace.sm,
-            children: [
-              for (final b in index.books)
-                if (b.testament == testament)
-                  KChip(
-                    key: Key('bible-book-${b.usfm}'),
-                    label: b.title,
-                    selected: b.usfm == _usfm,
-                    onTap: () => _chooseBook(b),
-                  ),
-            ],
-          ),
+          if (testament == null)
+            const KEmptyState(
+              key: Key('bible-books-empty'),
+              icon: KIcons.bookOpen,
+              title: 'No books in this version',
+              hint: 'Choose another version below.',
+            )
+          else
+            Wrap(
+              key: const Key('bible-books'),
+              spacing: KSpace.sm,
+              runSpacing: KSpace.sm,
+              children: [
+                for (final b in index.books)
+                  if (b.testament == testament)
+                    KChip(
+                      key: Key('bible-book-${b.usfm}'),
+                      label: b.title,
+                      selected: b.usfm == _usfm,
+                      onTap: () => _chooseBook(b),
+                    ),
+              ],
+            ),
           if (book != null) ...[
             const SizedBox(height: KSpace.gutter),
             KeyedSubtree(key: _chaptersKey, child: heading('Chapter')),

@@ -9,24 +9,32 @@
 String? formatServiceTime(String? raw) {
   final value = raw?.trim();
   if (value == null || value.isEmpty) return null;
+  final minutes = startMinutes(value);
+  if (minutes == null) return value;
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(minutes ~/ 60)}:${two(minutes % 60)}';
+}
 
+/// Minutes after midnight of a service time in either shape
+/// [formatServiceTime] reads (`'14:00'`, `'14:00:00'`, `'2:00 PM'`); null
+/// when [raw] is not a recognised clock value.
+int? startMinutes(String? raw) {
   final match = RegExp(
     r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$',
-  ).firstMatch(value);
-  if (match == null) return value;
+  ).firstMatch(raw?.trim() ?? '');
+  if (match == null) return null;
 
   var hour = int.parse(match.group(1)!);
   final minute = int.parse(match.group(2)!);
   final half = match.group(3)?.toLowerCase();
-  if (minute > 59) return value;
+  if (minute > 59) return null;
   if (half != null) {
-    if (hour < 1 || hour > 12) return value;
+    if (hour < 1 || hour > 12) return null;
     hour = hour % 12 + (half == 'pm' ? 12 : 0);
   } else if (hour > 23) {
-    return value;
+    return null;
   }
-  String two(int n) => n.toString().padLeft(2, '0');
-  return '${two(hour)}:${two(minute)}';
+  return hour * 60 + minute;
 }
 
 /// A single line describing when a branch meets, e.g. `Sundays · 14:00`.

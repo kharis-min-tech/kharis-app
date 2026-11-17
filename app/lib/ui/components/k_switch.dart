@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/kharis_theme.dart';
+import 'k_layout.dart' show kClear;
 
 /// An on/off switch. On: primary track with the thumb on the right; off:
 /// surface2 track with the thumb on the left, so state never rests on colour
@@ -65,7 +66,8 @@ class KSwitch extends StatelessWidget {
                   borderRadius: const BorderRadius.all(
                     Radius.circular(_trackHeight / 2),
                   ),
-                  border: Border.all(color: value ? kClearOf(k.line) : k.line),
+                  // Kept, but invisible, so the thumb does not shift.
+                  border: Border.all(color: value ? kClear(k.line) : k.line),
                 ),
                 child: AnimatedAlign(
                   duration: duration,
@@ -87,7 +89,4 @@ class KSwitch extends StatelessWidget {
       ),
     );
   }
-
-  /// The border keeps its width while invisible so the thumb does not shift.
-  static Color kClearOf(Color color) => color.withValues(alpha: 0);
 }

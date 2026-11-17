@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kharis_app/core/services/notification_service.dart'
     show NotificationPermission;
+import 'package:kharis_app/core/utils/service_time.dart' show startMinutes;
 import 'package:kharis_app/features/connect/presentation/screens/new_here_screen.dart';
 import 'package:kharis_app/features/connect/presentation/screens/testimony_screen.dart';
 import 'package:kharis_app/features/feedback/data/app_feedback_repository.dart';
@@ -61,24 +62,6 @@ void _pushPage(BuildContext context, Widget page) {
   );
 }
 
-/// Minutes after midnight a service starts, from "19:00", "19:00:00" or the
-/// older "7:00 PM"; null when the Studio set no clock time.
-int? _startMinutes(CampusService service) {
-  final m = RegExp(
-    r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$',
-  ).firstMatch(service.startTime?.trim() ?? '');
-  if (m == null) return null;
-  var hour = int.parse(m.group(1)!);
-  final minute = int.parse(m.group(2)!);
-  final half = m.group(3)?.toLowerCase();
-  if (half != null) {
-    if (hour < 1 || hour > 12) return null;
-    hour = hour % 12 + (half == 'pm' ? 12 : 0);
-  }
-  if (hour > 23 || minute > 59) return null;
-  return hour * 60 + minute;
-}
-
 const _dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /// The next of [services] to start after [now], as the Events tile says it:
@@ -93,9 +76,11 @@ String? nextServiceLabel(List<CampusService> services, DateTime now) {
     CampusService? next;
     for (final s in services) {
       if (weekdayIndex(s.day) != weekday) continue;
-      final start = _startMinutes(s) ?? endOfDay;
+      final start = startMinutes(s.startTime) ?? endOfDay;
       if (offset == 0 && start <= nowMinutes) continue;
-      if (next == null || start < (_startMinutes(next) ?? endOfDay)) next = s;
+      if (next == null || start < (startMinutes(next.startTime) ?? endOfDay)) {
+        next = s;
+      }
     }
     if (next == null) continue;
 
@@ -103,7 +88,7 @@ String? nextServiceLabel(List<CampusService> services, DateTime now) {
       RegExp(r'\s+service$', caseSensitive: false),
       '',
     );
-    final start = _startMinutes(next);
+    final start = startMinutes(next.startTime);
     final when = [
       _dayNames[weekday],
       if (start != null)

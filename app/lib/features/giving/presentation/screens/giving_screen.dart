@@ -103,6 +103,8 @@ class GivingScreen extends ConsumerWidget {
                           expand: true,
                           onPressed: () => _give(context),
                         ),
+                        const SizedBox(height: KSpace.md),
+                        const _SecureNote(),
                         if (rows.isNotEmpty) ...[
                           const SizedBox(height: KSpace.section),
                           _BankTransferCard(
@@ -126,6 +128,36 @@ class GivingScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The line under the Give button saying where the gift is made.
+const String kGiveSecureNote =
+    'You give securely on kharis.org, inside the app.';
+
+/// Where the gift is made, under the Give button.
+class _SecureNote extends StatelessWidget {
+  const _SecureNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    return MergeSemantics(
+      child: Row(
+        key: const Key('give-secure-note'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          KIcon(KIcons.lock, size: KSize.iconXs, color: k.muted),
+          const SizedBox(width: KSpace.xs),
+          Flexible(
+            child: Text(
+              kGiveSecureNote,
+              style: KharisText.meta.copyWith(color: k.muted),
+            ),
+          ),
+        ],
       ),
     );
   }

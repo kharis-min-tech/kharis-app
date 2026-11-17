@@ -71,7 +71,15 @@ Future<void> _chooseInPicker(
   }
   final book = find.byKey(Key('bible-book-$usfm'));
   await scrollUntilFound(t, book, scrollable: sheet);
+  // On a loaded device the tap can land while the list is still settling
+  // and be swallowed; the chapter grid would then still be the previous
+  // book's. Wait for the chip to show the book chosen, tapping again once.
+  bool chosen() => t.widget<KChip>(book).selected;
   await tapVisible(t, book);
+  if (!await pumpUntil(t, chosen, timeout: const Duration(seconds: 5))) {
+    await tapVisible(t, book);
+    await pumpUntil(t, chosen, timeout: const Duration(seconds: 5));
+  }
   if (chapters > 1) {
     final cell = find.byKey(Key('bible-chapter-$chapter'));
     await scrollUntilFound(t, cell, scrollable: sheet);
