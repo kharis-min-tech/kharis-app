@@ -265,10 +265,12 @@ Future<void> _checkModeSwitch(Journey j, Sermon s) async {
   final offset = s.videoStart ?? Duration.zero;
   await tapMode(t, 'Video');
   Duration? videoPos;
+  const notStarting = 'This video is taking too long to start.';
   final up = await pumpUntil(
     t,
     () {
       if (modeToggleOf(t).activeMode != MediaMode.video) return false;
+      if (inPlayer(find.text(notStarting)).evaluate().isNotEmpty) return true;
       final b = seekBarOf(t);
       if (b.duration > Duration.zero && b.position > Duration.zero) {
         videoPos ??= b.position;
@@ -279,7 +281,19 @@ Future<void> _checkModeSwitch(Journey j, Sermon s) async {
     timeout: const Duration(seconds: 45),
     step: const Duration(milliseconds: 100),
   );
-  j.check(up, 'video starts for "${s.title}"');
+  if (videoPos == null &&
+      inPlayer(find.text(notStarting)).evaluate().isNotEmpty) {
+    // YouTube withholds some videos from embedded players (it sits
+    // buffering). The app must not spin forever: it offers a way on.
+    j.note('DATA: YouTube did not deliver "${s.title}" to the embed');
+    j.check(
+      inPlayer(find.text('Listen instead')).evaluate().isNotEmpty &&
+          inPlayer(find.text('Try again')).evaluate().isNotEmpty,
+      'a video that will not start offers Listen instead and Try again',
+    );
+  } else {
+    j.check(up, 'video starts for "${s.title}"');
+  }
   if (videoPos != null) {
     final drift = (videoPos! - offset - beforeVideo).abs();
     j.check(
