@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kharis_app/core/constants/bible_books.dart';
+import 'package:kharis_app/features/home/data/bundled_bible.dart';
 
 /// Fetches Bible passage text and version metadata from the YouVersion
 /// Platform API.
@@ -9,11 +10,16 @@ import 'package:kharis_app/core/constants/bible_books.dart';
 ///   flutter build web --dart-define-from-file=env.json
 /// License set (June 2026): 20 English versions incl. NIV11 (111),
 /// AMP (1588), NASB2020 (2692), BSB (3034), ASV (12).
+///
+/// The public-domain KJV ([BundledBible.kjv]) ships with the app and is
+/// served from the bundle, offline, unless YouVersion lists it for the key.
 class BibleRepository {
-  /// [appKey] defaults to the build-time `YOUVERSION_API_KEY` define.
-  BibleRepository({Dio? dio, String? appKey})
+  /// [appKey] defaults to the build-time `YOUVERSION_API_KEY` define;
+  /// [bundled] to [BundledBible.kjv].
+  BibleRepository({Dio? dio, String? appKey, BundledBible? bundled})
     : _dio = dio ?? Dio(_dioOptions),
-      _key = appKey ?? _appKey;
+      _key = appKey ?? _appKey,
+      _bundled = bundled ?? BundledBible.kjv;
 
   /// Bounds every request so a stalled connection ends in the reader's
   /// error view with Retry instead of a spinner that never resolves.
@@ -32,9 +38,11 @@ class BibleRepository {
   static const defaultBibleAbbreviation = 'NIV';
 
   /// Translations the church has approved (26 Oct 2026), by YouVersion id.
-  /// Only these are ever offered. Ids not yet licensed for this app key
-  /// (KJV 1, NKJV 114, ESV 59, AMPC 8, MSG 97, RSV 2020) appear on their
-  /// own once YouVersion licenses them.
+  /// Only these are ever offered. KJV (1) is bundled with the app (public
+  /// domain), so it is always offered; YouVersion serves it instead if it
+  /// ever licenses it. Ids not yet licensed for this app key (NKJV 114,
+  /// ESV 59, AMPC 8, MSG 97, RSV 2020) appear on their own once YouVersion
+  /// licenses them.
   static const approvedBibleIds = <int>{
     111, // NIV 2011
     12, // ASV
@@ -48,10 +56,18 @@ class BibleRepository {
     2020, // RSV
   };
   final Dio _dio;
+  final BundledBible _bundled;
+
+  /// Whether the last versions list from YouVersion included the bundled
+  /// version's id. Until a list arrives the bundle serves it (offline first).
+  bool _bundledOnYouVersion = false;
 
   final _passageCache = <String, BiblePassage>{};
   final _booksCache = <int, List<BibleBook>>{};
   List<BibleVersion>? _biblesCache;
+
+  bool _servesBundled(int bibleId) =>
+      bibleId == _bundled.id && !_bundledOnYouVersion;
 
   Options get _options {
     if (_key.isEmpty) {
@@ -65,7 +81,8 @@ class BibleRepository {
     );
   }
 
-  /// Lists the church-approved Bible versions licensed for this app key.
+  /// Lists the church-approved Bible versions licensed for this app key,
+  /// plus the bundled KJV when YouVersion does not list it.
   Future<List<BibleVersion>> getBibles() async {
     if (_biblesCache != null) return _biblesCache!;
     final response = await _dio.get<Map<String, dynamic>>(
@@ -78,7 +95,7 @@ class BibleRepository {
     // An empty answer (an error-shaped 200) is a failure, not a fact to keep
     // for the session: Retry must ask again.
     if (data.isEmpty) throw StateError('No Bible versions returned');
-    _biblesCache = [
+    final versions = [
       for (final b in data)
         if (approvedBibleIds.contains((b['id'] as num).toInt()))
           BibleVersion(
@@ -88,6 +105,22 @@ class BibleRepository {
                     as String,
             title: (b['localized_title'] ?? b['title'] ?? '') as String,
           ),
+    ];
+    final onYouVersion = versions.any((v) => v.id == _bundled.id);
+    if (onYouVersion != _bundledOnYouVersion) {
+      // The source for that id changed: drop what the other one served.
+      _booksCache.remove(_bundled.id);
+      _passageCache.removeWhere((key, _) => key.startsWith('${_bundled.id}/'));
+      _bundledOnYouVersion = onYouVersion;
+    }
+    _biblesCache = [
+      ...versions,
+      if (!onYouVersion)
+        BibleVersion(
+          id: _bundled.id,
+          abbreviation: _bundled.abbreviation,
+          title: _bundled.title,
+        ),
     ];
     return _biblesCache!;
   }
@@ -100,6 +133,9 @@ class BibleRepository {
   Future<List<BibleBook>> getBooks(int bibleId) async {
     final cached = _booksCache[bibleId];
     if (cached != null) return cached;
+    if (_servesBundled(bibleId)) {
+      return _booksCache[bibleId] = await _bundledBooks();
+    }
 
     final response = await _withRetry(
       () => _dio.get<Map<String, dynamic>>(
@@ -160,6 +196,9 @@ class BibleRepository {
     final cacheKey = '$bibleId/$usfmId';
     final cached = _passageCache[cacheKey];
     if (cached != null) return cached;
+    if (_servesBundled(bibleId)) {
+      return _passageCache[cacheKey] = await _bundledPassage(usfmId);
+    }
 
     final response = await _withRetry(
       () => _dio.get<Map<String, dynamic>>(
@@ -204,6 +243,74 @@ class BibleRepository {
   /// Pause before the single transient retry. Tests shorten it.
   @visibleForTesting
   static Duration retryDelay = const Duration(milliseconds: 800);
+
+  // ── Bundled version ─────────────────────────────────────────────────────────
+
+  Future<List<BibleBook>> _bundledBooks() async {
+    final text = await _bundled.load();
+    return [
+      for (final canon in kCanonBooks)
+        if (text[canon.usfm] case final chapters?)
+          BibleBook(
+            usfm: canon.usfm,
+            title: canon.name,
+            testament: canon.testament,
+            chapters: [for (var c = 1; c <= chapters.length; c++) c],
+            verseCounts: {
+              for (final (i, verses) in chapters.indexed) i + 1: verses.length,
+            },
+          ),
+    ];
+  }
+
+  /// `JHN.3`, `JHN.3.16`, `JHN.3.16-18` or `JHN.3.16-JHN.3.18`, the passage
+  /// ids the YouVersion passages endpoint takes.
+  static final _passageIdRe = RegExp(
+    r'^([1-3A-Z]{3})\.(\d+)(?:\.(\d+)(?:-(?:\1\.\2\.)?(\d+))?)?$',
+  );
+
+  /// One `p` block of numbered verse segments, shaped like a parsed
+  /// YouVersion chapter. An id outside the text fails like the API's 404.
+  Future<BiblePassage> _bundledPassage(String usfmId) async {
+    final text = await _bundled.load();
+    final m = _passageIdRe.firstMatch(usfmId);
+    final canon = _canonByUsfm[m?[1]]?.book;
+    final chapters = text[m?[1]];
+    final chapter = int.parse(m?[2] ?? '0');
+    if (m == null ||
+        canon == null ||
+        chapters == null ||
+        chapter < 1 ||
+        chapter > chapters.length) {
+      throw StateError('No passage $usfmId in ${_bundled.abbreviation}');
+    }
+    final verses = chapters[chapter - 1];
+    final first = int.tryParse(m[3] ?? '') ?? 1;
+    final last =
+        int.tryParse(m[4] ?? '') ?? (m[3] == null ? verses.length : first);
+    if (first < 1 || last < first || last > verses.length) {
+      throw StateError('No passage $usfmId in ${_bundled.abbreviation}');
+    }
+    final range = m[3] == null
+        ? ''
+        : first == last
+        ? ':$first'
+        : ':$first-$last';
+    return BiblePassage(
+      reference: '${canon.name} $chapter$range',
+      blocks: [
+        PassageBlock(
+          styleClass: 'p',
+          segments: [
+            for (var v = first; v <= last; v++)
+              PassageSegment(verse: v, text: verses[v - 1]),
+          ],
+        ),
+      ],
+      copyright: _bundled.copyright,
+      bibleAbbreviation: _bundled.abbreviation,
+    );
+  }
 
   // ── HTML parsing ────────────────────────────────────────────────────────────
   //
