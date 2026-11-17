@@ -143,6 +143,15 @@ class AudioPlayerService {
 
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
+  /// Armed while the engine is buffering with playback on; see [stallTimeout].
+  Timer? _stallTimer;
+
+  /// How long playback may sit buffering before it counts as a dropped
+  /// stream. just_audio ignores iOS's "playback stalled" notification, so a
+  /// stream that stops delivering left the player loading forever.
+  @visibleForTesting
+  static Duration stallTimeout = const Duration(seconds: 20);
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   void _setupListeners() {
@@ -173,6 +182,7 @@ class AudioPlayerService {
     // Save on pause; finish on natural completion.
     _subscriptions.add(
       _player.playerStateStream.listen((state) {
+        _watchForStall(state);
         final sermon = _currentSermon;
         if (sermon == null) return;
         if (state.processingState == ProcessingState.completed) {
@@ -429,7 +439,12 @@ class AudioPlayerService {
     final queue = _queue;
     // Mid-load the sequence already shows the new window while the index
     // still points into the old one; the load itself positions the queue.
-    if (queue == null || !_hasWindow || _loadsInFlight > 0) return;
+    if (queue == null ||
+        !_hasWindow ||
+        _loadsInFlight > 0 ||
+        _shiftingEdits > 0) {
+      return;
+    }
     final sermon = _sermonAtNative(nativeIndex);
     if (sermon == null) return;
     final index = queue.items.indexWhere((s) => s.id == sermon.id);
@@ -441,8 +456,20 @@ class AudioPlayerService {
     final left = _currentSermon;
     final live = _livePosition;
     if (!appInitiated && left != null && live != null && live.$1 == left.id) {
-      // The engine moved on by itself, which it does at the end of a message.
-      _leave(left, live.$2, live.$3 ?? left.duration);
+      final length = live.$3 ?? left.duration;
+      if (length != null && !_inClosingStretch(live.$2, length)) {
+        // Not an ending: on iOS, AVQueuePlayer drops a message whose stream
+        // failed mid-play and starts the next one, and just_audio reports
+        // that as an ordinary move (it ignores the "failed to play to end"
+        // notification). Following it skipped members to another message
+        // a few seconds in. Recover the message they were listening to.
+        _history.savePosition(left, live.$2);
+        _lastPositionSave = DateTime.now();
+        unawaited(_recoverFromStreamError(left, queue, live.$2));
+        return;
+      }
+      // The engine moved on by itself at the end of a message.
+      _leave(left, live.$2, length);
     }
     _queue = queue.moveTo(index);
     _currentSermon = sermon;
@@ -460,6 +487,24 @@ class AudioPlayerService {
     unawaited(_safely(_extendWindow()));
   }
 
+  void _watchForStall(PlayerState state) {
+    final stalled =
+        state.playing && state.processingState == ProcessingState.buffering;
+    if (!stalled) {
+      _stallTimer?.cancel();
+      _stallTimer = null;
+      return;
+    }
+    _stallTimer ??= Timer(stallTimeout, () {
+      _stallTimer = null;
+      if (!_player.playing ||
+          _player.processingState != ProcessingState.buffering) {
+        return;
+      }
+      _onStreamError(TimeoutException('Stream stalled', stallTimeout));
+    });
+  }
+
   /// Keeps a neighbour on each side of the current message in the native
   /// window, so a finished message always has the next one to advance to.
   /// Only appends or prepends: the message on air is never touched.
@@ -474,7 +519,9 @@ class AudioPlayerService {
       // Shift first: the native index bump this insert causes must resolve
       // against the new start.
       _windowStart -= 1;
-      await _player.insertAudioSource(0, _child(queue.items[_windowStart]));
+      await _whileShifting(
+        () => _player.insertAudioSource(0, _child(queue.items[_windowStart])),
+      );
     }
   }
 
@@ -489,9 +536,28 @@ class AudioPlayerService {
     if (nativeIndex + 1 < length) {
       await _player.removeAudioSourceRange(nativeIndex + 1, length);
     }
-    if (nativeIndex > 0) await _player.removeAudioSourceRange(0, nativeIndex);
+    if (nativeIndex > 0) {
+      await _whileShifting(
+        () => _player.removeAudioSourceRange(0, nativeIndex),
+      );
+    }
     _windowStart = queue.index;
     await _extendWindow();
+  }
+
+  /// Window edits in progress that move the message on air to another
+  /// native index (an insert or removal before it). just_audio shows the new
+  /// sequence before the platform reports the shifted index, so an index
+  /// event meanwhile names the wrong message; [_onNativeIndex] ignores them.
+  int _shiftingEdits = 0;
+
+  Future<void> _whileShifting(Future<void> Function() edit) async {
+    _shiftingEdits++;
+    try {
+      await edit();
+    } finally {
+      _shiftingEdits--;
+    }
   }
 
   static Future<void> _safely(Future<void> work) => work.catchError((Object _) {
@@ -875,6 +941,7 @@ class AudioPlayerService {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   Future<void> dispose() async {
+    _stallTimer?.cancel();
     // Flush position before tearing down subscriptions.
     if (_player.playing) _saveCurrentPosition();
     for (final sub in _subscriptions) {

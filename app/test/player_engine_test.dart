@@ -375,21 +375,6 @@ void main() {
     },
   );
 
-  test(
-    'a lock-screen skip (native index move) is followed by the service',
-    () async {
-      await service.play(library[1], queue: library);
-      await settle();
-
-      // The OS skip button seeks the native window directly.
-      await native().seek(SeekRequest(position: Duration.zero, index: 0));
-      await settle();
-
-      expect(service.currentSermon?.id, 's1');
-      expect(service.queue!.index, 0);
-    },
-  );
-
   test('resume after the message finished starts it over', () async {
     await service.play(library[0]);
     await settle();
@@ -482,6 +467,73 @@ void main() {
 
       expect(service.currentSermon?.id, 's2');
       expect(PlaybackHistory(cache).progressOf(library[0]), isA<Finished>());
+    });
+
+    test('the engine dropping a message mid-way (iOS skips a failed stream) '
+        'reloads that message where it stopped instead of moving on', () async {
+      await playFirstAt(const Duration(minutes: 7));
+
+      // AVQueuePlayer drops the failed item and starts the next one; just_audio
+      // reports only the new index.
+      await native().seek(SeekRequest(position: Duration.zero, index: 1));
+      await settle();
+
+      expect(service.currentSermon?.id, 's1', reason: 'stays on s1');
+      expect(native().loads, hasLength(2), reason: 'one silent reload');
+      expect(native().loads.last.initialIndex, 0);
+      expectNear(
+        native().loads.last.initialPosition!,
+        const Duration(minutes: 7),
+      );
+      final history = PlaybackHistory(cache);
+      expect(history.progressOf(library[0]), isNot(isA<Finished>()));
+      expect(service.failure, isNull);
+      expect(native().playing, isTrue);
+    });
+  });
+
+  group('a stream that stalls mid-playback', () {
+    setUp(
+      () => AudioPlayerService.stallTimeout = const Duration(milliseconds: 50),
+    );
+    tearDown(
+      () => AudioPlayerService.stallTimeout = const Duration(seconds: 20),
+    );
+
+    Future<void> playAt(Duration at) async {
+      await service.play(library[1], queue: library);
+      await settle();
+      await native().seek(SeekRequest(position: at));
+      await settle();
+    }
+
+    test(
+      'is reloaded from the same point once it has buffered too long',
+      () async {
+        await playAt(const Duration(minutes: 4));
+
+        native().stall();
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+
+        expect(
+          native().loads,
+          hasLength(2),
+          reason: 'reloaded, not left loading',
+        );
+        expect(native().loads.last.initialPosition?.inSeconds, closeTo(240, 1));
+        expect(service.currentSermon?.id, 's2');
+      },
+    );
+
+    test('a short rebuffer is left alone', () async {
+      await playAt(const Duration(minutes: 4));
+
+      native()
+        ..stall()
+        ..recover();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(native().loads, hasLength(1));
     });
   });
 

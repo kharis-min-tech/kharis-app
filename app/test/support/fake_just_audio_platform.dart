@@ -156,6 +156,13 @@ class FakeAudioPlatformPlayer extends AudioPlayerPlatform {
     _broadcast();
   }
 
+  /// The stream stops delivering mid-playback: the native player sits
+  /// buffering with playback on, and (as just_audio on iOS) says nothing else.
+  void stall() {
+    _state = ProcessingStateMessage.buffering;
+    _broadcast();
+  }
+
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream => _events.stream;
 
