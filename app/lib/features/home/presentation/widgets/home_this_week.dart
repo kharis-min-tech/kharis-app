@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 
 import 'package:kharis_app/features/calendar/data/branch_service_events.dart';
 import 'package:kharis_app/features/calendar/data/event_repository.dart';
+import 'package:kharis_app/features/calendar/presentation/widgets/event_card.dart'
+    show reminderOutcomeMessage;
 import 'package:kharis_app/shared/providers/campus_config_provider.dart';
 import 'package:kharis_app/shared/providers/clock_provider.dart';
 import 'package:kharis_app/shared/providers/event_reminders_provider.dart';
@@ -33,17 +35,6 @@ final homeThisWeekEventsProvider = Provider<AsyncValue<List<Event>>>((ref) {
         ]..sort((a, b) => a.startTime.compareTo(b.startTime)),
       );
 });
-
-/// What the member is told after tapping "Remind me".
-String reminderOutcomeMessage(ReminderOutcome outcome) => switch (outcome) {
-  ReminderOutcome.on => 'We\u2019ll remind you an hour before it starts.',
-  ReminderOutcome.off => 'Reminder turned off.',
-  ReminderOutcome.permissionRefused =>
-    'Notifications are off. Turn them on in Settings to get reminders.',
-  ReminderOutcome.startsTooSoon =>
-    'This starts within the hour, so there is nothing to remind you of.',
-  ReminderOutcome.failed => 'Couldn\u2019t set the reminder. Try again.',
-};
 
 /// "This week" on Home: the branch's events in the next seven days, each
 /// opening its event and offering "Remind me", then a link to every event.
@@ -128,7 +119,7 @@ class _EventRow extends ConsumerWidget {
       ?..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(reminderOutcomeMessage(outcome)),
+          content: Text(reminderOutcomeMessage(outcome, event)),
           behavior: SnackBarBehavior.floating,
         ),
       );

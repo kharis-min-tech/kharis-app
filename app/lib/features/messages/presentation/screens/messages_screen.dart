@@ -120,16 +120,11 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 ),
               ),
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: KSpace.gutter,
-                  ),
-                  child: KTabs(
-                    key: const Key('messages-tabs'),
-                    tabs: [for (final t in tabs) t.label],
-                    currentIndex: tabs.indexOf(tab),
-                    onChanged: (i) => setState(() => _tab = tabs[i]),
-                  ),
+                child: KTabs(
+                  key: const Key('messages-tabs'),
+                  tabs: [for (final t in tabs) t.label],
+                  currentIndex: tabs.indexOf(tab),
+                  onChanged: (i) => setState(() => _tab = tabs[i]),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: KSpace.section)),
@@ -150,7 +145,12 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                 )
               else
                 ...switch (tab) {
-                  MessagesTab.forYou => const [_ForYou()],
+                  MessagesTab.forYou => [
+                    _ForYou(
+                      onDownloads: () =>
+                          setState(() => _tab = MessagesTab.downloads),
+                    ),
+                  ],
                   MessagesTab.books => const [_Books()],
                   MessagesTab.themes => const [_Themes()],
                   MessagesTab.series => const [_Series()],
@@ -221,10 +221,14 @@ class _Sections extends StatelessWidget {
 }
 
 class _ForYou extends ConsumerWidget {
-  const _ForYou();
+  const _ForYou({required this.onDownloads});
+
+  /// Opens the Downloads tab, from the empty state.
+  final VoidCallback onDownloads;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final library = ref.watch(sermonLibraryProvider);
     final sermons = ref.watch(sermonsProvider).valueOrNull ?? const <Sermon>[];
     final featured = featuredMessage(sermons);
     final recent = ref.watch(recentlyPlayedProvider);
@@ -238,6 +242,20 @@ class _ForYou extends ConsumerWidget {
           );
 
     return _Sections([
+      // Only once the archive has finished loading, came back empty, and
+      // there is nothing to feature either (the hero reads a wider list).
+      if (library.loaded && library.sermons.isEmpty && sermons.isEmpty)
+        KEmptyState(
+          key: const Key('messages-empty'),
+          icon: KIcons.soundwave,
+          title: 'No messages yet',
+          hint: 'New messages show here as soon as they are online.',
+          action: KButton(
+            label: 'Your downloads',
+            variant: KButtonVariant.outline,
+            onPressed: onDownloads,
+          ),
+        ),
       if (featured != null) _Hero(featured.sermon, part: featured.part),
       const HomeContinueListening(),
       if (lastPlayed != null && recommended.isNotEmpty)

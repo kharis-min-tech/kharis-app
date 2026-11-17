@@ -90,7 +90,8 @@ void openDashboardTab(
   ref.read(cacheServiceProvider).cachePreference(kLastTabKey, kTabPaths[index]);
 }
 
-/// Counts modal bottom sheets as they open and close on one navigator.
+/// Counts modal bottom sheets (and dialogs: a sheet under Reduce Motion is
+/// one) as they open and close on one navigator.
 /// A navigator observer serves a single navigator: create one per navigator
 /// (the root and each tab branch), all sharing [openSheetsProvider]'s count.
 class SheetObserver extends NavigatorObserver {
@@ -99,7 +100,10 @@ class SheetObserver extends NavigatorObserver {
   final ValueNotifier<int> _open;
 
   void _changed(Route<dynamic>? route, int by) {
-    if (route is ModalBottomSheetRoute) _open.value += by;
+    // With Reduce Motion on, a sheet opens as a dialog route.
+    if (route is ModalBottomSheetRoute || route is RawDialogRoute) {
+      _open.value += by;
+    }
   }
 
   @override
@@ -261,8 +265,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 /// tapping the highlighted one returns to its root. Back and swipe-back
 /// still leave just this page.
 class WithTabNav extends ConsumerWidget {
-  const WithTabNav({super.key, required this.child});
+  const WithTabNav({
+    super.key,
+    this.showMiniPlayer = true,
+    required this.child,
+  });
 
+  /// False where the mini player would crowd the page (Give, KA-001).
+  final bool showMiniPlayer;
   final Widget child;
 
   @override
@@ -276,6 +286,7 @@ class WithTabNav extends ConsumerWidget {
     final shell = overShell ? ref.read(activeTabShellProvider).shell : null;
     return DashboardNavFrame(
       currentIndex: shell?.currentIndex ?? 0,
+      showMiniPlayer: showMiniPlayer,
       onTap: (index) {
         // A page pushed straight onto the navigator, without a route of its
         // own, stays above the shell when the router moves: close it first.
@@ -288,19 +299,21 @@ class WithTabNav extends ConsumerWidget {
 }
 
 /// [child] with the floating nav over it, and the mini player above the nav
-/// while a message is loaded. Both step out of the way while a sheet is open
-/// or the keyboard is up.
+/// while a message is loaded (unless [showMiniPlayer] is false). Both step
+/// out of the way while a sheet is open or the keyboard is up.
 class DashboardNavFrame extends ConsumerStatefulWidget {
   const DashboardNavFrame({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.showMiniPlayer = true,
     required this.child,
   });
 
   /// The highlighted tab, an index into [kDashboardTabs].
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final bool showMiniPlayer;
   final Widget child;
 
   @override
@@ -365,7 +378,7 @@ class _DashboardNavFrameState extends ConsumerState<DashboardNavFrame> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (currentSermon != null)
+                      if (widget.showMiniPlayer && currentSermon != null)
                         const Padding(
                           padding: EdgeInsets.fromLTRB(
                             KSize.navInsetX,
