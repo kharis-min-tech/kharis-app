@@ -15,7 +15,11 @@ class KSegment {
     this.selected = false,
     this.enabled = true,
     this.tooltip,
+    this.key,
   });
+
+  /// Put on the option, so tests and journeys can find it.
+  final Key? key;
 
   final String label;
 
@@ -67,7 +71,7 @@ class KSegmentedControl extends StatelessWidget {
 }
 
 class _Segment extends StatelessWidget {
-  const _Segment(this.segment);
+  _Segment(this.segment) : super(key: segment.key);
 
   final KSegment segment;
 

@@ -1,5 +1,5 @@
 // Golden and behaviour tests for the Bible components: KReaderToolbar,
-// KVerse, KChapterNav, KChapterGrid, KHighlightSwatch, the compact
+// KVerse, KChapterNav, KChapterGrid, KBookGrid, KHighlightSwatch, the compact
 // KHeroCard and KStreakDots with today marked, in light and dark at 100% and
 // 200% text size, at the 390 design width. Regenerate after an intended
 // visual change:
@@ -34,20 +34,53 @@ Widget _padded(List<Widget> children) => Padding(
 
 Widget _toolbar() => _padded([
   KReaderToolbar(
-    layout: KReaderLayout.verses,
-    onLayoutChanged: (_) {},
     passage: 'John 1',
     version: 'KJV',
-    onSearch: () {},
+    previousLabel: 'Luke 24',
+    nextLabel: 'John 2',
+    onPrevious: () {},
+    onNext: () {},
     onPassage: () {},
+    onVersion: () {},
+    onStudy: () {},
   ),
   KReaderToolbar(
-    layout: KReaderLayout.paragraphs,
-    onLayoutChanged: (_) {},
     passage: '1 Thessalonians 5',
     version: 'NASB2020',
-    onSearch: () {},
+    nextLabel: '2 Thessalonians 1',
+    onNext: () {},
     onPassage: () {},
+    onVersion: () {},
+    onStudy: () {},
+  ),
+  KReaderToolbar(
+    passage: null,
+    version: 'NIV',
+    onPassage: () {},
+    onVersion: () {},
+    onStudy: () {},
+  ),
+]);
+
+Widget _bookGrid() => _padded([
+  KBookGrid(
+    books: [
+      for (final name in const [
+        'Romans',
+        '1 Corinthians',
+        '2 Corinthians',
+        'Galatians',
+        'Ephesians',
+        'Philippians',
+        'Colossians',
+        '1 Thessalonians',
+        '2 Thessalonians',
+        'Song of Solomon',
+      ])
+        (id: name, label: name),
+    ],
+    selected: 'Galatians',
+    onSelected: (_) {},
   ),
 ]);
 
@@ -167,6 +200,7 @@ void main() {
     'verse': _verses,
     'chapter_nav': _chapterNav,
     'chapter_grid': _chapterGrid,
+    'book_grid': _bookGrid,
     'highlight_swatch': _swatches,
     'hero_card_compact': _compactHero,
     'streak_dots_today': _streakToday,
@@ -209,31 +243,76 @@ void main() {
     }
   }
 
-  testWidgets('the toolbar switches layout and opens search and the picker', (
-    tester,
-  ) async {
-    KReaderLayout? layout;
-    var searched = 0;
-    var picked = 0;
+  testWidgets('the toolbar steps chapters and opens the picker, the '
+      'translations and the study tools', (tester) async {
+    final taps = <String>[];
     await pumpDesign(
       tester,
       _padded([
         KReaderToolbar(
-          layout: KReaderLayout.verses,
-          onLayoutChanged: (l) => layout = l,
           passage: 'John 1',
           version: 'KJV',
-          onSearch: () => searched++,
-          onPassage: () => picked++,
+          previousLabel: 'Luke 24',
+          nextLabel: 'John 2',
+          onPrevious: () => taps.add('previous'),
+          onNext: () => taps.add('next'),
+          onPassage: () => taps.add('passage'),
+          onVersion: () => taps.add('version'),
+          onStudy: () => taps.add('study'),
         ),
       ]),
       dark: false,
     );
-    await tester.tap(find.byKey(const Key('reader-layout-paragraphs')));
-    await tester.tap(find.byKey(const Key('bible-search')));
-    await tester.tap(find.byKey(const Key('bible-reference')));
-    expect(layout, KReaderLayout.paragraphs);
-    expect(searched, 1);
-    expect(picked, 1);
+    for (final key in const [
+      'bible-toolbar-prev',
+      'bible-toolbar-next',
+      'bible-reference',
+      'bible-translation',
+      'bible-study',
+    ]) {
+      await tester.tap(find.byKey(Key(key)));
+    }
+    expect(taps, ['previous', 'next', 'passage', 'version', 'study']);
+    for (final key in const [
+      'bible-toolbar-prev',
+      'bible-toolbar-next',
+      'bible-translation',
+      'bible-study',
+    ]) {
+      expect(
+        tester.getSize(find.byKey(Key(key))),
+        predicate<Size>(
+          (s) => s.width >= KSize.touchMin && s.height >= KSize.touchMin,
+        ),
+        reason: '$key is a 44 touch target',
+      );
+    }
+    expect(find.bySemanticsLabel('Previous chapter, Luke 24'), findsOneWidget);
+    expect(find.bySemanticsLabel('Next chapter, John 2'), findsOneWidget);
+    expect(find.bySemanticsLabel('Study tools'), findsOneWidget);
+  });
+
+  testWidgets('the toolbar dims Previous at the start of the Bible', (
+    tester,
+  ) async {
+    await pumpDesign(
+      tester,
+      _padded([
+        KReaderToolbar(
+          passage: 'Genesis 1',
+          version: 'KJV',
+          nextLabel: 'Genesis 2',
+          onNext: () {},
+          onPassage: () {},
+          onVersion: () {},
+          onStudy: () {},
+        ),
+      ]),
+      dark: false,
+    );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Previous chapter')),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+    );
   });
 }

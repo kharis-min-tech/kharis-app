@@ -8,6 +8,7 @@ import 'package:kharis_app/features/bible/presentation/bible_routes.dart';
 import 'package:kharis_app/features/bible/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/bible/presentation/widgets/passage_picker.dart';
 import 'package:kharis_app/features/bible/presentation/widgets/reference_search.dart';
+import 'package:kharis_app/features/bible/presentation/widgets/translation_sheet.dart';
 import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
@@ -20,9 +21,9 @@ import 'package:kharis_app/ui/components/components.dart';
 /// The church photo behind Continue reading.
 const _continuePhoto = AssetImage('assets/hero/sunday-bible-raised.jpg');
 
-/// The Bible tab (`/bible`): search with the passage picker, Continue
-/// reading, today's Daily reading with the week's dots, and the Highlights
-/// and My notes lists.
+/// The Bible tab (`/bible`): the translation switcher by the title, search
+/// with the passage picker, Continue reading, today's Daily reading with the
+/// week's dots, and the Highlights and My notes lists.
 class BibleScreen extends ConsumerStatefulWidget {
   const BibleScreen({super.key});
 
@@ -68,6 +69,7 @@ class _BibleScreenState extends ConsumerState<BibleScreen> {
     final error = _searchError;
     final highlights = ref.watch(verseHighlightCountProvider);
     final notes = ref.watch(verseNoteCountProvider);
+    final version = ref.watch(selectedBibleProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -84,7 +86,15 @@ class _BibleScreenState extends ConsumerState<BibleScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const KScreenHeader(title: 'Bible'),
+                  KScreenHeader(
+                    title: 'Bible',
+                    actions: [
+                      _TranslationChip(
+                        version: version.abbreviation,
+                        onTap: () => unawaited(showTranslationSheet(context)),
+                      ),
+                    ],
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       KSpace.gutter,
@@ -148,6 +158,41 @@ class _BibleScreenState extends ConsumerState<BibleScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The reading translation ("NIV" with a chevron), opening the translation
+/// switcher. The chip sits in a 44 hit area.
+class _TranslationChip extends StatelessWidget {
+  const _TranslationChip({required this.version, required this.onTap});
+
+  final String version;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Translation, $version. Change translation',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: KSize.touchMin),
+          child: Center(
+            widthFactor: 1,
+            child: KChip(
+              key: const Key('bible-landing-translation'),
+              label: version,
+              showChevron: true,
+              onTap: onTap,
             ),
           ),
         ),
