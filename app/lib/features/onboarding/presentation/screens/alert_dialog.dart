@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import '../../../../theme/kharis_theme.dart';
+
+/// The app-update prompt: the platform's own dialog (Cupertino on iOS,
+/// Material elsewhere) styled from the design tokens. With [forceUpdate] the
+/// cancel action is hidden.
 void showPlatformAlertDialogAdaptive(
   BuildContext context, {
   required String title,
@@ -14,22 +18,12 @@ void showPlatformAlertDialogAdaptive(
   showAdaptiveDialog(
     context: context,
     builder: (BuildContext context) {
+      final k = context.k;
       return AlertDialog.adaptive(
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
+        title: Text(title, style: KharisText.title.copyWith(color: k.text)),
         content: Text(
           description,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            fontSize: 10.sp,
-            fontWeight: FontWeight.w400,
-            color: Colors.black.withValues(alpha: 0.6),
-          ),
+          style: KharisText.body.copyWith(color: k.muted),
         ),
         actions: <Widget>[
           if (!forceUpdate)
@@ -40,11 +34,7 @@ void showPlatformAlertDialogAdaptive(
               },
               child: Text(
                 cancelText,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.red,
-                ),
+                style: KharisText.button.copyWith(color: k.muted),
               ),
             ),
           TextButton(
@@ -54,11 +44,7 @@ void showPlatformAlertDialogAdaptive(
             },
             child: Text(
               okText,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w500,
-                color: Colors.green,
-              ),
+              style: KharisText.button.copyWith(color: k.primaryText),
             ),
           ),
         ],
