@@ -12,6 +12,7 @@ class KChapterGrid extends StatelessWidget {
     required this.onSelected,
     required this.book,
     this.selected,
+    this.selectedKey,
   });
 
   /// Chapter numbers, in order.
@@ -23,6 +24,9 @@ class KChapterGrid extends StatelessWidget {
 
   /// The open chapter, if it is in this book.
   final int? selected;
+
+  /// Put on the [selected] cell, so the picker can bring it into view.
+  final GlobalKey? selectedKey;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,7 @@ class KChapterGrid extends StatelessWidget {
         final chapter = chapters[i];
         final on = chapter == selected;
         return Semantics(
+          key: on ? selectedKey : null,
           button: true,
           selected: on,
           label: '$book $chapter',

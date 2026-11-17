@@ -8,10 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kharis_app/features/bible/presentation/screens/bible_screen.dart';
 import 'package:kharis_app/features/bible/presentation/screens/reading_screen.dart';
 import 'package:kharis_app/features/bible/presentation/widgets/passage_picker.dart';
+import 'package:kharis_app/features/bible/presentation/widgets/study_sheet.dart';
+import 'package:kharis_app/features/bible/presentation/widgets/translation_sheet.dart';
 import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/shared/providers/sermon_provider.dart';
+import 'package:kharis_app/shared/providers/theme_provider.dart';
 import 'package:kharis_app/ui/components/components.dart';
 
 import '../support/harness.dart';
@@ -51,7 +54,9 @@ Future<bool> _passageLoaded(Journey j) async {
   );
 }
 
-/// In the open passage picker, picks [usfm] ([title]) chapter [chapter].
+/// In the open passage picker, picks [usfm] chapter [chapter]: from the
+/// open book's chapters back to the books, the testament, the book, then
+/// the chapter.
 Future<void> _chooseInPicker(
   Journey j,
   String usfm,
@@ -61,7 +66,12 @@ Future<void> _chooseInPicker(
 }) async {
   final t = j.tester;
   await pumpUntilFound(t, _picker);
-  final sheet = verticalScrollableIn(_picker);
+  final back = find.byKey(const Key('passage-picker-books'));
+  if (back.evaluate().isNotEmpty) {
+    await tapVisible(t, back);
+    await pumpUntilFound(t, find.byKey(const Key('bible-books')));
+    await pumpFor(t, const Duration(milliseconds: 400));
+  }
   final testament = find.byKey(
     Key('bible-testament-${newTestament ? 'newTestament' : 'old'}'),
   );
@@ -70,26 +80,33 @@ Future<void> _chooseInPicker(
     await pumpFor(t, const Duration(milliseconds: 400));
   }
   final book = find.byKey(Key('bible-book-$usfm'));
-  await scrollUntilFound(t, book, scrollable: sheet);
+  await scrollUntilFound(t, book, scrollable: verticalScrollableIn(_picker));
   // On a loaded device the tap can land while the list is still settling
-  // and be swallowed; the chapter grid would then still be the previous
-  // book's. Wait for the chip to show the book chosen, tapping again once.
-  bool chosen() => t.widget<KChip>(book).selected;
+  // and be swallowed; the sheet would then still show the books. Wait for
+  // the book's chapters (or, for a one-chapter book, the sheet to close),
+  // tapping again once.
+  bool chosen() => chapters > 1
+      ? find.byKey(const Key('bible-chapters')).evaluate().isNotEmpty
+      : _picker.evaluate().isEmpty;
   await tapVisible(t, book);
-  if (!await pumpUntil(t, chosen, timeout: const Duration(seconds: 5))) {
+  if (!await pumpUntil(t, chosen, timeout: const Duration(seconds: 5)) &&
+      book.evaluate().isNotEmpty) {
     await tapVisible(t, book);
     await pumpUntil(t, chosen, timeout: const Duration(seconds: 5));
   }
   if (chapters > 1) {
+    await pumpUntilFound(t, find.byKey(const Key('bible-chapters')));
+    await pumpFor(t, const Duration(milliseconds: 400));
     final cell = find.byKey(Key('bible-chapter-$chapter'));
-    await scrollUntilFound(t, cell, scrollable: sheet);
+    await scrollUntilFound(t, cell, scrollable: verticalScrollableIn(_picker));
     await tapVisible(t, cell);
   }
   await pumpUntil(t, () => _picker.evaluate().isEmpty);
   await _passageLoaded(j);
 }
 
-/// Opens the picker from the reader's reference and picks a chapter.
+/// Opens the picker from the reader's reference, which opens on the open
+/// book's chapters, and picks a chapter.
 Future<void> _pickChapter(
   Journey j,
   ({String usfm, String title, int chapters}) book,
@@ -100,6 +117,12 @@ Future<void> _pickChapter(
     j.tester,
     _inReader(find.byKey(const Key('bible-reference'))),
   );
+  await pumpUntilFound(j.tester, _picker);
+  j.check(
+    find.byKey(const Key('bible-chapters')).evaluate().isNotEmpty &&
+        find.byKey(const Key('passage-picker-books')).evaluate().isNotEmpty,
+    'the picker opens on the open book\u2019s chapters, Books one tap away',
+  );
   await _chooseInPicker(
     j,
     book.usfm,
@@ -109,6 +132,23 @@ Future<void> _pickChapter(
   );
 }
 
+/// Steps a chapter with the toolbar's Previous or Next, without scrolling.
+Future<void> _tapToolbarStep(Journey j, String key) async {
+  final t = j.tester;
+  await tapVisible(t, _inReader(find.byKey(Key(key))));
+  await pumpFor(t, const Duration(milliseconds: 500));
+  await _passageLoaded(j);
+}
+
+/// Opens the study tools from the reader toolbar.
+Future<void> _openStudy(Journey j) async {
+  await tapVisible(j.tester, _inReader(find.byKey(const Key('bible-study'))));
+  await pumpUntilFound(j.tester, find.byType(StudyToolsSheet));
+  await pumpFor(j.tester, const Duration(milliseconds: 400));
+}
+
+/// Steps a chapter with the end-of-chapter Previous or Next, scrolling down
+/// to it.
 Future<void> _tapStep(Journey j, String key) async {
   final t = j.tester;
   final step = _inReader(find.byKey(Key(key)));
@@ -124,13 +164,17 @@ Future<void> _tapStep(Journey j, String key) async {
   await _passageLoaded(j);
 }
 
-/// (g) Bible: the Bible tab's Daily reading opens on today's reading;
-/// "John 3:16" search marks the verse; a random book + chapter from the
-/// picker; previous / next across a book boundary; another translation, then
-/// NIV again; a chapter chosen away from today offers the way back to
-/// today's reading. The landing screen's picker opens a chapter, Done on it
-/// stays on the landing screen, the swipe back returns there and Continue
-/// reading offers that chapter; its search field opens a verse.
+/// (g) Bible: the Bible tab's Daily reading opens on today's reading; the
+/// study tools' "Go to a passage" finds John 3:16 and marks the verse; a
+/// random book + chapter from the stepped picker (which opens on the open
+/// book's chapters); the toolbar's Previous / Next and the end-of-chapter
+/// ones across a book boundary; another translation from the translation
+/// switcher, then NIV again; a chapter chosen away from today offers the way
+/// back to today's reading. The landing screen's picker opens a chapter, Done
+/// on it stays on the landing screen, the swipe back returns there and
+/// Continue reading offers that chapter; its search field opens a verse and
+/// its translation chip opens the switcher. One pass in dark mode shows the
+/// toolbar, the translation switcher and both picker steps.
 Future<void> bibleJourney(Journey j) async {
   final t = j.tester;
   final r = seeded(effectiveSeed, 'bible');
@@ -216,8 +260,21 @@ Future<void> bibleJourney(Journey j) async {
   }
   await j.shot('today');
 
-  // ── Search John 3:16 ─────────────────────────────────────────────────────
-  await tapVisible(t, _inReader(find.byKey(const Key('bible-search'))));
+  // ── Study tools: Go to a passage, John 3:16 ──────────────────────────────
+  await _openStudy(j);
+  j.check(
+    [
+      'bible-search',
+      'bible-study-highlights',
+      'bible-study-notes',
+      'reader-layout-verses',
+      'reader-text-size-medium',
+    ].every((k) => find.byKey(Key(k)).evaluate().isNotEmpty),
+    'the study tools hold Go to a passage, Highlights, My notes, the layout '
+    'and the text size',
+  );
+  await j.shot('study-tools');
+  await tapVisible(t, find.byKey(const Key('bible-search')));
   await pumpUntilFound(t, find.byKey(const Key('bible-search-field')));
   await t.enterText(find.byKey(const Key('bible-search-field')), 'John 3:16');
   // The sheet rides above the keyboard; close it so Go is where it is drawn.
@@ -257,6 +314,32 @@ Future<void> bibleJourney(Journey j) async {
   );
   await j.shot('random-chapter');
 
+  // ── Toolbar Previous / Next, no scrolling ────────────────────────────────
+  if (book.chapters == 1) {
+    j.note('${book.title} has one chapter; the toolbar step uses the boundary');
+  } else {
+    final forward = chapter < book.chapters;
+    final stepped = '${book.title} ${forward ? chapter + 1 : chapter - 1}';
+    await _tapToolbarStep(
+      j,
+      forward ? 'bible-toolbar-next' : 'bible-toolbar-prev',
+    );
+    j.check(
+      _label(t) == stepped,
+      'the toolbar\u2019s ${forward ? 'Next' : 'Previous'} opens $stepped '
+      'without scrolling (shows "${_label(t)}")',
+    );
+    await j.shot('toolbar-step');
+    await _tapToolbarStep(
+      j,
+      forward ? 'bible-toolbar-prev' : 'bible-toolbar-next',
+    );
+    j.check(
+      _label(t) == '${book.title} $chapter',
+      'and back to ${book.title} $chapter (shows "${_label(t)}")',
+    );
+  }
+
   // ── Across a book boundary ───────────────────────────────────────────────
   final i = r.nextInt(books.length - 1);
   final a = books[i];
@@ -280,8 +363,8 @@ Future<void> bibleJourney(Journey j) async {
   );
 
   // ── Translation ──────────────────────────────────────────────────────────
-  // The picker offers only church-approved translations the key is licensed
-  // for; everything else YouVersion lists must stay out of the picker.
+  // The translation switcher offers only church-approved translations the key
+  // is licensed for; everything else YouVersion lists must stay out of it.
   final licensed = await youVersionBibles();
   final offered = licensed
       .where((v) => v.id != 111)
@@ -295,26 +378,47 @@ Future<void> bibleJourney(Journey j) async {
     before.id == 111,
     'NIV is the default version (got ${before.abbreviation})',
   );
+  var shownSheet = false;
   Future<void> chooseVersion(int id) async {
-    await tapVisible(t, _inReader(find.byKey(const Key('bible-reference'))));
-    await pumpUntilFound(t, _picker, reason: 'passage picker');
-    final sheet = verticalScrollableIn(_picker);
+    await tapVisible(t, _inReader(find.byKey(const Key('bible-translation'))));
+    await pumpUntilFound(
+      t,
+      find.byType(TranslationSheet),
+      reason: 'translation switcher',
+    );
     final tile = find.byKey(Key('bible-version-$id'));
-    await scrollUntilFound(t, tile, scrollable: sheet);
+    await pumpUntilFound(t, tile);
     final listed = j.c.read(biblesProvider).valueOrNull ?? const [];
     j.check(
       listed.every((v) => BibleRepository.approvedBibleIds.contains(v.id)) &&
           notApproved.every(
             (v) => find.byKey(Key('bible-version-${v.id}')).evaluate().isEmpty,
           ),
-      'picker lists only approved versions '
+      'the switcher lists only approved translations '
       '(${listed.map((v) => v.abbreviation).join(', ')})',
     );
+    final screen = t.view.physicalSize.height / t.view.devicePixelRatio;
+    j.check(
+      listed.every((v) {
+        final row = find.byKey(Key('bible-version-${v.id}'));
+        return row.evaluate().isNotEmpty && t.getRect(row).bottom <= screen;
+      }),
+      'every translation is on screen without scrolling',
+    );
+    if (!shownSheet) {
+      shownSheet = true;
+      await j.shot('translation-sheet');
+    }
     await tapVisible(t, tile);
     await pumpUntil(t, () => j.c.read(selectedBibleProvider).id == id);
-    // Choosing a version leaves the sheet open; Done closes it.
-    await tapVisible(t, find.byKey(const Key('passage-picker-done')));
-    await pumpUntil(t, () => _picker.evaluate().isEmpty);
+    // One tap switches and closes the switcher.
+    j.check(
+      await pumpUntil(
+        t,
+        () => find.byType(TranslationSheet).evaluate().isEmpty,
+      ),
+      'choosing a translation closes the switcher',
+    );
     await _passageLoaded(j);
   }
 
@@ -416,7 +520,39 @@ Future<void> bibleJourney(Journey j) async {
     await pumpUntil(t, () => _picker.evaluate().isNotEmpty),
     'Choose a passage opens the picker',
   );
-  await j.shot('bible-picker');
+  await pumpFor(t, const Duration(milliseconds: 400));
+  j.check(
+    find.byKey(const Key('bible-chapters')).evaluate().isNotEmpty,
+    'with a chapter read, the picker opens on that book\u2019s chapters',
+  );
+  await j.shot('picker-chapters');
+  await tapVisible(t, find.byKey(const Key('passage-picker-books')));
+  j.check(
+    await pumpUntil(
+      t,
+      () => find.byKey(const Key('bible-books')).evaluate().isNotEmpty,
+    ),
+    'Books returns to the books',
+  );
+  final screenHeight = t.view.physicalSize.height / t.view.devicePixelRatio;
+  final lastBook = find.byKey(Key('bible-book-${books.last.usfm}'));
+  await tapVisible(t, find.byKey(const Key('bible-testament-newTestament')));
+  await pumpFor(t, const Duration(milliseconds: 400));
+  j.check(
+    lastBook.evaluate().isNotEmpty &&
+        t.getRect(lastBook).bottom <= screenHeight,
+    'the New Testament books fit on one screen',
+  );
+  await j.shot('picker-books');
+  final oldTestament = books.sublist(0, ntStart < 0 ? books.length : ntStart);
+  final malachi = find.byKey(Key('bible-book-${oldTestament.last.usfm}'));
+  await tapVisible(t, find.byKey(const Key('bible-testament-old')));
+  await pumpFor(t, const Duration(milliseconds: 400));
+  j.check(
+    malachi.evaluate().isNotEmpty && t.getRect(malachi).bottom <= screenHeight,
+    'the ${oldTestament.length} Old Testament books fit on one screen',
+  );
+  await j.shot('picker-books-old');
   await tapVisible(t, find.byKey(const Key('passage-picker-done')));
   j.check(
     await pumpUntil(
@@ -481,4 +617,46 @@ Future<void> bibleJourney(Journey j) async {
     '(shows "${_label(t)}", marked ${_markedVerses(t)})',
   );
   await j.shot('landing-search');
+
+  // ── Dark mode: toolbar, translation switcher, picker ─────────────────────
+  final theme = j.c.read(themeModeProvider);
+  await j.c.read(themeModeProvider.notifier).set(ThemeMode.dark);
+  await pumpFor(t, const Duration(milliseconds: 600));
+  await j.shot('dark-reader-toolbar');
+  await tapVisible(t, _inReader(find.byKey(const Key('bible-translation'))));
+  await pumpUntilFound(t, find.byType(TranslationSheet));
+  await pumpFor(t, const Duration(milliseconds: 400));
+  await j.shot('dark-translation-sheet');
+  await tapVisible(t, find.byKey(const Key('bible-version-111')));
+  await pumpUntil(t, () => find.byType(TranslationSheet).evaluate().isEmpty);
+  await tapVisible(t, _inReader(find.byKey(const Key('bible-reference'))));
+  await pumpUntilFound(t, find.byKey(const Key('bible-chapters')));
+  await pumpFor(t, const Duration(milliseconds: 400));
+  await j.shot('dark-picker-chapters');
+  await tapVisible(t, find.byKey(const Key('passage-picker-books')));
+  await pumpUntilFound(t, find.byKey(const Key('bible-books')));
+  await pumpFor(t, const Duration(milliseconds: 400));
+  await j.shot('dark-picker-books');
+  await tapVisible(t, find.byKey(const Key('passage-picker-done')));
+  await pumpUntil(t, () => _picker.evaluate().isEmpty);
+  await j.c.read(themeModeProvider.notifier).set(theme);
+  await pumpFor(t, const Duration(milliseconds: 600));
+
+  // ── The Bible tab's translation chip ─────────────────────────────────────
+  await goBack(t);
+  await pumpUntil(t, () => find.byType(ReadingScreen).evaluate().isEmpty);
+  await tapVisible(t, find.byKey(const Key('bible-landing-translation')));
+  j.check(
+    await pumpUntil(
+      t,
+      () => find.byType(TranslationSheet).evaluate().isNotEmpty,
+    ),
+    'the Bible tab\u2019s translation chip opens the switcher',
+  );
+  await pumpFor(t, const Duration(milliseconds: 400));
+  await tapVisible(t, find.byKey(const Key('bible-version-111')));
+  j.check(
+    await pumpUntil(t, () => find.byType(TranslationSheet).evaluate().isEmpty),
+    'choosing NIV there closes the switcher',
+  );
 }

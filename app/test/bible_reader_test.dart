@@ -19,6 +19,7 @@ import 'package:kharis_app/shared/models/sermon.dart';
 import 'package:kharis_app/shared/providers/cache_provider.dart';
 import 'package:kharis_app/shared/providers/last_read_provider.dart';
 import 'package:kharis_app/shared/providers/streaks_provider.dart';
+import 'package:kharis_app/shared/providers/text_size_provider.dart';
 import 'package:kharis_app/shared/providers/verse_marks_provider.dart';
 import 'package:kharis_app/ui/components/components.dart';
 
@@ -182,6 +183,9 @@ Future<_Reader> _pumpReader(
   bool booksEmpty = false,
   Set<String> missing = const {},
   BibleLocation? location,
+  bool dark = false,
+  double textScale = 1,
+  Size size = const Size(800, 1600),
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sharedPrefs = await SharedPreferences.getInstance();
@@ -189,7 +193,7 @@ Future<_Reader> _pumpReader(
     ..booksHang = booksHang
     ..booksEmpty = booksEmpty
     ..missing.addAll(missing);
-  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = ProviderContainer(
@@ -207,6 +211,14 @@ Future<_Reader> _pumpReader(
       container: container,
       child: MaterialApp(
         theme: KharisTheme.light(),
+        darkTheme: KharisTheme.dark(),
+        themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+        builder: (context, app) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: app!,
+        ),
         home: ReadingScreen(location: location),
       ),
     ),
@@ -256,12 +268,24 @@ Future<void> _openPicker(WidgetTester tester) async {
 }
 
 /// In the open picker: the book [usfm], then chapter [chapter] when given.
+/// From a book's chapters it goes back to the books first; a book in the
+/// other testament is found through that testament's tab.
 Future<void> _chooseBook(
   WidgetTester tester,
   String usfm, [
   int? chapter,
 ]) async {
+  final back = find.byKey(const Key('passage-picker-books'));
+  if (back.evaluate().isNotEmpty) {
+    await tester.tap(back);
+    await tester.pumpAndSettle();
+  }
   final book = find.byKey(Key('bible-book-$usfm'));
+  if (book.evaluate().isEmpty) {
+    final testament = kCanonBooks.firstWhere((b) => b.usfm == usfm).testament;
+    await tester.tap(find.byKey(Key('bible-testament-${testament.name}')));
+    await tester.pumpAndSettle();
+  }
   await tester.ensureVisible(book);
   await tester.tap(book);
   await tester.pumpAndSettle();
@@ -271,6 +295,12 @@ Future<void> _chooseBook(
     await tester.tap(cell);
     await tester.pumpAndSettle();
   }
+}
+
+/// Opens the study tools from the reader toolbar.
+Future<void> _openStudy(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('bible-study')));
+  await tester.pumpAndSettle();
 }
 
 Finder _title(String label) => find.descendant(
@@ -289,6 +319,7 @@ List<int?> _marked(WidgetTester tester) => [
 ];
 
 Future<void> _search(WidgetTester tester, String input) async {
+  await _openStudy(tester);
   await tester.tap(find.byKey(const Key('bible-search')));
   await tester.pumpAndSettle();
   await tester.enterText(find.byKey(const Key('bible-search-field')), input);
@@ -740,6 +771,98 @@ void main() {
       expect(_title('Matthew 1'), findsOneWidget);
     });
 
+    testWidgets('the toolbar steps to the next and previous chapter', (
+      tester,
+    ) async {
+      final r = await _pumpReader(tester, today: _today('Malachi', 4));
+
+      await tester.tap(find.byKey(const Key('bible-toolbar-next')));
+      await tester.pumpAndSettle();
+      expect(_title('Matthew 1'), findsOneWidget);
+      expect(r.repo.passageRequests.last, '111/MAT.1');
+
+      await tester.tap(find.byKey(const Key('bible-toolbar-next')));
+      await tester.pumpAndSettle();
+      expect(_title('Matthew 2'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('bible-toolbar-prev')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bible-toolbar-prev')));
+      await tester.pumpAndSettle();
+      // Back on today's chapter: today's reading again.
+      expect(_title('Malachi 4'), findsOneWidget);
+      expect(find.byKey(const Key('bible-today')), findsNothing);
+    });
+
+    testWidgets('the passage picker opens on the open book\u2019s chapters', (
+      tester,
+    ) async {
+      await _pumpReader(tester);
+
+      await _openPicker(tester);
+      expect(find.byKey(const Key('bible-chapters')), findsOneWidget);
+      expect(find.byKey(const Key('bible-books')), findsNothing);
+      expect(find.byKey(const Key('passage-picker-books')), findsOneWidget);
+      expect(
+        tester.getSemantics(find.byKey(const Key('bible-chapter-3'))),
+        isSemantics(isSelected: true, hasSelectedState: true),
+      );
+    });
+
+    testWidgets('the passage picker: books, then chapters, then the chapter '
+        'opens', (tester) async {
+      final r = await _pumpReader(tester);
+
+      await _openPicker(tester);
+      await tester.tap(find.byKey(const Key('passage-picker-books')));
+      await tester.pumpAndSettle();
+      // Back on the books, at John's testament.
+      expect(find.byKey(const Key('bible-books')), findsOneWidget);
+      expect(find.byKey(const Key('bible-book-JHN')), findsOneWidget);
+      expect(find.byKey(const Key('bible-book-GEN')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('bible-testament-old')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bible-book-GEN')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bible-chapters')), findsOneWidget);
+      expect(find.byKey(const Key('bible-chapter-50')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('bible-chapter-5')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bible-chapters')), findsNothing);
+      expect(_title('Genesis 5'), findsOneWidget);
+      expect(r.repo.passageRequests.last, '111/GEN.5');
+    });
+
+    testWidgets('Find a book narrows the books and opens the only match', (
+      tester,
+    ) async {
+      await _pumpReader(tester);
+      await _openPicker(tester);
+      await tester.tap(find.byKey(const Key('passage-picker-books')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('bible-book-filter')), 'tim');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bible-book-1TI')), findsOneWidget);
+      expect(find.byKey(const Key('bible-book-2TI')), findsOneWidget);
+      expect(find.byKey(const Key('bible-book-JHN')), findsNothing);
+
+      await tester.enterText(find.byKey(const Key('bible-book-filter')), 'lev');
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bible-chapters')), findsOneWidget);
+      expect(find.text('Leviticus'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('passage-picker-books')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('bible-book-filter')), 'xyz');
+      await tester.pumpAndSettle();
+      expect(find.text('No book called \u201cxyz\u201d'), findsOneWidget);
+    });
+
     testWidgets('the passage picker: book, then chapter', (tester) async {
       final r = await _pumpReader(tester);
 
@@ -776,6 +899,9 @@ void main() {
       expect(_title('John 3'), findsOneWidget);
 
       await _openPicker(tester);
+      expect(find.byKey(const Key('bible-chapters')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('passage-picker-books')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('bible-books')), findsOneWidget);
     });
 
@@ -806,29 +932,94 @@ void main() {
       expect(find.text('John has 21 chapters.'), findsOneWidget);
     });
 
-    testWidgets('changing version reloads and is remembered', (tester) async {
+    testWidgets('the translation switcher changes translation in one tap, '
+        'closes and is remembered', (tester) async {
       final r = await _pumpReader(tester);
 
-      await _openPicker(tester);
-      final version = find.byKey(const Key('bible-version-2692'));
-      await tester.ensureVisible(version);
-      await tester.tap(version);
+      await tester.tap(find.byKey(const Key('bible-translation')));
       await tester.pumpAndSettle();
+      // Only the account's approved translations, the reading one marked.
+      expect(find.byKey(const Key('bible-version-111')), findsOneWidget);
+      expect(find.byKey(const Key('bible-version-2692')), findsOneWidget);
+      expect(
+        tester.getSemantics(find.byKey(const Key('bible-version-111'))),
+        isSemantics(isSelected: true, hasSelectedState: true),
+      );
 
+      await tester.tap(find.byKey(const Key('bible-version-2692')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bible-version-2692')), findsNothing);
       expect(r.repo.passageRequests.last, '2692/JHN.3');
       expect(r.prefs.getInt(SelectedBibleController.idKey), 2692);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('bible-translation')),
+          matching: find.text('NASB2020'),
+        ),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('the layout toggle runs verses into paragraphs and is '
-        'remembered', (tester) async {
+    testWidgets('the study tools lead to highlights, notes and search, and '
+        'switch the layout and text size', (tester) async {
       final r = await _pumpReader(tester);
       expect(find.byType(KVerse), findsNWidgets(36));
 
+      await _openStudy(tester);
+      for (final key in const [
+        'bible-search',
+        'bible-study-highlights',
+        'bible-study-notes',
+      ]) {
+        expect(find.byKey(Key(key)), findsOneWidget);
+      }
       await tester.tap(find.byKey(const Key('reader-layout-paragraphs')));
       await tester.pumpAndSettle();
       expect(find.byType(KVerse), findsOneWidget);
       expect(r.container.read(readerLayoutProvider), KReaderLayout.paragraphs);
+
+      await tester.tap(find.byKey(const Key('reader-text-size-large')));
+      await tester.pumpAndSettle();
+      expect(r.container.read(textSizeProvider), TextSizeChoice.large);
     });
+
+    for (final dark in const [false, true]) {
+      testWidgets('the sheets lay out at 130% text in '
+          '${dark ? 'dark' : 'light'}', (tester) async {
+        await _pumpReader(
+          tester,
+          dark: dark,
+          textScale: 1.3,
+          size: const Size(KSize.designWidth, 844),
+          location: const BibleLocation('PSA', 119),
+        );
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.byKey(const Key('bible-translation')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('bible-version-2692')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byKey(const Key('bible-version-111')));
+        await tester.pumpAndSettle();
+
+        await _openPicker(tester);
+        expect(find.byKey(const Key('bible-chapter-119')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byKey(const Key('passage-picker-books')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('bible-books')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byKey(const Key('bible-testament-newTestament')));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byKey(const Key('passage-picker-done')));
+        await tester.pumpAndSettle();
+
+        await _openStudy(tester);
+        expect(find.byKey(const Key('reader-text-size-large')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
 
     testWidgets('offline shows Retry, and Retry loads the chapter', (
       tester,
@@ -997,6 +1188,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('bible-landing-search')), findsOneWidget);
       expect(find.byKey(const Key('bible-continue')), findsOneWidget);
+    });
+
+    testWidgets('the landing screen switches translation', (tester) async {
+      await _pumpRoutes(tester, open: '/bible');
+      final chip = find.byKey(const Key('bible-landing-translation'));
+      expect(
+        find.descendant(of: chip, matching: find.text('NIV')),
+        findsOneWidget,
+      );
+
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bible-version-2692')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bible-version-2692')), findsNothing);
+      expect(
+        find.descendant(of: chip, matching: find.text('NASB2020')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the landing screen explains a reference it cannot find', (

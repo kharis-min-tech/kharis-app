@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:kharis_app/features/bible/presentation/bible_routes.dart';
 import 'package:kharis_app/features/bible/presentation/reader_layout_provider.dart';
 import 'package:kharis_app/features/bible/presentation/widgets/passage_picker.dart';
 import 'package:kharis_app/features/bible/presentation/widgets/reference_search.dart';
+import 'package:kharis_app/features/bible/presentation/widgets/study_sheet.dart';
+import 'package:kharis_app/features/bible/presentation/widgets/translation_sheet.dart';
 import 'package:kharis_app/features/bible/presentation/widgets/verse_sheet.dart';
 import 'package:kharis_app/features/home/data/bible_reference.dart';
 import 'package:kharis_app/features/home/data/bible_repository.dart';
@@ -268,29 +272,66 @@ class _ReaderFrame extends StatelessWidget {
   }
 }
 
-/// The reader toolbar with the remembered layout.
+/// The reader toolbar: the chapter stepper with the passage picker, the
+/// translation switcher and the study tools.
 class _Toolbar extends ConsumerWidget {
   const _Toolbar({
     required this.passage,
     required this.onPassage,
     required this.onSearch,
+    this.previous,
+    this.next,
+    this.onNavigate,
   });
 
   final String? passage;
   final VoidCallback onPassage;
   final VoidCallback onSearch;
 
+  /// The chapters either side of the open one, stepped to with
+  /// [onNavigate]; both null leave the arrows out.
+  final BibleLocation? previous;
+  final BibleLocation? next;
+  final ValueChanged<BibleLocation>? onNavigate;
+
+  Future<void> _study(BuildContext context) async {
+    final tool = await showStudyTools(context);
+    if (tool == null || !context.mounted) return;
+    switch (tool) {
+      case StudyTool.search:
+        onSearch();
+      case StudyTool.highlights:
+        unawaited(context.push(kHighlightsPath));
+      case StudyTool.notes:
+        unawaited(context.push(kVerseNotesPath));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final version = ref.watch(selectedBibleProvider);
+    final index =
+        ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
+        BibleIndex.bundled();
+    final previous = this.previous;
+    final next = this.next;
+    final onNavigate = this.onNavigate;
+
     return KReaderToolbar(
       key: const Key('bible-toolbar'),
-      layout: ref.watch(readerLayoutProvider),
-      onLayoutChanged: (layout) =>
-          unawaited(ref.read(readerLayoutProvider.notifier).select(layout)),
       passage: passage,
-      version: ref.watch(selectedBibleProvider).abbreviation,
-      onSearch: onSearch,
+      version: version.abbreviation,
       onPassage: onPassage,
+      onVersion: () => unawaited(showTranslationSheet(context)),
+      onStudy: () => unawaited(_study(context)),
+      previousLabel: previous == null ? null : index.label(previous),
+      nextLabel: next == null ? null : index.label(next),
+      onPrevious: previous == null || onNavigate == null
+          ? null
+          : () => onNavigate(previous),
+      onNext: next == null || onNavigate == null
+          ? null
+          : () => onNavigate(next),
     );
   }
 }
@@ -482,11 +523,17 @@ class _PassageViewState extends ConsumerState<_PassageView> {
       ),
     ];
 
+    final previous = index.previous(location);
+    final next = index.next(location);
+
     Widget page(List<Widget> children) => _ReaderFrame(
       toolbar: _Toolbar(
         passage: chapterLabel,
         onPassage: widget.onPickPassage,
         onSearch: widget.onSearch,
+        previous: previous,
+        next: next,
+        onNavigate: widget.onNavigate,
       ),
       child: SingleChildScrollView(
         key: PageStorageKey('bible-${location.passageId}'),
@@ -523,12 +570,12 @@ class _PassageViewState extends ConsumerState<_PassageView> {
                     title: 'This passage isn\u2019t available',
                     hint:
                         '$chapterLabel isn\u2019t in ${version.abbreviation}. '
-                        'Choose another version.',
+                        'Choose another translation.',
                     action: KButton(
                       key: const Key('bible-change-version'),
-                      label: 'Change version',
+                      label: 'Change translation',
                       variant: KButtonVariant.outline,
-                      onPressed: widget.onPickPassage,
+                      onPressed: () => unawaited(showTranslationSheet(context)),
                     ),
                   ),
                 ),
@@ -551,8 +598,6 @@ class _PassageViewState extends ConsumerState<_PassageView> {
             ]);
           },
           data: (passage) {
-            final previous = index.previous(location);
-            final next = index.next(location);
             final body = _PassageBody(
               blocks: passage.blocks,
               location: location,

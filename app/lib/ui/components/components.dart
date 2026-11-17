@@ -5,6 +5,7 @@
 
 export '../../theme/kharis_theme.dart';
 export 'k_badge.dart';
+export 'k_book_grid.dart';
 export 'k_bottom_sheet.dart';
 export 'k_button.dart';
 export 'k_card.dart';

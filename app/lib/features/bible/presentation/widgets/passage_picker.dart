@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,10 +6,10 @@ import 'package:kharis_app/features/home/data/bible_repository.dart';
 import 'package:kharis_app/shared/providers/bible_provider.dart';
 import 'package:kharis_app/ui/components/components.dart';
 
-/// The passage picker: one sheet with the books (Old or New Testament), the
-/// chosen book's chapters and the Bible versions. Resolves to the chosen
-/// chapter, or null when the member closes it. Choosing a version changes
-/// the reading version at once and leaves the sheet open.
+/// The passage picker: one sheet in two steps. Books (Old or New Testament,
+/// or found by name) as a compact grid, then the chosen book's chapters.
+/// With a [current] place it opens on that book's chapters, one tap from the
+/// books. Resolves to the chosen chapter, or null when the member closes it.
 Future<BibleLocation?> showPassagePicker(
   BuildContext context, {
   BibleLocation? current,
@@ -31,14 +29,27 @@ class PassagePicker extends ConsumerStatefulWidget {
 }
 
 class _PassagePickerState extends ConsumerState<PassagePicker> {
-  final _chaptersKey = GlobalKey();
+  final _filter = TextEditingController();
 
-  /// The book whose chapters are shown.
+  /// Counts step changes, so a step shown again while its last showing
+  /// still fades out is a new child.
+  var _visit = 0;
+
+  /// The book whose chapters are shown; null on the books step.
   late String? _usfm = widget.current?.usfm;
 
   /// The testament whose books are shown; null until one is chosen, when it
-  /// follows [_usfm].
+  /// follows the open book.
   Testament? _testament;
+
+  /// The book name typed into Find a book.
+  String _query = '';
+
+  @override
+  void dispose() {
+    _filter.dispose();
+    super.dispose();
+  }
 
   void _chooseBook(BibleBook book) {
     // A book with one chapter has nothing more to choose.
@@ -46,23 +57,34 @@ class _PassagePickerState extends ConsumerState<PassagePicker> {
       Navigator.of(context).pop(BibleLocation(book.usfm, book.chapters.single));
       return;
     }
-    setState(() => _usfm = book.usfm);
-    // The chapters sit below the books: bring them into view.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final target = _chaptersKey.currentContext;
-      if (target == null || !target.mounted) return;
-      Scrollable.ensureVisible(
-        target,
-        duration: MediaQuery.disableAnimationsOf(target)
-            ? Duration.zero
-            : KMotion.fast,
-      );
+    FocusScope.of(context).unfocus();
+    _filter.clear();
+    setState(() {
+      _usfm = book.usfm;
+      _testament = book.testament;
+      _query = '';
+      _visit++;
     });
+  }
+
+  void _backToBooks(BibleBook book) => setState(() {
+    _usfm = null;
+    _testament = book.testament;
+    _visit++;
+  });
+
+  /// Books whose name has [_query] in it, spaces ignored ("1cor").
+  List<BibleBook> _matches(BibleIndex index) {
+    String fold(String s) => s.toLowerCase().replaceAll(' ', '');
+    final query = fold(_query);
+    return [
+      for (final b in index.books)
+        if (fold(b.title).contains(query)) b,
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
-    final k = context.k;
     final version = ref.watch(selectedBibleProvider);
     // The version's own list once it has loaded, the bundled 66-book table
     // until then, so a slow connection never leaves a spinner here.
@@ -70,162 +92,329 @@ class _PassagePickerState extends ConsumerState<PassagePicker> {
         ref.watch(bibleIndexProvider(version.id)).valueOrNull ??
         BibleIndex.bundled();
     final book = _usfm == null ? null : index.book(_usfm!);
-    final testaments = [
-      for (final t in Testament.values)
-        if (index.books.any((b) => b.testament == t)) t,
-    ];
-    // Null when the version answered with no books at all.
-    final Testament? testament = testaments.contains(_testament)
-        ? _testament!
-        : testaments.contains(book?.testament)
-        ? book!.testament
-        : testaments.firstOrNull;
-    final current = widget.current;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    Widget heading(String text) => Semantics(
-      header: true,
-      child: Text(text, style: KharisText.itemTitle.copyWith(color: k.text)),
+    final Widget step = book == null
+        ? _BooksStep(
+            key: ValueKey(_visit),
+            index: index,
+            testament: _testament,
+            selected: widget.current?.usfm,
+            query: _query,
+            filter: _filter,
+            matches: _query.trim().isEmpty ? null : _matches(index),
+            onTestament: (t) => setState(() => _testament = t),
+            onQuery: (q) => setState(() => _query = q),
+            onBook: _chooseBook,
+          )
+        : _ChaptersStep(
+            key: ValueKey(_visit),
+            book: book,
+            selected: widget.current?.usfm == book.usfm
+                ? widget.current?.chapter
+                : null,
+            onBack: () => _backToBooks(book),
+          );
+
+    return Padding(
+      // Find a book stays above the keyboard.
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: AnimatedSwitcher(
+        duration: reduceMotion ? Duration.zero : KMotion.fast,
+        // Books come from the left, chapters from the right.
+        transitionBuilder: (child, animation) {
+          final fromLeft = child is _BooksStep;
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween(
+                begin: Offset(fromLeft ? -_slide : _slide, 0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.topCenter,
+          children: [...previous, ?current],
+        ),
+        child: step,
+      ),
     );
+  }
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    current == null
-                        ? 'Choose a passage'
-                        : index.label(current.wholeChapter),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: KharisText.section.copyWith(color: k.text),
-                  ),
+  /// How far a step slides in, as a share of its width.
+  static const double _slide = 0.08;
+}
+
+/// The sheet's top row: the step's title (with Books on the chapters step)
+/// and Done.
+class _Header extends StatelessWidget {
+  const _Header({required this.title, this.onBack});
+
+  final String title;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    final onBack = this.onBack;
+
+    return Row(
+      children: [
+        if (onBack != null) ...[
+          Semantics(
+            button: true,
+            label: 'Back to books',
+            onTap: onBack,
+            excludeSemantics: true,
+            child: InkWell(
+              key: const Key('passage-picker-books'),
+              onTap: onBack,
+              borderRadius: const BorderRadius.all(
+                Radius.circular(KRadius.chip),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: KSize.touchMin,
+                  minHeight: KSize.touchMin,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    KIcon(
+                      KIcons.chevronLeft,
+                      size: KSize.iconSm,
+                      color: k.primaryText,
+                    ),
+                    const SizedBox(width: KSpace.xs),
+                    Text(
+                      'Books',
+                      style: KharisText.link.copyWith(color: k.primaryText),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: KSpace.xl),
-              KButton(
-                key: const Key('passage-picker-done'),
-                label: 'Done',
-                variant: KButtonVariant.inverse,
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: KSpace.x3),
-          heading('Book'),
-          if (testaments.length > 1) ...[
-            const SizedBox(height: KSpace.md),
-            Wrap(
-              spacing: KSpace.md,
-              runSpacing: KSpace.md,
-              children: [
-                for (final t in testaments)
-                  KChip(
-                    key: Key('bible-testament-${t.name}'),
-                    label: t == Testament.old
-                        ? 'Old Testament'
-                        : 'New Testament',
-                    selected: t == testament,
-                    onTap: () => setState(() => _testament = t),
-                  ),
-              ],
-            ),
-          ],
-          const SizedBox(height: KSpace.xl),
-          if (testament == null)
-            const KEmptyState(
-              key: Key('bible-books-empty'),
-              icon: KIcons.bookOpen,
-              title: 'No books in this version',
-              hint: 'Choose another version below.',
-            )
-          else
-            Wrap(
-              key: const Key('bible-books'),
-              spacing: KSpace.sm,
-              runSpacing: KSpace.sm,
-              children: [
-                for (final b in index.books)
-                  if (b.testament == testament)
-                    KChip(
-                      key: Key('bible-book-${b.usfm}'),
-                      label: b.title,
-                      selected: b.usfm == _usfm,
-                      onTap: () => _chooseBook(b),
-                    ),
-              ],
-            ),
-          if (book != null) ...[
-            const SizedBox(height: KSpace.gutter),
-            KeyedSubtree(key: _chaptersKey, child: heading('Chapter')),
-            const SizedBox(height: KSpace.md),
-            KChapterGrid(
-              book: book.title,
-              chapters: book.chapters,
-              selected: current?.usfm == book.usfm ? current?.chapter : null,
-              onSelected: (chapter) =>
-                  Navigator.of(context).pop(BibleLocation(book.usfm, chapter)),
-            ),
-          ],
-          const SizedBox(height: KSpace.gutter),
-          heading('Version'),
-          const SizedBox(height: KSpace.md),
-          _Versions(selected: version),
+          const SizedBox(width: KSpace.xl),
         ],
-      ),
+        Expanded(
+          child: Semantics(
+            header: true,
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: KharisText.section.copyWith(color: k.text),
+            ),
+          ),
+        ),
+        const SizedBox(width: KSpace.xl),
+        KButton(
+          key: const Key('passage-picker-done'),
+          label: 'Done',
+          variant: KButtonVariant.inverse,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
     );
   }
 }
 
-/// The approved versions the account returns, as option cards.
-class _Versions extends ConsumerWidget {
-  const _Versions({required this.selected});
+/// Step one: the testaments, Find a book and the books as a grid.
+class _BooksStep extends StatelessWidget {
+  const _BooksStep({
+    super.key,
+    required this.index,
+    required this.testament,
+    required this.selected,
+    required this.query,
+    required this.filter,
+    required this.matches,
+    required this.onTestament,
+    required this.onQuery,
+    required this.onBook,
+  });
 
-  final BibleVersion selected;
+  final BibleIndex index;
+
+  /// The testament chosen; null follows [selected], then the first.
+  final Testament? testament;
+
+  /// The open book, marked.
+  final String? selected;
+  final String query;
+  final TextEditingController filter;
+
+  /// Books matching [query]; null when nothing is typed.
+  final List<BibleBook>? matches;
+  final ValueChanged<Testament> onTestament;
+  final ValueChanged<String> onQuery;
+  final ValueChanged<BibleBook> onBook;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ref
-        .watch(biblesProvider)
-        .when(
-          loading: () => const Column(
-            key: Key('bible-versions-loading'),
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              KSkeleton(height: KSize.listRow, radius: KRadius.card),
-              SizedBox(height: KSpace.md),
-              KSkeleton(height: KSize.listRow, radius: KRadius.card),
-            ],
+  Widget build(BuildContext context) {
+    final k = context.k;
+    final testaments = [
+      for (final t in Testament.values)
+        if (index.books.any((b) => b.testament == t)) t,
+    ];
+    final open = selected == null ? null : index.book(selected!);
+    // Null when the version answered with no books at all.
+    final Testament? shown = testaments.contains(testament)
+        ? testament!
+        : testaments.contains(open?.testament)
+        ? open!.testament
+        : testaments.firstOrNull;
+    final matches = this.matches;
+    final books =
+        matches ??
+        [
+          for (final b in index.books)
+            if (b.testament == shown) b,
+        ];
+
+    if (shown == null) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _Header(title: 'Choose a book'),
+          SizedBox(height: KSpace.x3),
+          KEmptyState(
+            key: Key('bible-books-empty'),
+            icon: KIcons.bookOpen,
+            title: 'No books in this version',
+            hint:
+                'Tap Done, then choose another translation with the '
+                'translation button.',
           ),
-          error: (_, _) => KErrorState(
-            message:
-                'The versions didn\u2019t load. '
-                'Check your connection and retry.',
-            onRetry: () => ref.invalidate(biblesProvider),
-          ),
-          data: (bibles) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final (i, b) in bibles.indexed) ...[
-                if (i > 0) const SizedBox(height: KSpace.md),
-                KOptionCard(
-                  key: Key('bible-version-${b.id}'),
-                  title: b.abbreviation,
-                  meta: b.title.isEmpty ? null : b.title,
-                  selected: b.id == selected.id,
-                  onTap: () => unawaited(
-                    ref.read(selectedBibleProvider.notifier).select(b),
-                  ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _Header(title: 'Choose a book'),
+        const SizedBox(height: KSpace.x3),
+        if (testaments.length > 1) ...[
+          KSegmentedControl(
+            segments: [
+              for (final t in testaments)
+                KSegment(
+                  key: Key('bible-testament-${t.name}'),
+                  label: t == Testament.old ? 'Old Testament' : 'New Testament',
+                  semanticLabel: t == Testament.old
+                      ? 'Old Testament'
+                      : 'New Testament',
+                  selected: matches == null && t == shown,
+                  onTap: () {
+                    if (matches != null) {
+                      filter.clear();
+                      onQuery('');
+                    }
+                    onTestament(t);
+                  },
                 ),
-              ],
             ],
           ),
-        );
+          const SizedBox(height: KSpace.md),
+        ],
+        KSearchField(
+          key: const Key('bible-book-filter'),
+          hint: 'Find a book',
+          controller: filter,
+          onChanged: onQuery,
+          onSubmitted: (_) {
+            if (books.length == 1) onBook(books.single);
+          },
+        ),
+        const SizedBox(height: KSpace.xl),
+        Flexible(
+          child: SingleChildScrollView(
+            child: books.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: KSpace.x3),
+                    child: Text(
+                      'No book called \u201c${query.trim()}\u201d',
+                      textAlign: TextAlign.center,
+                      style: KharisText.meta.copyWith(color: k.muted),
+                    ),
+                  )
+                : KBookGrid(
+                    key: const Key('bible-books'),
+                    books: [
+                      for (final b in books) (id: b.usfm, label: b.title),
+                    ],
+                    selected: selected,
+                    onSelected: (usfm) => onBook(index.book(usfm)!),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Step two: Books, the book's name and its chapters, scrolled to the open
+/// chapter (Psalm 119 sits far down).
+class _ChaptersStep extends StatefulWidget {
+  const _ChaptersStep({
+    super.key,
+    required this.book,
+    required this.selected,
+    required this.onBack,
+  });
+
+  final BibleBook book;
+  final int? selected;
+  final VoidCallback onBack;
+
+  @override
+  State<_ChaptersStep> createState() => _ChaptersStepState();
+}
+
+class _ChaptersStepState extends State<_ChaptersStep> {
+  final _selected = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _selected.currentContext;
+      if (target == null || !target.mounted) return;
+      Scrollable.ensureVisible(target, alignment: 0.5);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final book = widget.book;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Header(title: book.title, onBack: widget.onBack),
+        const SizedBox(height: KSpace.x3),
+        Flexible(
+          child: SingleChildScrollView(
+            child: KChapterGrid(
+              key: const Key('bible-chapters'),
+              book: book.title,
+              chapters: book.chapters,
+              selected: widget.selected,
+              selectedKey: _selected,
+              onSelected: (chapter) =>
+                  Navigator.of(context).pop(BibleLocation(book.usfm, chapter)),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
